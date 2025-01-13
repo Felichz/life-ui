@@ -1,0 +1,66 @@
+import eslint from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import importPlugin from 'eslint-plugin-import';
+import prettierPlugin from 'eslint-plugin-prettier';
+import prettierConfig from 'eslint-config-prettier';
+
+export default tseslint.config(
+  eslint.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: ['./tsconfig.app.json', './tsconfig.node.json'],
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint.plugin,
+      'react': reactPlugin,
+      'react-hooks': reactHooksPlugin,
+      'import': importPlugin,
+      'prettier': prettierPlugin,
+    },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
+    rules: {
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        {
+          'prefer': 'type-imports',
+        },
+      ],
+      'import/order': [
+        'error',
+        {
+          'groups': ['builtin', 'external', 'internal', ['parent', 'sibling']],
+          'pathGroups': [
+            {
+              'pattern': 'react',
+              'group': 'external',
+              'position': 'before',
+            },
+          ],
+          'pathGroupsExcludedImportTypes': ['react'],
+          'newlines-between': 'always',
+          'alphabetize': {
+            'order': 'asc',
+            'caseInsensitive': true,
+          },
+        },
+      ],
+      'prettier/prettier': 'error',
+    },
+  },
+  prettierConfig,
+);
