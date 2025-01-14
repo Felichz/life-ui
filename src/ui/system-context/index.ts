@@ -1,2 +1,2 @@
-export { SystemProvider } from "./UiStateContext";
-export { useSystemContext } from "./useUiStateContext";
+export { UiStateProvider } from "./UiStateContext";
+export { useUiStateContext } from "./useUiStateContext";

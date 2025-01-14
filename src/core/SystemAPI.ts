@@ -6,12 +6,14 @@ import type {
   InvestedTimeRecord,
   UsefulMetrics,
   SystemParams,
+  DayState,
 } from "./types";
 
 const STORAGE_KEY = "system_state";
 
 const defaultState: PersistedState = {
   lifecycleState: "dayNotStarted",
+  currentDay: undefined,
   boards: {},
   activities: {},
   totalTempoBalance: 0,
@@ -62,22 +64,20 @@ class SystemAPI implements SystemAPIType {
     return this.getState();
   }
 
-  getLifecycleState(): "dayStarted" | "dayInProgress" | "dayNotStarted" {
+  getLifecycleState(): PersistedState["lifecycleState"] {
     return this.getState().lifecycleState;
   }
 
-  setLifecycleState({ state }: { state: "dayStarted" | "dayInProgress" | "dayNotStarted" }): void {
+  startDay(currentDay: DayState) {
     const currentState = this.getState();
-    this.setState({ ...currentState, lifecycleState: state });
+
+    this.setState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
   }
 
-  getDayStartMinute(): number | undefined {
-    return this.getState().dayStartMinute;
-  }
-
-  setDayStartMinute({ minute }: { minute: number }): void {
+  endDay() {
     const currentState = this.getState();
-    this.setState({ ...currentState, dayStartMinute: minute });
+
+    this.setState({ ...currentState, currentDay: undefined, lifecycleState: "dayNotStarted" });
   }
 
   getBoard({ boardId }: { boardId: string }): Board | undefined {
@@ -175,7 +175,7 @@ class SystemAPI implements SystemAPIType {
     return this.getState().totalTempoBalance;
   }
 
-  updateTotalTempoBalance({
+  updateTempoBalance({
     amount,
     investedTimeRecord,
   }: {
@@ -184,9 +184,15 @@ class SystemAPI implements SystemAPIType {
   }): void {
     const state = this.getState();
 
+    if (!state.currentDay) return;
+
     this.setState({
       ...state,
       totalTempoBalance: amount,
+      currentDay: {
+        ...state.currentDay,
+        dayTempoBalance: state.currentDay.dayTempoBalance + amount,
+      },
       investedTimeHistory: [...state.investedTimeHistory, investedTimeRecord],
     });
   }
@@ -223,6 +229,10 @@ class SystemAPI implements SystemAPIType {
   updateSystemParams(params: SystemParams): void {
     const state = this.getState();
     this.setState({ ...state, systemParams: params });
+  }
+
+  getCurrentDay(): DayState | undefined {
+    return this.getState().currentDay;
   }
 }
 
