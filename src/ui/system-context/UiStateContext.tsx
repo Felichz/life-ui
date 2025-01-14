@@ -6,9 +6,8 @@ import type { UiState } from "../../core/types";
 // Estado inicial del sistema
 const initialState: UiState = {
   totalTempoBalance: 0,
-  dayTempoBalance: 0,
+  currentDay: undefined,
   investedTimeHistory: [],
-  dayStartMinute: undefined,
   lifecycleState: "dayNotStarted",
   selectedActivity: undefined,
   boards: [],

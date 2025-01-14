@@ -101,9 +101,24 @@ export interface SystemParams {
   passiveTempoConsumptionRate: number;
 }
 
-export interface PersistedState {
-  lifecycleState: "dayStarted" | "dayInProgress" | "dayNotStarted";
-  dayStartMinute?: number | undefined;
+export type DayState = {
+  date: number;
+  // Minuto del 0 al 1440
+  dayStartMinute: number;
+  dayTempoBalance: number;
+};
+
+export type PersistedDayState =
+  | {
+      lifecycleState: "dayInProgress";
+      currentDay: DayState;
+    }
+  | {
+      lifecycleState: "dayNotStarted";
+      currentDay: undefined;
+    };
+
+export type PersistedState = {
   boards: Record<BoardId, Board>;
   activities: Record<ActivityId, Activity>;
   selectedActivity?: Activity | undefined;
@@ -111,7 +126,7 @@ export interface PersistedState {
   investedTimeHistory: InvestedTimeHistory;
   usefulMetrics: UsefulMetrics;
   systemParams: SystemParams;
-}
+} & PersistedDayState;
 
 // API para interacutar con la base de datos o local storage, persistencia del state del sistema
 export interface SystemAPIType {
@@ -119,10 +134,9 @@ export interface SystemAPIType {
   getPersistedState: () => PersistedState;
 
   // Gestión del ciclo de vida del sistema
+  startDay: (currentDay: DayState) => void;
+  endDay: () => void;
   getLifecycleState: () => PersistedState["lifecycleState"];
-  setLifecycleState: ({ state }: { state: PersistedState["lifecycleState"] }) => void;
-  getDayStartMinute: () => PersistedState["dayStartMinute"];
-  setDayStartMinute: ({ minute }: { minute: number }) => void;
 
   // Gestión de tableros (Boards)
   getBoard: ({ boardId }: { boardId: BoardId }) => PersistedState["boards"][BoardId] | undefined;
@@ -153,13 +167,14 @@ export interface SystemAPIType {
   // Gestión de Tempo
   getTotalTempoBalance: () => PersistedState["totalTempoBalance"];
 
-  updateTotalTempoBalance: ({
+  updateTempoBalance: ({
     amount,
     investedTimeRecord,
   }: {
     amount: number;
     investedTimeRecord: InvestedTimeRecord;
   }) => void;
+
   getInvestedTimeHistory: () => PersistedState["investedTimeHistory"];
   getInvestedTimeHistoryByDay: ({ day }: { day: Date }) => PersistedState["investedTimeHistory"];
 
@@ -169,21 +184,20 @@ export interface SystemAPIType {
 
   getSystemParams: () => PersistedState["systemParams"];
   updateSystemParams: (params: PersistedState["systemParams"]) => void;
+
+  getCurrentDay: () => DayState | undefined;
 }
 
 // Este es estado del sistema que se mantiene en la ui, se mantiene en el SystemContext
 // sincronizado y actualizado con el SystemAPI mediante el SystemEngine
-export interface UiState {
-  // Este concepto solo existe en la ui
+export type UiState = {
+  currentDay?: DayState | undefined;
+  lifecycleState: PersistedState["lifecycleState"];
   totalTempoBalance: number;
-  dayTempoBalance: number;
   investedTimeHistory: InvestedTimeRecord[];
-  // Minuto del 0 al 1440
-  dayStartMinute?: number | undefined;
-  lifecycleState: "dayStarted" | "dayInProgress" | "dayNotStarted";
   selectedActivity?: Activity | undefined;
   boards: Board[];
   activities: Activity[];
   usefulMetrics: UsefulMetrics;
   systemParams: SystemParams;
-}
+};

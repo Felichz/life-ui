@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import type { UiStateContextValue } from "src/ui/system-context/UiStateContext";
+
 import { systemAPI } from "./systemAPI";
 import type { Board, InvestedTimeRecord } from "./types";
 
@@ -24,9 +25,9 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
 
     setUiState((currentUiState) => ({
       ...currentUiState,
+      ...persistedState.currentDay,
       totalTempoBalance: persistedState.totalTempoBalance,
       investedTimeHistory: persistedState.investedTimeHistory,
-      dayStartMinute: persistedState.dayStartMinute,
       lifecycleState: persistedState.lifecycleState,
       selectedActivity: persistedState.selectedActivity,
       boards,
@@ -36,13 +37,25 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
     }));
   }, []);
 
+  // Sincroniza el estado del día con el uiState, se debe ejecutar cada vez que se modifica el estado del día
+  const syncDayState = () => {
+    const currentDay = systemAPI.getCurrentDay();
+
+    if (!currentDay) return;
+
+    setUiState((currentState) => ({
+      ...currentState,
+      currentDay: systemAPI.getCurrentDay(),
+    }));
+  };
+
   // Usado tanto para actividades completadas como para multas y para consumos pasivos
   const updateTempoBalance = ({
     tempoModification,
     minutes,
     reason,
   }: Pick<InvestedTimeRecord, "tempoModification" | "minutes" | "reason">) => {
-    systemAPI.updateTotalTempoBalance({
+    systemAPI.updateTempoBalance({
       amount: systemAPI.getTotalTempoBalance() + tempoModification,
       investedTimeRecord: {
         minutes,
@@ -52,10 +65,7 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
       },
     });
 
-    setUiState((currentState) => ({
-      ...currentState,
-      dayTempoBalance: currentState.dayTempoBalance + tempoModification,
-    }));
+    syncDayState();
   };
 
   // Ejecuta la lógica de evaluación base cada un minuto
@@ -71,4 +81,6 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
   const onCreateBoard = (board: Board) => {
     systemAPI.createBoard(board);
   };
+
+  return { updateTempoBalance, onCreateBoard };
 };
