@@ -80,7 +80,7 @@ class SystemAPI implements SystemAPIType {
     this.setState({ ...currentState, currentDay: undefined, lifecycleState: "dayNotStarted" });
   }
 
-  getBoard({ boardId }: { boardId: string }): Board | undefined {
+  getBoard(boardId: string): Board | undefined {
     const state = this.getState();
     return state.boards[boardId];
   }
@@ -112,13 +112,13 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
-  removeBoard({ boardId }: { boardId: string }): void {
+  removeBoard(boardId: string): void {
     const state = this.getState();
     const { [boardId]: _, ...remainingBoards } = state.boards;
     this.setState({ ...state, boards: remainingBoards });
   }
 
-  getActivity({ activityId }: { activityId: string }): Activity | undefined {
+  getActivity(activityId: string): Activity | undefined {
     const state = this.getState();
     return state.activities[activityId];
   }
@@ -147,16 +147,18 @@ class SystemAPI implements SystemAPIType {
     const existingActivity = state.activities[activityId];
     if (!existingActivity) return;
 
+    const updatedActivity = { ...existingActivity, ...activity } as Activity;
+
     this.setState({
       ...state,
       activities: {
         ...state.activities,
-        [activityId]: { ...existingActivity, ...activity },
+        [activityId]: updatedActivity,
       },
     });
   }
 
-  removeActivity({ activityId }: { activityId: string }): void {
+  removeActivity(activityId: string): void {
     const state = this.getState();
     const { [activityId]: _, ...remainingActivities } = state.activities;
     this.setState({ ...state, activities: remainingActivities });
@@ -166,7 +168,7 @@ class SystemAPI implements SystemAPIType {
     return this.getState().selectedActivity;
   }
 
-  setSelectedActivity({ activity }: { activity: Activity | undefined }): void {
+  setSelectedActivity(activity: Activity | undefined): void {
     const state = this.getState();
     this.setState({ ...state, selectedActivity: activity });
   }
@@ -175,23 +177,19 @@ class SystemAPI implements SystemAPIType {
     return this.getState().totalTempoBalance;
   }
 
-  updateTempoBalance({
-    amount,
-    investedTimeRecord,
-  }: {
-    amount: number;
-    investedTimeRecord: InvestedTimeRecord;
-  }): void {
+  updateTempoBalance(investedTimeRecord: InvestedTimeRecord): void {
     const state = this.getState();
 
     if (!state.currentDay) return;
 
+    const newBalance = state.totalTempoBalance + investedTimeRecord.tempoModification;
+
     this.setState({
       ...state,
-      totalTempoBalance: amount,
+      totalTempoBalance: newBalance,
       currentDay: {
         ...state.currentDay,
-        dayTempoBalance: state.currentDay.dayTempoBalance + amount,
+        dayTempoBalance: state.currentDay.dayTempoBalance + investedTimeRecord.tempoModification,
       },
       investedTimeHistory: [...state.investedTimeHistory, investedTimeRecord],
     });
@@ -201,7 +199,7 @@ class SystemAPI implements SystemAPIType {
     return this.getState().investedTimeHistory;
   }
 
-  getInvestedTimeHistoryByDay({ day }: { day: Date }): InvestedTimeRecord[] {
+  getInvestedTimeHistoryByDay(day: Date): InvestedTimeRecord[] {
     const history = this.getInvestedTimeHistory();
     return history.filter((record) => {
       const recordDate = new Date(record.timestamp);
