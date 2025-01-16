@@ -56,13 +56,10 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
     reason,
   }: Pick<InvestedTimeRecord, "tempoModification" | "minutes" | "reason">) => {
     systemAPI.updateTempoBalance({
-      amount: systemAPI.getTotalTempoBalance() + tempoModification,
-      investedTimeRecord: {
-        minutes,
-        reason,
-        tempoModification,
-        timestamp: new Date().getTime(),
-      },
+      minutes,
+      reason,
+      tempoModification,
+      timestamp: new Date().getTime(),
     });
 
     syncDayState();

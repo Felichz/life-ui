@@ -6,21 +6,36 @@ export interface Penalty {
   amount: number;
 }
 
+// Razones de incremento de tempo
+type TempoModificationReason =
+  | {
+      type: "challengeMinuteGeneration";
+      activityId: ActivityId;
+    }
+  | {
+      type: "challengeCompletionReward";
+      activityId: ActivityId;
+    }
+  | {
+      type: "earlyNeutralActivityEnd";
+      activityId: ActivityId;
+    }
+  | {
+      type: "hobbyConsumption";
+      activityId: ActivityId;
+    }
+  | {
+      type: "challengeCriteriaFailed";
+      activityId: ActivityId;
+    }
+  | {
+      type: "passiveConsumption";
+    };
+
 export interface InvestedTimeRecord {
   timestamp: number;
   minutes: number;
-  reason:
-    | {
-        type: "activity";
-        id: ActivityId;
-      }
-    | {
-        type: "penalty";
-        id: PenaltyId;
-      }
-    | {
-        type: "passiveTempoConsumption";
-      };
+  reason: TempoModificationReason;
   tempoModification: number;
 }
 
@@ -30,22 +45,16 @@ export type InvestedTimeHistory = InvestedTimeRecord[];
 interface BaseActivityConstraint {
   /** Tipo de criterio, p. ej. "expiration" */
   type: string;
-  /** Valor específico del criterio */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any;
   /** Penalización por incumplimiento (puede ser número fijo o porcentaje en string, e.g. "100%") */
   penalty?: number | string;
   /** Estado actual del criterio */
   status: "active" | "failed";
-  /** Penalización actual si aplica */
-  currentPenalty: number | undefined;
 }
 
 /** Criterio de expiración, que extiende el base */
 interface ExpirationActivityConstraint extends BaseActivityConstraint {
   type: "expiration";
-  /** value se interpreta como una fecha/hora límite */
-  value: Date;
+  expirationDate: number;
 }
 
 /** Unión de criterios disponibles */
@@ -56,29 +65,67 @@ type ActivityStatus = "toDo" | "inProgress" | "completed";
 
 type ActivityId = string;
 
-export interface Activity {
+interface BaseActivity {
   id: ActivityId;
   title: string;
-  type: ActivityType;
+  // type: ActivityType;
   isRepetitive: boolean;
-  tempoReward: number;
-  estimatedDuration: number;
+  /**
+   * Minutos en los que la actividad estuvo seleccionada
+   */
+  minutesActive: number;
+  // tempoReward: number;
+  // estimatedDuration: number;
+  // allowedTimeWindow?: {
+  //   start: string;
+  //   end: string;
+  // };
+
+  status: ActivityStatus;
+}
+
+interface TimeLimitedActivity extends BaseActivity {
+  type: "neutral" | "hobby";
   allowedTimeWindow?: {
     start: string;
     end: string;
   };
-  constraintList: ActivityConstraint[];
-  status: ActivityStatus;
 }
 
+// Actividad Tempo Neutral
+interface NeutralActivity extends TimeLimitedActivity {
+  type: "neutral";
+}
+
+// Al deseleccionar antes, se da compensación (se calcula segun el tiempo restante y el descuento)
+interface HobbyActivity extends TimeLimitedActivity {
+  type: "hobby";
+  tempoConsumptionRate: number; // Tasa reducida de consumo (ej: 0.5)
+}
+
+// Al deseleccionar antes, se da compensación para cubrir el totalTempoReward
+interface ChallengeActivity extends BaseActivity {
+  type: "challenge";
+  totalTempoReward: number;
+  constraintList: ExpirationActivityConstraint[];
+}
+
+export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;
+
 type BoardId = string;
+
+interface InheritableActivityProps {
+  challenge?: Pick<ChallengeActivity, "constraintList" | "isRepetitive">;
+  neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTimeWindow">;
+  hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTimeWindow">;
+}
 
 export interface Board {
   id: BoardId;
   parentBoardId: BoardId | undefined;
   childrenBoards: BoardId[] | undefined;
   activities: ActivityId[];
-  activityProps: Pick<Activity, "isRepetitive" | "allowedTimeWindow" | "constraintList">;
+  activityProps: InheritableActivityProps;
   title: string;
 }
 
@@ -139,18 +186,14 @@ export interface SystemAPIType {
   getLifecycleState: () => PersistedState["lifecycleState"];
 
   // Gestión de tableros (Boards)
-  getBoard: ({ boardId }: { boardId: BoardId }) => PersistedState["boards"][BoardId] | undefined;
+  getBoard: (boardId: BoardId) => PersistedState["boards"][BoardId] | undefined;
   getBoards: () => Board[];
   createBoard: (board: Board) => void;
   updateBoard: ({ boardId, board }: { boardId: BoardId; board: Partial<Board> }) => void;
-  removeBoard: ({ boardId }: { boardId: BoardId }) => void;
+  removeBoard: (boardId: BoardId) => void;
 
   // Gestión de actividades
-  getActivity: ({
-    activityId,
-  }: {
-    activityId: ActivityId;
-  }) => PersistedState["activities"][ActivityId] | undefined;
+  getActivity: (activityId: ActivityId) => PersistedState["activities"][ActivityId] | undefined;
   getActivities: () => Activity[];
   createActivity: (activity: Activity) => void;
   updateActivity: ({
@@ -160,23 +203,17 @@ export interface SystemAPIType {
     activityId: ActivityId;
     activity: Partial<Activity>;
   }) => void;
-  removeActivity: ({ activityId }: { activityId: ActivityId }) => void;
+  removeActivity: (activityId: ActivityId) => void;
   getSelectedActivity: () => PersistedState["selectedActivity"];
-  setSelectedActivity: ({ activity }: { activity: PersistedState["selectedActivity"] }) => void;
+  setSelectedActivity: (activity: PersistedState["selectedActivity"]) => void;
 
   // Gestión de Tempo
   getTotalTempoBalance: () => PersistedState["totalTempoBalance"];
 
-  updateTempoBalance: ({
-    amount,
-    investedTimeRecord,
-  }: {
-    amount: number;
-    investedTimeRecord: InvestedTimeRecord;
-  }) => void;
+  updateTempoBalance: (investedTimeRecord: InvestedTimeRecord) => void;
 
   getInvestedTimeHistory: () => PersistedState["investedTimeHistory"];
-  getInvestedTimeHistoryByDay: ({ day }: { day: Date }) => PersistedState["investedTimeHistory"];
+  getInvestedTimeHistoryByDay: (day: Date) => PersistedState["investedTimeHistory"];
 
   // Métricas y parámetros del sistema
   getUsefulMetrics: () => PersistedState["usefulMetrics"];
