@@ -51,8 +51,8 @@ interface ExpirationActivityConstraint extends BaseActivityConstraint {
 /** Unión de criterios disponibles */
 export type ActivityConstraint = ExpirationActivityConstraint;
 
-type ActivityType = "challenge" | "neutral" | "disscount";
-type ActivityStatus = "pending" | "completed";
+type ActivityType = "challenge" | "neutral" | "discount";
+type ActivityStatus = "toDo" | "inProgress" | "completed";
 
 type ActivityId = string;
 
