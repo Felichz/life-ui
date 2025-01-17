@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 
 import type { UiStateContextValue } from "src/ui/system-context/UiStateContext";
 
 import { systemAPI } from "./systemAPI";
-import type { Board, InvestedTimeRecord } from "./types";
+import type { Activity, Board, InvestedTimeRecord, TempoModificationRecord } from "./types";
 
 /**
  * @param systemState - El estado del sistema que se mantiene en la ui, se mantiene en el SystemContext, sincronizado con el SystemAPI
@@ -13,22 +13,26 @@ import type { Board, InvestedTimeRecord } from "./types";
 type SystemEngineProps = UiStateContextValue;
 
 /**
- * Se encarga de ejecutar la lógica core del sistema y lógica de negocio
+ * Este hook gestiona la lógica del sistema.
+ * - Expone SOLO las acciones que la UI (usuario) necesita (crear board, completar challenge, etc.).
+ * - Mantiene internas las funciones que corren en el loop 1-min o que no son disparadas por el usuario directamente.
  */
 export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
-  // Esto podria ser una funcion async si se usa una base de datos en lugar de local storage
+  /**
+   * PRIMER BLOQUE: Efectos de inicialización y sincronización
+   */
   useEffect(() => {
+    // Al montar el hook, sincronizamos la UI con el estado persistido
     const persistedState = systemAPI.getPersistedState();
-
     const boards = Object.values(persistedState.boards);
     const activities = Object.values(persistedState.activities);
 
     setUiState((currentUiState) => ({
       ...currentUiState,
       ...persistedState.currentDay,
+      lifecycleState: persistedState.lifecycleState,
       totalTempoBalance: persistedState.totalTempoBalance,
       investedTimeHistory: persistedState.investedTimeHistory,
-      lifecycleState: persistedState.lifecycleState,
       selectedActivity: persistedState.selectedActivity,
       boards,
       activities,
@@ -37,36 +41,11 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
     }));
   }, []);
 
-  // Sincroniza el estado del día con el uiState, se debe ejecutar cada vez que se modifica el estado del día
-  const syncDayState = () => {
-    const currentDay = systemAPI.getCurrentDay();
-
-    if (!currentDay) return;
-
-    setUiState((currentState) => ({
-      ...currentState,
-      currentDay: systemAPI.getCurrentDay(),
-    }));
-  };
-
-  // Usado tanto para actividades completadas como para multas y para consumos pasivos
-  const updateTempoBalance = ({
-    tempoModification,
-    minutes,
-    reason,
-  }: Pick<InvestedTimeRecord, "tempoModification" | "minutes" | "reason">) => {
-    systemAPI.updateTempoBalance({
-      minutes,
-      reason,
-      tempoModification,
-      timestamp: new Date().getTime(),
-    });
-
-    syncDayState();
-  };
-
   // Ejecuta la lógica de evaluación base cada un minuto
   // En caso de no tener ninguna actividad seleccionada, se aplica el consumo default y se actualiza InvestedTimeHistory
+  // En caso de tener una actividad seleccionada, se aplica el consumo de la actividad y se actualiza InvestedTimeHistory.
+  // Para actualizar el InvestedTimeHistory se debe analizar si el ultimo registro es de la misma actividad, si es así,
+  // se suma el tiempo, si no, se crea un nuevo registro.
   useEffect(() => {
     const interval = setInterval(() => {
       // Evaluar el estado del sistema
@@ -75,9 +54,189 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const onCreateBoard = (board: Board) => {
-    systemAPI.createBoard(board);
+  /**
+   * Función privada para re-sincronizar el UiState tras cada modificación en systemAPI.
+   */
+  const _syncUiStateFromPersisted = useCallback(() => {
+    const persistedState = systemAPI.getPersistedState();
+
+    setUiState((current) => ({
+      ...current,
+      lifecycleState: persistedState.lifecycleState,
+      currentDay: persistedState.currentDay,
+      totalTempoBalance: persistedState.totalTempoBalance,
+      investedTimeHistory: persistedState.investedTimeHistory,
+      selectedActivity: persistedState.selectedActivity,
+      boards: Object.values(persistedState.boards),
+      activities: Object.values(persistedState.activities),
+      usefulMetrics: persistedState.usefulMetrics,
+      systemParams: persistedState.systemParams,
+    }));
+  }, [setUiState]);
+
+  /**
+   * SEGUNDO BLOQUE: LÓGICA PRIVADA (core) - NO se expone
+   * Estas funciones podrían llamarse en un setInterval (bucle de 1 minuto) o en otras partes
+   * internas del sistema. Ejemplo: aplicar consumos pasivos, generar tempo, etc.
+   */
+  const _applyChallengeMinuteGeneration = (activity: Activity, minutes: number) => {
+    // Lógica para reason="challengeMinuteGeneration"
+    // Al final, se llama a systemAPI.updateTempoBalance(...)
+    // y luego _syncUiStateFromPersisted().
   };
 
-  return { updateTempoBalance, onCreateBoard };
+  const _applyIdlePassiveConsumption = (minutes: number) => {
+    // Lógica para reason="passiveConsumption" con status="idle"
+    // ...
+  };
+
+  const _applyDiscountedConsumption = (activity: Activity, minutes: number) => {
+    // Lógica reason="discountedPassiveConsumption"
+    // ...
+  };
+
+  const _applyNeutralEarlyCompletionCompensation = (activity: Activity, compensation: number) => {
+    // Lógica reason="earlyCompletionCompensation"
+    // ...
+  };
+
+  const _applyChallengeCriteriaFailed = (activity: Activity, penaltyAmount: number) => {
+    // Lógica reason="challengeCriteriaFailed"
+    // ...
+  };
+
+  // etc. (Otras funciones "privadas" para la lógica core minuto a minuto o cálculos internos)
+
+  /**
+   * TERCER BLOQUE: LÓGICA PÚBLICA - ACCIONES DEL USUARIO
+   * Este es el set de métodos que SÍ retornaremos. Tienen sentido en la UI.
+   */
+
+  // ===========================
+  //     ACCIONES: Día
+  // ===========================
+  const startDay = () => {
+    /**
+     * 1. Crear un nuevo dayState (p.ej., con date=now, dayStartMinute=0, dayTempoBalance=0).
+     * 2. systemAPI.startDay(...)
+     * 3. _syncUiStateFromPersisted()
+     */
+  };
+
+  const endDay = () => {
+    /**
+     * 1. systemAPI.endDay()
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  // ===========================
+  //   ACCIONES: Boards
+  // ===========================
+  const createBoard = (board: Board) => {
+    /**
+     * 1. systemAPI.createBoard(board)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  const updateBoard = (board: Board) => {
+    /**
+     * 1. systemAPI.updateBoard(board)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  const removeBoard = (board: Board) => {
+    /**
+     * 1. systemAPI.removeBoard(board)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  // ===========================
+  //   ACCIONES: Activities
+  // ===========================
+  const createActivity = (activity: Activity) => {
+    /**
+     * 1. systemAPI.createActivity(activity)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  const updateActivity = (activity: Activity) => {
+    /**
+     * 1. systemAPI.updateActivity(activity)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  const removeActivity = (activity: Activity) => {
+    /**
+     * 1. systemAPI.removeActivity(activity)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  /**
+   * Seleccionar o quitar selección de actividad:
+   */
+  const selectActivity = (activity: Activity) => {
+    /**
+     * 1. systemAPI.setSelectedActivity(activity)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  const unselectActivity = () => {
+    /**
+     * 1. systemAPI.setSelectedActivity(undefined)
+     * 2. _syncUiStateFromPersisted()
+     */
+  };
+
+  /**
+   * Completar un challenge manualmente (acción del usuario).
+   * Por ejemplo, aplicamos la recompensa (reason="challengeCompletionReward").
+   */
+  const completeChallenge = (activity: Activity, reward: number) => {
+    /**
+     * Lógica:
+     * 1. Construir tempoModificationRecord con reason="challengeCompletionReward", tempoModification=reward, status="activity", ...
+     * 2. systemAPI.updateTempoBalance({ tempoModificationRecord, ... })
+     * 3. Mark activity as "completed" => systemAPI.updateActivity({ ... })
+     * 4. Des-seleccionar la actividad => systemAPI.setSelectedActivity(undefined)
+     * 5. _syncUiStateFromPersisted()
+     */
+  };
+
+  // ===========================
+  // DEVOLVEMOS SOLO LAS FUNCIONES "PÚBLICAS"
+  // ===========================
+  return {
+    // DÍA
+    day: {
+      startDay,
+      endDay,
+    },
+    // BOARDS
+    board: {
+      createBoard,
+      updateBoard,
+      removeBoard,
+    },
+    // ACTIVITIES
+    activity: {
+      createActivity,
+      updateActivity,
+      removeActivity,
+      selectActivity,
+      unselectActivity,
+      completeChallenge,
+      // ... otras si la UI las necesita
+    },
+    // NO exponemos "tempo" con applyChallengeMinuteGeneration, etc.
+    // porque esas funciones son internas al bucle de 1 min o a la lógica core
+    // y no se llaman directamente desde la UI.
+  };
 };

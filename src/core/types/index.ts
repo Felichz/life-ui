@@ -6,40 +6,72 @@ export interface Penalty {
   amount: number;
 }
 
-// Razones de incremento de tempo
-type TempoModificationReason =
+// Registro de tiempo invertido por tipo de actividad
+type InvestedTimeRecordByType =
   | {
-      type: "challengeMinuteGeneration";
+      status: "activity";
       activityId: ActivityId;
+      type: Activity["type"];
     }
   | {
-      type: "challengeCompletionReward";
-      activityId: ActivityId;
-    }
-  | {
-      type: "earlyNeutralActivityEnd";
-      activityId: ActivityId;
-    }
-  | {
-      type: "hobbyConsumption";
-      activityId: ActivityId;
-    }
-  | {
-      type: "challengeCriteriaFailed";
-      activityId: ActivityId;
-    }
-  | {
-      type: "passiveConsumption";
+      status: "idle";
+      activityId?: undefined;
+      type?: undefined;
     };
 
-export interface InvestedTimeRecord {
+export type InvestedTimeRecord = {
   timestamp: number;
-  minutes: number;
-  reason: TempoModificationReason;
   tempoModification: number;
-}
+  minutesInvested: number;
+} & InvestedTimeRecordByType;
 
 export type InvestedTimeHistory = InvestedTimeRecord[];
+
+// Modificaciones posibles para un Desafío
+type ChallengeTempoModificationReason =
+  | "challengeMinuteGeneration" // +1 por minuto dentro del tiempo estimado
+  | "challengeCompletionReward" // Tempos restantes al completar antes
+  | "challengeCriteriaFailed" // Penalización por fallar criterios
+  | "passiveConsumption"; // -1/min al exceder tiempo estimado
+
+// Modificaciones posibles para Actividad Neutral
+type NeutralTempoModificationReason = "earlyCompletionCompensation"; // Compensación por terminar antes
+
+// Modificaciones posibles para Actividad Hobby
+type DiscountTempoModificationReason = "discountedPassiveConsumption"; // Consumo a tasa reducida
+
+type TempoModificationByType =
+  | {
+      status: "activity";
+      activityId: ActivityId;
+      type: ChallengeActivity["type"];
+      reason: ChallengeTempoModificationReason;
+    }
+  | {
+      status: "activity";
+      activityId: ActivityId;
+      type: NeutralActivity["type"];
+      reason: NeutralTempoModificationReason;
+    }
+  | {
+      status: "activity";
+      activityId: ActivityId;
+      type: HobbyActivity["type"];
+      reason: DiscountTempoModificationReason;
+    }
+  | {
+      status: "idle";
+      reason: "passiveConsumption";
+      activityId?: undefined;
+      type?: undefined;
+    };
+
+export type TempoModificationRecord = {
+  timestamp: number;
+  tempoModification: number;
+} & TempoModificationByType;
+
+export type TempoModificationHistory = TempoModificationRecord[];
 
 /** Criterio de aceptación base */
 interface BaseActivityConstraint {
@@ -63,48 +95,50 @@ export type ActivityConstraint = ExpirationActivityConstraint;
 type ActivityType = "challenge" | "neutral" | "discount";
 type ActivityStatus = "toDo" | "inProgress" | "completed";
 
-type ActivityId = string;
+export type ActivityId = string;
 
 interface BaseActivity {
   id: ActivityId;
+  parentBoardId?: BoardId | undefined;
+  type: ActivityType;
   title: string;
-  // type: ActivityType;
   isRepetitive: boolean;
   /**
-   * Minutos en los que la actividad estuvo seleccionada
+   * Minutos acumulados en los que la actividad estuvo activa durante el día actual.
+   * Se incrementa cada vez que pasa un minuto y está seleccionada.
    */
   minutesActive: number;
-  // tempoReward: number;
-  // estimatedDuration: number;
-  // allowedTimeWindow?: {
-  //   start: string;
-  //   end: string;
-  // };
 
   status: ActivityStatus;
 }
 
 interface TimeLimitedActivity extends BaseActivity {
-  type: "neutral" | "hobby";
+  type: "neutral" | "discount";
   allowedTimeWindow?: {
-    start: string;
-    end: string;
+    /**
+     * Minuto del 0 al 1440
+     */
+    start: number;
+    /**
+     * Minuto del 0 al 1440
+     */
+    end: number;
   };
 }
 
 // Actividad Tempo Neutral
-interface NeutralActivity extends TimeLimitedActivity {
+export interface NeutralActivity extends TimeLimitedActivity {
   type: "neutral";
 }
 
 // Al deseleccionar antes, se da compensación (se calcula segun el tiempo restante y el descuento)
-interface HobbyActivity extends TimeLimitedActivity {
-  type: "hobby";
+export interface HobbyActivity extends TimeLimitedActivity {
+  type: "discount";
   tempoConsumptionRate: number; // Tasa reducida de consumo (ej: 0.5)
 }
 
 // Al deseleccionar antes, se da compensación para cubrir el totalTempoReward
-interface ChallengeActivity extends BaseActivity {
+export interface ChallengeActivity extends BaseActivity {
   type: "challenge";
   totalTempoReward: number;
   constraintList: ExpirationActivityConstraint[];
@@ -112,7 +146,7 @@ interface ChallengeActivity extends BaseActivity {
 
 export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;
 
-type BoardId = string;
+export type BoardId = string;
 
 interface InheritableActivityProps {
   challenge?: Pick<ChallengeActivity, "constraintList" | "isRepetitive">;
@@ -170,7 +204,12 @@ export type PersistedState = {
   activities: Record<ActivityId, Activity>;
   selectedActivity?: Activity | undefined;
   totalTempoBalance: number;
+  /**
+   * Es como un timeline de los minutos invertidos en las actividades, se separa en registros por actividad (o idle)
+   * No existen dos registros de la misma actividad consecutivos ni dos registros idle consecutivos.
+   */
   investedTimeHistory: InvestedTimeHistory;
+  tempoModificationHistory: TempoModificationHistory;
   usefulMetrics: UsefulMetrics;
   systemParams: SystemParams;
 } & PersistedDayState;
@@ -186,31 +225,32 @@ export interface SystemAPIType {
   getLifecycleState: () => PersistedState["lifecycleState"];
 
   // Gestión de tableros (Boards)
-  getBoard: (boardId: BoardId) => PersistedState["boards"][BoardId] | undefined;
+  getBoard: (boardId: BoardId) => Board | undefined;
   getBoards: () => Board[];
   createBoard: (board: Board) => void;
-  updateBoard: ({ boardId, board }: { boardId: BoardId; board: Partial<Board> }) => void;
-  removeBoard: (boardId: BoardId) => void;
+  updateBoard: (board: Board) => void;
+  removeBoard: (board: Board) => void;
 
   // Gestión de actividades
-  getActivity: (activityId: ActivityId) => PersistedState["activities"][ActivityId] | undefined;
+  getActivity: (activityId: ActivityId) => Activity | undefined;
   getActivities: () => Activity[];
   createActivity: (activity: Activity) => void;
-  updateActivity: ({
-    activityId,
-    activity,
-  }: {
-    activityId: ActivityId;
-    activity: Partial<Activity>;
-  }) => void;
-  removeActivity: (activityId: ActivityId) => void;
+  updateActivity: (activity: Activity) => void;
+  removeActivity: (activity: Activity) => void;
+
   getSelectedActivity: () => PersistedState["selectedActivity"];
   setSelectedActivity: (activity: PersistedState["selectedActivity"]) => void;
 
   // Gestión de Tempo
   getTotalTempoBalance: () => PersistedState["totalTempoBalance"];
 
-  updateTempoBalance: (investedTimeRecord: InvestedTimeRecord) => void;
+  updateTempoBalance: ({
+    investedTimeRecord,
+    tempoModificationRecord,
+  }: {
+    investedTimeRecord: InvestedTimeRecord;
+    tempoModificationRecord: TempoModificationRecord;
+  }) => void;
 
   getInvestedTimeHistory: () => PersistedState["investedTimeHistory"];
   getInvestedTimeHistoryByDay: (day: Date) => PersistedState["investedTimeHistory"];
@@ -231,7 +271,7 @@ export type UiState = {
   currentDay?: DayState | undefined;
   lifecycleState: PersistedState["lifecycleState"];
   totalTempoBalance: number;
-  investedTimeHistory: InvestedTimeRecord[];
+  investedTimeHistory: InvestedTimeHistory;
   selectedActivity?: Activity | undefined;
   boards: Board[];
   activities: Activity[];
