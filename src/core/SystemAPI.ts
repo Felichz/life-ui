@@ -7,6 +7,9 @@ import type {
   UsefulMetrics,
   SystemParams,
   DayState,
+  BoardId,
+  ActivityId,
+  TempoModificationRecord,
 } from "./types";
 
 const STORAGE_KEY = "system_state";
@@ -18,6 +21,7 @@ const defaultState: PersistedState = {
   activities: {},
   totalTempoBalance: 0,
   investedTimeHistory: [],
+  tempoModificationHistory: [],
   usefulMetrics: {
     totalGeneratedTemposEver: 0,
     totalMinutesInvested: {
@@ -34,7 +38,7 @@ const defaultState: PersistedState = {
 };
 
 /**
- * Interactúa con el local storage para obtener y guardar el estado del sistema
+ *  Interactúa con el local storage para obtener y guardar el estado del sistema
  */
 class SystemAPI implements SystemAPIType {
   private getState(): PersistedState {
@@ -56,7 +60,7 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
-  private setState(state: PersistedState): void {
+  private saveState(state: PersistedState): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
@@ -71,16 +75,16 @@ class SystemAPI implements SystemAPIType {
   startDay(currentDay: DayState) {
     const currentState = this.getState();
 
-    this.setState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
+    this.saveState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
   }
 
   endDay() {
     const currentState = this.getState();
 
-    this.setState({ ...currentState, currentDay: undefined, lifecycleState: "dayNotStarted" });
+    this.saveState({ ...currentState, currentDay: undefined, lifecycleState: "dayNotStarted" });
   }
 
-  getBoard(boardId: string): Board | undefined {
+  getBoard(boardId: BoardId): Board | undefined {
     const state = this.getState();
     return state.boards[boardId];
   }
@@ -92,33 +96,34 @@ class SystemAPI implements SystemAPIType {
 
   createBoard(board: Board): void {
     const state = this.getState();
-    this.setState({
+    this.saveState({
       ...state,
       boards: { ...state.boards, [board.id]: board },
     });
   }
 
-  updateBoard({ boardId, board }: { boardId: string; board: Partial<Board> }): void {
+  updateBoard(board: Board): void {
     const state = this.getState();
-    const existingBoard = state.boards[boardId];
+    const existingBoard = state.boards[board.id];
+
     if (!existingBoard) return;
 
-    this.setState({
+    this.saveState({
       ...state,
       boards: {
         ...state.boards,
-        [boardId]: { ...existingBoard, ...board },
+        [board.id]: board,
       },
     });
   }
 
-  removeBoard(boardId: string): void {
+  removeBoard(board: Board): void {
     const state = this.getState();
-    const { [boardId]: _, ...remainingBoards } = state.boards;
-    this.setState({ ...state, boards: remainingBoards });
+    const { [board.id]: _, ...remainingBoards } = state.boards;
+    this.saveState({ ...state, boards: remainingBoards });
   }
 
-  getActivity(activityId: string): Activity | undefined {
+  getActivity(activityId: ActivityId): Activity | undefined {
     const state = this.getState();
     return state.activities[activityId];
   }
@@ -129,39 +134,60 @@ class SystemAPI implements SystemAPIType {
   }
 
   createActivity(activity: Activity): void {
+    const { parentBoardId } = activity;
     const state = this.getState();
-    this.setState({
+
+    // Actualizar el estado con la nueva actividad
+    const newState: PersistedState = {
       ...state,
       activities: { ...state.activities, [activity.id]: activity },
-    });
+    };
+
+    // Si se proporciona un parentBoardId, actualizar el tablero correspondiente
+    const parentBoard = parentBoardId ? newState.boards[parentBoardId] : undefined;
+
+    if (parentBoardId && parentBoard) {
+      newState.boards[parentBoardId] = {
+        ...parentBoard,
+        activities: [...(parentBoard.activities || []), activity.id],
+      };
+    }
+
+    this.saveState(newState);
   }
 
-  updateActivity({
-    activityId,
-    activity,
-  }: {
-    activityId: string;
-    activity: Partial<Activity>;
-  }): void {
+  updateActivity(activity: Activity): void {
     const state = this.getState();
-    const existingActivity = state.activities[activityId];
-    if (!existingActivity) return;
 
-    const updatedActivity = { ...existingActivity, ...activity } as Activity;
+    if (!state.activities[activity.id]) return;
 
-    this.setState({
+    this.saveState({
       ...state,
       activities: {
         ...state.activities,
-        [activityId]: updatedActivity,
+        [activity.id]: activity,
       },
     });
   }
 
-  removeActivity(activityId: string): void {
+  removeActivity(activity: Activity): void {
     const state = this.getState();
-    const { [activityId]: _, ...remainingActivities } = state.activities;
-    this.setState({ ...state, activities: remainingActivities });
+
+    // Eliminar la referencia del board padre si existe
+    if (activity.parentBoardId) {
+      const parentBoard = state.boards[activity.parentBoardId];
+
+      if (parentBoard) {
+        this.updateBoard({
+          ...parentBoard,
+          activities: parentBoard.activities.filter((id) => id !== activity.id),
+        });
+      }
+    }
+
+    // Eliminar la actividad
+    const { [activity.id]: _, ...remainingActivities } = state.activities;
+    this.saveState({ ...state, activities: remainingActivities });
   }
 
   getSelectedActivity(): Activity | undefined {
@@ -170,29 +196,102 @@ class SystemAPI implements SystemAPIType {
 
   setSelectedActivity(activity: Activity | undefined): void {
     const state = this.getState();
-    this.setState({ ...state, selectedActivity: activity });
+    this.saveState({ ...state, selectedActivity: activity });
   }
 
   getTotalTempoBalance(): number {
     return this.getState().totalTempoBalance;
   }
 
-  updateTempoBalance(investedTimeRecord: InvestedTimeRecord): void {
+  private shouldUpdateLastRecord(
+    lastRecord: InvestedTimeRecord,
+    newRecord: InvestedTimeRecord
+  ): boolean {
+    const isSameActivity =
+      "activityId" in lastRecord &&
+      "activityId" in newRecord &&
+      lastRecord.activityId === newRecord.activityId;
+
+    const areBothIdle = lastRecord.status === "idle" && newRecord.status === "idle";
+
+    return isSameActivity || areBothIdle;
+  }
+
+  private mergeTimeRecords(
+    lastRecord: InvestedTimeRecord,
+    newRecord: InvestedTimeRecord
+  ): InvestedTimeRecord {
+    return {
+      ...lastRecord,
+      minutesInvested: lastRecord.minutesInvested + newRecord.minutesInvested,
+      tempoModification: lastRecord.tempoModification + newRecord.tempoModification,
+    };
+  }
+
+  updateTempoBalance({
+    investedTimeRecord,
+    tempoModificationRecord,
+  }: {
+    investedTimeRecord?: InvestedTimeRecord | undefined;
+    tempoModificationRecord: TempoModificationRecord;
+  }): void {
     const state = this.getState();
 
     if (!state.currentDay) return;
 
-    const newBalance = state.totalTempoBalance + investedTimeRecord.tempoModification;
+    // Actualizar historial de tiempo invertido
+    const newInvestedTimeHistory = investedTimeRecord
+      ? this.updateInvestedTimeHistory({ investedTimeRecord })
+      : state.investedTimeHistory;
 
-    this.setState({
+    // Calcular nuevos balances
+    const { dayTempoBalance, totalTempoBalance } = this.calculateNewBalances({
+      tempoModification: tempoModificationRecord.tempoModification,
+    });
+
+    // Guardar todos los cambios
+    this.saveState({
       ...state,
-      totalTempoBalance: newBalance,
+      lifecycleState: "dayInProgress",
       currentDay: {
         ...state.currentDay,
-        dayTempoBalance: state.currentDay.dayTempoBalance + investedTimeRecord.tempoModification,
+        dayTempoBalance,
       },
-      investedTimeHistory: [...state.investedTimeHistory, investedTimeRecord],
+      totalTempoBalance,
+      investedTimeHistory: newInvestedTimeHistory,
+      tempoModificationHistory: [...state.tempoModificationHistory, tempoModificationRecord],
     });
+  }
+
+  private updateInvestedTimeHistory({
+    investedTimeRecord: newRecord,
+  }: {
+    investedTimeRecord: InvestedTimeRecord;
+  }): InvestedTimeRecord[] {
+    const currentHistory = this.getInvestedTimeHistory();
+    const lastRecord = currentHistory.at(-1);
+
+    if (!lastRecord) {
+      return [newRecord];
+    }
+
+    if (this.shouldUpdateLastRecord(lastRecord, newRecord)) {
+      return [...currentHistory.slice(0, -1), this.mergeTimeRecords(lastRecord, newRecord)];
+    }
+
+    return [...currentHistory, newRecord];
+  }
+
+  private calculateNewBalances({ tempoModification }: { tempoModification: number }) {
+    const state = this.getState();
+    const currentDay = state.currentDay;
+
+    const prevDayTempoBalance = currentDay?.dayTempoBalance ?? 0;
+
+    return {
+      totalTempoBalance: state.totalTempoBalance + tempoModification,
+      dayTempoBalance: prevDayTempoBalance + tempoModification,
+    };
   }
 
   getInvestedTimeHistory(): InvestedTimeRecord[] {
@@ -217,7 +316,7 @@ class SystemAPI implements SystemAPIType {
 
   updateUsefulMetrics({ metrics }: { metrics: UsefulMetrics }): void {
     const state = this.getState();
-    this.setState({ ...state, usefulMetrics: metrics });
+    this.saveState({ ...state, usefulMetrics: metrics });
   }
 
   getSystemParams(): SystemParams {
@@ -226,7 +325,7 @@ class SystemAPI implements SystemAPIType {
 
   updateSystemParams(params: SystemParams): void {
     const state = this.getState();
-    this.setState({ ...state, systemParams: params });
+    this.saveState({ ...state, systemParams: params });
   }
 
   getCurrentDay(): DayState | undefined {
