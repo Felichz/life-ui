@@ -35,6 +35,7 @@ const defaultState: PersistedState = {
   systemParams: {
     passiveTempoConsumptionRate: 1,
   },
+  lastUpdateTimestamp: Date.now(),
 };
 
 /**
@@ -334,6 +335,11 @@ class SystemAPI implements SystemAPIType {
 
   getCurrentDay(): DayState | undefined {
     return this.getState().currentDay;
+  }
+
+  updateLastUpdateTimestamp(timestamp: number): void {
+    const state = this.getState();
+    this.saveState({ ...state, lastUpdateTimestamp: timestamp });
   }
 }
 

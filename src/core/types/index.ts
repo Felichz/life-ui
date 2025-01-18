@@ -205,6 +205,11 @@ export type PersistedState = {
   tempoModificationHistory: TempoModificationHistory;
   usefulMetrics: UsefulMetrics;
   systemParams: SystemParams;
+  /**
+   * Timestamp de la última actualización del sistema
+   * Se usa para calcular el tiempo transcurrido cuando la app se reactiva
+   */
+  lastUpdateTimestamp: number;
 } & PersistedDayState;
 
 // API para interacutar con la base de datos o local storage, persistencia del state del sistema
@@ -260,11 +265,17 @@ export interface SystemAPIType {
   updateSystemParams: (params: PersistedState["systemParams"]) => void;
 
   getCurrentDay: () => DayState | undefined;
+
+  /**
+   * Actualiza el timestamp de la última actualización del sistema
+   */
+  updateLastUpdateTimestamp: (timestamp: number) => void;
 }
 
 // Este es estado del sistema que se mantiene en la ui, se mantiene en el SystemContext
 // sincronizado y actualizado con el SystemAPI mediante el SystemEngine
 export type UiState = {
+  updatingSystemState: boolean;
   currentDay?: DayState | undefined;
   lifecycleState: PersistedState["lifecycleState"];
   totalTempoBalance: number;
