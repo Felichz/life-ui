@@ -146,7 +146,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       // Calculamos cuántos minutos faltan para terminar el día
       const dayEndMinute = currentDay.dayStartMinute + 960;
       const lastUpdateMinute = _getMinutesFromTimestamp(lastUpdateTimestamp);
-      const minutesToEndDay = dayEndMinute - lastUpdateMinute;
 
       if (minutesRemainingToProcess === 0) {
         shouldContinue = false;
