@@ -42,22 +42,13 @@ const defaultState: PersistedState = {
  */
 class SystemAPI implements SystemAPIType {
   private getState(): PersistedState {
-    const stateStr = localStorage.getItem(STORAGE_KEY);
+    const persistedState = localStorage.getItem(STORAGE_KEY);
 
-    if (!stateStr) {
+    if (!persistedState) {
       return defaultState;
     }
 
-    return JSON.parse(stateStr, (key, value) => {
-      // Convertir strings de fecha a objetos Date
-      if (key === "timestamp" || key === "value") {
-        const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-        if (typeof value === "string" && dateRegex.test(value)) {
-          return new Date(value);
-        }
-      }
-      return value;
-    });
+    return JSON.parse(persistedState);
   }
 
   private saveState(state: PersistedState): void {
