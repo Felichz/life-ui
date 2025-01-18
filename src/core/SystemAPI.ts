@@ -263,6 +263,12 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
+  pushToInvestedTimeHistory(investedTimeRecord: InvestedTimeRecord): void {
+    const state = this.getState();
+    const newInvestedTimeHistory = this.updateInvestedTimeHistory({ investedTimeRecord });
+    this.saveState({ ...state, investedTimeHistory: newInvestedTimeHistory });
+  }
+
   private updateInvestedTimeHistory({
     investedTimeRecord: newRecord,
   }: {
