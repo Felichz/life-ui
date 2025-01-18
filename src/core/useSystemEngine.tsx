@@ -3,7 +3,13 @@ import { useCallback, useEffect } from "react";
 import type { UiStateContextValue } from "src/ui/system-context/UiStateContext";
 
 import { systemAPI } from "./systemAPI";
-import type { Activity, Board, InvestedTimeRecord, TempoModificationRecord } from "./types";
+import type {
+  Activity,
+  Board,
+  ChallengeActivity,
+  InvestedTimeRecord,
+  TempoModificationRecord,
+} from "./types";
 
 /**
  * @param systemState - El estado del sistema que se mantiene en la ui, se mantiene en el SystemContext, sincronizado con el SystemAPI
@@ -48,11 +54,44 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
   // se suma el tiempo, si no, se crea un nuevo registro.
   useEffect(() => {
     const interval = setInterval(() => {
-      // Evaluar el estado del sistema
+      const currentActivity = uiState.selectedActivity;
+
+      // Si no hay actividad seleccionada, aplicamos consumo pasivo
+      if (!currentActivity) {
+        _applyIdlePassiveConsumption();
+
+        _syncUiStateFromPersisted();
+
+        return;
+      }
+
+      // Lógica según el tipo de actividad
+      switch (currentActivity.type) {
+        case "challenge": {
+          _applyChallengeMinuteGeneration(currentActivity);
+          break;
+        }
+        case "neutral": {
+          _applyNeutralTimeRecord(currentActivity);
+          break;
+        }
+        case "discount": {
+          _applyDiscountedConsumption(currentActivity, 1);
+          break;
+        }
+      }
+
+      // Actualizar minutesActive de la actividad
+      systemAPI.updateActivity({
+        ...currentActivity,
+        minutesActive: currentActivity.minutesActive + 1,
+      });
+
+      _syncUiStateFromPersisted();
     }, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [uiState.selectedActivity, uiState.systemParams]);
 
   /**
    * Función privada para re-sincronizar el UiState tras cada modificación en systemAPI.
@@ -79,25 +118,124 @@ export const useSystemEngine = ({ uiState, setUiState }: SystemEngineProps) => {
    * Estas funciones podrían llamarse en un setInterval (bucle de 1 minuto) o en otras partes
    * internas del sistema. Ejemplo: aplicar consumos pasivos, generar tempo, etc.
    */
-  const _applyChallengeMinuteGeneration = (activity: Activity, minutes: number) => {
-    // Lógica para reason="challengeMinuteGeneration"
-    // Al final, se llama a systemAPI.updateTempoBalance(...)
-    // y luego _syncUiStateFromPersisted().
+  const _applyChallengeMinuteGeneration = useCallback((activity: ChallengeActivity) => {
+    const now = Date.now();
+    const isWithinEstimatedTime = activity.minutesActive < activity.totalTempoReward;
+
+    // Si estamos dentro del tiempo estimado, generamos tempo
+    if (isWithinEstimatedTime) {
+      const investedTimeRecord: InvestedTimeRecord = {
+        status: "activity",
+        activityId: activity.id,
+        type: "challenge",
+        timestamp: now,
+        tempoModification: 1,
+        minutesInvested: 1,
+      };
+
+      const tempoModificationRecord: TempoModificationRecord = {
+        status: "activity",
+        activityId: activity.id,
+        type: "challenge",
+        timestamp: now,
+        reason: "challengeMinuteGeneration",
+        tempoModification: 1,
+      };
+
+      systemAPI.updateTempoBalance({
+        investedTimeRecord,
+        tempoModificationRecord,
+      });
+    } else {
+      // Si excedimos el tiempo estimado, aplicamos consumo pasivo
+      _applyIdlePassiveConsumption();
+    }
+  }, []);
+
+  const _applyNeutralTimeRecord = useCallback((activity: Activity) => {
+    const now = Date.now();
+
+    const investedTimeRecord: InvestedTimeRecord = {
+      status: "activity",
+      activityId: activity.id,
+      type: "neutral",
+      timestamp: now,
+      tempoModification: 0,
+      minutesInvested: 1,
+    };
+
+    systemAPI.pushToInvestedTimeHistory(investedTimeRecord);
+  }, []);
+
+  const _applyDiscountedConsumption = useCallback((activity: Activity, minutes: number) => {
+    if (activity.type !== "discount") return;
+
+    const now = Date.now();
+    const discountedConsumption = -activity.tempoConsumptionRate * minutes;
+
+    const investedTimeRecord: InvestedTimeRecord = {
+      status: "activity",
+      activityId: activity.id,
+      type: "discount",
+      timestamp: now,
+      tempoModification: discountedConsumption,
+      minutesInvested: minutes,
+    };
+
+    const tempoModificationRecord: TempoModificationRecord = {
+      status: "activity",
+      activityId: activity.id,
+      type: "discount",
+      timestamp: now,
+      reason: "discountedPassiveConsumption",
+      tempoModification: discountedConsumption,
+    };
+
+    systemAPI.updateTempoBalance({
+      investedTimeRecord,
+      tempoModificationRecord,
+    });
+  }, []);
+
+  const _applyIdlePassiveConsumption = useCallback(() => {
+    const now = Date.now();
+
+    const passiveConsumption = 0 - systemAPI.getSystemParams().passiveTempoConsumptionRate;
+
+    const investedTimeRecord: InvestedTimeRecord = {
+      status: "idle",
+      timestamp: now,
+      tempoModification: passiveConsumption,
+      minutesInvested: 1,
+    };
+
+    const tempoModificationRecord: TempoModificationRecord = {
+      status: "idle",
+      timestamp: now,
+      reason: "passiveConsumption",
+      tempoModification: passiveConsumption,
+    };
+
+    systemAPI.updateTempoBalance({
+      investedTimeRecord,
+      tempoModificationRecord,
+    });
+  }, [uiState.systemParams]);
+
+  const _applyNeutralActivityEarlyCompletionCompensation = (
+    activity: Activity,
+    compensation: number
+  ) => {
+    // Lógica reason="earlyNeutralActivityCompletionCompensation"
+    // Debe calcular una compensacion en tempos segun el tiempo que faltaba para completar la actividad
   };
 
-  const _applyIdlePassiveConsumption = (minutes: number) => {
-    // Lógica para reason="passiveConsumption" con status="idle"
-    // ...
-  };
-
-  const _applyDiscountedConsumption = (activity: Activity, minutes: number) => {
-    // Lógica reason="discountedPassiveConsumption"
-    // ...
-  };
-
-  const _applyNeutralEarlyCompletionCompensation = (activity: Activity, compensation: number) => {
+  const _applyDiscountActivityEarlyCompletionCompensation = (
+    activity: Activity,
+    compensation: number
+  ) => {
     // Lógica reason="earlyCompletionCompensation"
-    // ...
+    // Debe calcular una compensacion en tempos segun el tiempo que faltaba para completar la actividad y su descuento por minuto
   };
 
   const _applyChallengeCriteriaFailed = (activity: Activity, penaltyAmount: number) => {

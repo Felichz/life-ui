@@ -35,10 +35,12 @@ type ChallengeTempoModificationReason =
   | "passiveConsumption"; // -1/min al exceder tiempo estimado
 
 // Modificaciones posibles para Actividad Neutral
-type NeutralTempoModificationReason = "earlyCompletionCompensation"; // Compensación por terminar antes
+type NeutralTempoModificationReason = "earlyNeutralActivityCompletionCompensation"; // Compensación por terminar antes
 
 // Modificaciones posibles para Actividad Hobby
-type DiscountTempoModificationReason = "discountedPassiveConsumption"; // Consumo a tasa reducida
+type DiscountTempoModificationReason =
+  | "discountedPassiveConsumption"
+  | "earlyDiscountActivityCompletionCompensation"; // Consumo a tasa reducida
 
 type TempoModificationByType =
   | {
