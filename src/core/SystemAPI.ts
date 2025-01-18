@@ -196,7 +196,14 @@ class SystemAPI implements SystemAPIType {
 
   setSelectedActivity(activity: Activity | undefined): void {
     const state = this.getState();
+
     this.saveState({ ...state, selectedActivity: activity });
+  }
+
+  unselectActivity(): void {
+    const state = this.getState();
+
+    this.saveState({ ...state, selectedActivity: undefined });
   }
 
   getTotalTempoBalance(): number {
@@ -339,4 +346,4 @@ class SystemAPI implements SystemAPIType {
   }
 }
 
-export const systemAPI = new SystemAPI();
+export const systemApi = new SystemAPI();

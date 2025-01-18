@@ -116,16 +116,7 @@ interface BaseActivity {
 
 interface TimeLimitedActivity extends BaseActivity {
   type: "neutral" | "discount";
-  allowedTimeWindow?: {
-    /**
-     * Minuto del 0 al 1440
-     */
-    start: number;
-    /**
-     * Minuto del 0 al 1440
-     */
-    end: number;
-  };
+  allowedTime: number;
 }
 
 // Actividad Tempo Neutral
@@ -152,8 +143,8 @@ export type BoardId = string;
 
 interface InheritableActivityProps {
   challenge?: Pick<ChallengeActivity, "constraintList" | "isRepetitive">;
-  neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTimeWindow">;
-  hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTimeWindow">;
+  neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTime">;
+  hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTime">;
 }
 
 export interface Board {
@@ -242,6 +233,7 @@ export interface SystemAPIType {
 
   getSelectedActivity: () => PersistedState["selectedActivity"];
   setSelectedActivity: (activity: PersistedState["selectedActivity"]) => void;
+  unselectActivity: () => void;
 
   // Gestión de Tempo
   getTotalTempoBalance: () => PersistedState["totalTempoBalance"];
@@ -250,12 +242,15 @@ export interface SystemAPIType {
     investedTimeRecord,
     tempoModificationRecord,
   }: {
-    investedTimeRecord: InvestedTimeRecord;
+    investedTimeRecord?: InvestedTimeRecord | undefined;
     tempoModificationRecord: TempoModificationRecord;
   }) => void;
 
   getInvestedTimeHistory: () => PersistedState["investedTimeHistory"];
   getInvestedTimeHistoryByDay: (day: Date) => PersistedState["investedTimeHistory"];
+
+  // Agregar registros al historial de tiempo invertido
+  pushToInvestedTimeHistory: (investedTimeRecord: InvestedTimeRecord) => void;
 
   // Métricas y parámetros del sistema
   getUsefulMetrics: () => PersistedState["usefulMetrics"];
