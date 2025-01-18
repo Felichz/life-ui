@@ -5,6 +5,7 @@ import type { UiState } from "../../core/types";
 
 // Estado inicial del sistema
 const initialState: UiState = {
+  updatingSystemState: false,
   totalTempoBalance: 0,
   currentDay: undefined,
   investedTimeHistory: [],

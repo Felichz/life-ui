@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { UiStateContextValue } from "src/ui/system-context/UiStateContext";
 
@@ -12,6 +12,7 @@ import type {
   DayState,
   NeutralActivity,
   SystemAPIType,
+  UiState,
 } from "./types";
 
 /**
@@ -20,6 +21,7 @@ import type {
  * @param persistedState - El estado del sistema que se mantiene en la base de datos o local storage
  */
 type SystemEngineProps = {
+  uiState: UiState;
   setUiState: UiStateContextValue["setUiState"];
   systemApi: SystemAPIType;
 };
@@ -29,7 +31,7 @@ type SystemEngineProps = {
  * - Expone SOLO las acciones que la UI (usuario) necesita (crear board, completar challenge, etc.).
  * - Mantiene internas las funciones que corren en el loop 1-min o que no son disparadas por el usuario directamente.
  */
-export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) => {
+export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngineProps) => {
   /**
    * PRIMER BLOQUE: Efectos de inicialización y sincronización
    */
@@ -51,53 +53,38 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
       usefulMetrics: persistedState.usefulMetrics,
       systemParams: persistedState.systemParams,
     }));
+
+    // Al iniciar, actualizamos el estado del sistema según el tiempo transcurrido
+    _updateSystemState();
   }, []);
 
   // Ejecuta la lógica de evaluación base cada un minuto
-  // En caso de no tener ninguna actividad seleccionada, se aplica el consumo default y se actualiza InvestedTimeHistory
-  // En caso de tener una actividad seleccionada, se aplica el consumo de la actividad y se actualiza InvestedTimeHistory.
-  // Para actualizar el InvestedTimeHistory se debe analizar si el ultimo registro es de la misma actividad, si es así,
-  // se suma el tiempo, si no, se crea un nuevo registro.
   useEffect(() => {
     const interval = setInterval(() => {
-      const currentActivity = systemApi.getSelectedActivity();
+      setUiState((current) => {
+        if (current.updatingSystemState === false) {
+          _updateSystemState();
 
-      // Si no hay actividad seleccionada, aplicamos consumo pasivo
-      if (!currentActivity) {
-        _applyIdlePassiveConsumption();
-
-        _syncUiStateFromPersisted();
-
-        return;
-      }
-
-      // Lógica según el tipo de actividad
-      switch (currentActivity.type) {
-        case "challenge": {
-          _applyChallengeMinuteGeneration(currentActivity);
-          break;
+          return {
+            ...current,
+            updatingSystemState: true,
+          };
         }
-        case "neutral": {
-          _applyNeutralTimeRecord(currentActivity);
-          break;
-        }
-        case "discount": {
-          _applyDiscountedConsumption(currentActivity);
-          break;
-        }
-      }
 
-      // Actualizar minutesActive de la actividad
-      systemApi.updateActivity({
-        ...currentActivity,
-        minutesActive: currentActivity.minutesActive + 1,
+        return current;
       });
-
-      _syncUiStateFromPersisted();
     }, 60000);
 
     return () => clearInterval(interval);
   }, []);
+
+  const _getMinutesFromTimestamp = useCallback((timestamp: number) => {
+    return new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
+  }, []);
+
+  const _getCurrentMinute = useCallback(() => {
+    return _getMinutesFromTimestamp(Date.now());
+  }, [_getMinutesFromTimestamp]);
 
   /**
    * Función privada para re-sincronizar el UiState tras cada modificación en systemApi.
@@ -118,6 +105,102 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
       systemParams: persistedState.systemParams,
     }));
   }, [setUiState]);
+
+  /**
+   * Función privada para actualizar el estado del sistema según el tiempo transcurrido
+   * Esta función se encarga de:
+   * 1. Calcular minutos transcurridos desde la última actualización
+   * 2. Aplicar los cambios correspondientes según la actividad actual
+   * 3. Verificar si el día debe terminar
+   */
+  const _updateSystemState = useCallback(() => {
+    // En cada iteración vamos a:
+    // 1. Obtener el estado más reciente
+    // 2. Calcular si podemos procesar un minuto más
+    // 3. Procesar el minuto
+    // 4. Actualizar lastUpdateTimestamp
+    // 5. Repetir hasta que no haya más minutos que procesar
+    let shouldContinue = true;
+
+    // TODO: Cambiar por un bucle de setTimeout para no bloquear el hilo principal
+    while (shouldContinue) {
+      const now = Date.now();
+
+      // Obtenemos el estado más reciente en cada iteración
+      const persistedState = systemApi.getPersistedState();
+      const currentDay = persistedState.currentDay;
+      const lastUpdateTimestamp = persistedState.lastUpdateTimestamp;
+
+      // Si no hay día en progreso, no hay nada que actualizar
+      if (!currentDay || persistedState.lifecycleState !== "dayInProgress") {
+        return;
+      }
+
+      const minutesRemainingToProcess = Math.floor((now - lastUpdateTimestamp) / 60000);
+
+      // Si no ha pasado ningún minuto, no hay nada que actualizar
+      if (minutesRemainingToProcess === 0) {
+        return;
+      }
+
+      // Calculamos cuántos minutos faltan para terminar el día
+      const dayEndMinute = currentDay.dayStartMinute + 960;
+      const lastUpdateMinute = _getMinutesFromTimestamp(lastUpdateTimestamp);
+      const minutesToEndDay = dayEndMinute - lastUpdateMinute;
+
+      if (minutesRemainingToProcess === 0) {
+        shouldContinue = false;
+
+        // Si corresponde, terminamos el día
+        if (dayEndMinute === lastUpdateMinute) {
+          systemApi.endDay();
+          _syncUiStateFromPersisted();
+        }
+
+        return;
+      }
+
+      // Procesamos un solo minuto
+      const currentActivity = systemApi.getSelectedActivity();
+
+      // Si no hay actividad seleccionada, aplicamos consumo pasivo
+      if (!currentActivity) {
+        _applyIdlePassiveConsumption();
+      } else {
+        // Lógica según el tipo de actividad
+        switch (currentActivity.type) {
+          case "challenge": {
+            _applyChallengeMinuteGeneration(currentActivity);
+            break;
+          }
+          case "neutral": {
+            _applyNeutralTimeRecord(currentActivity);
+            break;
+          }
+          case "discount": {
+            _applyDiscountedConsumption(currentActivity);
+            break;
+          }
+        }
+
+        // Actualizar minutesActive de la actividad
+        systemApi.updateActivity({
+          ...currentActivity,
+          minutesActive: currentActivity.minutesActive + 1,
+        });
+      }
+
+      // Actualizamos el timestamp sumando un minuto
+      systemApi.updateLastUpdateTimestamp(lastUpdateTimestamp + 60000);
+    }
+
+    setUiState((current) => ({
+      ...current,
+      updatingSystemState: false,
+    }));
+
+    _syncUiStateFromPersisted();
+  }, []);
 
   /**
    * SEGUNDO BLOQUE: LÓGICA PRIVADA (core) - NO se expone
@@ -151,13 +234,18 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
         investedTimeRecord,
         tempoModificationRecord,
       });
+
+      systemApi.updateActivity({
+        ...activity,
+        minutesActive: activity.minutesActive + 1,
+      });
     } else {
       // Si excedimos el tiempo estimado, aplicamos consumo pasivo
       _applyIdlePassiveConsumption();
     }
   }, []);
 
-  const _applyNeutralTimeRecord = useCallback((activity: Activity) => {
+  const _applyNeutralTimeRecord = useCallback((activity: NeutralActivity) => {
     const investedTimeRecord: InvestedTimeRecord = {
       status: "activity",
       activityId: activity.id,
@@ -167,7 +255,16 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
       minutesInvested: 1,
     };
 
+    systemApi.updateActivity({
+      ...activity,
+      minutesActive: activity.minutesActive + 1,
+    });
+
     systemApi.pushToInvestedTimeHistory(investedTimeRecord);
+
+    if (activity.minutesActive === activity.allowedTime) {
+      systemApi.unselectActivity();
+    }
   }, []);
 
   const _applyDiscountedConsumption = useCallback((activity: HobbyActivity) => {
@@ -195,6 +292,15 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
       investedTimeRecord,
       tempoModificationRecord,
     });
+
+    systemApi.updateActivity({
+      ...activity,
+      minutesActive: activity.minutesActive + 1,
+    });
+
+    if (activity.minutesActive === activity.allowedTime) {
+      systemApi.unselectActivity();
+    }
   }, []);
 
   const _applyIdlePassiveConsumption = useCallback(() => {
@@ -297,7 +403,9 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
   //     ACCIONES: Día
   // ===========================
   const startDay = useCallback(() => {
-    const currentMinute = new Date().getHours() * 60 + new Date().getMinutes();
+    const currentMinute = _getCurrentMinute();
+
+    systemApi.updateLastUpdateTimestamp(Date.now());
 
     const dayState: DayState = {
       date: Date.now(),
@@ -436,7 +544,8 @@ export const useSystemEngine = ({ setUiState, systemApi }: SystemEngineProps) =>
     // DÍA
     day: {
       startDay,
-      endDay,
+      // Por ahora no se puede terminar el día desde la UI, una vez que se inicia un dia, ya se fija el tiempo de finalización
+      // endDay,
     },
     // BOARDS
     board: {
