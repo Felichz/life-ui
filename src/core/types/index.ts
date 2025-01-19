@@ -215,33 +215,33 @@ export type PersistedState = {
 // API para interacutar con la base de datos o local storage, persistencia del state del sistema
 export interface SystemAPIType {
   // Obtiene todo el estado del sistema
-  getPersistedState: () => PersistedState;
+  getPersistedState: () => Promise<PersistedState>;
 
   // Gestión del ciclo de vida del sistema
-  startDay: (currentDay: DayState) => void;
-  endDay: () => void;
-  getLifecycleState: () => PersistedState["lifecycleState"];
+  getLifecycleState: () => Promise<PersistedState["lifecycleState"]>;
+  startDay: (currentDay: DayState) => Promise<void>;
+  endDay: () => Promise<void>;
 
   // Gestión de tableros (Boards)
-  getBoard: (boardId: BoardId) => Board | undefined;
-  getBoards: () => Board[];
-  createBoard: (board: Board) => void;
-  updateBoard: (board: Board) => void;
-  removeBoard: (board: Board) => void;
+  getBoard: (boardId: BoardId) => Promise<Board | undefined>;
+  getBoards: () => Promise<Board[]>;
+  createBoard: (board: Board) => Promise<void>;
+  updateBoard: (board: Board) => Promise<void>;
+  removeBoard: (board: Board) => Promise<void>;
 
   // Gestión de actividades
-  getActivity: (activityId: ActivityId) => Activity | undefined;
-  getActivities: () => Activity[];
-  createActivity: (activity: Activity) => void;
-  updateActivity: (activity: Activity) => void;
-  removeActivity: (activity: Activity) => void;
+  getActivity: (activityId: ActivityId) => Promise<Activity | undefined>;
+  getActivities: () => Promise<Activity[]>;
+  createActivity: (activity: Activity) => Promise<void>;
+  updateActivity: (activity: Activity) => Promise<void>;
+  removeActivity: (activity: Activity) => Promise<void>;
 
-  getSelectedActivity: () => PersistedState["selectedActivity"];
-  setSelectedActivity: (activity: PersistedState["selectedActivity"]) => void;
-  unselectActivity: () => void;
+  getSelectedActivity: () => Promise<PersistedState["selectedActivity"] | undefined>;
+  setSelectedActivity: (activity: PersistedState["selectedActivity"] | undefined) => Promise<void>;
+  unselectActivity: () => Promise<void>;
 
   // Gestión de Tempo
-  getTotalTempoBalance: () => PersistedState["totalTempoBalance"];
+  getTotalTempoBalance: () => Promise<PersistedState["totalTempoBalance"]>;
 
   updateTempoBalance: ({
     investedTimeRecord,
@@ -249,27 +249,27 @@ export interface SystemAPIType {
   }: {
     investedTimeRecord?: InvestedTimeRecord | undefined;
     tempoModificationRecord: TempoModificationRecord;
-  }) => void;
+  }) => Promise<void>;
 
-  getInvestedTimeHistory: () => PersistedState["investedTimeHistory"];
-  getInvestedTimeHistoryByDay: (day: Date) => PersistedState["investedTimeHistory"];
+  getInvestedTimeHistory: () => Promise<InvestedTimeHistory>;
+  getInvestedTimeHistoryByDay: (day: Date) => Promise<InvestedTimeHistory>;
 
   // Agregar registros al historial de tiempo invertido
-  pushToInvestedTimeHistory: (investedTimeRecord: InvestedTimeRecord) => void;
+  pushToInvestedTimeHistory: (investedTimeRecord: InvestedTimeRecord) => Promise<void>;
 
   // Métricas y parámetros del sistema
-  getUsefulMetrics: () => PersistedState["usefulMetrics"];
-  updateUsefulMetrics: ({ metrics }: { metrics: PersistedState["usefulMetrics"] }) => void;
+  getUsefulMetrics: () => Promise<UsefulMetrics>;
+  updateUsefulMetrics: ({ metrics }: { metrics: UsefulMetrics }) => Promise<void>;
 
-  getSystemParams: () => PersistedState["systemParams"];
-  updateSystemParams: (params: PersistedState["systemParams"]) => void;
+  getSystemParams: () => Promise<SystemParams>;
+  updateSystemParams: (params: SystemParams) => Promise<void>;
 
-  getCurrentDay: () => DayState | undefined;
+  getCurrentDay: () => Promise<DayState | undefined>;
 
   /**
    * Actualiza el timestamp de la última actualización del sistema
    */
-  updateLastUpdateTimestamp: (timestamp: number) => void;
+  updateLastUpdateTimestamp: (timestamp: number) => Promise<void>;
 }
 
 // Este es estado del sistema que se mantiene en la ui, se mantiene en el SystemContext

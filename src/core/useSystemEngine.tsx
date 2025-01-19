@@ -37,22 +37,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    */
   useEffect(() => {
     // Al montar el hook, sincronizamos la UI con el estado persistido
-    const persistedState = systemApi.getPersistedState();
-    const boards = Object.values(persistedState.boards);
-    const activities = Object.values(persistedState.activities);
-
-    setUiState((currentUiState) => ({
-      ...currentUiState,
-      ...persistedState.currentDay,
-      lifecycleState: persistedState.lifecycleState,
-      totalTempoBalance: persistedState.totalTempoBalance,
-      investedTimeHistory: persistedState.investedTimeHistory,
-      selectedActivity: persistedState.selectedActivity,
-      boards,
-      activities,
-      usefulMetrics: persistedState.usefulMetrics,
-      systemParams: persistedState.systemParams,
-    }));
+    _syncUiStateFromPersisted();
 
     // Al iniciar, actualizamos el estado del sistema según el tiempo transcurrido
     _updateSystemState();
@@ -89,8 +74,11 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   /**
    * Función privada para re-sincronizar el UiState tras cada modificación en systemApi.
    */
-  const _syncUiStateFromPersisted = useCallback(() => {
-    const persistedState = systemApi.getPersistedState();
+  const _syncUiStateFromPersisted = useCallback(async () => {
+    const persistedState = await systemApi.getPersistedState();
+    console.log("_syncUiStateFromPersisted");
+    console.log("persistedState", persistedState);
+    console.log("============");
 
     setUiState((current) => ({
       ...current,
@@ -113,7 +101,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * 2. Aplicar los cambios correspondientes según la actividad actual
    * 3. Verificar si el día debe terminar
    */
-  const _updateSystemState = useCallback(() => {
+  const _updateSystemState = useCallback(async () => {
+    console.log("_updateSystemState");
+
     // En cada iteración vamos a:
     // 1. Obtener el estado más reciente
     // 2. Calcular si podemos procesar un minuto más
@@ -124,15 +114,18 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
     // TODO: Cambiar por un bucle de setTimeout para no bloquear el hilo principal
     while (shouldContinue) {
+      console.log("_updateSystemState iteration");
+
       const now = Date.now();
 
       // Obtenemos el estado más reciente en cada iteración
-      const persistedState = systemApi.getPersistedState();
+      const persistedState = await systemApi.getPersistedState();
       const currentDay = persistedState.currentDay;
       const lastUpdateTimestamp = persistedState.lastUpdateTimestamp;
 
       // Si no hay día en progreso, no hay nada que actualizar
       if (!currentDay || persistedState.lifecycleState !== "dayInProgress") {
+        console.log("_updateSystemState return: no day in progress");
         return;
       }
 
@@ -140,6 +133,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       // Si no ha pasado ningún minuto, no hay nada que actualizar
       if (minutesRemainingToProcess === 0) {
+        console.log("_updateSystemState return: no minutes to process");
         return;
       }
 
@@ -152,53 +146,56 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
         // Si corresponde, terminamos el día
         if (dayEndMinute === lastUpdateMinute) {
-          systemApi.endDay();
-          _syncUiStateFromPersisted();
+          await systemApi.endDay();
+          await _syncUiStateFromPersisted();
         }
 
+        console.log("_updateSystemState return: end day");
         return;
       }
 
       // Procesamos un solo minuto
-      const currentActivity = systemApi.getSelectedActivity();
+      const currentActivity = await systemApi.getSelectedActivity();
 
       // Si no hay actividad seleccionada, aplicamos consumo pasivo
       if (!currentActivity) {
-        _applyIdlePassiveConsumption();
+        await _applyIdlePassiveConsumption();
       } else {
         // Lógica según el tipo de actividad
         switch (currentActivity.type) {
           case "challenge": {
-            _applyChallengeMinuteGeneration(currentActivity);
+            await _applyChallengeMinuteGeneration(currentActivity);
             break;
           }
           case "neutral": {
-            _applyNeutralTimeRecord(currentActivity);
+            await _applyNeutralTimeRecord(currentActivity);
             break;
           }
           case "discount": {
-            _applyDiscountedConsumption(currentActivity);
+            await _applyDiscountedConsumption(currentActivity);
             break;
           }
         }
 
         // Actualizar minutesActive de la actividad
-        systemApi.updateActivity({
+        await systemApi.updateActivity({
           ...currentActivity,
           minutesActive: currentActivity.minutesActive + 1,
         });
       }
 
       // Actualizamos el timestamp sumando un minuto
-      systemApi.updateLastUpdateTimestamp(lastUpdateTimestamp + 60000);
+      await systemApi.updateLastUpdateTimestamp(lastUpdateTimestamp + 60000);
     }
+
+    console.log("_updateSystemState setUiState");
 
     setUiState((current) => ({
       ...current,
       updatingSystemState: false,
     }));
 
-    _syncUiStateFromPersisted();
+    await _syncUiStateFromPersisted();
   }, []);
 
   /**
@@ -206,7 +203,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Estas funciones podrían llamarse en un setInterval (bucle de 1 minuto) o en otras partes
    * internas del sistema. Ejemplo: aplicar consumos pasivos, generar tempo, etc.
    */
-  const _applyChallengeMinuteGeneration = useCallback((activity: ChallengeActivity) => {
+  const _applyChallengeMinuteGeneration = useCallback(async (activity: ChallengeActivity) => {
     const isWithinEstimatedTime = activity.minutesActive < activity.totalTempoReward;
 
     // Si estamos dentro del tiempo estimado, generamos tempo
@@ -229,22 +226,22 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModification: 1,
       };
 
-      systemApi.updateTempoBalance({
+      await systemApi.updateTempoBalance({
         investedTimeRecord,
         tempoModificationRecord,
       });
 
-      systemApi.updateActivity({
+      await systemApi.updateActivity({
         ...activity,
         minutesActive: activity.minutesActive + 1,
       });
     } else {
       // Si excedimos el tiempo estimado, aplicamos consumo pasivo
-      _applyIdlePassiveConsumption();
+      await _applyIdlePassiveConsumption();
     }
   }, []);
 
-  const _applyNeutralTimeRecord = useCallback((activity: NeutralActivity) => {
+  const _applyNeutralTimeRecord = useCallback(async (activity: NeutralActivity) => {
     const investedTimeRecord: InvestedTimeRecord = {
       status: "activity",
       activityId: activity.id,
@@ -254,19 +251,19 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       minutesInvested: 1,
     };
 
-    systemApi.updateActivity({
+    await systemApi.updateActivity({
       ...activity,
       minutesActive: activity.minutesActive + 1,
     });
 
-    systemApi.pushToInvestedTimeHistory(investedTimeRecord);
+    await systemApi.pushToInvestedTimeHistory(investedTimeRecord);
 
     if (activity.minutesActive === activity.allowedTime) {
-      systemApi.unselectActivity();
+      await systemApi.unselectActivity();
     }
   }, []);
 
-  const _applyDiscountedConsumption = useCallback((activity: HobbyActivity) => {
+  const _applyDiscountedConsumption = useCallback(async (activity: HobbyActivity) => {
     const discountedConsumption = 0 - activity.tempoConsumptionRate;
 
     const investedTimeRecord: InvestedTimeRecord = {
@@ -287,23 +284,24 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       tempoModification: discountedConsumption,
     };
 
-    systemApi.updateTempoBalance({
+    await systemApi.updateTempoBalance({
       investedTimeRecord,
       tempoModificationRecord,
     });
 
-    systemApi.updateActivity({
+    await systemApi.updateActivity({
       ...activity,
       minutesActive: activity.minutesActive + 1,
     });
 
     if (activity.minutesActive === activity.allowedTime) {
-      systemApi.unselectActivity();
+      await systemApi.unselectActivity();
     }
   }, []);
 
-  const _applyIdlePassiveConsumption = useCallback(() => {
-    const passiveConsumption = 0 - systemApi.getSystemParams().passiveTempoConsumptionRate;
+  const _applyIdlePassiveConsumption = useCallback(async () => {
+    const { passiveTempoConsumptionRate } = await systemApi.getSystemParams();
+    const passiveConsumption = 0 - passiveTempoConsumptionRate;
 
     const investedTimeRecord: InvestedTimeRecord = {
       status: "idle",
@@ -319,14 +317,14 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       tempoModification: passiveConsumption,
     };
 
-    systemApi.updateTempoBalance({
+    await systemApi.updateTempoBalance({
       investedTimeRecord,
       tempoModificationRecord,
     });
   }, []);
 
   const _applyNeutralActivityEarlyCompletionCompensation = useCallback(
-    (activity: NeutralActivity) => {
+    async (activity: NeutralActivity) => {
       const compensation = activity.allowedTime - activity.minutesActive;
 
       const tempoModificationRecord: TempoModificationRecord = {
@@ -338,7 +336,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModification: compensation,
       };
 
-      systemApi.updateTempoBalance({
+      await systemApi.updateTempoBalance({
         tempoModificationRecord,
       });
     },
@@ -346,7 +344,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const _applyDiscountActivityEarlyCompletionCompensation = useCallback(
-    (activity: HobbyActivity) => {
+    async (activity: HobbyActivity) => {
       // Calculamos el tiempo restante no utilizado
       const unusedTime = activity.allowedTime - activity.minutesActive;
 
@@ -366,7 +364,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModification: compensation,
       };
 
-      systemApi.updateTempoBalance({
+      await systemApi.updateTempoBalance({
         tempoModificationRecord,
       });
     },
@@ -374,7 +372,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const _applyChallengeCriteriaFailed = useCallback(
-    ({ activity, penaltyAmount }: { activity: ChallengeActivity; penaltyAmount: number }) => {
+    async ({ activity, penaltyAmount }: { activity: ChallengeActivity; penaltyAmount: number }) => {
       const tempoModificationRecord: TempoModificationRecord = {
         status: "activity",
         activityId: activity.id,
@@ -384,7 +382,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModification: -penaltyAmount,
       };
 
-      systemApi.updateTempoBalance({
+      await systemApi.updateTempoBalance({
         tempoModificationRecord,
       });
     },
@@ -401,10 +399,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   // ===========================
   //     ACCIONES: Día
   // ===========================
-  const startDay = useCallback(() => {
+  const startDay = useCallback(async () => {
     const currentMinute = _getCurrentMinute();
 
-    systemApi.updateLastUpdateTimestamp(Date.now());
+    await systemApi.updateLastUpdateTimestamp(Date.now());
 
     const dayState: DayState = {
       date: Date.now(),
@@ -412,43 +410,43 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       dayTempoBalance: 0,
     };
 
-    systemApi.startDay(dayState);
+    await systemApi.startDay(dayState);
 
-    _syncUiStateFromPersisted();
+    await _syncUiStateFromPersisted();
   }, [_syncUiStateFromPersisted]);
 
-  const endDay = useCallback(() => {
-    systemApi.endDay();
+  const endDay = useCallback(async () => {
+    await systemApi.endDay();
 
-    _syncUiStateFromPersisted();
+    await _syncUiStateFromPersisted();
   }, [_syncUiStateFromPersisted]);
 
   // ===========================
   //   ACCIONES: Boards
   // ===========================
   const createBoard = useCallback(
-    (board: Board) => {
-      systemApi.createBoard(board);
+    async (board: Board) => {
+      await systemApi.createBoard(board);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
 
   const updateBoard = useCallback(
-    (board: Board) => {
-      systemApi.updateBoard(board);
+    async (board: Board) => {
+      await systemApi.updateBoard(board);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
 
   const removeBoard = useCallback(
-    (board: Board) => {
-      systemApi.removeBoard(board);
+    async (board: Board) => {
+      await systemApi.removeBoard(board);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
@@ -457,28 +455,28 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   //   ACCIONES: Activities
   // ===========================
   const createActivity = useCallback(
-    (activity: Activity) => {
-      systemApi.createActivity(activity);
+    async (activity: Activity) => {
+      await systemApi.createActivity(activity);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
 
   const updateActivity = useCallback(
-    (activity: Activity) => {
-      systemApi.updateActivity(activity);
+    async (activity: Activity) => {
+      await systemApi.updateActivity(activity);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
 
   const removeActivity = useCallback(
-    (activity: Activity) => {
-      systemApi.removeActivity(activity);
+    async (activity: Activity) => {
+      await systemApi.removeActivity(activity);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
@@ -487,18 +485,18 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Seleccionar o quitar selección de actividad:
    */
   const selectActivity = useCallback(
-    (activity: Activity) => {
-      systemApi.setSelectedActivity(activity);
+    async (activity: Activity) => {
+      await systemApi.setSelectedActivity(activity);
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
 
-  const unselectActivity = useCallback(() => {
-    systemApi.unselectActivity();
+  const unselectActivity = useCallback(async () => {
+    await systemApi.unselectActivity();
 
-    _syncUiStateFromPersisted();
+    await _syncUiStateFromPersisted();
   }, [_syncUiStateFromPersisted]);
 
   /**
@@ -506,7 +504,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Por ejemplo, aplicamos la recompensa (reason="challengeCompletionReward").
    */
   const completeChallenge = useCallback(
-    (activity: ChallengeActivity) => {
+    async (activity: ChallengeActivity) => {
       const reward = activity.totalTempoReward - activity.minutesActive;
 
       const tempoModificationRecord: TempoModificationRecord = {
@@ -518,20 +516,20 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModification: reward,
       };
 
-      systemApi.updateTempoBalance({
+      await systemApi.updateTempoBalance({
         tempoModificationRecord,
       });
 
       // Actualizar el estado de la actividad a completada
-      systemApi.updateActivity({
+      await systemApi.updateActivity({
         ...activity,
         status: "completed",
       });
 
       // Deseleccionar la actividad
-      systemApi.unselectActivity();
+      await systemApi.unselectActivity();
 
-      _syncUiStateFromPersisted();
+      await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );

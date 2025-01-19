@@ -1,8 +1,7 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 .logo {
@@ -39,4 +38,20 @@
 
 .read-the-docs {
   color: #888;
+}
+
+.state-display {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px;
+  background-color: #1e1e1e;
+  overflow: auto;
+}
+
+.state-display h2 {
+  margin: 0 0 20px 0;
+  color: #fff;
 }
