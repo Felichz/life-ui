@@ -10,6 +10,7 @@ import type {
   BoardId,
   ActivityId,
   TempoModificationRecord,
+  InvestedTimeHistory,
 } from "./types";
 
 const STORAGE_KEY = "system_state";
@@ -38,12 +39,65 @@ const defaultState: PersistedState = {
   lastUpdateTimestamp: Date.now(),
 };
 
+class StorageWrapper {
+  private memoryStorage: Map<string, string>;
+  private hasStorageAccess: boolean;
+
+  constructor() {
+    this.memoryStorage = new Map();
+    this.hasStorageAccess = false;
+  }
+
+  private async requestAccess(): Promise<boolean> {
+    try {
+      // Prueba más completa de localStorage
+      const testKey = "__storage_test__";
+      localStorage.setItem(testKey, testKey);
+      const result = localStorage.getItem(testKey);
+      localStorage.removeItem(testKey);
+
+      this.hasStorageAccess = result === testKey;
+      return this.hasStorageAccess;
+    } catch (error) {
+      console.warn("Storage access denied, falling back to memory storage:", error);
+      this.hasStorageAccess = false;
+      return false;
+    }
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    await this.requestAccess();
+
+    if (this.hasStorageAccess) {
+      return localStorage.getItem(key);
+    }
+
+    return this.memoryStorage.get(key) || null;
+  }
+
+  async setItem(key: string, value: string): Promise<void> {
+    await this.requestAccess();
+
+    if (this.hasStorageAccess) {
+      localStorage.setItem(key, value);
+    } else {
+      this.memoryStorage.set(key, value);
+    }
+  }
+}
+
 /**
  *  Interactúa con el local storage para obtener y guardar el estado del sistema
  */
 class SystemAPI implements SystemAPIType {
-  private getState(): PersistedState {
-    const persistedState = localStorage.getItem(STORAGE_KEY);
+  private storage: StorageWrapper;
+
+  constructor() {
+    this.storage = new StorageWrapper();
+  }
+
+  private async getState(): Promise<PersistedState> {
+    const persistedState = await this.storage.getItem(STORAGE_KEY);
 
     if (!persistedState) {
       return defaultState;
@@ -52,55 +106,58 @@ class SystemAPI implements SystemAPIType {
     return JSON.parse(persistedState);
   }
 
-  private saveState(state: PersistedState): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  private async saveState(state: PersistedState): Promise<void> {
+    await this.storage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  getPersistedState(): PersistedState {
+  async getPersistedState(): Promise<PersistedState> {
     return this.getState();
   }
 
-  getLifecycleState(): PersistedState["lifecycleState"] {
-    return this.getState().lifecycleState;
+  async getLifecycleState(): Promise<PersistedState["lifecycleState"]> {
+    const state = await this.getState();
+    return state.lifecycleState;
   }
 
-  startDay(currentDay: DayState) {
-    const currentState = this.getState();
-
-    this.saveState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
+  async startDay(currentDay: DayState): Promise<void> {
+    const currentState = await this.getState();
+    await this.saveState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
   }
 
-  endDay() {
-    const currentState = this.getState();
-
-    this.saveState({ ...currentState, currentDay: undefined, lifecycleState: "dayNotStarted" });
+  async endDay(): Promise<void> {
+    const currentState = await this.getState();
+    await this.saveState({
+      ...currentState,
+      currentDay: undefined,
+      lifecycleState: "dayNotStarted",
+    });
   }
 
-  getBoard(boardId: BoardId): Board | undefined {
-    const state = this.getState();
+  async getBoard(boardId: BoardId): Promise<Board | undefined> {
+    const state = await this.getState();
     return state.boards[boardId];
   }
 
-  getBoards(): Board[] {
-    const state = this.getState();
+  async getBoards(): Promise<Board[]> {
+    const state = await this.getState();
     return Object.values(state.boards);
   }
 
-  createBoard(board: Board): void {
-    const state = this.getState();
-    this.saveState({
+  async createBoard(board: Board): Promise<void> {
+    const state = await this.getState();
+    await this.saveState({
       ...state,
       boards: { ...state.boards, [board.id]: board },
     });
   }
 
-  updateBoard(board: Board): void {
-    const state = this.getState();
+  async updateBoard(board: Board): Promise<void> {
+    const state = await this.getState();
     const existingBoard = state.boards[board.id];
 
     if (!existingBoard) return;
 
-    this.saveState({
+    await this.saveState({
       ...state,
       boards: {
         ...state.boards,
@@ -109,25 +166,25 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
-  removeBoard(board: Board): void {
-    const state = this.getState();
+  async removeBoard(board: Board): Promise<void> {
+    const state = await this.getState();
     const { [board.id]: _, ...remainingBoards } = state.boards;
-    this.saveState({ ...state, boards: remainingBoards });
+    await this.saveState({ ...state, boards: remainingBoards });
   }
 
-  getActivity(activityId: ActivityId): Activity | undefined {
-    const state = this.getState();
+  async getActivity(activityId: ActivityId): Promise<Activity | undefined> {
+    const state = await this.getState();
     return state.activities[activityId];
   }
 
-  getActivities(): Activity[] {
-    const state = this.getState();
+  async getActivities(): Promise<Activity[]> {
+    const state = await this.getState();
     return Object.values(state.activities);
   }
 
-  createActivity(activity: Activity): void {
+  async createActivity(activity: Activity): Promise<void> {
     const { parentBoardId } = activity;
-    const state = this.getState();
+    const state = await this.getState();
 
     // Actualizar el estado con la nueva actividad
     const newState: PersistedState = {
@@ -145,15 +202,15 @@ class SystemAPI implements SystemAPIType {
       };
     }
 
-    this.saveState(newState);
+    await this.saveState(newState);
   }
 
-  updateActivity(activity: Activity): void {
-    const state = this.getState();
+  async updateActivity(activity: Activity): Promise<void> {
+    const state = await this.getState();
 
     if (!state.activities[activity.id]) return;
 
-    this.saveState({
+    await this.saveState({
       ...state,
       activities: {
         ...state.activities,
@@ -162,15 +219,15 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
-  removeActivity(activity: Activity): void {
-    const state = this.getState();
+  async removeActivity(activity: Activity): Promise<void> {
+    const state = await this.getState();
 
     // Eliminar la referencia del board padre si existe
     if (activity.parentBoardId) {
       const parentBoard = state.boards[activity.parentBoardId];
 
       if (parentBoard) {
-        this.updateBoard({
+        await this.updateBoard({
           ...parentBoard,
           activities: parentBoard.activities.filter((id) => id !== activity.id),
         });
@@ -179,27 +236,27 @@ class SystemAPI implements SystemAPIType {
 
     // Eliminar la actividad
     const { [activity.id]: _, ...remainingActivities } = state.activities;
-    this.saveState({ ...state, activities: remainingActivities });
+    await this.saveState({ ...state, activities: remainingActivities });
   }
 
-  getSelectedActivity(): Activity | undefined {
-    return this.getState().selectedActivity;
+  async getSelectedActivity(): Promise<Activity | undefined> {
+    const state = await this.getState();
+    return state.selectedActivity;
   }
 
-  setSelectedActivity(activity: Activity | undefined): void {
-    const state = this.getState();
-
-    this.saveState({ ...state, selectedActivity: activity });
+  async setSelectedActivity(activity: Activity | undefined): Promise<void> {
+    const state = await this.getState();
+    await this.saveState({ ...state, selectedActivity: activity });
   }
 
-  unselectActivity(): void {
-    const state = this.getState();
-
-    this.saveState({ ...state, selectedActivity: undefined });
+  async unselectActivity(): Promise<void> {
+    const state = await this.getState();
+    await this.saveState({ ...state, selectedActivity: undefined });
   }
 
-  getTotalTempoBalance(): number {
-    return this.getState().totalTempoBalance;
+  async getTotalTempoBalance(): Promise<PersistedState["totalTempoBalance"]> {
+    const state = await this.getState();
+    return state.totalTempoBalance;
   }
 
   private shouldUpdateLastRecord(
@@ -227,29 +284,29 @@ class SystemAPI implements SystemAPIType {
     };
   }
 
-  updateTempoBalance({
+  async updateTempoBalance({
     investedTimeRecord,
     tempoModificationRecord,
   }: {
     investedTimeRecord?: InvestedTimeRecord | undefined;
     tempoModificationRecord: TempoModificationRecord;
-  }): void {
-    const state = this.getState();
+  }): Promise<void> {
+    const state = await this.getState();
 
     if (!state.currentDay) return;
 
     // Actualizar historial de tiempo invertido
     const newInvestedTimeHistory = investedTimeRecord
-      ? this.updateInvestedTimeHistory({ investedTimeRecord })
+      ? await this.updateInvestedTimeHistory({ investedTimeRecord })
       : state.investedTimeHistory;
 
     // Calcular nuevos balances
-    const { dayTempoBalance, totalTempoBalance } = this.calculateNewBalances({
+    const { dayTempoBalance, totalTempoBalance } = await this.calculateNewBalances({
       tempoModification: tempoModificationRecord.tempoModification,
     });
 
     // Guardar todos los cambios
-    this.saveState({
+    await this.saveState({
       ...state,
       lifecycleState: "dayInProgress",
       currentDay: {
@@ -262,18 +319,18 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
-  pushToInvestedTimeHistory(investedTimeRecord: InvestedTimeRecord): void {
-    const state = this.getState();
-    const newInvestedTimeHistory = this.updateInvestedTimeHistory({ investedTimeRecord });
-    this.saveState({ ...state, investedTimeHistory: newInvestedTimeHistory });
+  async pushToInvestedTimeHistory(investedTimeRecord: InvestedTimeRecord): Promise<void> {
+    const state = await this.getState();
+    const newInvestedTimeHistory = await this.updateInvestedTimeHistory({ investedTimeRecord });
+    await this.saveState({ ...state, investedTimeHistory: newInvestedTimeHistory });
   }
 
-  private updateInvestedTimeHistory({
+  private async updateInvestedTimeHistory({
     investedTimeRecord: newRecord,
   }: {
     investedTimeRecord: InvestedTimeRecord;
-  }): InvestedTimeRecord[] {
-    const currentHistory = this.getInvestedTimeHistory();
+  }): Promise<InvestedTimeRecord[]> {
+    const currentHistory = await this.getInvestedTimeHistory();
     const lastRecord = currentHistory.at(-1);
 
     if (!lastRecord) {
@@ -287,8 +344,8 @@ class SystemAPI implements SystemAPIType {
     return [...currentHistory, newRecord];
   }
 
-  private calculateNewBalances({ tempoModification }: { tempoModification: number }) {
-    const state = this.getState();
+  private async calculateNewBalances({ tempoModification }: { tempoModification: number }) {
+    const state = await this.getState();
     const currentDay = state.currentDay;
 
     const prevDayTempoBalance = currentDay?.dayTempoBalance ?? 0;
@@ -299,12 +356,13 @@ class SystemAPI implements SystemAPIType {
     };
   }
 
-  getInvestedTimeHistory(): InvestedTimeRecord[] {
-    return this.getState().investedTimeHistory;
+  async getInvestedTimeHistory(): Promise<InvestedTimeHistory> {
+    const state = await this.getState();
+    return state.investedTimeHistory;
   }
 
-  getInvestedTimeHistoryByDay(day: Date): InvestedTimeRecord[] {
-    const history = this.getInvestedTimeHistory();
+  async getInvestedTimeHistoryByDay(day: Date): Promise<InvestedTimeHistory> {
+    const history = await this.getInvestedTimeHistory();
     return history.filter((record) => {
       const recordDate = new Date(record.timestamp);
       return (
@@ -315,31 +373,34 @@ class SystemAPI implements SystemAPIType {
     });
   }
 
-  getUsefulMetrics(): UsefulMetrics {
-    return this.getState().usefulMetrics;
+  async getUsefulMetrics(): Promise<UsefulMetrics> {
+    const state = await this.getState();
+    return state.usefulMetrics;
   }
 
-  updateUsefulMetrics({ metrics }: { metrics: UsefulMetrics }): void {
-    const state = this.getState();
-    this.saveState({ ...state, usefulMetrics: metrics });
+  async updateUsefulMetrics({ metrics }: { metrics: UsefulMetrics }): Promise<void> {
+    const state = await this.getState();
+    await this.saveState({ ...state, usefulMetrics: metrics });
   }
 
-  getSystemParams(): SystemParams {
-    return this.getState().systemParams;
+  async getSystemParams(): Promise<SystemParams> {
+    const state = await this.getState();
+    return state.systemParams;
   }
 
-  updateSystemParams(params: SystemParams): void {
-    const state = this.getState();
-    this.saveState({ ...state, systemParams: params });
+  async updateSystemParams(params: SystemParams): Promise<void> {
+    const state = await this.getState();
+    await this.saveState({ ...state, systemParams: params });
   }
 
-  getCurrentDay(): DayState | undefined {
-    return this.getState().currentDay;
+  async getCurrentDay(): Promise<DayState | undefined> {
+    const state = await this.getState();
+    return state.currentDay;
   }
 
-  updateLastUpdateTimestamp(timestamp: number): void {
-    const state = this.getState();
-    this.saveState({ ...state, lastUpdateTimestamp: timestamp });
+  async updateLastUpdateTimestamp(timestamp: number): Promise<void> {
+    const state = await this.getState();
+    await this.saveState({ ...state, lastUpdateTimestamp: timestamp });
   }
 }
 
