@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createContext, useState } from "react";
 
-import type { UiState } from "../../core/types";
+import type { UiState } from "../core/types";
 
 // Estado inicial del sistema
 const initialState: UiState = {

@@ -3,5 +3,14 @@
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
-  ]
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@core": ["./src/core"],
+      "@core/*": ["./src/core/*"]
+    },
+    "jsx": "react-jsx"
+  }
 }
