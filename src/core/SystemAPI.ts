@@ -26,7 +26,7 @@ const defaultState: PersistedState = {
   usefulMetrics: {
     totalGeneratedTemposEver: 0,
     totalMinutesInvested: {
-      intrinsecProductivity: 0,
+      intrinsicProductivity: 0,
       challenges: 0,
       hobbies: 0,
       rest: 0,
@@ -145,6 +145,18 @@ class SystemAPI implements SystemAPIType {
 
   async createBoard(board: Board): Promise<void> {
     const state = await this.getState();
+
+    // Si tiene padre, actualizar childrenBoards del padre
+    if (board.parentBoardId) {
+      const parentBoard = state.boards[board.parentBoardId];
+      if (parentBoard) {
+        await this.updateBoard({
+          ...parentBoard,
+          childrenBoards: [...(parentBoard.childrenBoards || []), board.id],
+        });
+      }
+    }
+
     await this.saveState({
       ...state,
       boards: { ...state.boards, [board.id]: board },
@@ -157,6 +169,31 @@ class SystemAPI implements SystemAPIType {
 
     if (!existingBoard) return;
 
+    // Si cambió el parentBoardId
+    if (existingBoard.parentBoardId !== board.parentBoardId) {
+      // Eliminar referencia del padre anterior
+      if (existingBoard.parentBoardId) {
+        const oldParent = state.boards[existingBoard.parentBoardId];
+        if (oldParent) {
+          await this.updateBoard({
+            ...oldParent,
+            childrenBoards: oldParent.childrenBoards?.filter((id) => id !== board.id),
+          });
+        }
+      }
+
+      // Agregar referencia al nuevo padre
+      if (board.parentBoardId) {
+        const newParent = state.boards[board.parentBoardId];
+        if (newParent) {
+          await this.updateBoard({
+            ...newParent,
+            childrenBoards: [...(newParent.childrenBoards || []), board.id],
+          });
+        }
+      }
+    }
+
     await this.saveState({
       ...state,
       boards: {
@@ -168,6 +205,37 @@ class SystemAPI implements SystemAPIType {
 
   async removeBoard(board: Board): Promise<void> {
     const state = await this.getState();
+
+    // 1. Actualizar el board padre si existe
+    if (board.parentBoardId) {
+      const parentBoard = state.boards[board.parentBoardId];
+      if (parentBoard) {
+        await this.updateBoard({
+          ...parentBoard,
+          childrenBoards: parentBoard.childrenBoards?.filter((id) => id !== board.id),
+        });
+      }
+    }
+
+    // 2. Eliminar recursivamente los boards hijos
+    if (board.childrenBoards) {
+      for (const childId of board.childrenBoards) {
+        const childBoard = state.boards[childId];
+        if (childBoard) {
+          await this.removeBoard(childBoard); // Llamada recursiva para eliminar hijos
+        }
+      }
+    }
+
+    // 3. Eliminar las actividades asociadas
+    for (const activityId of board.activities) {
+      const activity = state.activities[activityId];
+      if (activity) {
+        await this.removeActivity(activity);
+      }
+    }
+
+    // 4. Finalmente eliminar el board
     const { [board.id]: _, ...remainingBoards } = state.boards;
     await this.saveState({ ...state, boards: remainingBoards });
   }
