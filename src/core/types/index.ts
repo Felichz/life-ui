@@ -88,7 +88,7 @@ interface BaseActivityConstraint {
 /** Criterio de expiración, que extiende el base */
 interface ExpirationActivityConstraint extends BaseActivityConstraint {
   type: "expiration";
-  expirationDate: number;
+  dayMinuteExpiration: number;
 }
 
 /** Unión de criterios disponibles */
@@ -159,7 +159,7 @@ export interface Board {
 export interface UsefulMetrics {
   totalGeneratedTemposEver: number;
   totalMinutesInvested: {
-    intrinsecProductivity: number;
+    intrinsicProductivity: number;
     challenges: number;
     hobbies: number;
     rest: number;

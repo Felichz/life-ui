@@ -15,7 +15,7 @@ const initialState: UiState = {
   activities: [],
   usefulMetrics: {
     totalMinutesInvested: {
-      intrinsecProductivity: 0,
+      intrinsicProductivity: 0,
       challenges: 0,
       hobbies: 0,
       rest: 0,
