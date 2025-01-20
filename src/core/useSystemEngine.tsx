@@ -1,7 +1,5 @@
 import { useCallback, useEffect } from "react";
 
-import type { UiStateContextValue } from "src/ui/system-context/UiStateContext";
-
 import type {
   Activity,
   Board,
@@ -14,6 +12,8 @@ import type {
   SystemAPIType,
   UiState,
 } from "./types";
+
+import type { UiStateContextValue } from "@/system-context/UiStateContext";
 
 /**
  * @param systemState - El estado del sistema que se mantiene en la ui, se mantiene en el SystemContext, sincronizado con el SystemAPI
