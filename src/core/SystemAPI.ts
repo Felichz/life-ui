@@ -210,10 +210,11 @@ class SystemAPI implements SystemAPIType {
     if (board.parentBoardId) {
       const parentBoard = state.boards[board.parentBoardId];
       if (parentBoard) {
-        await this.updateBoard({
+        const updatedParentBoard = {
           ...parentBoard,
-          childrenBoards: parentBoard.childrenBoards?.filter((id) => id !== board.id),
-        });
+          childrenBoards: parentBoard.childrenBoards?.filter((id) => id !== board.id) || [],
+        };
+        state.boards[board.parentBoardId] = updatedParentBoard;
       }
     }
 
@@ -222,22 +223,26 @@ class SystemAPI implements SystemAPIType {
       for (const childId of board.childrenBoards) {
         const childBoard = state.boards[childId];
         if (childBoard) {
-          await this.removeBoard(childBoard); // Llamada recursiva para eliminar hijos
+          // Eliminar el hijo del estado actual
+          delete state.boards[childId];
+          // Eliminar las actividades del hijo
+          for (const activityId of childBoard.activities) {
+            delete state.activities[activityId];
+          }
         }
       }
     }
 
-    // 3. Eliminar las actividades asociadas
+    // 3. Eliminar las actividades asociadas al board actual
     for (const activityId of board.activities) {
-      const activity = state.activities[activityId];
-      if (activity) {
-        await this.removeActivity(activity);
-      }
+      delete state.activities[activityId];
     }
 
-    // 4. Finalmente eliminar el board
-    const { [board.id]: _, ...remainingBoards } = state.boards;
-    await this.saveState({ ...state, boards: remainingBoards });
+    // 4. Eliminar el board actual
+    delete state.boards[board.id];
+
+    // 5. Guardar el estado actualizado
+    await this.saveState(state);
   }
 
   async getActivity(activityId: ActivityId): Promise<Activity | undefined> {
@@ -274,9 +279,12 @@ class SystemAPI implements SystemAPIType {
   }
 
   async updateActivity(activity: Activity): Promise<void> {
+    console.log("updateActivity", activity);
     const state = await this.getState();
 
     if (!state.activities[activity.id]) return;
+
+    console.log("prev persisted state", state);
 
     await this.saveState({
       ...state,
@@ -285,6 +293,8 @@ class SystemAPI implements SystemAPIType {
         [activity.id]: activity,
       },
     });
+
+    console.log("new persisted state", await this.getState());
   }
 
   async removeActivity(activity: Activity): Promise<void> {
@@ -309,12 +319,16 @@ class SystemAPI implements SystemAPIType {
 
   async getSelectedActivity(): Promise<Activity | undefined> {
     const state = await this.getState();
-    return state.selectedActivity;
+
+    if (!state.selectedActivity) return undefined;
+
+    return state.activities[state.selectedActivity];
   }
 
-  async setSelectedActivity(activity: Activity | undefined): Promise<void> {
+  async setSelectedActivity(activity: Activity): Promise<void> {
     const state = await this.getState();
-    await this.saveState({ ...state, selectedActivity: activity });
+
+    await this.saveState({ ...state, selectedActivity: activity?.id });
   }
 
   async unselectActivity(): Promise<void> {
