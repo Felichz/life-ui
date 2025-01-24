@@ -86,7 +86,7 @@ interface BaseActivityConstraint {
 }
 
 /** Criterio de expiración, que extiende el base */
-interface ExpirationActivityConstraint extends BaseActivityConstraint {
+export interface ExpirationActivityConstraint extends BaseActivityConstraint {
   type: "expiration";
   dayMinuteExpiration: number;
 }
@@ -195,7 +195,7 @@ export type PersistedDayState =
 export type PersistedState = {
   boards: Record<BoardId, Board>;
   activities: Record<ActivityId, Activity>;
-  selectedActivity?: Activity | undefined;
+  selectedActivity?: ActivityId | undefined;
   totalTempoBalance: number;
   /**
    * Es como un timeline de los minutos invertidos en las actividades, se separa en registros por actividad (o idle)
@@ -236,8 +236,8 @@ export interface SystemAPIType {
   updateActivity: (activity: Activity) => Promise<void>;
   removeActivity: (activity: Activity) => Promise<void>;
 
-  getSelectedActivity: () => Promise<PersistedState["selectedActivity"] | undefined>;
-  setSelectedActivity: (activity: PersistedState["selectedActivity"] | undefined) => Promise<void>;
+  getSelectedActivity: () => Promise<Activity | undefined>;
+  setSelectedActivity: (activity: Activity) => Promise<void>;
   unselectActivity: () => Promise<void>;
 
   // Gestión de Tempo
@@ -280,9 +280,23 @@ export type UiState = {
   lifecycleState: PersistedState["lifecycleState"];
   totalTempoBalance: number;
   investedTimeHistory: InvestedTimeHistory;
+  tempoModificationHistory: TempoModificationHistory;
   selectedActivity?: Activity | undefined;
   boards: Board[];
   activities: Activity[];
   usefulMetrics: UsefulMetrics;
   systemParams: SystemParams;
 };
+
+export type CreateBoardInput = Omit<Board, "id">;
+
+export type CreateActivityBaseInput = Omit<BaseActivity, "id">;
+
+export type CreateChallengeActivityInput = CreateActivityBaseInput &
+  Omit<ChallengeActivity, keyof BaseActivity | "id">;
+export type CreateNeutralActivityInput = CreateActivityBaseInput &
+  Omit<NeutralActivity, keyof BaseActivity | "id">;
+export type CreateHobbyActivityInput = CreateActivityBaseInput &
+  Omit<HobbyActivity, keyof BaseActivity | "id">;
+
+export type CreateActivityInput = Omit<Activity, "id">;

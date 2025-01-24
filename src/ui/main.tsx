@@ -4,7 +4,8 @@ import { createRoot } from "react-dom/client";
 
 import "./index.css";
 import App from "./app";
-import { UiStateProvider } from "./system-context/UiStateContext";
+
+import { UiStateProvider } from "@/ui/system-context/UiStateContext";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

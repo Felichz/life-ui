@@ -11,9 +11,11 @@ import type {
   NeutralActivity,
   SystemAPIType,
   UiState,
+  CreateBoardInput,
+  CreateActivityInput,
 } from "./types";
 
-import type { UiStateContextValue } from "@/system-context/UiStateContext";
+import type { UiStateContextValue } from "@/ui/system-context/UiStateContext";
 
 /**
  * @param systemState - El estado del sistema que se mantiene en la ui, se mantiene en el SystemContext, sincronizado con el SystemAPI
@@ -45,15 +47,24 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
   // Ejecuta la lógica de evaluación base cada un minuto
   useEffect(() => {
+    const startUpdate = async () => {
+      setUiState((current) => ({
+        ...current,
+        updatingSystemState: true,
+      }));
+
+      await _updateSystemState();
+
+      setUiState((current) => ({
+        ...current,
+        updatingSystemState: false,
+      }));
+    };
+
     const interval = setInterval(() => {
       setUiState((current) => {
         if (current.updatingSystemState === false) {
-          _updateSystemState();
-
-          return {
-            ...current,
-            updatingSystemState: true,
-          };
+          startUpdate();
         }
 
         return current;
@@ -76,9 +87,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    */
   const _syncUiStateFromPersisted = useCallback(async () => {
     const persistedState = await systemApi.getPersistedState();
-    console.log("_syncUiStateFromPersisted");
+    console.log("===== _syncUiStateFromPersisted ===== ");
     console.log("persistedState", persistedState);
-    console.log("============");
+    console.log("========================================");
 
     setUiState((current) => ({
       ...current,
@@ -86,7 +97,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       currentDay: persistedState.currentDay,
       totalTempoBalance: persistedState.totalTempoBalance,
       investedTimeHistory: persistedState.investedTimeHistory,
-      selectedActivity: persistedState.selectedActivity,
+      tempoModificationHistory: persistedState.tempoModificationHistory,
+      selectedActivity: persistedState.selectedActivity
+        ? persistedState.activities[persistedState.selectedActivity]
+        : undefined,
       boards: Object.values(persistedState.boards),
       activities: Object.values(persistedState.activities),
       usefulMetrics: persistedState.usefulMetrics,
@@ -102,7 +116,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * 3. Verificar si el día debe terminar
    */
   const _updateSystemState = useCallback(async () => {
-    console.log("_updateSystemState");
+    console.log("========= START _updateSystemState =========");
+    console.log("_updateSystemState => uiState", uiState);
 
     // En cada iteración vamos a:
     // 1. Obtener el estado más reciente
@@ -119,11 +134,13 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const currentDay = persistedState.currentDay;
       const lastUpdateTimestamp = persistedState.lastUpdateTimestamp;
 
-      console.log(`_updateSystemState iteration for minute ${await _getCurrentProcessedMinute()}`);
+      console.log(
+        `_updateSystemState => iteration for minute ${await _getCurrentProcessedMinute()}`
+      );
 
       // Si no hay día en progreso, no hay nada que actualizar
       if (!currentDay || persistedState.lifecycleState !== "dayInProgress") {
-        console.log("_updateSystemState return: no day in progress");
+        console.log("_updateSystemState => return because no day in progress");
         return;
       }
 
@@ -131,25 +148,29 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const dayEndMinute = currentDay.dayStartMinute + 960;
       const lastUpdateMinute = await _getCurrentProcessedMinute();
 
-      const minutesRemainingToProcess = _getMinutesFromTimestamp(Date.now()) - lastUpdateMinute;
+      const isSameDay = new Date(currentDay.date).toDateString() === new Date().toDateString();
 
-      console.log("minutesRemainingToProcess", minutesRemainingToProcess);
+      const minutesRemainingToProcess = isSameDay
+        ? _getMinutesFromTimestamp(Date.now()) - lastUpdateMinute
+        : dayEndMinute - lastUpdateMinute;
+
+      console.log("_updateSystemState => minutesRemainingToProcess", minutesRemainingToProcess);
       console.log(
-        "because _getMinutesFromTimestamp(Date.now())",
+        "    because _getMinutesFromTimestamp(Date.now())",
         _getMinutesFromTimestamp(Date.now())
       );
-      console.log("and lastUpdateMinute", lastUpdateMinute);
+      console.log("        and lastUpdateMinute", lastUpdateMinute);
 
       // Si no ha pasado ningún minuto, no hay nada que actualizar
       if (minutesRemainingToProcess === 0) {
-        console.log("_updateSystemState return: no minutes to process");
+        console.log("_updateSystemState => return because no minutes to process");
         shouldContinue = false;
         return;
       }
 
       // Si corresponde, terminamos el día
       if (dayEndMinute === lastUpdateMinute) {
-        console.log("_updateSystemState return: end day");
+        console.log("_updateSystemState => return because end day");
 
         await endDay();
         await _syncUiStateFromPersisted();
@@ -157,39 +178,43 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       // Procesamos un solo minuto
       const currentActivity = await systemApi.getSelectedActivity();
+      console.log("_updateSystemState => currentActivity", currentActivity);
 
       // Si hay una actividad seleccionada
       if (currentActivity) {
         // Lógica según el tipo de actividad
         switch (currentActivity.type) {
           case "challenge": {
+            console.log("_updateSystemState => _applyChallengeMinuteGeneration");
             await _applyChallengeMinuteGeneration({
               activity: currentActivity,
-              currentProcessingMinute: lastUpdateMinute,
             });
 
             // Evaluamos los constraints
+            console.log("_updateSystemState => _evaluateChallengeConstraints");
             await _evaluateChallengeConstraints({
               activity: currentActivity,
-              currentProcessingMinute: lastUpdateMinute,
             });
             break;
           }
           case "neutral": {
+            console.log("_updateSystemState => _applyNeutralTimeRecord");
             await _applyNeutralTimeRecord({
               activity: currentActivity,
-              currentProcessingMinute: lastUpdateMinute,
             });
             break;
           }
           case "discount": {
+            console.log("_updateSystemState => _applyDiscountedConsumption");
             await _applyDiscountedConsumption({
               activity: currentActivity,
-              currentProcessingMinute: lastUpdateMinute,
             });
             break;
           }
         }
+
+        console.log("_updateSystemState => minutesActive", currentActivity.minutesActive);
+        console.log("_updateSystemState => new minutesActive", currentActivity.minutesActive + 1);
 
         // Actualizar minutesActive de la actividad
         await systemApi.updateActivity({
@@ -198,21 +223,16 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         });
       } else {
         // Si no hay actividad seleccionada, aplicamos consumo pasivo
-        await _applyIdlePassiveConsumption({ currentProcessingMinute: lastUpdateMinute });
+        await _applyIdlePassiveConsumption();
       }
 
       // Actualizamos el timestamp sumando un minuto
       await systemApi.updateLastUpdateTimestamp(lastUpdateTimestamp + 60000);
+
+      console.log("_updateSystemState => setUiState");
+
+      await _syncUiStateFromPersisted();
     }
-
-    console.log("_updateSystemState setUiState");
-
-    setUiState((current) => ({
-      ...current,
-      updatingSystemState: false,
-    }));
-
-    await _syncUiStateFromPersisted();
   }, []);
 
   /**
@@ -221,13 +241,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * internas del sistema. Ejemplo: aplicar consumos pasivos, generar tempo, etc.
    */
   const _applyChallengeMinuteGeneration = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: ChallengeActivity;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity }: { activity: ChallengeActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
       const isWithinEstimatedTime = activity.minutesActive < activity.totalTempoReward;
 
       // Si estamos dentro del tiempo estimado, generamos tempo
@@ -236,7 +252,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           status: "activity",
           activityId: activity.id,
           type: "challenge",
-          timestamp: currentProcessingMinute,
+          timestamp: lastUpdateTimestamp,
           tempoModification: 1,
           minutesInvested: 1,
         };
@@ -245,7 +261,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           status: "activity",
           activityId: activity.id,
           type: "challenge",
-          timestamp: currentProcessingMinute,
+          timestamp: lastUpdateTimestamp,
           reason: "challengeMinuteGeneration",
           tempoModification: 1,
         };
@@ -254,44 +270,34 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           investedTimeRecord,
           tempoModificationRecord,
         });
-
-        await systemApi.updateActivity({
-          ...activity,
-          minutesActive: activity.minutesActive + 1,
-        });
       } else {
         // Si excedimos el tiempo estimado, aplicamos consumo pasivo
-        await _applyIdlePassiveConsumption({ currentProcessingMinute });
+        await _applyIdlePassiveConsumption();
       }
     },
     []
   );
 
   const _applyNeutralTimeRecord = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: NeutralActivity;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity }: { activity: NeutralActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
+      if (activity.minutesActive > activity.allowedTime) {
+        await systemApi.unselectActivity();
+      }
+
       const investedTimeRecord: InvestedTimeRecord = {
         status: "activity",
         activityId: activity.id,
         type: "neutral",
-        timestamp: currentProcessingMinute,
+        timestamp: lastUpdateTimestamp,
         tempoModification: 0,
         minutesInvested: 1,
       };
 
-      await systemApi.updateActivity({
-        ...activity,
-        minutesActive: activity.minutesActive + 1,
-      });
-
       await systemApi.pushToInvestedTimeHistory(investedTimeRecord);
 
-      if (activity.minutesActive >= activity.allowedTime) {
+      if (activity.minutesActive === activity.allowedTime) {
         await systemApi.unselectActivity();
       }
     },
@@ -299,20 +305,20 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const _applyDiscountedConsumption = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: HobbyActivity;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity }: { activity: HobbyActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
+      if (activity.minutesActive > activity.allowedTime) {
+        await systemApi.unselectActivity();
+      }
+
       const discountedConsumption = 0 - activity.tempoConsumptionRate;
 
       const investedTimeRecord: InvestedTimeRecord = {
         status: "activity",
         activityId: activity.id,
         type: "discount",
-        timestamp: currentProcessingMinute,
+        timestamp: lastUpdateTimestamp,
         tempoModification: discountedConsumption,
         minutesInvested: 1,
       };
@@ -321,7 +327,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         status: "activity",
         activityId: activity.id,
         type: "discount",
-        timestamp: currentProcessingMinute,
+        timestamp: lastUpdateTimestamp,
         reason: "discountedPassiveConsumption",
         tempoModification: discountedConsumption,
       };
@@ -331,11 +337,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModificationRecord,
       });
 
-      await systemApi.updateActivity({
-        ...activity,
-        minutesActive: activity.minutesActive + 1,
-      });
-
       if (activity.minutesActive === activity.allowedTime) {
         await systemApi.unselectActivity();
       }
@@ -343,48 +344,43 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     []
   );
 
-  const _applyIdlePassiveConsumption = useCallback(
-    async ({ currentProcessingMinute }: { currentProcessingMinute: number }) => {
-      const { passiveTempoConsumptionRate } = await systemApi.getSystemParams();
-      const passiveConsumption = 0 - passiveTempoConsumptionRate;
+  const _applyIdlePassiveConsumption = useCallback(async () => {
+    const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
-      const investedTimeRecord: InvestedTimeRecord = {
-        status: "idle",
-        timestamp: currentProcessingMinute,
-        tempoModification: passiveConsumption,
-        minutesInvested: 1,
-      };
+    const { passiveTempoConsumptionRate } = await systemApi.getSystemParams();
+    const passiveConsumption = 0 - passiveTempoConsumptionRate;
 
-      const tempoModificationRecord: TempoModificationRecord = {
-        status: "idle",
-        timestamp: currentProcessingMinute,
-        reason: "passiveConsumption",
-        tempoModification: passiveConsumption,
-      };
+    const investedTimeRecord: InvestedTimeRecord = {
+      status: "idle",
+      timestamp: lastUpdateTimestamp,
+      tempoModification: passiveConsumption,
+      minutesInvested: 1,
+    };
 
-      await systemApi.updateTempoBalance({
-        investedTimeRecord,
-        tempoModificationRecord,
-      });
-    },
-    []
-  );
+    const tempoModificationRecord: TempoModificationRecord = {
+      status: "idle",
+      timestamp: lastUpdateTimestamp,
+      reason: "passiveConsumption",
+      tempoModification: passiveConsumption,
+    };
+
+    await systemApi.updateTempoBalance({
+      investedTimeRecord,
+      tempoModificationRecord,
+    });
+  }, []);
 
   const _applyNeutralActivityEarlyCompletionCompensation = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: NeutralActivity;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity }: { activity: NeutralActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
       const compensation = activity.allowedTime - activity.minutesActive;
 
       const tempoModificationRecord: TempoModificationRecord = {
         status: "activity",
         activityId: activity.id,
         type: "neutral",
-        timestamp: currentProcessingMinute,
+        timestamp: lastUpdateTimestamp,
         reason: "earlyNeutralActivityCompletionCompensation",
         tempoModification: compensation,
       };
@@ -397,13 +393,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const _applyDiscountActivityEarlyCompletionCompensation = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: HobbyActivity;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity }: { activity: HobbyActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
       // Calculamos el tiempo restante no utilizado
       const unusedTime = activity.allowedTime - activity.minutesActive;
 
@@ -418,7 +410,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         status: "activity",
         activityId: activity.id,
         type: "discount",
-        timestamp: currentProcessingMinute,
+        timestamp: lastUpdateTimestamp,
         reason: "earlyDiscountActivityCompletionCompensation",
         tempoModification: compensation,
       };
@@ -431,20 +423,14 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const _applyChallengeCriteriaFailed = useCallback(
-    async ({
-      activity,
-      penaltyAmount,
-      currentProcessingMinute,
-    }: {
-      activity: ChallengeActivity;
-      penaltyAmount: number;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity, penaltyAmount }: { activity: ChallengeActivity; penaltyAmount: number }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
       const tempoModificationRecord: TempoModificationRecord = {
         status: "activity",
         activityId: activity.id,
         type: "challenge",
-        timestamp: currentProcessingMinute,
+        timestamp: lastUpdateTimestamp,
         reason: "challengeCriteriaFailed",
         tempoModification: -penaltyAmount,
       };
@@ -457,13 +443,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const _evaluateChallengeConstraints = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: ChallengeActivity;
-      currentProcessingMinute: number;
-    }) => {
+    async ({ activity }: { activity: ChallengeActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
       // Solo evaluamos challenges y solo si tienen constraints
       if (activity.type !== "challenge" || !activity.constraintList?.length) {
         return;
@@ -479,7 +461,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         switch (constraint.type) {
           case "expiration": {
             // Si pasó el minuto de expiración
-            if (currentProcessingMinute > constraint.dayMinuteExpiration) {
+            if (lastUpdateTimestamp > constraint.dayMinuteExpiration) {
               // Marcamos el constraint como fallido
               const updatedActivity: ChallengeActivity = {
                 ...activity,
@@ -509,7 +491,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
                 await _applyChallengeCriteriaFailed({
                   activity,
                   penaltyAmount,
-                  currentProcessingMinute,
                 });
               }
             }
@@ -554,9 +535,13 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   //   ACCIONES: Boards
   // ===========================
   const createBoard = useCallback(
-    async (board: Board) => {
+    async (boardInput: CreateBoardInput) => {
+      console.log("createBoard boardInput", boardInput);
+      const board: Board = {
+        ...boardInput,
+        id: crypto.randomUUID(),
+      };
       await systemApi.createBoard(board);
-
       await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
@@ -584,9 +569,17 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   //   ACCIONES: Activities
   // ===========================
   const createActivity = useCallback(
-    async (activity: Activity) => {
-      await systemApi.createActivity(activity);
+    async (activityInput: Omit<Activity, "id">) => {
+      if (!validateNewActivity(activityInput)) {
+        throw new Error("Invalid activity data");
+      }
 
+      const activity: Activity = {
+        ...activityInput,
+        id: crypto.randomUUID(),
+      } as Activity;
+
+      await systemApi.createActivity(activity);
       await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
@@ -615,6 +608,13 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    */
   const selectActivity = useCallback(
     async (activity: Activity) => {
+      // Primero actualizamos el estado de la actividad a "inProgress"
+      await systemApi.updateActivity({
+        ...activity,
+        status: "inProgress",
+      });
+
+      // Luego la seleccionamos
       await systemApi.setSelectedActivity(activity);
 
       await _syncUiStateFromPersisted();
@@ -637,7 +637,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           if (currentActivity.minutesActive < currentActivity.allowedTime) {
             await _applyNeutralActivityEarlyCompletionCompensation({
               activity: currentActivity,
-              currentProcessingMinute: await _getCurrentProcessedMinute(),
             });
           }
           break;
@@ -647,7 +646,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           if (currentActivity.minutesActive < currentActivity.allowedTime) {
             await _applyDiscountActivityEarlyCompletionCompensation({
               activity: currentActivity,
-              currentProcessingMinute: await _getCurrentProcessedMinute(),
             });
           }
           break;
@@ -672,27 +670,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Por ejemplo, aplicamos la recompensa (reason="challengeCompletionReward").
    */
   const completeChallenge = useCallback(
-    async ({
-      activity,
-      currentProcessingMinute,
-    }: {
-      activity: ChallengeActivity;
-      currentProcessingMinute: number;
-    }) => {
-      const reward = activity.totalTempoReward - activity.minutesActive;
-
-      const tempoModificationRecord: TempoModificationRecord = {
-        status: "activity",
-        activityId: activity.id,
-        type: "challenge",
-        timestamp: currentProcessingMinute,
-        reason: "challengeCompletionReward",
-        tempoModification: reward,
-      };
-
-      await systemApi.updateTempoBalance({
-        tempoModificationRecord,
-      });
+    async ({ activity }: { activity: ChallengeActivity }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
       // Actualizar el estado de la actividad a completada
       await systemApi.updateActivity({
@@ -703,28 +682,122 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       // Deseleccionar la actividad
       await systemApi.unselectActivity();
 
+      if (activity.minutesActive >= activity.totalTempoReward) {
+        await _syncUiStateFromPersisted();
+        return;
+      }
+
+      const reward = activity.totalTempoReward - activity.minutesActive;
+
+      const tempoModificationRecord: TempoModificationRecord = {
+        status: "activity",
+        activityId: activity.id,
+        type: "challenge",
+        timestamp: lastUpdateTimestamp,
+        reason: "challengeCompletionReward",
+        tempoModification: reward,
+      };
+
+      await systemApi.updateTempoBalance({
+        tempoModificationRecord,
+      });
+
       await _syncUiStateFromPersisted();
     },
     [_syncUiStateFromPersisted]
   );
 
+  // Funciones utilitarias
+  const calculateActivityProgress = (activity: Activity): number => {
+    if (activity.type === "challenge") {
+      return Math.min((activity.minutesActive / activity.totalTempoReward) * 100, 100);
+    }
+    return Math.min((activity.minutesActive / activity.allowedTime) * 100, 100);
+  };
+
+  const validateNewActivity = (activity: Partial<Activity>): boolean => {
+    if (!activity.title?.trim()) return false;
+
+    if (activity.type === "neutral" || activity.type === "discount") {
+      if (!activity.allowedTime || activity.allowedTime <= 0 || activity.allowedTime > 960) {
+        return false;
+      }
+    }
+
+    if (activity.type === "challenge") {
+      if (!activity.totalTempoReward || activity.totalTempoReward <= 0) {
+        return false;
+      }
+    }
+
+    if (activity.type === "discount") {
+      if (
+        !activity.tempoConsumptionRate ||
+        activity.tempoConsumptionRate <= 0 ||
+        activity.tempoConsumptionRate >= 1
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const getActivitiesByBoard = (boardId: string): Activity[] => {
+    return uiState.activities.filter((a) => a.parentBoardId === boardId);
+  };
+
+  const calculateDayProgress = (
+    day: DayState | undefined
+  ): {
+    remainingTime: number;
+    endTime: string;
+    currentMinute: number;
+  } => {
+    if (!day) {
+      return {
+        remainingTime: 0,
+        endTime: "--:--",
+        currentMinute: 0,
+      };
+    }
+
+    const dayStartDate = new Date(day.date);
+    const currentDate = new Date();
+    const minutesElapsed = Math.floor(
+      (currentDate.getTime() - dayStartDate.getTime()) / (1000 * 60)
+    );
+
+    const remainingTime = Math.max(0, Math.min(960 - minutesElapsed, 960));
+
+    const endDate = new Date(day.date);
+    endDate.setMinutes(endDate.getMinutes() + 960);
+    const endTime = endDate.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    return {
+      remainingTime,
+      endTime,
+      currentMinute: Math.min(minutesElapsed, 960),
+    };
+  };
+
   // ===========================
   // DEVOLVEMOS SOLO LAS FUNCIONES "PÚBLICAS"
   // ===========================
   return {
-    // DÍA
     day: {
       startDay,
-      // Por ahora no se puede terminar el día desde la UI, una vez que se inicia un dia, ya se fija el tiempo de finalización
-      // endDay,
+      calculateProgress: calculateDayProgress,
     },
-    // BOARDS
     board: {
       createBoard,
       updateBoard,
       removeBoard,
+      getActivities: getActivitiesByBoard,
     },
-    // ACTIVITIES
     activity: {
       createActivity,
       updateActivity,
@@ -732,10 +805,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       selectActivity,
       unselectActivity,
       completeChallenge,
-      // ... otras si la UI las necesita
+      calculateProgress: calculateActivityProgress,
+      validate: validateNewActivity,
     },
-    // NO exponemos "tempo" con applyChallengeMinuteGeneration, etc.
-    // porque esas funciones son internas al bucle de 1 min o a la lógica core
-    // y no se llaman directamente desde la UI.
   };
 };

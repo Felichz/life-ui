@@ -9,7 +9,9 @@
     "paths": {
       "@/*": ["./src/*"],
       "@core": ["./src/core"],
-      "@core/*": ["./src/core/*"]
+      "@core/*": ["./src/core/*"],
+      "@shadcn": ["./src/ui/components/shadcn"],
+      "@shadcn/*": ["./src/ui/components/shadcn/*"]
     },
     "jsx": "react-jsx"
   }
