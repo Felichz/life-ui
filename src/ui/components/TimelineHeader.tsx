@@ -13,7 +13,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./shadcn/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./shadcn/tooltip";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
 import type { Activity, InvestedTimeRecord } from "@/core/types";
@@ -120,7 +119,8 @@ const TimelineHeader: React.FC = () => {
 
     const dayStartDate = new Date(uiState.currentDay.date);
 
-    return dayHistory.map((segment: InvestedTimeRecord) => {
+    // Creamos un único objeto que contendrá todos los segmentos
+    const segments = dayHistory.map((segment: InvestedTimeRecord) => {
       const segmentDate = new Date(segment.timestamp);
       const minutesFromStart = Math.floor(
         (segmentDate.getTime() - dayStartDate.getTime()) / (1000 * 60)
@@ -134,7 +134,6 @@ const TimelineHeader: React.FC = () => {
       const type = segment.status === "activity" ? segment.type : ("idle" as const);
 
       return {
-        id: segment.timestamp.toString(),
         minutesFromStart,
         duration: segment.minutesInvested,
         type,
@@ -143,6 +142,33 @@ const TimelineHeader: React.FC = () => {
         timeRange: formatTimeRange(minutesFromStart, segment.minutesInvested),
       };
     });
+
+    type TimelineSegment = {
+      timeline: string;
+      totalSegments: number;
+      [key: `segment_${number}`]: number;
+      [key: `segment_${number}_start`]: number;
+      [key: `segment_${number}_type`]: Activity["type"] | "idle";
+      [key: `segment_${number}_title`]: string;
+      [key: `segment_${number}_tempo`]: number;
+      [key: `segment_${number}_range`]: string;
+    };
+
+    // Creamos un único objeto que representa toda la línea de tiempo
+    return [
+      segments.reduce<TimelineSegment>(
+        (acc, segment, index) => ({
+          ...acc,
+          [`segment_${index}`]: segment.duration,
+          [`segment_${index}_start`]: segment.minutesFromStart,
+          [`segment_${index}_type`]: segment.type,
+          [`segment_${index}_title`]: segment.title,
+          [`segment_${index}_tempo`]: segment.tempoModification,
+          [`segment_${index}_range`]: segment.timeRange,
+        }),
+        { timeline: "timeline", totalSegments: segments.length }
+      ),
+    ];
   }, [uiState.currentDay, dayHistory, uiState.activities]);
 
   return (
@@ -191,12 +217,20 @@ const TimelineHeader: React.FC = () => {
         <div className="h-24 bg-secondary rounded-lg">
           <ResponsiveBar
             data={timelineData}
-            keys={["duration"]}
-            indexBy="minutesFromStart"
+            keys={Array.from(
+              { length: timelineData[0]?.totalSegments || 0 },
+              (_, i) => `segment_${i}`
+            )}
+            indexBy="timeline"
             layout="horizontal"
             valueScale={{ type: "linear", min: 0, max: 960 }}
             indexScale={{ type: "band", round: true }}
-            colors={({ data }) => getActivityColor(data.type)}
+            colors={(bar) => {
+              const segmentIndex = parseInt(bar.id.toString().split("_")[1]);
+              const type =
+                timelineData[0]?.[`segment_${segmentIndex}_type` as keyof (typeof timelineData)[0]];
+              return getActivityColor(type as Activity["type"] | "idle");
+            }}
             borderRadius={2}
             padding={0}
             margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
@@ -206,26 +240,46 @@ const TimelineHeader: React.FC = () => {
             axisLeft={null}
             enableGridY={false}
             enableLabel={false}
-            tooltip={({ data }) => (
-              <div className="bg-popover text-popover-foreground rounded-lg shadow-lg p-3 text-sm">
-                <p className="font-medium">{data.title}</p>
-                <p className="text-muted-foreground">{data.timeRange}</p>
-                <p>Duración: {formatTime(data.duration)}</p>
-                {data.tempoModification !== 0 && (
-                  <p className="font-medium">
-                    Tempo: {data.tempoModification > 0 ? "+" : ""}
-                    {data.tempoModification}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-          {/* Marcador de tiempo actual */}
-          <div
-            className="absolute h-full w-0.5 bg-red-500 z-10"
-            style={{
-              left: `${(Math.min(currentMinute, 960) / 960) * 100}%`,
+            tooltip={({ id, value }) => {
+              const segmentIndex = parseInt(id.toString().split("_")[1]);
+              const data = timelineData[0];
+              if (!data) return null;
+
+              const title = data[`segment_${segmentIndex}_title` as keyof typeof data];
+              const range = data[`segment_${segmentIndex}_range` as keyof typeof data];
+              const tempo = data[`segment_${segmentIndex}_tempo` as keyof typeof data];
+
+              return (
+                <div className="bg-popover text-popover-foreground rounded-lg shadow-lg p-3 text-sm">
+                  <p className="font-medium">{title}</p>
+                  <p className="text-muted-foreground">{range}</p>
+                  <p>Duración: {formatTime(value)}</p>
+                  {typeof tempo === "number" && tempo !== 0 && (
+                    <p className="font-medium">
+                      Tempo: {tempo > 0 ? "+" : ""}
+                      {tempo}
+                    </p>
+                  )}
+                </div>
+              );
             }}
+            layers={[
+              "grid",
+              "bars",
+              () => {
+                // Capa personalizada para el marcador de tiempo actual
+                return (
+                  <line
+                    x1={`${(Math.min(currentMinute, 960) / 960) * 100}%`}
+                    x2={`${(Math.min(currentMinute, 960) / 960) * 100}%`}
+                    y1={0}
+                    y2="100%"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                  />
+                );
+              },
+            ]}
           />
         </div>
       </div>
