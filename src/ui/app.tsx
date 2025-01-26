@@ -1,7 +1,7 @@
 import { useUiStateContext } from "./system-context/useUiStateContext";
 
-import MainLayout from "@/ui/components/MainLayout";
 import { SystemEngineProvider } from "@/core/SystemEngineContext";
+import MainLayout from "@/ui/components/MainLayout";
 
 import "./app.css";
 

@@ -1,5 +1,6 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
+import { TimeSimulator } from "./TimeSimulator";
 import type {
   Activity,
   Board,
@@ -13,6 +14,7 @@ import type {
   UiState,
   CreateBoardInput,
   CreateActivityInput,
+  SystemParams,
 } from "./types";
 
 import type { UiStateContextValue } from "@/ui/system-context/UiStateContext";
@@ -34,6 +36,8 @@ type SystemEngineProps = {
  * - Mantiene internas las funciones que corren en el loop 1-min o que no son disparadas por el usuario directamente.
  */
 export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngineProps) => {
+  const timeSimulator = useMemo(() => TimeSimulator.getInstance(), []);
+
   /**
    * PRIMER BLOQUE: Efectos de inicialización y sincronización
    */
@@ -45,7 +49,19 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     _updateSystemState();
   }, []);
 
-  // Ejecuta la lógica de evaluación base cada un minuto
+  // Efecto para sincronizar el modo de prueba
+  useEffect(() => {
+    timeSimulator.setTestMode(uiState.systemParams.isTestMode);
+  }, [uiState.systemParams.isTestMode]);
+
+  // Efecto para sincronizar el multiplicador de tiempo
+  useEffect(() => {
+    if (uiState.systemParams.isTestMode) {
+      timeSimulator.setTimeMultiplier(uiState.systemParams.timeMultiplier);
+    }
+  }, [uiState.systemParams.timeMultiplier, uiState.systemParams.isTestMode]);
+
+  // Ejecuta la lógica de evaluación base cada un minuto (o cada segundo en modo prueba)
   useEffect(() => {
     const startUpdate = async () => {
       setUiState((current) => ({
@@ -66,13 +82,12 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         if (current.updatingSystemState === false) {
           startUpdate();
         }
-
         return current;
       });
-    }, 60000);
+    }, timeSimulator.getUpdateInterval());
 
     return () => clearInterval(interval);
-  }, []);
+  }, [uiState.systemParams.isTestMode]);
 
   const _getMinutesFromTimestamp = useCallback((timestamp: number) => {
     return new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
@@ -139,16 +154,18 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const dayEndMinute = currentDay.dayStartMinute + 960;
       const lastUpdateMinute = await _getCurrentProcessedMinute();
 
-      const isSameDay = new Date(currentDay.date).toDateString() === new Date().toDateString();
+      // Usamos el tiempo simulado para la comparación del mismo día
+      const isSameDay =
+        new Date(currentDay.date).toDateString() === new Date(timeSimulator.now()).toDateString();
 
       const minutesRemainingToProcess = isSameDay
-        ? _getMinutesFromTimestamp(Date.now()) - lastUpdateMinute
+        ? _getMinutesFromTimestamp(timeSimulator.now()) - lastUpdateMinute
         : dayEndMinute - lastUpdateMinute;
 
       console.log("_updateSystemState => minutesRemainingToProcess", minutesRemainingToProcess);
       console.log(
-        "    because _getMinutesFromTimestamp(Date.now())",
-        _getMinutesFromTimestamp(Date.now())
+        "    because _getMinutesFromTimestamp(timeSimulator.now())",
+        _getMinutesFromTimestamp(timeSimulator.now())
       );
       console.log("        and lastUpdateMinute", lastUpdateMinute);
 
@@ -218,7 +235,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       }
 
       // Actualizamos el timestamp sumando un minuto
-      await systemApi.updateLastUpdateTimestamp(lastUpdateTimestamp + 60000);
+      await systemApi.updateLastUpdateTimestamp(
+        lastUpdateTimestamp + timeSimulator.getTimeIncrement()
+      );
 
       console.log("_updateSystemState => setUiState");
 
@@ -512,13 +531,12 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   // ===========================
   const startDay = useCallback(async () => {
     const dayState: DayState = {
-      date: Date.now(),
-      dayStartMinute: _getMinutesFromTimestamp(Date.now()),
+      date: timeSimulator.now(),
+      dayStartMinute: _getMinutesFromTimestamp(timeSimulator.now()),
       dayTempoBalance: 0,
     };
 
     await systemApi.startDay(dayState);
-
     await _syncUiStateFromPersisted();
   }, [_syncUiStateFromPersisted]);
 
@@ -760,7 +778,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     }
 
     const dayStartDate = new Date(day.date);
-    const currentDate = new Date();
+    const currentDate = new Date(timeSimulator.now());
     const minutesElapsed = Math.floor(
       (currentDate.getTime() - dayStartDate.getTime()) / (1000 * 60)
     );
@@ -805,5 +823,12 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       calculateProgress: calculateActivityProgress,
       validate: validateNewActivity,
     },
+    updateSystemParams: useCallback(
+      async (params: SystemParams) => {
+        await systemApi.updateSystemParams(params);
+        await _syncUiStateFromPersisted();
+      },
+      [_syncUiStateFromPersisted]
+    ),
   };
 };

@@ -35,6 +35,7 @@ const defaultState: PersistedState = {
   },
   systemParams: {
     passiveTempoConsumptionRate: 1,
+    isTestMode: false,
   },
   lastUpdateTimestamp: Date.now(),
 };
