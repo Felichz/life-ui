@@ -173,6 +173,16 @@ export interface SystemParams {
    * @default 1
    */
   passiveTempoConsumptionRate: number;
+  /**
+   * Si está activo, el sistema procesará cada minuto como si fuera un segundo
+   * @default false
+   */
+  isTestMode: boolean;
+  /**
+   * Factor de multiplicación del tiempo en modo prueba
+   * @default 1
+   */
+  timeMultiplier: number;
 }
 
 export type DayState = {
