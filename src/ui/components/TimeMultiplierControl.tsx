@@ -1,6 +1,9 @@
 import { useCallback, useState, useEffect } from "react";
+
 import { FastForward, Pause, Play, RotateCcw } from "lucide-react";
+
 import { useUiStateContext } from "../system-context/useUiStateContext";
+
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
 
 export const TimeMultiplierControl = () => {
@@ -81,6 +84,19 @@ export const TimeMultiplierControl = () => {
         title="Restablecer velocidad normal (x1)"
       >
         <RotateCcw className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() =>
+          updateSystemParams({
+            ...uiState.systemParams,
+            timeMultiplier: 60,
+          })
+        }
+        disabled={uiState.systemParams.timeMultiplier === 60}
+        className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Establecer velocidad x60"
+      >
+        x60
       </button>
     </div>
   );
