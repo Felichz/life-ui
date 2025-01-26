@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { TimeSimulator } from "./TimeSimulator";
 import type {
@@ -30,13 +30,23 @@ type SystemEngineProps = {
   systemApi: SystemAPIType;
 };
 
+let instances = 0;
+
 /**
  * Este hook gestiona la lógica del sistema.
  * - Expone SOLO las acciones que la UI (usuario) necesita (crear board, completar challenge, etc.).
  * - Mantiene internas las funciones que corren en el loop 1-min o que no son disparadas por el usuario directamente.
  */
 export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngineProps) => {
+  const instance = useRef(instances++);
+
   const timeSimulator = useMemo(() => TimeSimulator.getInstance(), []);
+
+  useEffect(() => {
+    instances++;
+    instance.current = instances;
+    console.log("new instance", instance.current);
+  }, []);
 
   /**
    * PRIMER BLOQUE: Efectos de inicialización y sincronización
@@ -63,6 +73,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
   // Ejecuta la lógica de evaluación base cada un minuto (o cada segundo en modo prueba)
   useEffect(() => {
+    console.log(`start new minute useEffect for an ${timeSimulator.getUpdateInterval()} interval`);
+
     const startUpdate = async () => {
       setUiState((current) => ({
         ...current,
@@ -77,17 +89,23 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       }));
     };
 
+    console.log(`we're setting the interval at ${timeSimulator.getUpdateInterval()}ms`);
+
     const interval = setInterval(() => {
+      console.log("  interval iteration");
+
       setUiState((current) => {
         if (current.updatingSystemState === false) {
+          console.log("    starting update because not updating");
           startUpdate();
         }
+        console.log("    already updating system state?");
         return current;
       });
     }, timeSimulator.getUpdateInterval());
 
     return () => clearInterval(interval);
-  }, [uiState.systemParams.isTestMode]);
+  }, [timeSimulator.getUpdateInterval()]);
 
   const _getMinutesFromTimestamp = useCallback((timestamp: number) => {
     return new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
@@ -102,9 +120,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    */
   const _syncUiStateFromPersisted = useCallback(async () => {
     const persistedState = await systemApi.getPersistedState();
-    console.log("===== _syncUiStateFromPersisted ===== ");
-    console.log("persistedState", persistedState);
-    console.log("========================================");
+    console.log("= _syncUiStateFromPersisted = ");
+
+    timeSimulator.setTimeMultiplier(persistedState.systemParams.timeMultiplier);
 
     setUiState((current) => ({
       ...current,
@@ -131,8 +149,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * 3. Verificar si el día debe terminar
    */
   const _updateSystemState = useCallback(async () => {
-    console.log("========= START _updateSystemState =========");
-    console.log("_updateSystemState => uiState", uiState);
+    console.log("= START _updateSystemState =");
 
     const processNextMinute = async () => {
       // Obtenemos el estado más reciente en cada iteración
@@ -140,13 +157,11 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const currentDay = persistedState.currentDay;
       const lastUpdateTimestamp = persistedState.lastUpdateTimestamp;
 
-      console.log(
-        `_updateSystemState => iteration for minute ${await _getCurrentProcessedMinute()}`
-      );
+      console.log(`  iteration for minute ${await _getCurrentProcessedMinute()}`);
 
       // Si no hay día en progreso, no hay nada que actualizar
       if (!currentDay || persistedState.lifecycleState !== "dayInProgress") {
-        console.log("_updateSystemState => return because no day in progress");
+        console.log("  return because no day in progress");
         return;
       }
 
@@ -154,30 +169,28 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const dayEndMinute = currentDay.dayStartMinute + 960;
       const lastUpdateMinute = await _getCurrentProcessedMinute();
 
-      // Usamos el tiempo simulado para la comparación del mismo día
-      const isSameDay =
-        new Date(currentDay.date).toDateString() === new Date(timeSimulator.now()).toDateString();
+      console.log("timeSimulator.now()", timeSimulator.now());
+      console.log("lastUpdateTimestamp", lastUpdateTimestamp);
+      const minutesRemainingToProcess = Math.floor(
+        (timeSimulator.now() - lastUpdateTimestamp) / 60000
+      );
 
-      const minutesRemainingToProcess = isSameDay
-        ? _getMinutesFromTimestamp(timeSimulator.now()) - lastUpdateMinute
-        : dayEndMinute - lastUpdateMinute;
-
-      console.log("_updateSystemState => minutesRemainingToProcess", minutesRemainingToProcess);
+      console.log("  minutesRemainingToProcess", minutesRemainingToProcess);
       console.log(
         "    because _getMinutesFromTimestamp(timeSimulator.now())",
         _getMinutesFromTimestamp(timeSimulator.now())
       );
-      console.log("        and lastUpdateMinute", lastUpdateMinute);
+      console.log("    and lastUpdateMinute", lastUpdateMinute);
 
       // Si no ha pasado ningún minuto, no hay nada que actualizar
       if (minutesRemainingToProcess === 0) {
-        console.log("_updateSystemState => return because no minutes to process");
+        console.log("  return because no minutes to process");
         return;
       }
 
       // Si corresponde, terminamos el día
       if (dayEndMinute === lastUpdateMinute) {
-        console.log("_updateSystemState => return because end day");
+        console.log("  return because end day");
 
         await endDay();
         await _syncUiStateFromPersisted();
@@ -186,34 +199,34 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       // Procesamos un solo minuto
       const currentActivity = await systemApi.getSelectedActivity();
-      console.log("_updateSystemState => currentActivity", currentActivity);
+      console.log("  currentActivity", currentActivity);
 
       // Si hay una actividad seleccionada
       if (currentActivity) {
         // Lógica según el tipo de actividad
         switch (currentActivity.type) {
           case "challenge": {
-            console.log("_updateSystemState => _applyChallengeMinuteGeneration");
+            console.log("  _applyChallengeMinuteGeneration");
             await _applyChallengeMinuteGeneration({
               activity: currentActivity,
             });
 
             // Evaluamos los constraints
-            console.log("_updateSystemState => _evaluateChallengeConstraints");
+            console.log("  _evaluateChallengeConstraints");
             await _evaluateChallengeConstraints({
               activity: currentActivity,
             });
             break;
           }
           case "neutral": {
-            console.log("_updateSystemState => _applyNeutralTimeRecord");
+            console.log("  _applyNeutralTimeRecord");
             await _applyNeutralTimeRecord({
               activity: currentActivity,
             });
             break;
           }
           case "discount": {
-            console.log("_updateSystemState => _applyDiscountedConsumption");
+            console.log("  _applyDiscountedConsumption");
             await _applyDiscountedConsumption({
               activity: currentActivity,
             });
@@ -221,8 +234,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           }
         }
 
-        console.log("_updateSystemState => minutesActive", currentActivity.minutesActive);
-        console.log("_updateSystemState => new minutesActive", currentActivity.minutesActive + 1);
+        console.log("  minutesActive", currentActivity.minutesActive);
+        console.log("  new minutesActive", currentActivity.minutesActive + 1);
 
         // Actualizar minutesActive de la actividad
         await systemApi.updateActivity({
@@ -239,7 +252,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         lastUpdateTimestamp + timeSimulator.getTimeIncrement()
       );
 
-      console.log("_updateSystemState => setUiState");
+      console.log("  setUiState");
 
       await _syncUiStateFromPersisted();
 
@@ -298,9 +311,17 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     async ({ activity }: { activity: NeutralActivity }) => {
       const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
-      if (activity.minutesActive > activity.allowedTime) {
-        await systemApi.unselectActivity();
-      }
+      // Si ya alcanzamos el tiempo límite, deseleccionamos, autocompletamos, y no registramos más tiempo
+      // if (activity.minutesActive >= activity.allowedTime) {
+      //   await systemApi.unselectActivity();
+
+      //   await systemApi.updateActivity({
+      //     ...activity,
+      //     status: "completed",
+      //   });
+
+      //   return;
+      // }
 
       const investedTimeRecord: InvestedTimeRecord = {
         status: "activity",
@@ -313,9 +334,33 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       await systemApi.pushToInvestedTimeHistory(investedTimeRecord);
 
-      if (activity.minutesActive === activity.allowedTime) {
+      // Si con este nuevo minuto llegamos al límite, deseleccionamos
+      if (activity.minutesActive + 1 === activity.allowedTime) {
         await systemApi.unselectActivity();
+
+        console.log("updateActivity!", {
+          ...activity,
+          status: "completed",
+        });
+
+        await systemApi.updateActivity({
+          ...activity,
+          status: "completed",
+          minutesActive: activity.minutesActive + 1,
+        });
+
+        return;
       }
+
+      console.log("updateActivity!!", {
+        ...activity,
+        minutesActive: activity.minutesActive + 1,
+      });
+
+      await systemApi.updateActivity({
+        ...activity,
+        minutesActive: activity.minutesActive + 1,
+      });
     },
     []
   );
@@ -324,8 +369,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     async ({ activity }: { activity: HobbyActivity }) => {
       const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
-      if (activity.minutesActive > activity.allowedTime) {
+      // Si ya alcanzamos el tiempo límite, deseleccionamos y no registramos más tiempo
+      if (activity.minutesActive >= activity.allowedTime) {
         await systemApi.unselectActivity();
+        return;
       }
 
       const discountedConsumption = 0 - activity.tempoConsumptionRate;
@@ -353,7 +400,14 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModificationRecord,
       });
 
-      if (activity.minutesActive === activity.allowedTime) {
+      // Actualizamos minutesActive
+      await systemApi.updateActivity({
+        ...activity,
+        minutesActive: activity.minutesActive + 1,
+      });
+
+      // Si con este nuevo minuto llegamos al límite, deseleccionamos
+      if (activity.minutesActive + 1 === activity.allowedTime) {
         await systemApi.unselectActivity();
       }
     },
@@ -799,6 +853,15 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     };
   };
 
+  const updateSystemParams = useCallback(
+    async (params: SystemParams) => {
+      console.log("updateSystemParams", params);
+      await systemApi.updateSystemParams(params);
+      await _syncUiStateFromPersisted();
+    },
+    [systemApi.updateSystemParams, _syncUiStateFromPersisted]
+  );
+
   // ===========================
   // DEVOLVEMOS SOLO LAS FUNCIONES "PÚBLICAS"
   // ===========================
@@ -823,12 +886,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       calculateProgress: calculateActivityProgress,
       validate: validateNewActivity,
     },
-    updateSystemParams: useCallback(
-      async (params: SystemParams) => {
-        await systemApi.updateSystemParams(params);
-        await _syncUiStateFromPersisted();
-      },
-      [_syncUiStateFromPersisted]
-    ),
+    updateSystemParams,
+    clearAllData: useCallback(async () => {
+      await systemApi.clearAllData();
+    }, []),
   };
 };

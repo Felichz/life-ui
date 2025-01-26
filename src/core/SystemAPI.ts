@@ -36,6 +36,7 @@ const defaultState: PersistedState = {
   systemParams: {
     passiveTempoConsumptionRate: 1,
     isTestMode: false,
+    timeMultiplier: 1,
   },
   lastUpdateTimestamp: Date.now(),
 };
@@ -280,12 +281,9 @@ class SystemAPI implements SystemAPIType {
   }
 
   async updateActivity(activity: Activity): Promise<void> {
-    console.log("updateActivity", activity);
     const state = await this.getState();
 
     if (!state.activities[activity.id]) return;
-
-    console.log("prev persisted state", state);
 
     await this.saveState({
       ...state,
@@ -294,8 +292,6 @@ class SystemAPI implements SystemAPIType {
         [activity.id]: activity,
       },
     });
-
-    console.log("new persisted state", await this.getState());
   }
 
   async removeActivity(activity: Activity): Promise<void> {
@@ -484,6 +480,17 @@ class SystemAPI implements SystemAPIType {
   async updateLastUpdateTimestamp(timestamp: number): Promise<void> {
     const state = await this.getState();
     await this.saveState({ ...state, lastUpdateTimestamp: timestamp });
+  }
+
+  async clearAllData(): Promise<void> {
+    const state = await this.getState();
+
+    // Validar que el test mode esté activo
+    if (!state.systemParams.isTestMode) {
+      throw new Error("No se puede borrar la data si el modo de prueba no está activo");
+    }
+
+    await this.saveState(defaultState);
   }
 }
 

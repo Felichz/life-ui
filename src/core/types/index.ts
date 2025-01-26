@@ -280,6 +280,11 @@ export interface SystemAPIType {
    * Actualiza el timestamp de la última actualización del sistema
    */
   updateLastUpdateTimestamp: (timestamp: number) => Promise<void>;
+
+  /**
+   * Borra toda la data persistida. Solo disponible en modo de prueba.
+   */
+  clearAllData: () => Promise<void>;
 }
 
 // Este es estado del sistema que se mantiene en la ui, se mantiene en el SystemContext
