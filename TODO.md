@@ -4,7 +4,9 @@ Bugs para fixear:
 
 Features que faltan implementar:
 
+    - Al finalizar el día debemos guardar información de las actividades repetibles
     - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
+    - Un nuevo sistema de notificaciones donde se avisen cosas como multas que estan cerca de aplicarse
 
 Faltan testear casos raros que seguramente esten bugeados:
 

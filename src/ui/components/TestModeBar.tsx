@@ -1,5 +1,6 @@
 import React from "react";
 
+import { ClearDataButton } from "./ClearDataButton";
 import { TestModeToggle } from "./TestModeToggle";
 import { TimeMultiplierControl } from "./TimeMultiplierControl";
 
@@ -24,6 +25,8 @@ export const TestModeBar = () => {
         <TestModeToggle />
         <div className="h-8 w-px bg-border" />
         <TimeMultiplierControl />
+        <div className="h-8 w-px bg-border" />
+        <ClearDataButton />
       </div>
     </div>
   );

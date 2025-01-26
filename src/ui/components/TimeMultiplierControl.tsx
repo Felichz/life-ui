@@ -26,6 +26,13 @@ export const TimeMultiplierControl = () => {
     });
   }, [inputMultiplier, uiState.systemParams, updateSystemParams]);
 
+  const handleQuickApply = useCallback(async () => {
+    await updateSystemParams({
+      ...uiState.systemParams,
+      timeMultiplier: 60,
+    });
+  }, [inputMultiplier, uiState.systemParams, updateSystemParams]);
+
   const handleReset = useCallback(async () => {
     await updateSystemParams({
       ...uiState.systemParams,
@@ -86,12 +93,7 @@ export const TimeMultiplierControl = () => {
         <RotateCcw className="w-4 h-4" />
       </button>
       <button
-        onClick={() =>
-          updateSystemParams({
-            ...uiState.systemParams,
-            timeMultiplier: 60,
-          })
-        }
+        onClick={handleQuickApply}
         disabled={uiState.systemParams.timeMultiplier === 60}
         className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
         title="Establecer velocidad x60"

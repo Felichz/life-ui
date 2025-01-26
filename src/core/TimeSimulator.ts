@@ -12,6 +12,8 @@ export class TimeSimulator {
   private constructor() {}
 
   static getInstance(): TimeSimulator {
+    console.log("TimeSimulator.getInstance");
+
     if (!TimeSimulator.instance) {
       TimeSimulator.instance = new TimeSimulator();
     }
@@ -85,7 +87,7 @@ export class TimeSimulator {
    */
   getUpdateInterval(): number {
     if (!this.isTestMode || this.timeMultiplier === 0) return 60000;
-    return Math.max(1000 / this.timeMultiplier, 100); // Mínimo 100ms para evitar actualizaciones demasiado frecuentes
+    return Math.max(60000 / this.timeMultiplier, 1000); // Mínimo 1000ms para evitar actualizaciones demasiado frecuentes
   }
 
   /**
