@@ -1,7 +1,5 @@
 import React from "react";
 
-import { ResponsiveBar } from "@nivo/bar";
-
 import { Button } from "./shadcn/button";
 import { Card, CardContent } from "./shadcn/card";
 import {
@@ -13,31 +11,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./shadcn/dialog";
+import Timeline from "./Timeline";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
-import type { Activity, InvestedTimeRecord } from "@/core/types";
+import type { Activity } from "@/core/types";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
 
 const formatTime = (minutes: number): string => {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return `${hours}h ${mins}m`;
-};
-
-const formatTimeRange = (startMinute: number, duration: number): string => {
-  const startDate = new Date();
-  startDate.setHours(Math.floor(startMinute / 60), startMinute % 60);
-
-  const endDate = new Date(startDate);
-  endDate.setMinutes(endDate.getMinutes() + duration);
-
-  return `${startDate.toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })} - ${endDate.toLocaleTimeString("es-ES", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
 };
 
 const getActivityTypeColor = (type: Activity["type"] | "idle"): string => {
@@ -188,79 +171,6 @@ const TimelineHeader: React.FC = () => {
     );
   }
 
-  const dayHistory = React.useMemo(() => {
-    if (!uiState.currentDay) return [];
-
-    const dayStartDate = new Date(uiState.currentDay.date);
-    const dayEndDate = new Date(dayStartDate);
-    dayEndDate.setMinutes(dayEndDate.getMinutes() + 960);
-
-    return uiState.investedTimeHistory
-      .filter((record) => {
-        const recordDate = new Date(record.timestamp);
-        return recordDate >= dayStartDate && recordDate <= dayEndDate;
-      })
-      .sort((a, b) => a.timestamp - b.timestamp);
-  }, [uiState.currentDay, uiState.investedTimeHistory]);
-
-  // Transformamos los datos para el gráfico de Nivo
-  const timelineData = React.useMemo(() => {
-    if (!uiState.currentDay || !dayHistory.length) return [];
-
-    const dayStartDate = new Date(uiState.currentDay.date);
-
-    // Creamos un único objeto que contendrá todos los segmentos
-    const segments = dayHistory.map((segment: InvestedTimeRecord) => {
-      const segmentDate = new Date(segment.timestamp);
-      const minutesFromStart = Math.floor(
-        (segmentDate.getTime() - dayStartDate.getTime()) / (1000 * 60)
-      );
-
-      const activity =
-        segment.status === "activity"
-          ? uiState.activities.find((a) => a.id === segment.activityId)
-          : undefined;
-
-      const type = segment.status === "activity" ? segment.type : ("idle" as const);
-
-      return {
-        minutesFromStart,
-        duration: segment.minutesInvested,
-        type,
-        title: activity?.title || "Inactivo",
-        tempoModification: segment.tempoModification,
-        timeRange: formatTimeRange(minutesFromStart, segment.minutesInvested),
-      };
-    });
-
-    type TimelineSegment = {
-      timeline: string;
-      totalSegments: number;
-      [key: `segment_${number}`]: number;
-      [key: `segment_${number}_start`]: number;
-      [key: `segment_${number}_type`]: Activity["type"] | "idle";
-      [key: `segment_${number}_title`]: string;
-      [key: `segment_${number}_tempo`]: number;
-      [key: `segment_${number}_range`]: string;
-    };
-
-    // Creamos un único objeto que representa toda la línea de tiempo
-    return [
-      segments.reduce<TimelineSegment>(
-        (acc, segment, index) => ({
-          ...acc,
-          [`segment_${index}`]: segment.duration,
-          [`segment_${index}_start`]: segment.minutesFromStart,
-          [`segment_${index}_type`]: segment.type,
-          [`segment_${index}_title`]: segment.title,
-          [`segment_${index}_tempo`]: segment.tempoModification,
-          [`segment_${index}_range`]: segment.timeRange,
-        }),
-        { timeline: "timeline", totalSegments: segments.length }
-      ),
-    ];
-  }, [uiState.currentDay, dayHistory, uiState.activities]);
-
   return (
     <div className="flex flex-col gap-4">
       {/* Datos del Día */}
@@ -300,68 +210,13 @@ const TimelineHeader: React.FC = () => {
         </Card>
       </div>
 
-      {/* Timeline con Nivo Bar */}
-      <div className="w-full relative">
-        <div className="h-24 bg-secondary rounded-lg">
-          <ResponsiveBar
-            data={timelineData}
-            keys={Array.from(
-              { length: timelineData[0]?.totalSegments || 0 },
-              (_, i) => `segment_${i}`
-            )}
-            indexBy="timeline"
-            layout="horizontal"
-            valueScale={{ type: "linear", min: 0, max: 960 }}
-            indexScale={{ type: "band", round: true }}
-            colors={(bar) => {
-              const segmentIndex = parseInt(bar.id.toString().split("_")[1]);
-              const type =
-                timelineData[0]?.[`segment_${segmentIndex}_type` as keyof (typeof timelineData)[0]];
-              return getActivityTypeColor(type as Activity["type"] | "idle");
-            }}
-            borderRadius={2}
-            padding={0}
-            margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-            axisTop={null}
-            axisRight={null}
-            axisBottom={null}
-            axisLeft={null}
-            enableGridY={false}
-            enableLabel={false}
-            role="application"
-            ariaLabel="Timeline del día"
-            barAriaLabel={(e) =>
-              `${
-                timelineData[0]?.[`segment_${e.id.toString().split("_")[1]}_title` as keyof object]
-              } ${
-                timelineData[0]?.[`segment_${e.id.toString().split("_")[1]}_range` as keyof object]
-              }`
-            }
-            tooltip={({ id, ...rest }) => {
-              const segmentIndex = parseInt(id.toString().split("_")[1]);
-              return (
-                <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg text-sm">
-                  <p className="font-medium">
-                    {timelineData[0]?.[`segment_${segmentIndex}_title` as keyof object]}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {timelineData[0]?.[`segment_${segmentIndex}_range` as keyof object]}
-                  </p>
-                  <p>
-                    Tempo:{" "}
-                    {(timelineData[0]?.[
-                      `segment_${segmentIndex}_tempo` as keyof object
-                    ] as number) > 0
-                      ? "+"
-                      : ""}
-                    {timelineData[0]?.[`segment_${segmentIndex}_tempo` as keyof object]}
-                  </p>
-                </div>
-              );
-            }}
-          />
-        </div>
-      </div>
+      {/* Timeline */}
+      <Timeline
+        dayStartDate={new Date(uiState.currentDay.date)}
+        currentMinute={currentMinute}
+        history={uiState.investedTimeHistory}
+        activities={uiState.activities}
+      />
     </div>
   );
 };
