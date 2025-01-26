@@ -40,7 +40,7 @@ const formatTimeRange = (startMinute: number, duration: number): string => {
   })}`;
 };
 
-const getActivityColor = (type: Activity["type"] | "idle"): string => {
+const getActivityTypeColor = (type: Activity["type"] | "idle"): string => {
   switch (type) {
     case "challenge":
       return "#3b82f6"; // blue-500
@@ -52,6 +52,97 @@ const getActivityColor = (type: Activity["type"] | "idle"): string => {
     default:
       return "#94a3b8"; // slate-400
   }
+};
+
+const getActivityTypeLabel = (type: Activity["type"]): string => {
+  switch (type) {
+    case "challenge":
+      return "Desafío";
+    case "neutral":
+      return "Neutral";
+    case "discount":
+      return "Hobby";
+  }
+};
+
+const SelectedActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => {
+  const systemEngine = useSystemEngineContext();
+  const progress = systemEngine.activity.calculateProgress(activity);
+
+  const getActivityDetails = () => {
+    switch (activity.type) {
+      case "challenge":
+        return {
+          timeLabel: "Tiempo Estimado",
+          timeValue: `${activity.minutesActive}/${activity.totalTempoReward}m`,
+          extraLabel: "Recompensa",
+          extraValue: `+${activity.totalTempoReward} tempos`,
+        };
+      case "neutral":
+      case "discount":
+        return {
+          timeLabel: "Tiempo Permitido",
+          timeValue: `${activity.minutesActive}/${activity.allowedTime}m`,
+          extraLabel: activity.type === "discount" ? "Consumo" : undefined,
+          extraValue:
+            activity.type === "discount"
+              ? `-${activity.tempoConsumptionRate} tempo/min`
+              : undefined,
+        };
+    }
+  };
+
+  const details = getActivityDetails();
+
+  return (
+    <Card className="w-[300px]">
+      <CardContent className="p-4">
+        <div className="space-y-4">
+          <div>
+            <h3 className="font-semibold text-lg">{activity.title}</h3>
+            <span
+              className="text-xs px-2 py-1 rounded-full"
+              style={{
+                backgroundColor: getActivityTypeColor(activity.type) + "20",
+                color: getActivityTypeColor(activity.type),
+              }}
+            >
+              {getActivityTypeLabel(activity.type)}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{details.timeLabel}</span>
+              <span className="font-medium">{details.timeValue}</span>
+            </div>
+            {details.extraLabel && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{details.extraLabel}</span>
+                <span className="font-medium">{details.extraValue}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full transition-all duration-500"
+                style={{
+                  width: `${progress}%`,
+                  backgroundColor: getActivityTypeColor(activity.type),
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Progreso</span>
+              <span>{progress.toFixed(0)}%</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 };
 
 const TimelineHeader: React.FC = () => {
@@ -97,7 +188,6 @@ const TimelineHeader: React.FC = () => {
     );
   }
 
-  // Ordenamos y filtramos el historial para asegurar que está dentro del día actual
   const dayHistory = React.useMemo(() => {
     if (!uiState.currentDay) return [];
 
@@ -175,26 +265,24 @@ const TimelineHeader: React.FC = () => {
     <div className="flex flex-col gap-4">
       {/* Datos del Día */}
       <div className="flex justify-between items-center">
-        <Card className="w-fit">
-          <CardContent className="p-4">
-            <div className="flex gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Tiempo Restante</p>
-                <p className="text-lg font-semibold">{formatTime(remainingTime)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Finaliza</p>
-                <p className="text-lg font-semibold">{endTime}</p>
-              </div>
-              {uiState.selectedActivity && (
+        <div className="flex gap-4 items-center">
+          <Card className="w-fit">
+            <CardContent className="p-4">
+              <div className="flex gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Actividad Actual</p>
-                  <p className="text-lg font-semibold">{uiState.selectedActivity.title}</p>
+                  <p className="text-sm text-muted-foreground">Tiempo Restante</p>
+                  <p className="text-lg font-semibold">{formatTime(remainingTime)}</p>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <div>
+                  <p className="text-sm text-muted-foreground">Finaliza</p>
+                  <p className="text-lg font-semibold">{endTime}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {uiState.selectedActivity && <SelectedActivityCard activity={uiState.selectedActivity} />}
+        </div>
 
         <Card className="w-fit">
           <CardContent className="p-4">
@@ -229,7 +317,7 @@ const TimelineHeader: React.FC = () => {
               const segmentIndex = parseInt(bar.id.toString().split("_")[1]);
               const type =
                 timelineData[0]?.[`segment_${segmentIndex}_type` as keyof (typeof timelineData)[0]];
-              return getActivityColor(type as Activity["type"] | "idle");
+              return getActivityTypeColor(type as Activity["type"] | "idle");
             }}
             borderRadius={2}
             padding={0}
@@ -240,46 +328,37 @@ const TimelineHeader: React.FC = () => {
             axisLeft={null}
             enableGridY={false}
             enableLabel={false}
-            tooltip={({ id, value }) => {
+            role="application"
+            ariaLabel="Timeline del día"
+            barAriaLabel={(e) =>
+              `${
+                timelineData[0]?.[`segment_${e.id.toString().split("_")[1]}_title` as keyof object]
+              } ${
+                timelineData[0]?.[`segment_${e.id.toString().split("_")[1]}_range` as keyof object]
+              }`
+            }
+            tooltip={({ id, ...rest }) => {
               const segmentIndex = parseInt(id.toString().split("_")[1]);
-              const data = timelineData[0];
-              if (!data) return null;
-
-              const title = data[`segment_${segmentIndex}_title` as keyof typeof data];
-              const range = data[`segment_${segmentIndex}_range` as keyof typeof data];
-              const tempo = data[`segment_${segmentIndex}_tempo` as keyof typeof data];
-
               return (
-                <div className="bg-popover text-popover-foreground rounded-lg shadow-lg p-3 text-sm">
-                  <p className="font-medium">{title}</p>
-                  <p className="text-muted-foreground">{range}</p>
-                  <p>Duración: {formatTime(value)}</p>
-                  {typeof tempo === "number" && tempo !== 0 && (
-                    <p className="font-medium">
-                      Tempo: {tempo > 0 ? "+" : ""}
-                      {tempo}
-                    </p>
-                  )}
+                <div className="bg-popover text-popover-foreground p-2 rounded-lg shadow-lg text-sm">
+                  <p className="font-medium">
+                    {timelineData[0]?.[`segment_${segmentIndex}_title` as keyof object]}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {timelineData[0]?.[`segment_${segmentIndex}_range` as keyof object]}
+                  </p>
+                  <p>
+                    Tempo:{" "}
+                    {(timelineData[0]?.[
+                      `segment_${segmentIndex}_tempo` as keyof object
+                    ] as number) > 0
+                      ? "+"
+                      : ""}
+                    {timelineData[0]?.[`segment_${segmentIndex}_tempo` as keyof object]}
+                  </p>
                 </div>
               );
             }}
-            layers={[
-              "grid",
-              "bars",
-              () => {
-                // Capa personalizada para el marcador de tiempo actual
-                return (
-                  <line
-                    x1={`${(Math.min(currentMinute, 960) / 960) * 100}%`}
-                    x2={`${(Math.min(currentMinute, 960) / 960) * 100}%`}
-                    y1={0}
-                    y2="100%"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                  />
-                );
-              },
-            ]}
           />
         </div>
       </div>
