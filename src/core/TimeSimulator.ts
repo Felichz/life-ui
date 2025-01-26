@@ -96,4 +96,16 @@ export class TimeSimulator {
   getTimeIncrement(): number {
     return 60000; // Siempre incrementamos un minuto
   }
+
+  /**
+   * Avanza manualmente un minuto en el tiempo simulado
+   * Solo funciona en modo prueba y cuando el multiplicador es 0
+   */
+  advanceOneMinute(): void {
+    if (!this.isTestMode || this.timeMultiplier !== 0) return;
+
+    const now = Date.now();
+    this.simulationStartTime += this.getTimeIncrement();
+    this.simulationStartRealTime = now;
+  }
 }

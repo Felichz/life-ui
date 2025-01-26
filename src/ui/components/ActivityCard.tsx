@@ -350,7 +350,6 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
     handleAction(() =>
       engine.activity.completeChallenge({
         activity,
-        currentProcessingMinute: Date.now(),
       })
     );
 
@@ -360,36 +359,40 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
     try {
       setIsLoading(true);
 
-      let updatedActivity: Activity;
       const baseUpdates = {
-        ...activity,
+        id: activity.id,
         title: editedTitle.trim(),
       };
 
+      let activityUpdates: Partial<Activity> & { id: string };
+
       switch (activity.type) {
         case "challenge":
-          updatedActivity = {
+          activityUpdates = {
             ...baseUpdates,
             totalTempoReward: editedTempoReward,
             constraintList: editedConstraints,
-          } as ChallengeActivity;
+          };
           break;
         case "neutral":
-          updatedActivity = {
+          activityUpdates = {
             ...baseUpdates,
             allowedTime: editedAllowedTime,
-          } as NeutralActivity;
+          };
           break;
         case "discount":
-          updatedActivity = {
+          activityUpdates = {
             ...baseUpdates,
             allowedTime: editedAllowedTime,
             tempoConsumptionRate: editedConsumptionRate,
-          } as HobbyActivity;
+          };
           break;
         default:
           throw new Error("Tipo de actividad inválido");
       }
+
+      // Validamos que los campos actualizados sean válidos
+      const updatedActivity = { ...activity, ...activityUpdates };
 
       if (!engine.activity.validate(updatedActivity)) {
         toast({
@@ -400,7 +403,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
         return;
       }
 
-      await engine.activity.updateActivity(updatedActivity);
+      await engine.activity.updateActivity(activityUpdates);
       setIsEditDialogOpen(false);
 
       toast({
