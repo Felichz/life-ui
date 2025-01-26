@@ -119,16 +119,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     console.log("========= START _updateSystemState =========");
     console.log("_updateSystemState => uiState", uiState);
 
-    // En cada iteración vamos a:
-    // 1. Obtener el estado más reciente
-    // 2. Calcular si podemos procesar un minuto más
-    // 3. Procesar el minuto
-    // 4. Actualizar lastUpdateTimestamp
-    // 5. Repetir hasta que no haya más minutos que procesar
-    let shouldContinue = true;
-
-    // TODO: Cambiar por un bucle de setTimeout para no bloquear el hilo principal
-    while (shouldContinue) {
+    const processNextMinute = async () => {
       // Obtenemos el estado más reciente en cada iteración
       const persistedState = await systemApi.getPersistedState();
       const currentDay = persistedState.currentDay;
@@ -164,7 +155,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       // Si no ha pasado ningún minuto, no hay nada que actualizar
       if (minutesRemainingToProcess === 0) {
         console.log("_updateSystemState => return because no minutes to process");
-        shouldContinue = false;
         return;
       }
 
@@ -174,6 +164,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
         await endDay();
         await _syncUiStateFromPersisted();
+        return;
       }
 
       // Procesamos un solo minuto
@@ -232,7 +223,13 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       console.log("_updateSystemState => setUiState");
 
       await _syncUiStateFromPersisted();
-    }
+
+      // Programamos el siguiente minuto con un pequeño retraso para no bloquear el hilo principal
+      setTimeout(processNextMinute, 50);
+    };
+
+    // Iniciamos el procesamiento del primer minuto
+    processNextMinute();
   }, []);
 
   /**
