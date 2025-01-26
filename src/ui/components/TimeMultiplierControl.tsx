@@ -1,14 +1,15 @@
 import { useCallback, useState, useEffect } from "react";
 
-import { FastForward, Pause, Play, RotateCcw } from "lucide-react";
+import { Check, FastForward, Pause, Play, RotateCcw, StepForward } from "lucide-react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "./shadcn/tooltip";
 import { useUiStateContext } from "../system-context/useUiStateContext";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
 
 export const TimeMultiplierControl = () => {
   const { uiState } = useUiStateContext();
-  const { updateSystemParams } = useSystemEngineContext();
+  const { updateSystemParams, advanceOneMinute } = useSystemEngineContext();
   const [inputMultiplier, setInputMultiplier] = useState<number>(
     uiState.systemParams.timeMultiplier
   );
@@ -61,45 +62,97 @@ export const TimeMultiplierControl = () => {
 
   return (
     <div className="flex items-center gap-2">
-      <input
-        type="number"
-        min={0}
-        step={1}
-        value={inputMultiplier}
-        onChange={(e) => setInputMultiplier(Math.max(0, parseInt(e.target.value) || 0))}
-        className="w-20 px-2 py-1 text-sm border rounded text-foreground bg-background"
-        placeholder="Multiplicador"
-      />
-      <button
-        onClick={handleApply}
-        disabled={inputMultiplier === uiState.systemParams.timeMultiplier}
-        className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <FastForward className="w-4 h-4" />
-      </button>
-      <button
-        onClick={isPaused ? handleResume : handlePause}
-        className="px-3 py-1 text-sm text-white bg-gray-500 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        title={isPaused ? "Reanudar simulación" : "Pausar simulación"}
-      >
-        {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-      </button>
-      <button
-        onClick={handleReset}
-        disabled={uiState.systemParams.timeMultiplier === 1}
-        className="px-3 py-1 text-sm text-white bg-gray-500 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Restablecer velocidad normal (x1)"
-      >
-        <RotateCcw className="w-4 h-4" />
-      </button>
-      <button
-        onClick={handleQuickApply}
-        disabled={uiState.systemParams.timeMultiplier === 60}
-        className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Establecer velocidad x60"
-      >
-        x60
-      </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={inputMultiplier}
+            onChange={(e) => setInputMultiplier(Math.max(0, parseInt(e.target.value) || 0))}
+            className="w-20 px-2 py-1 text-sm border rounded text-foreground bg-background"
+            placeholder="Multiplicador"
+          />
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Multiplicador de tiempo personalizado</p>
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={handleApply}
+            disabled={inputMultiplier === uiState.systemParams.timeMultiplier}
+            className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check className="w-4 h-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Aplicar multiplicador personalizado</p>
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={isPaused ? handleResume : handlePause}
+            className="px-3 py-1 text-sm text-white bg-gray-500 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{isPaused ? "Reanudar simulación" : "Pausar simulación"}</p>
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={handleReset}
+            disabled={uiState.systemParams.timeMultiplier === 1}
+            className="px-3 py-1 text-sm text-white bg-gray-500 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Restablecer velocidad normal (x1)</p>
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={handleQuickApply}
+            disabled={uiState.systemParams.timeMultiplier === 60}
+            className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            x60
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Establecer velocidad x60</p>
+        </TooltipContent>
+      </Tooltip>
+
+      {isPaused && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={advanceOneMinute}
+              className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600"
+            >
+              <StepForward className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Avanzar un minuto manualmente</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 };

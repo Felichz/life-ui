@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { TimeSimulator } from "./TimeSimulator";
 import type {
   Activity,
+  ActivityId,
   Board,
   ChallengeActivity,
   HobbyActivity,
@@ -206,27 +207,27 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         // Lógica según el tipo de actividad
         switch (currentActivity.type) {
           case "challenge": {
-            console.log("  _applyChallengeMinuteGeneration");
+            console.log("  = _applyChallengeMinuteGeneration =");
             await _applyChallengeMinuteGeneration({
               activity: currentActivity,
             });
 
             // Evaluamos los constraints
-            console.log("  _evaluateChallengeConstraints");
+            console.log("  = _evaluateChallengeConstraints =");
             await _evaluateChallengeConstraints({
               activity: currentActivity,
             });
             break;
           }
           case "neutral": {
-            console.log("  _applyNeutralTimeRecord");
+            console.log("  = _applyNeutralTimeRecord =");
             await _applyNeutralTimeRecord({
               activity: currentActivity,
             });
             break;
           }
           case "discount": {
-            console.log("  _applyDiscountedConsumption");
+            console.log("  = _applyDiscountedConsumption =");
             await _applyDiscountedConsumption({
               activity: currentActivity,
             });
@@ -239,7 +240,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
         // Actualizar minutesActive de la actividad
         await systemApi.updateActivity({
-          ...currentActivity,
+          id: currentActivity.id,
           minutesActive: currentActivity.minutesActive + 1,
         });
       } else {
@@ -311,18 +312,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     async ({ activity }: { activity: NeutralActivity }) => {
       const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
-      // Si ya alcanzamos el tiempo límite, deseleccionamos, autocompletamos, y no registramos más tiempo
-      // if (activity.minutesActive >= activity.allowedTime) {
-      //   await systemApi.unselectActivity();
-
-      //   await systemApi.updateActivity({
-      //     ...activity,
-      //     status: "completed",
-      //   });
-
-      //   return;
-      // }
-
       const investedTimeRecord: InvestedTimeRecord = {
         status: "activity",
         activityId: activity.id,
@@ -338,29 +327,12 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       if (activity.minutesActive + 1 === activity.allowedTime) {
         await systemApi.unselectActivity();
 
-        console.log("updateActivity!", {
-          ...activity,
-          status: "completed",
-        });
-
+        console.log("updateActivity! mark as completed");
         await systemApi.updateActivity({
-          ...activity,
+          id: activity.id,
           status: "completed",
-          minutesActive: activity.minutesActive + 1,
         });
-
-        return;
       }
-
-      console.log("updateActivity!!", {
-        ...activity,
-        minutesActive: activity.minutesActive + 1,
-      });
-
-      await systemApi.updateActivity({
-        ...activity,
-        minutesActive: activity.minutesActive + 1,
-      });
     },
     []
   );
@@ -368,12 +340,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   const _applyDiscountedConsumption = useCallback(
     async ({ activity }: { activity: HobbyActivity }) => {
       const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-      // Si ya alcanzamos el tiempo límite, deseleccionamos y no registramos más tiempo
-      if (activity.minutesActive >= activity.allowedTime) {
-        await systemApi.unselectActivity();
-        return;
-      }
 
       const discountedConsumption = 0 - activity.tempoConsumptionRate;
 
@@ -400,15 +366,15 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         tempoModificationRecord,
       });
 
-      // Actualizamos minutesActive
-      await systemApi.updateActivity({
-        ...activity,
-        minutesActive: activity.minutesActive + 1,
-      });
-
       // Si con este nuevo minuto llegamos al límite, deseleccionamos
       if (activity.minutesActive + 1 === activity.allowedTime) {
         await systemApi.unselectActivity();
+
+        console.log("updateActivity! mark as completed");
+        await systemApi.updateActivity({
+          id: activity.id,
+          status: "completed",
+        });
       }
     },
     []
@@ -655,8 +621,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const updateActivity = useCallback(
-    async (activity: Activity) => {
-      await systemApi.updateActivity(activity);
+    async (activityUpdates: Partial<Activity> & { id: ActivityId }) => {
+      await systemApi.updateActivity(activityUpdates);
 
       await _syncUiStateFromPersisted();
     },
@@ -679,7 +645,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     async (activity: Activity) => {
       // Primero actualizamos el estado de la actividad a "inProgress"
       await systemApi.updateActivity({
-        ...activity,
+        id: activity.id,
         status: "inProgress",
       });
 
@@ -744,7 +710,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       // Actualizar el estado de la actividad a completada
       await systemApi.updateActivity({
-        ...activity,
+        id: activity.id,
         status: "completed",
       });
 
@@ -862,6 +828,15 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     [systemApi.updateSystemParams, _syncUiStateFromPersisted]
   );
 
+  /**
+   * Avanza manualmente un minuto en el sistema
+   * Solo funciona cuando el multiplicador es 0
+   */
+  const advanceOneMinute = useCallback(async () => {
+    timeSimulator.advanceOneMinute();
+    await _updateSystemState();
+  }, [_updateSystemState]);
+
   // ===========================
   // DEVOLVEMOS SOLO LAS FUNCIONES "PÚBLICAS"
   // ===========================
@@ -887,6 +862,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       validate: validateNewActivity,
     },
     updateSystemParams,
+    advanceOneMinute,
     clearAllData: useCallback(async () => {
       await systemApi.clearAllData();
     }, []),

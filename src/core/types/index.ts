@@ -243,7 +243,7 @@ export interface SystemAPIType {
   getActivity: (activityId: ActivityId) => Promise<Activity | undefined>;
   getActivities: () => Promise<Activity[]>;
   createActivity: (activity: Activity) => Promise<void>;
-  updateActivity: (activity: Activity) => Promise<void>;
+  updateActivity: (activityUpdates: Partial<Activity> & { id: ActivityId }) => Promise<void>;
   removeActivity: (activity: Activity) => Promise<void>;
 
   getSelectedActivity: () => Promise<Activity | undefined>;

@@ -11,6 +11,9 @@ import type {
   ActivityId,
   TempoModificationRecord,
   InvestedTimeHistory,
+  ChallengeActivity,
+  NeutralActivity,
+  HobbyActivity,
 } from "./types";
 
 const STORAGE_KEY = "system_state";
@@ -280,16 +283,33 @@ class SystemAPI implements SystemAPIType {
     await this.saveState(newState);
   }
 
-  async updateActivity(activity: Activity): Promise<void> {
+  async updateActivity(activityUpdates: Partial<Activity> & { id: ActivityId }): Promise<void> {
+    console.log("systemApi updateActivity", activityUpdates);
     const state = await this.getState();
 
-    if (!state.activities[activity.id]) return;
+    if (!state.activities[activityUpdates.id]) return;
+
+    const currentActivity = state.activities[activityUpdates.id];
+
+    // Aseguramos que el tipo resultante sea una Activity válida
+    let updatedActivity: Activity;
+    switch (currentActivity.type) {
+      case "challenge":
+        updatedActivity = { ...currentActivity, ...activityUpdates } as ChallengeActivity;
+        break;
+      case "neutral":
+        updatedActivity = { ...currentActivity, ...activityUpdates } as NeutralActivity;
+        break;
+      case "discount":
+        updatedActivity = { ...currentActivity, ...activityUpdates } as HobbyActivity;
+        break;
+    }
 
     await this.saveState({
       ...state,
       activities: {
         ...state.activities,
-        [activity.id]: activity,
+        [updatedActivity.id]: updatedActivity,
       },
     });
   }
