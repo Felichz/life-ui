@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 
 import type {
   Activity,
@@ -23,6 +23,8 @@ import { useToast } from "@shadcn/hooks/use-toast";
 import { Input } from "@shadcn/input";
 import { Label } from "@shadcn/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shadcn/select";
+
+import { TimeSelector } from "./TimeSelector";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
@@ -700,18 +702,15 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
                   {editedConstraints.map((constraint, index) => (
                     <div key={index} className="space-y-2 p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
-                        <Label>Minuto de Expiración</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="960"
+                        <Label>Hora de Expiración</Label>
+                        <TimeSelector
                           value={constraint.dayMinuteExpiration}
-                          onChange={(e) =>
+                          onChange={(minutes) =>
                             handleUpdateConstraint(index, {
-                              dayMinuteExpiration: parseInt(e.target.value),
+                              dayMinuteExpiration: minutes,
                             })
                           }
-                          className="w-24"
+                          className="w-[230px]"
                         />
                       </div>
 
