@@ -301,6 +301,7 @@ export type UiState = {
   activities: Activity[];
   usefulMetrics: UsefulMetrics;
   systemParams: SystemParams;
+  lastUpdateTimestamp: number;
 };
 
 export type CreateBoardInput = Omit<Board, "id">;

@@ -136,6 +136,13 @@ const TimelineHeader: React.FC = () => {
     uiState.currentDay
   );
 
+  const formatCurrentDateTime = (date: Date): string => {
+    return date.toLocaleString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   if (!uiState.currentDay) {
     return (
       <div className="flex justify-between items-center p-4">
@@ -171,6 +178,8 @@ const TimelineHeader: React.FC = () => {
     );
   }
 
+  const currentDateTime = new Date(uiState.lastUpdateTimestamp);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Datos del Día */}
@@ -182,6 +191,10 @@ const TimelineHeader: React.FC = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Tiempo Restante</p>
                   <p className="text-lg font-semibold">{formatTime(remainingTime)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Hora Actual</p>
+                  <p className="text-lg font-semibold">{formatCurrentDateTime(currentDateTime)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Finaliza</p>
