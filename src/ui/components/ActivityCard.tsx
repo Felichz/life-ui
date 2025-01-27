@@ -52,7 +52,7 @@ const StatusBadge: React.FC<{ status: ActivityStatus; activity?: Activity }> = (
 
     switch (status) {
       case "toDo":
-        return "bg-secondary";
+        return "";
       case "inProgress":
         return "bg-blue-500";
       case "completed":
@@ -75,7 +75,14 @@ const StatusBadge: React.FC<{ status: ActivityStatus; activity?: Activity }> = (
     }
   };
 
-  return <Badge className={getStatusColor(status, activity)}>{getStatusLabel(status)}</Badge>;
+  return (
+    <Badge
+      className={getStatusColor(status, activity)}
+      variant={status === "toDo" ? "static" : undefined}
+    >
+      {getStatusLabel(status)}
+    </Badge>
+  );
 };
 
 const TypeBadge: React.FC<{ type: ActivityType }> = ({ type }) => {
