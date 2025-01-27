@@ -166,22 +166,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         return;
       }
 
-      // Calculamos cuántos minutos faltan para terminar el día
-      const dayEndMinute = currentDay.dayStartMinute + 960;
-      const lastUpdateMinute = await _getCurrentProcessedMinute();
-
-      console.log("timeSimulator.now()", timeSimulator.now());
-      console.log("lastUpdateTimestamp", lastUpdateTimestamp);
       const minutesRemainingToProcess = Math.floor(
         (timeSimulator.now() - lastUpdateTimestamp) / 60000
       );
-
-      console.log("  minutesRemainingToProcess", minutesRemainingToProcess);
-      console.log(
-        "    because _getMinutesFromTimestamp(timeSimulator.now())",
-        _getMinutesFromTimestamp(timeSimulator.now())
-      );
-      console.log("    and lastUpdateMinute", lastUpdateMinute);
 
       // Si no ha pasado ningún minuto, no hay nada que actualizar
       if (minutesRemainingToProcess === 0) {
@@ -189,8 +176,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         return;
       }
 
+      const dayEndTimestamp = currentDay.date + 960 * 60000;
+
       // Si corresponde, terminamos el día
-      if (dayEndMinute === lastUpdateMinute) {
+      if (lastUpdateTimestamp + 60000 >= dayEndTimestamp) {
         console.log("  return because end day");
 
         await endDay();
