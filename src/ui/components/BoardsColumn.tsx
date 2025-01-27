@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@shadcn/tooltip";
 
 import ActivityCard from "./ActivityCard";
+import { TimeSelector } from "./TimeSelector";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
 import type {
@@ -36,6 +37,7 @@ import type {
   CreateChallengeActivityInput,
   CreateNeutralActivityInput,
   CreateHobbyActivityInput,
+  InheritableActivityProps,
 } from "@/core/types";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
 
@@ -130,6 +132,8 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   const { toast } = useToast();
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState(board.title);
+  const [isEditingProps, setIsEditingProps] = React.useState(false);
+  const [editedProps, setEditedProps] = React.useState(board.activityProps);
   const [newActivityType, setNewActivityType] = React.useState<
     "neutral" | "challenge" | "discount"
   >("neutral");
@@ -365,48 +369,382 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     setNewActivityConstraints(newActivityConstraints.filter((_, i) => i !== index));
   };
 
+  const handleUpdateProps = async () => {
+    try {
+      setIsLoading(true);
+      // Aseguramos que los valores requeridos estén presentes
+      const updatedProps: InheritableActivityProps = {
+        challenge: editedProps.challenge
+          ? {
+              isRepetitive: editedProps.challenge.isRepetitive ?? false,
+              constraintList: editedProps.challenge.constraintList ?? [],
+            }
+          : undefined,
+        neutral: editedProps.neutral
+          ? {
+              isRepetitive: editedProps.neutral.isRepetitive ?? false,
+              allowedTime: editedProps.neutral.allowedTime ?? 30,
+            }
+          : undefined,
+        hobby: editedProps.hobby
+          ? {
+              isRepetitive: editedProps.hobby.isRepetitive ?? false,
+              allowedTime: editedProps.hobby.allowedTime ?? 30,
+              tempoConsumptionRate: editedProps.hobby.tempoConsumptionRate ?? 0.5,
+            }
+          : undefined,
+      };
+
+      await engine.board.updateBoard({
+        ...board,
+        activityProps: updatedProps,
+      });
+      setIsEditingProps(false);
+      toast({
+        title: "Propiedades actualizadas",
+        description: "Las propiedades del tablero se han actualizado correctamente",
+      });
+    } catch (error) {
+      console.error("Error al actualizar propiedades:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudieron actualizar las propiedades",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateChallengeProps = (
+    updates: Partial<Pick<ChallengeActivity, "constraintList" | "isRepetitive">>
+  ) => {
+    setEditedProps((prev) => ({
+      ...prev,
+      challenge: prev.challenge
+        ? {
+            isRepetitive: updates.isRepetitive ?? prev.challenge.isRepetitive ?? false,
+            constraintList: updates.constraintList ?? prev.challenge.constraintList ?? [],
+          }
+        : {
+            isRepetitive: updates.isRepetitive ?? false,
+            constraintList: updates.constraintList ?? [],
+          },
+    }));
+  };
+
+  const updateNeutralProps = (
+    updates: Partial<Pick<NeutralActivity, "allowedTime" | "isRepetitive">>
+  ) => {
+    setEditedProps((prev) => ({
+      ...prev,
+      neutral: prev.neutral
+        ? {
+            isRepetitive: updates.isRepetitive ?? prev.neutral.isRepetitive ?? false,
+            allowedTime: updates.allowedTime ?? prev.neutral.allowedTime ?? 30,
+          }
+        : {
+            isRepetitive: updates.isRepetitive ?? false,
+            allowedTime: updates.allowedTime ?? 30,
+          },
+    }));
+  };
+
+  const updateHobbyProps = (
+    updates: Partial<Pick<HobbyActivity, "allowedTime" | "isRepetitive" | "tempoConsumptionRate">>
+  ) => {
+    setEditedProps((prev) => ({
+      ...prev,
+      hobby: prev.hobby
+        ? {
+            isRepetitive: updates.isRepetitive ?? prev.hobby.isRepetitive ?? false,
+            allowedTime: updates.allowedTime ?? prev.hobby.allowedTime ?? 30,
+            tempoConsumptionRate:
+              updates.tempoConsumptionRate ?? prev.hobby.tempoConsumptionRate ?? 0.5,
+          }
+        : {
+            isRepetitive: updates.isRepetitive ?? false,
+            allowedTime: updates.allowedTime ?? 30,
+            tempoConsumptionRate: updates.tempoConsumptionRate ?? 0.5,
+          },
+    }));
+  };
+
   return (
-    <Card className="p-4 mb-4" style={{ marginLeft: `${level * 1}rem` }}>
-      <div className="flex justify-between items-center mb-4">
-        {isEditingTitle ? (
-          <div className="flex gap-2 items-center">
-            <Input
-              value={newTitle}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTitle(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                if (e.key === "Enter") handleUpdateTitle();
-                if (e.key === "Escape") {
-                  setNewTitle(board.title);
-                  setIsEditingTitle(false);
-                }
-              }}
-              autoFocus
-            />
-            <Button size="sm" onClick={handleUpdateTitle} disabled={isLoading}>
-              Guardar
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setNewTitle(board.title);
-                setIsEditingTitle(false);
-              }}
-              disabled={isLoading}
-            >
-              Cancelar
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-2 items-center">
-            <h3 className="text-lg font-semibold">{board.title}</h3>
-            <Button variant="ghost" size="sm" onClick={() => setIsEditingTitle(true)}>
-              ✏️
-            </Button>
-            <BoardPropertiesInfo board={board} />
-          </div>
-        )}
-        <div className="flex gap-2">
+    <Accordion type="single" collapsible>
+      <AccordionItem value={board.id} className="border-none">
+        <div className="flex items-center gap-2 px-2 py-1">
+          <AccordionTrigger className="flex-1 hover:no-underline py-0">
+            <div className="flex items-center gap-2">
+              {isEditingTitle ? (
+                <div className="flex gap-2 items-center">
+                  <Input
+                    value={newTitle}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewTitle(e.target.value)
+                    }
+                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                      if (e.key === "Enter") handleUpdateTitle();
+                      if (e.key === "Escape") {
+                        setNewTitle(board.title);
+                        setIsEditingTitle(false);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={handleUpdateTitle} disabled={isLoading}>
+                    Guardar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setNewTitle(board.title);
+                      setIsEditingTitle(false);
+                    }}
+                    disabled={isLoading}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-sm font-medium">{board.title}</span>
+              )}
+            </div>
+          </AccordionTrigger>
+          <BoardPropertiesInfo board={board} />
+          <Dialog open={isEditingProps} onOpenChange={setIsEditingProps}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <span className="sr-only">Editar propiedades</span>
+                ⚙️
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Editar Propiedades del Tablero</DialogTitle>
+                <DialogDescription>
+                  Configura las propiedades que heredarán las actividades creadas en este tablero
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="challenge">
+                    <AccordionTrigger>Propiedades para Desafíos</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 p-4">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="challenge-repetitive"
+                            checked={editedProps.challenge?.isRepetitive ?? false}
+                            onCheckedChange={(checked) =>
+                              updateChallengeProps({ isRepetitive: checked as boolean })
+                            }
+                          />
+                          <Label htmlFor="challenge-repetitive">Repetible</Label>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Criterios de Aceptación</Label>
+                          {editedProps.challenge?.constraintList?.map((constraint, index) => (
+                            <div key={index} className="space-y-2 p-4 border rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <Label>Hora de Expiración</Label>
+                                <TimeSelector
+                                  value={constraint.dayMinuteExpiration}
+                                  onChange={(minutes) => {
+                                    const newConstraints = [
+                                      ...(editedProps.challenge?.constraintList ?? []),
+                                    ];
+                                    newConstraints[index] = {
+                                      ...newConstraints[index],
+                                      dayMinuteExpiration: minutes,
+                                    };
+                                    updateChallengeProps({ constraintList: newConstraints });
+                                  }}
+                                  className="w-[230px]"
+                                />
+                              </div>
+                              <div className="flex items-center justify-between mt-2">
+                                <Label>Penalización</Label>
+                                <div className="flex items-center gap-2">
+                                  {typeof constraint.penalty === "number" && (
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={constraint.penalty}
+                                      onChange={(e) => {
+                                        const newConstraints = [
+                                          ...(editedProps.challenge?.constraintList ?? []),
+                                        ];
+                                        newConstraints[index] = {
+                                          ...newConstraints[index],
+                                          penalty: parseInt(e.target.value),
+                                        };
+                                        updateChallengeProps({ constraintList: newConstraints });
+                                      }}
+                                      className="w-24"
+                                    />
+                                  )}
+                                  <Select
+                                    value={
+                                      typeof constraint.penalty === "string"
+                                        ? constraint.penalty
+                                        : "fixed"
+                                    }
+                                    onValueChange={(value) => {
+                                      const newConstraints = [
+                                        ...(editedProps.challenge?.constraintList ?? []),
+                                      ];
+                                      newConstraints[index] = {
+                                        ...newConstraints[index],
+                                        penalty: value === "fixed" ? 0 : value,
+                                      };
+                                      updateChallengeProps({ constraintList: newConstraints });
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-32">
+                                      <SelectValue placeholder="Tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="fixed">Valor Fijo</SelectItem>
+                                      <SelectItem value="100%">100%</SelectItem>
+                                      <SelectItem value="50%">50%</SelectItem>
+                                      <SelectItem value="25%">25%</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  const newConstraints = [
+                                    ...(editedProps.challenge?.constraintList ?? []),
+                                  ];
+                                  newConstraints.splice(index, 1);
+                                  updateChallengeProps({ constraintList: newConstraints });
+                                }}
+                                className="mt-2"
+                              >
+                                Eliminar Criterio
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              const newConstraint: ExpirationActivityConstraint = {
+                                type: "expiration",
+                                dayMinuteExpiration: 60,
+                                penalty: "100%",
+                                status: "active",
+                              };
+                              updateChallengeProps({
+                                constraintList: [
+                                  ...(editedProps.challenge?.constraintList ?? []),
+                                  newConstraint,
+                                ],
+                              });
+                            }}
+                          >
+                            Agregar Criterio
+                          </Button>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="neutral">
+                    <AccordionTrigger>Propiedades para Actividades Neutrales</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 p-4">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="neutral-repetitive"
+                            checked={editedProps.neutral?.isRepetitive ?? false}
+                            onCheckedChange={(checked) =>
+                              updateNeutralProps({ isRepetitive: checked as boolean })
+                            }
+                          />
+                          <Label htmlFor="neutral-repetitive">Repetible</Label>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tiempo Permitido</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              value={editedProps.neutral?.allowedTime ?? 30}
+                              onChange={(e) =>
+                                updateNeutralProps({ allowedTime: parseInt(e.target.value) })
+                              }
+                              className="w-24"
+                            />
+                            <span>minutos</span>
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="hobby">
+                    <AccordionTrigger>Propiedades para Hobbies</AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 p-4">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="hobby-repetitive"
+                            checked={editedProps.hobby?.isRepetitive ?? false}
+                            onCheckedChange={(checked) =>
+                              updateHobbyProps({ isRepetitive: checked as boolean })
+                            }
+                          />
+                          <Label htmlFor="hobby-repetitive">Repetible</Label>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tiempo Permitido</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              value={editedProps.hobby?.allowedTime ?? 30}
+                              onChange={(e) =>
+                                updateHobbyProps({ allowedTime: parseInt(e.target.value) })
+                              }
+                              className="w-24"
+                            />
+                            <span>minutos</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Tasa de Consumo</Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="1"
+                              value={editedProps.hobby?.tempoConsumptionRate ?? 0.5}
+                              onChange={(e) =>
+                                updateHobbyProps({
+                                  tempoConsumptionRate: parseFloat(e.target.value),
+                                })
+                              }
+                              className="w-24"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditingProps(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleUpdateProps} disabled={isLoading}>
+                  {isLoading ? "Guardando..." : "Guardar Cambios"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog open={isCreateActivityDialogOpen} onOpenChange={setIsCreateActivityDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={isLoading}>
@@ -677,18 +1015,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                     {newActivityConstraints.map((constraint, index) => (
                       <div key={index} className="space-y-2 p-4 border rounded-lg">
                         <div className="flex items-center justify-between">
-                          <Label>Minuto de Expiración</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="960"
+                          <Label>Hora de Expiración</Label>
+                          <TimeSelector
                             value={constraint.dayMinuteExpiration}
-                            onChange={(e) =>
+                            onChange={(minutes) =>
                               handleUpdateActivityConstraint(index, {
-                                dayMinuteExpiration: parseInt(e.target.value),
+                                dayMinuteExpiration: minutes,
                               })
                             }
-                            className="w-24"
+                            className="w-[230px]"
                           />
                         </div>
 
@@ -759,11 +1094,9 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
           <Button variant="outline" size="sm" onClick={handleCreateSubBoard} disabled={isLoading}>
             Nuevo Subtablero
           </Button>
-
           {!board.parentBoardId && (
             <Dialog>
               <DialogTrigger asChild>
@@ -795,31 +1128,31 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
             </Dialog>
           )}
         </div>
-      </div>
 
-      {/* Actividades del tablero actual */}
-      {activities.length > 0 && (
-        <div className="mb-4">
-          {activities.map((activity) => (
-            <ActivityCard key={activity.id} activity={activity} />
-          ))}
-        </div>
-      )}
+        {/* Actividades del tablero actual */}
+        {activities.length > 0 && (
+          <div className="mb-4">
+            {activities.map((activity) => (
+              <ActivityCard key={activity.id} activity={activity} />
+            ))}
+          </div>
+        )}
 
-      {/* Subtableros */}
-      {childBoards.length > 0 && (
-        <Accordion type="single" collapsible className="mt-4">
-          {childBoards.map((childBoard) => (
-            <AccordionItem key={childBoard.id} value={childBoard.id}>
-              <AccordionTrigger>{childBoard.title}</AccordionTrigger>
-              <AccordionContent>
-                <BoardItem board={childBoard} level={level + 1} />
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      )}
-    </Card>
+        {/* Subtableros */}
+        {childBoards.length > 0 && (
+          <Accordion type="single" collapsible className="mt-4">
+            {childBoards.map((childBoard) => (
+              <AccordionItem key={childBoard.id} value={childBoard.id}>
+                <AccordionTrigger>{childBoard.title}</AccordionTrigger>
+                <AccordionContent>
+                  <BoardItem board={childBoard} level={level + 1} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
+      </AccordionItem>
+    </Accordion>
   );
 };
 
@@ -1023,18 +1356,15 @@ const BoardsColumn: React.FC = () => {
                         {challengeConstraints.map((constraint, index) => (
                           <div key={index} className="space-y-2 p-4 border rounded-lg">
                             <div className="flex items-center justify-between">
-                              <Label>Minuto de Expiración</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="960"
+                              <Label>Hora de Expiración</Label>
+                              <TimeSelector
                                 value={constraint.dayMinuteExpiration}
-                                onChange={(e) =>
+                                onChange={(minutes) =>
                                   handleUpdateConstraint(index, {
-                                    dayMinuteExpiration: parseInt(e.target.value),
+                                    dayMinuteExpiration: minutes,
                                   })
                                 }
-                                className="w-24"
+                                className="w-[230px]"
                               />
                             </div>
 

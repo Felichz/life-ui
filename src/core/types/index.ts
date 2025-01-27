@@ -141,7 +141,7 @@ export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;
 
 export type BoardId = string;
 
-interface InheritableActivityProps {
+export interface InheritableActivityProps {
   challenge?: Pick<ChallengeActivity, "constraintList" | "isRepetitive">;
   neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTime">;
   hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTime">;
