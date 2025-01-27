@@ -139,6 +139,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       activities: Object.values(persistedState.activities),
       usefulMetrics: persistedState.usefulMetrics,
       systemParams: persistedState.systemParams,
+      lastUpdateTimestamp: persistedState.lastUpdateTimestamp,
     }));
   }, [setUiState]);
 
