@@ -5,6 +5,8 @@ Bugs para fixear:
 
 Features que faltan implementar:
     POC:
+        - Cuando se excede el tiempo limite de un desafio se debe mostrar un modal mostrando las acciones disponibles, esto esta para grooming y clarificacion de que deberia ser posible en este caso
+        - Progress bar circular que muestre el flujo de un minuto (quiza se pueda en testmode si el timemultiplier es diferente a 1 para no complicar las cosas, hay que probar)
         - Falta borde de actividad seleccionada en la card de tiempo neutral
         - Guardar info de tiempo excedido para cada desafio, es un dato muy util para el usuario
         - Posibilidad de drag and drop de actividades dentro de un mismo board (debe haber un boton de mover para arrastrar)
@@ -14,7 +16,9 @@ Features que faltan implementar:
         - Se deben mostrar los crieterias heredados de los board dentro del modal de creacion de actividad y dentro del modal de editar actividades
         - Al finalizar el día debemos guardar información de las actividades repetibles
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
+        - Implementar algun concepto que ayude a evitar malos habitos, capaz incentivando si se evita un mal habito en el dia, o penalizar si se hace el mal habito, o capaz una combinacion de los dos
         - Me gustaria que las notificaciones se muestren mejor en ui, quiero que se vea el titulo de la actividad seleccionada (clickeable que te lleve a la activity card por id del html), y que muestre los tempos actuales al momento de la notificacion
+        - Quiero que el timeline muestre horas con 0 minutos, por ejemplo 12:00, 12:30, 13:00, etc, las unicas horas "no exactas" serian la del inicio del dia y finalizacion del dia
 
     Para luego:
         - Un nuevo sistema de notificaciones donde se avisen cosas como multas que estan cerca de aplicarse
