@@ -1,0 +1,21 @@
+Bugs para fixear:
+    - La pantalla de boards no parece ser scrolleable
+    - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad
+
+Features que faltan implementar:
+    POC:
+        - Quiero que la opcion default seleccionada en el select de tipo de actividad al crear una actividad sea desafio
+        - Input para editar nombre de board en el modal de edicion de board
+        - Quiero poder ver la hora estimada de finalizacion de una actividad (la hora del limite definido en las props)
+        - Se deben mostrar los crieterias heredados de los board dentro del modal de creacion de actividad y dentro del modal de editar actividades
+        - Al finalizar el día debemos guardar información de las actividades repetibles
+        - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
+
+    Para luego:
+        - Un nuevo sistema de notificaciones donde se avisen cosas como multas que estan cerca de aplicarse
+        - Monitorear cuando estoy en la app y cuando no, pueden ser datos utiles para mostrar
+        - Agregar multiples acciones posibles cuando se excede el tiempo de un desafio, hay que pensar como manejar la flexibilidad y adaptabilidad en estos casos
+        - Crear plantillas de boards, configs base para aplicar
+
+Faltan testear casos raros que seguramente esten bugeados:
+    - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
