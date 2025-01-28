@@ -5,6 +5,7 @@ Bugs para fixear:
 
 Features que faltan implementar:
     POC:
+        - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles
         - Cuando se excede el tiempo limite de un desafio se debe mostrar un modal mostrando las acciones disponibles, esto esta para grooming y clarificacion de que deberia ser posible en este caso
         - Progress bar circular que muestre el flujo de un minuto (quiza se pueda en testmode si el timemultiplier es diferente a 1 para no complicar las cosas, hay que probar)
         - Falta borde de actividad seleccionada en la card de tiempo neutral
@@ -19,6 +20,7 @@ Features que faltan implementar:
         - Implementar algun concepto que ayude a evitar malos habitos, capaz incentivando si se evita un mal habito en el dia, o penalizar si se hace el mal habito, o capaz una combinacion de los dos
         - Me gustaria que las notificaciones se muestren mejor en ui, quiero que se vea el titulo de la actividad seleccionada (clickeable que te lleve a la activity card por id del html), y que muestre los tempos actuales al momento de la notificacion
         - Quiero que el timeline muestre horas con 0 minutos, por ejemplo 12:00, 12:30, 13:00, etc, las unicas horas "no exactas" serian la del inicio del dia y finalizacion del dia
+        - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad
 
     Para luego:
         - Un nuevo sistema de notificaciones donde se avisen cosas como multas que estan cerca de aplicarse
