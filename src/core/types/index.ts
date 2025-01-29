@@ -75,24 +75,38 @@ export type TempoModificationRecord = {
 
 export type TempoModificationHistory = TempoModificationRecord[];
 
-/** Criterio de aceptación base */
-interface BaseActivityConstraint {
+/** Constraints especificos de un desafio */
+type BaseChallengeConstraint = {
+  /** Id de esta instancia de constraint */
+  id: string;
   /** Tipo de criterio, p. ej. "expiration" */
   type: string;
   /** Penalización por incumplimiento (puede ser número fijo o porcentaje en string, e.g. "100%") */
   penalty?: number | string;
+  /** Id del constraint original del que este fue clonado */
+  parentConstraintId?: string | undefined;
+  /** Cantidad de veces que fallo este constraint (especifico para este id unico, para esta instancia en esta actividad) */
+  failCount: number;
   /** Estado actual del criterio */
   status: "active" | "failed";
-}
+};
 
 /** Criterio de expiración, que extiende el base */
-export interface ExpirationActivityConstraint extends BaseActivityConstraint {
+export interface ExpirationChallengeConstraint extends BaseChallengeConstraint {
   type: "expiration";
   dayMinuteExpiration: number;
 }
 
 /** Unión de criterios disponibles */
-export type ActivityConstraint = ExpirationActivityConstraint;
+export type ChallengeConstraint = ExpirationChallengeConstraint;
+
+// Constraints que se guardan dentro de un board para luego heredarlos a los desafios
+type BoardExpirationChallengeConstraint = Pick<
+  ExpirationChallengeConstraint,
+  "id" | "type" | "penalty" | "dayMinuteExpiration"
+>;
+
+export type BoardChallengeConstraint = BoardExpirationChallengeConstraint;
 
 type ActivityType = "challenge" | "neutral" | "discount";
 type ActivityStatus = "toDo" | "inProgress" | "completed";
@@ -134,18 +148,21 @@ export interface HobbyActivity extends TimeLimitedActivity {
 export interface ChallengeActivity extends BaseActivity {
   type: "challenge";
   totalTempoReward: number;
-  constraintList: ExpirationActivityConstraint[];
+  constraintList: ExpirationChallengeConstraint[];
 }
 
 export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;
 
-export type BoardId = string;
-
 export interface InheritableActivityProps {
-  challenge?: Pick<ChallengeActivity, "constraintList" | "isRepetitive">;
+  challenge?: { constraintList: BoardChallengeConstraint[] } & Pick<
+    ChallengeActivity,
+    "isRepetitive"
+  >;
   neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTime">;
   hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTime">;
 }
+
+export type BoardId = string;
 
 export interface Board {
   id: BoardId;

@@ -468,66 +468,14 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     []
   );
 
-  const _evaluateChallengeConstraints = useCallback(
-    async ({ activity }: { activity: ChallengeActivity }) => {
-      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-      // Solo evaluamos challenges y solo si tienen constraints
-      if (activity.type !== "challenge" || !activity.constraintList?.length) {
-        return;
-      }
-
-      // Evaluamos cada constraint que esté activo
-      for (const constraint of activity.constraintList) {
-        // Saltamos los que ya fallaron
-        if (constraint.status === "failed") {
-          continue;
-        }
-
-        switch (constraint.type) {
-          case "expiration": {
-            // Si pasó el minuto de expiración
-            if (lastUpdateTimestamp > constraint.dayMinuteExpiration) {
-              // Marcamos el constraint como fallido
-              const updatedActivity: ChallengeActivity = {
-                ...activity,
-                constraintList: activity.constraintList.map((c) =>
-                  c === constraint ? { ...c, status: "failed" } : c
-                ),
-              };
-
-              await systemApi.updateActivity(updatedActivity);
-
-              // Calculamos la penalización
-              let penaltyAmount = 0;
-
-              if (typeof constraint.penalty === "string" && constraint.penalty.endsWith("%")) {
-                // Si es porcentual, calculamos sobre el total reward
-                const percentage = parseInt(constraint.penalty) / 100;
-                penaltyAmount = activity.totalTempoReward * percentage;
-              }
-
-              if (typeof constraint.penalty === "number") {
-                // Si es fijo, usamos el número directamente
-                penaltyAmount = constraint.penalty;
-              }
-
-              // Aplicamos la penalización
-              if (penaltyAmount > 0) {
-                await _applyChallengeCriteriaFailed({
-                  activity,
-                  penaltyAmount,
-                });
-              }
-            }
-            break;
-          }
-          // Aquí se pueden agregar más tipos de constraints en el futuro
-        }
-      }
-    },
+  const _evaluateAllChallengeConstraints = useCallback(
+    async ({ activity }: { activity: ChallengeActivity }) => {},
     [_applyChallengeCriteriaFailed]
   );
+
+  // Primero obtiene todas las actividades del state persistido con systemApi.getActivities()
+  // Luego obtiene todos los constraints de todas las actividades
+  const _getAllActivityConstraints = useCallback(async () => {}, []);
 
   // etc. (Otras funciones "privadas" para la lógica core minuto a minuto o cálculos internos)
 
