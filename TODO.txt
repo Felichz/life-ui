@@ -1,7 +1,13 @@
 Bugs para fixear:
+    - Laburar bien los constraints y constraint heredados (revisar `Que quiero de los constraint.txt`)
     - Las horas mostradas en los timelines no son correctas, debe mostrar el rango horario y los minutos que representa
     - El boton para deseleccionar una actividad no funciona, bueno, parece que la actividad se deselecciona pero la activity card sigue mostrando el boton para deseleccionar, y se sigue mostrando en status en progreso, sera que el ui no se actualiza?
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
+    
+    Faltan testear casos raros que seguramente esten bugeados:
+        - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
+        - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
+
 
 Features que faltan implementar:
     POC:
@@ -28,5 +34,3 @@ Features que faltan implementar:
         - Agregar multiples acciones posibles cuando se excede el tiempo de un desafio, hay que pensar como manejar la flexibilidad y adaptabilidad en estos casos
         - Crear plantillas de boards, configs base para aplicar
 
-Faltan testear casos raros que seguramente esten bugeados:
-    - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
