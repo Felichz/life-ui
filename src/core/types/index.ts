@@ -154,10 +154,7 @@ export interface ChallengeActivity extends BaseActivity {
 export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;
 
 export interface InheritableActivityProps {
-  challenge?: { constraintList: BoardChallengeConstraint[] } & Pick<
-    ChallengeActivity,
-    "isRepetitive"
-  >;
+  challenge?: Pick<ChallengeActivity, "isRepetitive">;
   neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTime">;
   hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTime">;
 }
@@ -170,6 +167,7 @@ export interface Board {
   childrenBoards: BoardId[] | undefined;
   activities: ActivityId[];
   activityProps: InheritableActivityProps;
+  constraintList: BoardChallengeConstraint[];
   title: string;
 }
 

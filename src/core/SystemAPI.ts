@@ -166,7 +166,7 @@ class SystemAPI implements SystemAPIType {
       allInheritedConstraints: BoardChallengeConstraint[] = []
     ) => {
       // Combinar constraints heredados con los del board actual
-      const currentBoardConstraints = currentBoard.activityProps.challenge?.constraintList || [];
+      const currentBoardConstraints = currentBoard.constraintList;
       const combinedConstraints = [...allInheritedConstraints, ...currentBoardConstraints];
 
       // Obtener los challenges del board actual
