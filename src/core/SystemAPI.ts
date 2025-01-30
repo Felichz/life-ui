@@ -495,10 +495,19 @@ class SystemAPI implements SystemAPIType {
   async updateTempoBalance({
     investedTimeRecord,
     tempoModificationRecord,
-  }: {
-    investedTimeRecord?: InvestedTimeRecord | undefined;
-    tempoModificationRecord: TempoModificationRecord;
-  }): Promise<void> {
+  }:
+    | {
+        investedTimeRecord: InvestedTimeRecord;
+        tempoModificationRecord: TempoModificationRecord;
+      }
+    | {
+        investedTimeRecord: InvestedTimeRecord;
+        tempoModificationRecord?: undefined;
+      }
+    | {
+        investedTimeRecord?: undefined;
+        tempoModificationRecord?: TempoModificationRecord;
+      }): Promise<void> {
     const state = await this.getState();
 
     if (!state.currentDay) return;
@@ -508,9 +517,12 @@ class SystemAPI implements SystemAPIType {
       ? await this.updateInvestedTimeHistory({ investedTimeRecord })
       : state.investedTimeHistory;
 
+    const tempoModification = (tempoModificationRecord?.tempoModification ||
+      investedTimeRecord?.tempoModification) as number;
+
     // Calcular nuevos balances
     const { dayTempoBalance, totalTempoBalance } = await this.calculateNewBalances({
-      tempoModification: tempoModificationRecord.tempoModification,
+      tempoModification,
     });
 
     // Guardar todos los cambios
@@ -523,7 +535,9 @@ class SystemAPI implements SystemAPIType {
       },
       totalTempoBalance,
       investedTimeHistory: newInvestedTimeHistory,
-      tempoModificationHistory: [...state.tempoModificationHistory, tempoModificationRecord],
+      tempoModificationHistory: tempoModificationRecord
+        ? [...state.tempoModificationHistory, tempoModificationRecord]
+        : state.tempoModificationHistory,
     });
   }
 

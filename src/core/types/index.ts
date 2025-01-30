@@ -27,45 +27,23 @@ export type InvestedTimeRecord = {
 
 export type InvestedTimeHistory = InvestedTimeRecord[];
 
-// Modificaciones posibles para un Desafío
-type ChallengeTempoModificationReason =
-  | "challengeMinuteGeneration" // +1 por minuto dentro del tiempo estimado
-  | "challengeCompletionReward" // Tempos restantes al completar antes
-  | "challengeCriteriaFailed" // Penalización por fallar criterios
-  | "passiveConsumption"; // -1/min al exceder tiempo estimado
-
-// Modificaciones posibles para Actividad Neutral
-type NeutralTempoModificationReason = "earlyNeutralActivityCompletionCompensation"; // Compensación por terminar antes
-
-// Modificaciones posibles para Actividad Hobby
-type DiscountTempoModificationReason =
-  | "discountedPassiveConsumption"
-  | "earlyDiscountActivityCompletionCompensation"; // Consumo a tasa reducida
-
 type TempoModificationByType =
   | {
-      status: "activity";
       activityId: ActivityId;
       type: ChallengeActivity["type"];
-      reason: ChallengeTempoModificationReason;
+      reason:
+        | "challengeCompletionReward" // Tempos restantes al completar antes
+        | "challengeCriteriaFailed"; // Penalización por fallar criterios;
     }
   | {
-      status: "activity";
       activityId: ActivityId;
       type: NeutralActivity["type"];
-      reason: NeutralTempoModificationReason;
+      reason: "earlyNeutralActivityCompletionCompensation"; // Compensación por terminar antes
     }
   | {
-      status: "activity";
       activityId: ActivityId;
       type: HobbyActivity["type"];
-      reason: DiscountTempoModificationReason;
-    }
-  | {
-      status: "idle";
-      reason: "passiveConsumption";
-      activityId?: undefined;
-      type?: undefined;
+      reason: "earlyDiscountActivityCompletionCompensation"; // Consumo a tasa reducida
     };
 
 export type TempoModificationRecord = {
@@ -271,10 +249,19 @@ export interface SystemAPIType {
   updateTempoBalance: ({
     investedTimeRecord,
     tempoModificationRecord,
-  }: {
-    investedTimeRecord?: InvestedTimeRecord | undefined;
-    tempoModificationRecord: TempoModificationRecord;
-  }) => Promise<void>;
+  }:
+    | {
+        investedTimeRecord: InvestedTimeRecord;
+        tempoModificationRecord: TempoModificationRecord;
+      }
+    | {
+        investedTimeRecord: InvestedTimeRecord;
+        tempoModificationRecord?: undefined;
+      }
+    | {
+        investedTimeRecord?: undefined;
+        tempoModificationRecord?: TempoModificationRecord;
+      }) => Promise<void>;
 
   getInvestedTimeHistory: () => Promise<InvestedTimeHistory>;
   getInvestedTimeHistoryByDay: (day: Date) => Promise<InvestedTimeHistory>;
