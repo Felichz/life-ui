@@ -186,7 +186,7 @@ class SystemAPI implements SystemAPIType {
             );
 
             if (inheritedConstraint) {
-              // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propeidades heredables menos el id)
+              // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propiedades heredables menos el id)
               updatedConstraints.push({
                 ...constraint,
                 ...inheritedConstraint,
