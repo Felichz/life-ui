@@ -203,10 +203,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
             });
 
             // Evaluamos los constraints
-            console.log("  = _evaluateChallengeConstraints =");
-            await _evaluateChallengeConstraints({
-              activity: currentActivity,
-            });
+            // console.log("  = _evaluateChallengeConstraints =");
+            // await _evaluateChallengeConstraints({
+            //   activity: currentActivity,
+            // });
             break;
           }
           case "neutral": {
@@ -277,18 +277,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
           minutesInvested: 1,
         };
 
-        const tempoModificationRecord: TempoModificationRecord = {
-          status: "activity",
-          activityId: activity.id,
-          type: "challenge",
-          timestamp: lastUpdateTimestamp,
-          reason: "challengeMinuteGeneration",
-          tempoModification: 1,
-        };
-
         await systemApi.updateTempoBalance({
           investedTimeRecord,
-          tempoModificationRecord,
         });
       } else {
         // Si excedimos el tiempo estimado, aplicamos consumo pasivo
@@ -342,18 +332,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         minutesInvested: 1,
       };
 
-      const tempoModificationRecord: TempoModificationRecord = {
-        status: "activity",
-        activityId: activity.id,
-        type: "discount",
-        timestamp: lastUpdateTimestamp,
-        reason: "discountedPassiveConsumption",
-        tempoModification: discountedConsumption,
-      };
-
       await systemApi.updateTempoBalance({
         investedTimeRecord,
-        tempoModificationRecord,
       });
 
       // Si con este nuevo minuto llegamos al límite, deseleccionamos
@@ -383,16 +363,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       minutesInvested: 1,
     };
 
-    const tempoModificationRecord: TempoModificationRecord = {
-      status: "idle",
-      timestamp: lastUpdateTimestamp,
-      reason: "passiveConsumption",
-      tempoModification: passiveConsumption,
-    };
-
     await systemApi.updateTempoBalance({
       investedTimeRecord,
-      tempoModificationRecord,
     });
   }, []);
 
@@ -403,7 +375,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const compensation = activity.allowedTime - activity.minutesActive;
 
       const tempoModificationRecord: TempoModificationRecord = {
-        status: "activity",
         activityId: activity.id,
         type: "neutral",
         timestamp: lastUpdateTimestamp,
@@ -433,7 +404,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const compensation = compensationFactor * unusedTime;
 
       const tempoModificationRecord: TempoModificationRecord = {
-        status: "activity",
         activityId: activity.id,
         type: "discount",
         timestamp: lastUpdateTimestamp,
@@ -453,7 +423,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
       const tempoModificationRecord: TempoModificationRecord = {
-        status: "activity",
         activityId: activity.id,
         type: "challenge",
         timestamp: lastUpdateTimestamp,
@@ -663,7 +632,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const reward = activity.totalTempoReward - activity.minutesActive;
 
       const tempoModificationRecord: TempoModificationRecord = {
-        status: "activity",
         activityId: activity.id,
         type: "challenge",
         timestamp: lastUpdateTimestamp,
