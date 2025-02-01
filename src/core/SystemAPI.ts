@@ -16,6 +16,7 @@ import type {
   HobbyActivity,
   BoardChallengeConstraint,
   ChallengeConstraint,
+  InheritableActivityProps,
 } from "./types";
 
 const STORAGE_KEY = "system_state";
@@ -150,91 +151,207 @@ class SystemAPI implements SystemAPIType {
     return Object.values(state.boards);
   }
 
-  // Cada vez que se modifica un board (al actualizar con la funcion `updateBoard`), se deben sincronizar los constraint de todos los desafios de este board, o cuando se crea una nueva actividad dentro de un board se deben actualizar todos los constraint desde el board root, y esta es la funcion encargada de hacer eso, esta funcion recibe un board y se encarga de actualizar todos los constraint haciendo un proceso recursivo hacia dentro, osea incluyendo sub boards
-  // En cuanto a la implementacion, esta funcion debe hacer un analisis recursivo adentrandose en cada sub board (cada iteracion procesa un unico board), debemos asegurarnos de ir guardando los constraint del board actual y pasarlos a la siguiente iteracion recursiva, porque necesitamos esta informacion para saber que constraints debemos enviar hacia cada desafio, ya que esto funciona como herencia
-  // Osea, en cada iteracion recursiva, tendremos a mano todos los constraints del board actual (`board.activityProps.challenge.constraintList`) y todos los constraint de los board padres que fueron enviados desde iteraciones anteriores, podemos ir guardando esto dentro de una variable llamada `allInheritedConstraints`
-  // Luego en cada una de estas iteraciones, debemos filtrar todas las actividades de tipo challenge del board actual, y para cada uno de estos desaifos, debemos actualizar su `constraintList` de la siguiente manera:
-  //   1. Para cada constraint del desafio, se debe verificar si el `parentConstraintId` existe como `id` en algun constraint de `allInheritedConstraints`
-  //   2. En caso de que exista, se debe reemplazar el constraint del desafio por el constraint original de `allInheritedConstraints`, actualmente las constraint heredables osea las constraint de un board tienen las propiedades `id`, `type`, y `penalty`, en el caso del constraint del desafio, este puede tener propiedades especificas de la instancia como `failCount` o `status`, asi que lo que tenemos que hacer en esta funcion es actualizar solo unas propiedades especificas que son `type` y `penalty` ya que estas son las que se heredan
-  //   3. En caso de que un constraint tenga un `parentConstraintId` que no exista como `id` dentro de `allInheritedConstraints`, se debe eliminar el constraint del challenge, ya que esto significaria que el constraint original fue eliminado del board original
-  // Luego debemos iterar sobre `allInheritedConstraints` y revisar si el `id` de alguno de estos constraint no existe dentro de los constraint del challenge como `parentConstraintId`, en caso de que aun no exista debemos crear el constraint desde 0 en el desafio, asi que debemos crearle una nueva `id` propia, debemos crearle el `parentConstraintId` basado en el `id` del constraint original de `allInheritedConstraints`, debemos definir `failCount` en 0, y `status` en
-  async _syncBoardInheritableChallengeConstraints(board: Board): Promise<void> {
-    const state = await this.getState();
+  private async _traverseBoardHierarchy<T>({
+    board,
+    processBoard,
+    initialInheritedData,
+  }: {
+    board: Board;
+    processBoard: (currentBoard: Board, inheritedData: T) => Promise<T>;
+    initialInheritedData: T;
+  }): Promise<void> {
+    const iterationCallback = async (currentBoard: Board, inheritedData: T) => {
+      // Procesar el board actual y obtener datos para pasar a los hijos
+      const updatedInheritedData = await processBoard(currentBoard, inheritedData);
 
-    const processBoard = async (
-      currentBoard: Board,
-      allInheritedConstraints: BoardChallengeConstraint[] = []
-    ) => {
-      // Combinar constraints heredados con los del board actual
-      const currentBoardConstraints = currentBoard.constraintList;
-      const combinedConstraints = [...allInheritedConstraints, ...currentBoardConstraints];
-
-      // Obtener los challenges del board actual
-      const childChallenges = currentBoard.activities
-        .map((id) => state.activities[id])
-        .filter((activity) => activity.type === "challenge");
-
-      // Actualizar los constraints de cada challenge
-      for (const challenge of childChallenges) {
-        const updatedConstraints: ChallengeConstraint[] = [];
-
-        for (const constraint of challenge.constraintList) {
-          if (constraint.parentConstraintId) {
-            // Buscar el constraint heredado correspondiente
-            const inheritedConstraint = allInheritedConstraints.find(
-              (ic) => ic.id === constraint.parentConstraintId
-            );
-
-            if (inheritedConstraint) {
-              // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propiedades heredables menos el id)
-              updatedConstraints.push({
-                ...constraint,
-                ...inheritedConstraint,
-                id: constraint.id,
-              });
-            }
-            // Si no existe, no se agrega (se elimina)
-          } else {
-            // Mantener constraints sin parent
-            updatedConstraints.push(constraint);
-          }
-        }
-
-        // Agregar constraints heredados que no estén presentes
-        for (const inheritedConstraint of allInheritedConstraints) {
-          const exists = updatedConstraints.some(
-            (uc) => uc.parentConstraintId === inheritedConstraint.id
-          );
-
-          if (!exists) {
-            updatedConstraints.push({
-              ...inheritedConstraint,
-              id: crypto.randomUUID(),
-              parentConstraintId: inheritedConstraint.id,
-              failCount: 0,
-              status: "active",
-            });
-          }
-        }
-
-        // Actualizar el challenge con los nuevos constraints
-        challenge.constraintList = updatedConstraints;
-
-        await this.updateActivity(challenge);
-      }
-
-      // Procesar recursivamente solo los hijos directos
+      // Procesar recursivamente los hijos directos
       if (currentBoard.childrenBoards) {
         for (const childBoardId of currentBoard.childrenBoards) {
-          const childBoard = state.boards[childBoardId];
+          const childBoard = await this.getBoard(childBoardId);
           if (childBoard) {
-            await processBoard(childBoard, combinedConstraints);
+            await iterationCallback(childBoard, updatedInheritedData);
           }
         }
       }
     };
 
-    await processBoard(board);
+    await iterationCallback(board, initialInheritedData);
+  }
+
+  /**
+   * Sincroniza los constraint de desafíos para el tablero actual.
+   *
+   * Esta función se encarga de combinar los constraint heredados (provenientes del tablero padre)
+   * con los constraint propios definidos en el tablero actual. Luego, se encarga de recorrer las
+   * actividades de tipo desafío que pertenecen al tablero y actualizar, modificar o eliminar los
+   * constraint según corresponda:
+   *
+   * - Si un constraint en la actividad tiene un identificador de constraint padre, se busca el constraint
+   *   heredado y se actualizan ciertas propiedades (como type, penalty y dayMinuteExpiration).
+   * - Si no existe el constraint heredado, ese constraint se elimina de la actividad.
+   * - Se añaden a la actividad los constraint heredados que aún no se han aplicado.
+   *
+   * @param currentBoard - El tablero actual que contiene actividades y constraint propios.
+   * @param inheritedConstraints - Lista de constraint heredados a aplicar provenientes del padre.
+   * @returns Promise que resuelve con la lista combinada de constraint (heredados y propios) para seguir la sincronización.
+   */
+  private async _syncChallengeConstraintsCallback({
+    currentBoard,
+    inheritedConstraints,
+  }: {
+    currentBoard: Board;
+    inheritedConstraints: BoardChallengeConstraint[];
+  }): Promise<BoardChallengeConstraint[]> {
+    const state = await this.getState();
+
+    // Lógica original de constraints
+    const currentBoardConstraints = currentBoard.constraintList;
+    const combinedConstraints = [...inheritedConstraints, ...currentBoardConstraints];
+
+    const childChallenges = currentBoard.activities
+      .map((id) => state.activities[id])
+      .filter((activity): activity is ChallengeActivity => activity?.type === "challenge");
+
+    for (const challenge of childChallenges) {
+      const updatedConstraints: ChallengeConstraint[] = [];
+
+      for (const constraint of challenge.constraintList) {
+        if (constraint.parentConstraintId) {
+          // Buscar el constraint heredado correspondiente
+          const inheritedConstraint = inheritedConstraints.find(
+            (ic) => ic.id === constraint.parentConstraintId
+          );
+
+          if (inheritedConstraint) {
+            // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propiedades heredables menos el id)
+            updatedConstraints.push({
+              ...constraint,
+              ...inheritedConstraint,
+              id: constraint.id,
+            });
+          }
+          // Si no existe, no se agrega (se elimina)
+        } else {
+          // Mantener constraints sin parent
+          updatedConstraints.push(constraint);
+        }
+      }
+
+      // Agregar constraints heredados que no estén presentes
+      for (const inheritedConstraint of inheritedConstraints) {
+        const exists = updatedConstraints.some(
+          (uc) => uc.parentConstraintId === inheritedConstraint.id
+        );
+
+        if (!exists) {
+          updatedConstraints.push({
+            ...inheritedConstraint,
+            id: crypto.randomUUID(),
+            parentConstraintId: inheritedConstraint.id,
+            failCount: 0,
+            status: "active",
+          });
+        }
+      }
+
+      // Actualizar el challenge con los nuevos constraint
+      challenge.constraintList = updatedConstraints;
+
+      await this.updateActivity(challenge);
+    }
+
+    return combinedConstraints;
+  }
+
+  /**
+   * Sincroniza las propiedades heredables de las actividades para el tablero actual.
+   *
+   * Esta función combina las propiedades heredadas (provenientes del tablero padre) con las propiedades
+   * especificadas en el tablero actual (currentBoard.activityProps). El resultado es un objeto de propiedades
+   * heredables combinadas que se utilizan para actualizar las actividades asociadas al tablero:
+   *
+   * - Se recorre cada actividad (de cualquier tipo) en el tablero.
+   * - Cada actividad se actualiza asignándole las propiedades heredadas correspondientes en función de su tipo.
+   *
+   * @param currentBoard - El tablero actual del cual se extraen las propiedades propias para actividades.
+   * @param inheritedProps - Objeto con las propiedades heredadas que provienen del tablero padre.
+   * @returns Promise que resuelve con las propiedades heredables combinadas (un objeto InheritableActivityProps)
+   *          que pueden ser propagadas a los tableros hijos o utilizadas para la actualización de actividades.
+   */
+  private async _syncActivityPropsCallback({
+    currentBoard,
+    inheritedProps,
+  }: {
+    currentBoard: Board;
+    inheritedProps: InheritableActivityProps;
+  }): Promise<InheritableActivityProps> {
+    const state = await this.getState();
+
+    const combinedProps = {
+      challenge: {
+        ...inheritedProps.challenge,
+        ...currentBoard.activityProps.challenge,
+      },
+      neutral: {
+        ...inheritedProps.neutral,
+        ...currentBoard.activityProps.neutral,
+      },
+      discount: {
+        ...inheritedProps.discount,
+        ...currentBoard.activityProps.discount,
+      },
+    };
+
+    const childActivities = currentBoard.activities
+      .map((id) => state.activities[id])
+      .filter((activity): activity is Activity => activity !== undefined);
+
+    for (const activity of childActivities) {
+      const updatedActivity = {
+        ...activity,
+        inheritedProps: combinedProps[activity.type],
+      };
+
+      await this.updateActivity(updatedActivity as Activity);
+    }
+
+    return combinedProps;
+  }
+
+  /**
+   * Sincroniza recursivamente el estado del tablero y sus hijos, actualizando
+   * los constraint de desafíos y las propiedades heredables de las actividades.
+   *
+   * Recorre la jerarquía de tableros iniciando desde el tablero proporcionado. En cada iteración:
+   *  - Se actualizan los constraint de desafíos combinando los constraint heredados del padre
+   *    con los constraint propios definidos en el tablero actual.
+   *  - Se actualizan las propiedades heredables de las actividades combinando las propiedades heredadas
+   *    con las propiedades específicas del tablero actual.
+   *
+   * @param board - Tablero raíz desde el cual se inicia la sincronización (incluye sus tableros hijos).
+   * @returns Promise que se resuelve cuando la sincronización de todo el árbol de tableros ha finalizado.
+   */
+  private async _syncBoardWithChildren(board: Board): Promise<void> {
+    await this._traverseBoardHierarchy({
+      board,
+      processBoard: async (currentBoard, { constraints, activityProps }) => {
+        const newConstraints = await this._syncChallengeConstraintsCallback({
+          currentBoard,
+          inheritedConstraints: constraints,
+        });
+
+        const newProps = await this._syncActivityPropsCallback({
+          currentBoard,
+          inheritedProps: activityProps,
+        });
+
+        return { constraints: newConstraints, activityProps: newProps };
+      },
+      initialInheritedData: {
+        constraints: [] as BoardChallengeConstraint[],
+        activityProps: {} as InheritableActivityProps,
+      },
+    });
   }
 
   // Function recursiva que busca el board padre de un board y luego busca el padre de este board, y asi sucesivamente hasta que no haya mas boards padres, basicamente retorna el board root de la actividad. Si el board no tiene padre, retorna el mismo board
@@ -309,7 +426,7 @@ class SystemAPI implements SystemAPIType {
       },
     });
 
-    await this._syncBoardInheritableChallengeConstraints(board);
+    await this._syncBoardWithChildren(board);
   }
 
   async removeBoard(board: Board): Promise<void> {
@@ -386,10 +503,10 @@ class SystemAPI implements SystemAPIType {
 
     await this.saveState(newState);
 
-    // Sincronizar nuevamente los constraints desde el board root ya que la actividad puede heredar constraints desde el board root
+    // Sincronizar nuevamente los constraints y propiedades heredadas desde el board root ya que la actividad puede heredar desde el board root
     const rootBoard = await this._getRootBoard(parentBoard);
 
-    await this._syncBoardInheritableChallengeConstraints(rootBoard);
+    await this._syncBoardWithChildren(rootBoard);
   }
 
   async updateActivity(activityUpdates: Partial<Activity> & { id: ActivityId }): Promise<void> {
