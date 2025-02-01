@@ -114,12 +114,14 @@ interface TimeLimitedActivity extends BaseActivity {
 // Actividad Tempo Neutral
 export interface NeutralActivity extends TimeLimitedActivity {
   type: "neutral";
+  inheritedProps: InheritableActivityProps["neutral"];
 }
 
 // Al deseleccionar antes, se da compensación (se calcula segun el tiempo restante y el descuento)
 export interface HobbyActivity extends TimeLimitedActivity {
   type: "discount";
   tempoConsumptionRate: number; // Tasa reducida de consumo (ej: 0.5)
+  inheritedProps: InheritableActivityProps["discount"];
 }
 
 // Al deseleccionar antes, se da compensación para cubrir el totalTempoReward
@@ -127,14 +129,15 @@ export interface ChallengeActivity extends BaseActivity {
   type: "challenge";
   totalTempoReward: number;
   constraintList: ExpirationChallengeConstraint[];
+  inheritedProps: InheritableActivityProps["challenge"];
 }
 
 export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;
 
 export interface InheritableActivityProps {
-  challenge?: Pick<ChallengeActivity, "isRepetitive">;
-  neutral?: Pick<NeutralActivity, "isRepetitive" | "allowedTime">;
-  hobby?: Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTime">;
+  challenge?: Partial<Pick<ChallengeActivity, "isRepetitive">>;
+  neutral?: Partial<Pick<NeutralActivity, "isRepetitive" | "allowedTime">>;
+  discount?: Partial<Pick<HobbyActivity, "isRepetitive" | "tempoConsumptionRate" | "allowedTime">>;
 }
 
 export type BoardId = string;
