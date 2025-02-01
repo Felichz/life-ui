@@ -218,6 +218,11 @@ export type PersistedState = {
   lastUpdateTimestamp: number;
 } & PersistedDayState;
 
+export type CreateActivityInput =
+  | Omit<ChallengeActivity, "id" | "inheritedProps">
+  | Omit<NeutralActivity, "id" | "inheritedProps">
+  | Omit<HobbyActivity, "id" | "inheritedProps">;
+
 // API para interacutar con la base de datos o local storage, persistencia del state del sistema
 export interface SystemAPIType {
   // Obtiene todo el estado del sistema
@@ -312,12 +317,3 @@ export type UiState = {
 export type CreateBoardInput = Omit<Board, "id">;
 
 export type CreateActivityBaseInput = Omit<BaseActivity, "id">;
-
-export type CreateChallengeActivityInput = CreateActivityBaseInput &
-  Omit<ChallengeActivity, keyof BaseActivity | "id">;
-export type CreateNeutralActivityInput = CreateActivityBaseInput &
-  Omit<NeutralActivity, keyof BaseActivity | "id">;
-export type CreateHobbyActivityInput = CreateActivityBaseInput &
-  Omit<HobbyActivity, keyof BaseActivity | "id">;
-
-export type CreateActivityInput = Omit<Activity, "id">;

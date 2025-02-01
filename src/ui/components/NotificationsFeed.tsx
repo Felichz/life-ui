@@ -26,18 +26,12 @@ const NotificationsFeed: React.FC = () => {
 
   const getReasonText = (record: TempoModificationRecord) => {
     switch (record.reason) {
-      case "challengeMinuteGeneration":
-        return "Generación de tempo por minuto de desafío";
       case "challengeCompletionReward":
         return "Recompensa por completar desafío";
       case "challengeCriteriaFailed":
         return "Penalización por fallar criterios";
-      case "passiveConsumption":
-        return "Consumo pasivo de tempo";
       case "earlyNeutralActivityCompletionCompensation":
         return "Compensación por terminar actividad neutral antes";
-      case "discountedPassiveConsumption":
-        return "Consumo reducido de tempo";
       case "earlyDiscountActivityCompletionCompensation":
         return "Compensación por terminar hobby antes";
       default:
@@ -74,11 +68,9 @@ const NotificationsFeed: React.FC = () => {
                       {formatTime(record.timestamp)} • {record.tempoModification > 0 ? "+" : ""}
                       {record.tempoModification} tempos
                     </p>
-                    {record.status === "activity" && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Actividad: {record.activityId}
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Actividad: {record.activityId}
+                    </p>
                   </div>
                 </div>
               </Card>

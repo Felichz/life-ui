@@ -510,22 +510,16 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   // ===========================
   //   ACCIONES: Activities
   // ===========================
-  const createActivity = useCallback(
-    async (activityInput: Omit<Activity, "id">) => {
-      if (!validateNewActivity(activityInput)) {
-        throw new Error("Invalid activity data");
-      }
 
-      const activity: Activity = {
-        ...activityInput,
-        id: crypto.randomUUID(),
-      } as Activity;
+  const createActivity = async (activityInput: CreateActivityInput) => {
+    await systemApi.createActivity({
+      ...activityInput,
+      id: crypto.randomUUID(),
+      inheritedProps: {},
+    });
 
-      await systemApi.createActivity(activity);
-      await _syncUiStateFromPersisted();
-    },
-    [_syncUiStateFromPersisted]
-  );
+    await _syncUiStateFromPersisted();
+  };
 
   const updateActivity = useCallback(
     async (activityUpdates: Partial<Activity> & { id: ActivityId }) => {
