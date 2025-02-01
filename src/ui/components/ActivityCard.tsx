@@ -5,7 +5,7 @@ import type {
   ChallengeActivity,
   HobbyActivity,
   NeutralActivity,
-  ExpirationActivityConstraint,
+  ExpirationChallengeConstraint,
 } from "@core/types";
 import { Badge } from "@shadcn/badge";
 import { Button } from "@shadcn/button";
@@ -108,14 +108,6 @@ const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity 
   const engine = useSystemEngineContext();
   const progress = engine.activity.calculateProgress(activity);
 
-  // Obtener los constraints heredados del tablero padre
-  const { uiState } = useUiStateContext();
-  const parentBoard = activity.parentBoardId
-    ? uiState.boards.find((b) => b.id === activity.parentBoardId)
-    : undefined;
-  const inheritedConstraints = parentBoard?.activityProps.challenge?.constraintList || [];
-
-  // Solo usar los constraints propios de la actividad
   const activityConstraints = activity.constraintList;
 
   const formatConstraintPenalty = (penalty: number | string | undefined) => {
@@ -170,16 +162,15 @@ const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity 
       </div>
       <p>Recompensa: +{activity.totalTempoReward} tempos</p>
 
-      {(activityConstraints.length > 0 || inheritedConstraints.length > 0) && (
+      {activityConstraints.length > 0 && (
         <div className="mt-2">
           <p className="font-medium mb-1">Criterios de Aceptación:</p>
           <div className="space-y-2">
-            {/* Mostrar constraints propios */}
             {activityConstraints.map((constraint, index) => {
               if (constraint.type === "expiration") {
                 return (
                   <div
-                    key={`activity-${index}`}
+                    key={constraint.id}
                     className={`flex items-center justify-between p-2 rounded ${
                       constraint.status === "failed"
                         ? "bg-destructive/10 text-destructive"
@@ -193,47 +184,11 @@ const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity 
                           Fallido
                         </Badge>
                       )}
-                    </div>
-                    <span className="text-xs">{formatConstraintPenalty(constraint.penalty)}</span>
-                  </div>
-                );
-              }
-              return null;
-            })}
-
-            {/* Mostrar constraints heredados */}
-            {inheritedConstraints.map((constraint, index) => {
-              if (constraint.type === "expiration") {
-                // Buscar si hay un constraint equivalente en la actividad
-                const matchingActivityConstraint = activityConstraints.find(
-                  (ac) =>
-                    ac.type === constraint.type &&
-                    ac.dayMinuteExpiration === constraint.dayMinuteExpiration &&
-                    ac.penalty === constraint.penalty
-                );
-
-                // Si ya existe un constraint equivalente, no lo mostramos
-                if (matchingActivityConstraint) return null;
-
-                return (
-                  <div
-                    key={`inherited-${index}`}
-                    className={`flex items-center justify-between p-2 rounded ${
-                      constraint.status === "failed"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-secondary/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Expira: {formatMinuteToTime(constraint.dayMinuteExpiration)}</span>
-                      {constraint.status === "failed" && (
-                        <Badge variant="destructive" className="text-[10px]">
-                          Fallido
+                      {constraint.parentConstraintId && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Heredado
                         </Badge>
                       )}
-                      <Badge variant="outline" className="text-[10px]">
-                        Heredado
-                      </Badge>
                     </div>
                     <span className="text-xs">{formatConstraintPenalty(constraint.penalty)}</span>
                   </div>
@@ -293,48 +248,26 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
   const [editedConsumptionRate, setEditedConsumptionRate] = React.useState(
     "tempoConsumptionRate" in activity ? activity.tempoConsumptionRate : 0.5
   );
-  const [editedConstraints, setEditedConstraints] = React.useState<ExpirationActivityConstraint[]>(
+  const [editedConstraints, setEditedConstraints] = React.useState<ExpirationChallengeConstraint[]>(
     "constraintList" in activity ? [...activity.constraintList] : []
   );
 
-  // Obtener las propiedades heredadas del tablero padre
-  const parentBoard = React.useMemo(() => {
-    return uiState.boards.find((b) => b.id === activity.parentBoardId);
-  }, [activity.parentBoardId, uiState.boards]);
-
-  const inheritedProps = React.useMemo(() => {
-    if (!parentBoard) return null;
-    return parentBoard.activityProps;
-  }, [parentBoard]);
+  const isChallenge = activity.type === "challenge";
+  const isNeutral = activity.type === "neutral";
+  const isHobby = activity.type === "discount";
+  const isNeutralOrHobby = isNeutral || isHobby;
 
   const isAllowedTimeInherited = React.useMemo(() => {
-    if (!inheritedProps) return false;
-    if (activity.type === "neutral") {
-      return inheritedProps.neutral?.allowedTime === activity.allowedTime;
-    }
-    if (activity.type === "discount") {
-      return inheritedProps.hobby?.allowedTime === activity.allowedTime;
-    }
-    return false;
-  }, [activity, inheritedProps]);
+    return isNeutralOrHobby && activity.inheritedProps?.allowedTime !== undefined;
+  }, [activity]);
 
   const isConsumptionRateInherited = React.useMemo(() => {
-    if (!inheritedProps || activity.type !== "discount") return false;
-    return (
-      inheritedProps.hobby?.tempoConsumptionRate ===
-      (activity as HobbyActivity).tempoConsumptionRate
-    );
-  }, [activity, inheritedProps]);
+    return isHobby && activity.inheritedProps?.tempoConsumptionRate !== undefined;
+  }, [activity]);
 
   const areConstraintsInherited = React.useMemo(() => {
-    if (!inheritedProps || activity.type !== "challenge") return false;
-    const challengeActivity = activity as ChallengeActivity;
-    const inheritedConstraints = inheritedProps.challenge?.constraintList || [];
-    return (
-      inheritedConstraints.length > 0 &&
-      JSON.stringify(inheritedConstraints) === JSON.stringify(challengeActivity.constraintList)
-    );
-  }, [activity, inheritedProps]);
+    return isChallenge && activity.constraintList.some((c) => !!c.parentConstraintId);
+  }, [activity]);
 
   const handleAction = async (action: () => Promise<void>) => {
     try {
@@ -432,18 +365,20 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
   };
 
   const handleAddConstraint = () => {
-    const newConstraint: ExpirationActivityConstraint = {
+    const newConstraint: ExpirationChallengeConstraint = {
+      id: crypto.randomUUID(),
       type: "expiration",
       dayMinuteExpiration: 0,
       penalty: 0,
       status: "active",
+      failCount: 0,
     };
     setEditedConstraints([...editedConstraints, newConstraint]);
   };
 
   const handleUpdateConstraint = (
     index: number,
-    updates: Partial<ExpirationActivityConstraint>
+    updates: Partial<ExpirationChallengeConstraint>
   ) => {
     setEditedConstraints(
       editedConstraints.map((constraint, i) =>
@@ -652,7 +587,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
               />
             </div>
 
-            {(activity.type === "neutral" || activity.type === "discount") && (
+            {isNeutralOrHobby && (
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="allowedTime">Tiempo Permitido (minutos)</Label>
