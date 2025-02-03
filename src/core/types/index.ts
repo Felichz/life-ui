@@ -130,6 +130,7 @@ export interface ChallengeActivity extends BaseActivity {
   totalTempoReward: number;
   constraintList: ExpirationChallengeConstraint[];
   inheritedProps: InheritableActivityProps["challenge"];
+  exceededMinutes?: number;
 }
 
 export type Activity = NeutralActivity | HobbyActivity | ChallengeActivity;

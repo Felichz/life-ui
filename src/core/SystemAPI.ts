@@ -45,6 +45,7 @@ const defaultState: PersistedState = {
     timeMultiplier: 1,
   },
   lastUpdateTimestamp: Date.now(),
+  selectedActivity: undefined,
 };
 
 class StorageWrapper {
