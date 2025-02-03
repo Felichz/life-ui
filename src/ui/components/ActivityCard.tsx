@@ -123,7 +123,7 @@ const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity 
   };
 
   const isGeneratingTempo = activity.minutesActive < activity.totalTempoReward;
-  const exceededMinutes = Math.max(0, activity.minutesActive - activity.totalTempoReward);
+  const exceededMinutes = activity.exceededMinutes ?? 0;
 
   return (
     <div className="mt-2 text-sm">

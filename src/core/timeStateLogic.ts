@@ -1,0 +1,301 @@
+import type { TimeSimulator } from "./TimeSimulator";
+import type { Activity, InvestedTimeRecord, SystemParams } from "./types";
+
+// Interfaces para los parámetros de entrada
+export interface TimeStateInput {
+  currentDay?: {
+    date: number;
+    dayStartMinute: number;
+    dayTempoBalance: number;
+  };
+  lastUpdateTimestamp: number;
+  currentActivity?: Activity;
+  systemParams: SystemParams;
+  totalTempoBalance: number;
+  timeSimulator: TimeSimulator;
+}
+
+export interface ProcessTimeBatchInput {
+  deltaTime: number;
+  baseTimestamp: number;
+  currentActivity?: Activity;
+  systemParams: SystemParams;
+}
+
+// Interfaces para los resultados
+export interface TimeStateResult {
+  shouldEndDay: boolean;
+  processedMinutes: number;
+  timeRecords: InvestedTimeRecord[];
+  newDayTempoBalance: number;
+  newTotalTempoBalance: number;
+  updatedTimestamp: number;
+  updatedActivity?: Activity;
+}
+
+export interface ProcessTimeBatchResult {
+  timeRecords: InvestedTimeRecord[];
+  updatedActivity?: Activity;
+  updatedTimestamp: number;
+}
+
+/**
+ * Convierte un timestamp en minutos del día (0-1440)
+ */
+export function getMinutesFromTimestamp(timestamp: number): number {
+  const date = new Date(timestamp);
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+/**
+ * Calcula los nuevos balances basado en una modificación de tempo
+ */
+export function calculateNewBalances({
+  currentDayBalance,
+  totalBalance,
+  tempoModification,
+}: {
+  currentDayBalance: number;
+  totalBalance: number;
+  tempoModification: number;
+}): { newDayTempoBalance: number; newTotalTempoBalance: number } {
+  return {
+    newDayTempoBalance: currentDayBalance + tempoModification,
+    newTotalTempoBalance: totalBalance + tempoModification,
+  };
+}
+
+/**
+ * Procesa un lote de tiempo para una actividad específica
+ */
+export function processTimeBatch({
+  deltaTime,
+  baseTimestamp,
+  currentActivity,
+  systemParams,
+}: ProcessTimeBatchInput): ProcessTimeBatchResult {
+  const records: InvestedTimeRecord[] = [];
+  let activeMinutes = 0;
+
+  if (currentActivity) {
+    switch (currentActivity.type) {
+      case "challenge": {
+        // Calculamos el tiempo que aún aporta recompensa
+        const remaining = currentActivity.totalTempoReward - currentActivity.minutesActive;
+        const activeMinutes = Math.min(deltaTime, remaining);
+        // Los minutos extra serán lo que queda
+        const extraMinutes = deltaTime - activeMinutes;
+
+        // Registrar tiempo de actividad
+        if (activeMinutes > 0) {
+          records.push({
+            status: "activity",
+            activityId: currentActivity.id,
+            type: "challenge",
+            timestamp: baseTimestamp,
+            tempoModification: activeMinutes * 1,
+            minutesInvested: activeMinutes,
+          });
+        }
+
+        // Registrar tiempo idle restante
+        if (extraMinutes > 0) {
+          records.push({
+            status: "idle",
+            timestamp: baseTimestamp + activeMinutes * 60000,
+            tempoModification: extraMinutes * -systemParams.passiveTempoConsumptionRate,
+            minutesInvested: extraMinutes,
+          });
+        }
+
+        return {
+          timeRecords: records,
+          updatedActivity: {
+            ...currentActivity,
+            // Sólo se actualiza minutesActive con los minutos que aportan recompensa
+            minutesActive: currentActivity.minutesActive + activeMinutes,
+            // Se acumulan los extra en la nueva propiedad
+            exceededMinutes: (currentActivity.exceededMinutes ?? 0) + extraMinutes,
+          },
+          updatedTimestamp: baseTimestamp + deltaTime * 60000,
+        };
+      }
+      case "neutral": {
+        const remaining = currentActivity.allowedTime - currentActivity.minutesActive;
+        activeMinutes = Math.min(deltaTime, remaining);
+        const idleMinutes = deltaTime - activeMinutes;
+
+        // Registrar tiempo neutral
+        if (activeMinutes > 0) {
+          records.push({
+            status: "activity",
+            activityId: currentActivity.id,
+            type: "neutral",
+            timestamp: baseTimestamp,
+            tempoModification: 0,
+            minutesInvested: activeMinutes,
+          });
+        }
+
+        // Registrar tiempo idle
+        if (idleMinutes > 0) {
+          records.push({
+            status: "idle",
+            timestamp: baseTimestamp + activeMinutes * 60000,
+            tempoModification: idleMinutes * -systemParams.passiveTempoConsumptionRate,
+            minutesInvested: idleMinutes,
+          });
+        }
+
+        return {
+          timeRecords: records,
+          updatedActivity: {
+            ...currentActivity,
+            minutesActive: currentActivity.minutesActive + activeMinutes,
+            status: activeMinutes === remaining ? "completed" : currentActivity.status,
+          },
+          updatedTimestamp: baseTimestamp + deltaTime * 60000,
+        };
+      }
+      case "discount": {
+        const remaining = currentActivity.allowedTime - currentActivity.minutesActive;
+        activeMinutes = Math.min(deltaTime, remaining);
+        const idleMinutes = deltaTime - activeMinutes;
+
+        // Registrar tiempo con descuento
+        if (activeMinutes > 0) {
+          records.push({
+            status: "activity",
+            activityId: currentActivity.id,
+            type: "discount",
+            timestamp: baseTimestamp,
+            tempoModification: activeMinutes * -currentActivity.tempoConsumptionRate,
+            minutesInvested: activeMinutes,
+          });
+        }
+
+        // Registrar tiempo idle
+        if (idleMinutes > 0) {
+          records.push({
+            status: "idle",
+            timestamp: baseTimestamp + activeMinutes * 60000,
+            tempoModification: idleMinutes * -systemParams.passiveTempoConsumptionRate,
+            minutesInvested: idleMinutes,
+          });
+        }
+
+        return {
+          timeRecords: records,
+          updatedActivity: {
+            ...currentActivity,
+            minutesActive: currentActivity.minutesActive + activeMinutes,
+            status: activeMinutes === remaining ? "completed" : currentActivity.status,
+          },
+          updatedTimestamp: baseTimestamp + deltaTime * 60000,
+        };
+      }
+    }
+  }
+
+  // Si no hay actividad, registrar todo el tiempo como idle
+  records.push({
+    status: "idle",
+    timestamp: baseTimestamp,
+    tempoModification: deltaTime * -systemParams.passiveTempoConsumptionRate,
+    minutesInvested: deltaTime,
+  });
+
+  return {
+    timeRecords: records,
+    updatedTimestamp: baseTimestamp + deltaTime * 60000,
+  };
+}
+
+/**
+ * Función principal que actualiza el estado del sistema según el tiempo transcurrido
+ */
+export function updateTimeState({
+  currentDay,
+  lastUpdateTimestamp,
+  currentActivity,
+  systemParams,
+  totalTempoBalance,
+  timeSimulator,
+}: TimeStateInput): TimeStateResult {
+  if (!currentDay) {
+    return {
+      shouldEndDay: false,
+      processedMinutes: 0,
+      timeRecords: [],
+      newDayTempoBalance: 0,
+      newTotalTempoBalance: totalTempoBalance,
+      updatedTimestamp: lastUpdateTimestamp,
+      updatedActivity: undefined,
+    };
+  }
+
+  const now = timeSimulator.now();
+  const deltaTime = Math.floor((now - lastUpdateTimestamp) / 60000);
+
+  if (deltaTime <= 0) {
+    return {
+      shouldEndDay: false,
+      processedMinutes: 0,
+      timeRecords: [],
+      newDayTempoBalance: currentDay.dayTempoBalance,
+      newTotalTempoBalance: totalTempoBalance,
+      updatedTimestamp: lastUpdateTimestamp,
+      updatedActivity: undefined,
+    };
+  }
+
+  const dayEndTimestamp = currentDay.date + 960 * 60000; // 16 horas en ms
+  const remainingDayTime = dayEndTimestamp - lastUpdateTimestamp;
+  const remainingDayMinutes = Math.floor(remainingDayTime / 60000);
+  const processableMinutes = Math.min(deltaTime, remainingDayMinutes);
+
+  if (processableMinutes <= 0) {
+    return {
+      shouldEndDay: true,
+      processedMinutes: 0,
+      timeRecords: [],
+      newDayTempoBalance: currentDay.dayTempoBalance,
+      newTotalTempoBalance: totalTempoBalance,
+      updatedTimestamp: lastUpdateTimestamp,
+      updatedActivity: undefined,
+    };
+  }
+
+  const { timeRecords, updatedActivity, updatedTimestamp } = processTimeBatch({
+    deltaTime: processableMinutes,
+    baseTimestamp: lastUpdateTimestamp,
+    currentActivity,
+    systemParams,
+  });
+
+  let newDayTempoBalance = currentDay.dayTempoBalance;
+  let newTotalTempoBalance = totalTempoBalance;
+
+  // Calcular los nuevos balances
+  timeRecords.forEach((record) => {
+    const { newDayTempoBalance: dayBalance, newTotalTempoBalance: totalBalance } =
+      calculateNewBalances({
+        currentDayBalance: newDayTempoBalance,
+        totalBalance: newTotalTempoBalance,
+        tempoModification: record.tempoModification,
+      });
+
+    newDayTempoBalance = dayBalance;
+    newTotalTempoBalance = totalBalance;
+  });
+
+  return {
+    shouldEndDay: processableMinutes < deltaTime,
+    processedMinutes: processableMinutes,
+    timeRecords,
+    newDayTempoBalance,
+    newTotalTempoBalance,
+    updatedTimestamp,
+    updatedActivity,
+  };
+}

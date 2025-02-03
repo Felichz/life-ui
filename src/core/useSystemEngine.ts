@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { TimeSimulator } from "./TimeSimulator";
+import { updateTimeState } from "./timeStateLogic";
 import type {
   Activity,
   ActivityId,
   Board,
   ChallengeActivity,
   HobbyActivity,
-  InvestedTimeRecord,
   TempoModificationRecord,
   DayState,
   NeutralActivity,
@@ -48,6 +48,52 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     instance.current = instances;
     console.log("new instance", instance.current);
   }, []);
+
+  /**
+   * Función privada para re-sincronizar el UiState tras cada modificación en systemApi.
+   */
+  const _syncUiStateFromPersisted = useCallback(async () => {
+    const persistedState = await systemApi.getPersistedState();
+    console.log("= _syncUiStateFromPersisted = ");
+
+    timeSimulator.setTimeMultiplier(persistedState.systemParams.timeMultiplier);
+
+    setUiState((current) => ({
+      ...current,
+      lifecycleState: persistedState.lifecycleState,
+      currentDay: persistedState.currentDay,
+      totalTempoBalance: persistedState.totalTempoBalance,
+      investedTimeHistory: persistedState.investedTimeHistory,
+      tempoModificationHistory: persistedState.tempoModificationHistory,
+      selectedActivity: persistedState.selectedActivity
+        ? persistedState.activities[persistedState.selectedActivity]
+        : undefined,
+      boards: Object.values(persistedState.boards),
+      activities: Object.values(persistedState.activities),
+      usefulMetrics: persistedState.usefulMetrics,
+      systemParams: persistedState.systemParams,
+      lastUpdateTimestamp: persistedState.lastUpdateTimestamp,
+    }));
+  }, [setUiState]);
+
+  // ===========================
+  //            Día
+  // ===========================
+  const startDay = useCallback(async () => {
+    const dayState: DayState = {
+      date: timeSimulator.now(),
+      dayStartMinute: _getMinutesFromTimestamp(timeSimulator.now()),
+      dayTempoBalance: 0,
+    };
+
+    await systemApi.startDay(dayState);
+    await _syncUiStateFromPersisted();
+  }, [_syncUiStateFromPersisted]);
+
+  const endDay = useCallback(async () => {
+    await systemApi.endDay();
+    await _syncUiStateFromPersisted();
+  }, [_syncUiStateFromPersisted]);
 
   /**
    * PRIMER BLOQUE: Efectos de inicialización y sincronización
@@ -112,261 +158,59 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     return new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
   }, []);
 
-  const _getCurrentProcessedMinute = useCallback(async () => {
-    return _getMinutesFromTimestamp((await systemApi.getPersistedState()).lastUpdateTimestamp);
-  }, [_getMinutesFromTimestamp, systemApi]);
-
-  /**
-   * Función privada para re-sincronizar el UiState tras cada modificación en systemApi.
-   */
-  const _syncUiStateFromPersisted = useCallback(async () => {
-    const persistedState = await systemApi.getPersistedState();
-    console.log("= _syncUiStateFromPersisted = ");
-
-    timeSimulator.setTimeMultiplier(persistedState.systemParams.timeMultiplier);
-
-    setUiState((current) => ({
-      ...current,
-      lifecycleState: persistedState.lifecycleState,
-      currentDay: persistedState.currentDay,
-      totalTempoBalance: persistedState.totalTempoBalance,
-      investedTimeHistory: persistedState.investedTimeHistory,
-      tempoModificationHistory: persistedState.tempoModificationHistory,
-      selectedActivity: persistedState.selectedActivity
-        ? persistedState.activities[persistedState.selectedActivity]
-        : undefined,
-      boards: Object.values(persistedState.boards),
-      activities: Object.values(persistedState.activities),
-      usefulMetrics: persistedState.usefulMetrics,
-      systemParams: persistedState.systemParams,
-      lastUpdateTimestamp: persistedState.lastUpdateTimestamp,
-    }));
-  }, [setUiState]);
-
   /**
    * Función privada para actualizar el estado del sistema según el tiempo transcurrido
-   * Esta función se encarga de:
-   * 1. Calcular minutos transcurridos desde la última actualización
-   * 2. Aplicar los cambios correspondientes según la actividad actual
-   * 3. Verificar si el día debe terminar
    */
   const _updateSystemState = useCallback(async () => {
     console.log("= START _updateSystemState =");
+    const persistedState = await systemApi.getPersistedState();
+    const {
+      currentDay,
+      lastUpdateTimestamp,
+      activities,
+      systemParams,
+      totalTempoBalance,
+      selectedActivity,
+    } = persistedState;
 
-    const processNextMinute = async () => {
-      // Obtenemos el estado más reciente en cada iteración
-      const persistedState = await systemApi.getPersistedState();
-      const currentDay = persistedState.currentDay;
-      const lastUpdateTimestamp = persistedState.lastUpdateTimestamp;
-
-      console.log(`  iteration for minute ${await _getCurrentProcessedMinute()}`);
-
-      // Si no hay día en progreso, no hay nada que actualizar
-      if (!currentDay || persistedState.lifecycleState !== "dayInProgress") {
-        console.log("  return because no day in progress");
-        return;
-      }
-
-      const minutesRemainingToProcess = Math.floor(
-        (timeSimulator.now() - lastUpdateTimestamp) / 60000
-      );
-
-      // Si no ha pasado ningún minuto, no hay nada que actualizar
-      if (minutesRemainingToProcess === 0) {
-        console.log("  return because no minutes to process");
-        return;
-      }
-
-      const dayEndTimestamp = currentDay.date + 960 * 60000;
-
-      // Si corresponde, terminamos el día
-      if (lastUpdateTimestamp + 60000 >= dayEndTimestamp) {
-        console.log("  return because end day");
-
-        await endDay();
-        await _syncUiStateFromPersisted();
-        return;
-      }
-
-      // Procesamos un solo minuto
-      const currentActivity = await systemApi.getSelectedActivity();
-      console.log("  currentActivity", currentActivity);
-
-      // Si hay una actividad seleccionada
-      if (currentActivity) {
-        // Lógica según el tipo de actividad
-        switch (currentActivity.type) {
-          case "challenge": {
-            console.log("  = _applyChallengeMinuteGeneration =");
-            await _applyChallengeMinuteGeneration({
-              activity: currentActivity,
-            });
-
-            // Evaluamos los constraints
-            // console.log("  = _evaluateChallengeConstraints =");
-            // await _evaluateChallengeConstraints({
-            //   activity: currentActivity,
-            // });
-            break;
-          }
-          case "neutral": {
-            console.log("  = _applyNeutralTimeRecord =");
-            await _applyNeutralTimeRecord({
-              activity: currentActivity,
-            });
-            break;
-          }
-          case "discount": {
-            console.log("  = _applyDiscountedConsumption =");
-            await _applyDiscountedConsumption({
-              activity: currentActivity,
-            });
-            break;
-          }
-        }
-
-        console.log("  minutesActive", currentActivity.minutesActive);
-        console.log("  new minutesActive", currentActivity.minutesActive + 1);
-
-        // Actualizar minutesActive de la actividad
-        await systemApi.updateActivity({
-          id: currentActivity.id,
-          minutesActive: currentActivity.minutesActive + 1,
-        });
-      } else {
-        // Si no hay actividad seleccionada, aplicamos consumo pasivo
-        await _applyIdlePassiveConsumption();
-      }
-
-      // Actualizamos el timestamp sumando un minuto
-      await systemApi.updateLastUpdateTimestamp(
-        lastUpdateTimestamp + timeSimulator.getTimeIncrement()
-      );
-
-      console.log("  setUiState");
-
-      await _syncUiStateFromPersisted();
-
-      // Programamos el siguiente minuto con un pequeño retraso para no bloquear el hilo principal
-      setTimeout(processNextMinute, 50);
-    };
-
-    // Iniciamos el procesamiento del primer minuto
-    processNextMinute();
-  }, []);
-
-  /**
-   * SEGUNDO BLOQUE: LÓGICA PRIVADA (core) - NO se expone
-   * Estas funciones podrían llamarse en un setInterval (bucle de 1 minuto) o en otras partes
-   * internas del sistema. Ejemplo: aplicar consumos pasivos, generar tempo, etc.
-   */
-  const _applyChallengeMinuteGeneration = useCallback(
-    async ({ activity }: { activity: ChallengeActivity }) => {
-      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-      const isWithinEstimatedTime = activity.minutesActive < activity.totalTempoReward;
-
-      // Si estamos dentro del tiempo estimado, generamos tempo
-      if (isWithinEstimatedTime) {
-        const investedTimeRecord: InvestedTimeRecord = {
-          status: "activity",
-          activityId: activity.id,
-          type: "challenge",
-          timestamp: lastUpdateTimestamp,
-          tempoModification: 1,
-          minutesInvested: 1,
-        };
-
-        await systemApi.updateTempoBalance({
-          investedTimeRecord,
-        });
-      } else {
-        // Si excedimos el tiempo estimado, aplicamos consumo pasivo
-        await _applyIdlePassiveConsumption();
-      }
-    },
-    []
-  );
-
-  const _applyNeutralTimeRecord = useCallback(
-    async ({ activity }: { activity: NeutralActivity }) => {
-      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-      const investedTimeRecord: InvestedTimeRecord = {
-        status: "activity",
-        activityId: activity.id,
-        type: "neutral",
-        timestamp: lastUpdateTimestamp,
-        tempoModification: 0,
-        minutesInvested: 1,
-      };
-
-      await systemApi.pushToInvestedTimeHistory(investedTimeRecord);
-
-      // Si con este nuevo minuto llegamos al límite, deseleccionamos
-      if (activity.minutesActive + 1 === activity.allowedTime) {
-        await systemApi.unselectActivity();
-
-        console.log("updateActivity! mark as completed");
-        await systemApi.updateActivity({
-          id: activity.id,
-          status: "completed",
-        });
-      }
-    },
-    []
-  );
-
-  const _applyDiscountedConsumption = useCallback(
-    async ({ activity }: { activity: HobbyActivity }) => {
-      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-      const discountedConsumption = 0 - activity.tempoConsumptionRate;
-
-      const investedTimeRecord: InvestedTimeRecord = {
-        status: "activity",
-        activityId: activity.id,
-        type: "discount",
-        timestamp: lastUpdateTimestamp,
-        tempoModification: discountedConsumption,
-        minutesInvested: 1,
-      };
-
-      await systemApi.updateTempoBalance({
-        investedTimeRecord,
-      });
-
-      // Si con este nuevo minuto llegamos al límite, deseleccionamos
-      if (activity.minutesActive + 1 === activity.allowedTime) {
-        await systemApi.unselectActivity();
-
-        console.log("updateActivity! mark as completed");
-        await systemApi.updateActivity({
-          id: activity.id,
-          status: "completed",
-        });
-      }
-    },
-    []
-  );
-
-  const _applyIdlePassiveConsumption = useCallback(async () => {
-    const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-    const { passiveTempoConsumptionRate } = await systemApi.getSystemParams();
-    const passiveConsumption = 0 - passiveTempoConsumptionRate;
-
-    const investedTimeRecord: InvestedTimeRecord = {
-      status: "idle",
-      timestamp: lastUpdateTimestamp,
-      tempoModification: passiveConsumption,
-      minutesInvested: 1,
-    };
-
-    await systemApi.updateTempoBalance({
-      investedTimeRecord,
+    const currentActivity = selectedActivity ? activities[selectedActivity] : undefined;
+    const { shouldEndDay, timeRecords, updatedTimestamp, updatedActivity } = updateTimeState({
+      currentDay,
+      lastUpdateTimestamp,
+      currentActivity,
+      systemParams,
+      totalTempoBalance,
+      timeSimulator,
     });
-  }, []);
+
+    // Actualizamos la actividad persistida, asegurando que los nuevos minutos activos se guarden
+    if (updatedActivity) {
+      await systemApi.updateActivity(updatedActivity);
+      // Verificamos si la actividad es de tipo "neutral" o "discount" y su tiempo ha sido completado.
+      if (
+        (updatedActivity.type === "neutral" || updatedActivity.type === "discount") &&
+        updatedActivity.minutesActive >= updatedActivity.allowedTime
+      ) {
+        await systemApi.unselectActivity();
+      }
+    }
+
+    // Procesamos los registros de tiempo
+    for (const record of timeRecords) {
+      await systemApi.updateTempoBalance({ investedTimeRecord: record });
+    }
+
+    // Actualizamos el timestamp de la última actualización
+    await systemApi.updateLastUpdateTimestamp(updatedTimestamp);
+
+    // Si debe terminar el día, se ejecuta la función endDay
+    if (shouldEndDay) {
+      await endDay();
+    }
+
+    // Sincronizamos el estado de la UI con el estado persistido
+    await _syncUiStateFromPersisted();
+  }, [endDay, _syncUiStateFromPersisted, timeSimulator, systemApi]);
 
   const _applyNeutralActivityEarlyCompletionCompensation = useCallback(
     async ({ activity }: { activity: NeutralActivity }) => {
@@ -452,26 +296,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * TERCER BLOQUE: LÓGICA PÚBLICA - ACCIONES DEL USUARIO
    * Este es el set de métodos que SÍ retornaremos. Tienen sentido en la UI.
    */
-
-  // ===========================
-  //     ACCIONES: Día
-  // ===========================
-  const startDay = useCallback(async () => {
-    const dayState: DayState = {
-      date: timeSimulator.now(),
-      dayStartMinute: _getMinutesFromTimestamp(timeSimulator.now()),
-      dayTempoBalance: 0,
-    };
-
-    await systemApi.startDay(dayState);
-    await _syncUiStateFromPersisted();
-  }, [_syncUiStateFromPersisted]);
-
-  const endDay = useCallback(async () => {
-    await systemApi.endDay();
-
-    await _syncUiStateFromPersisted();
-  }, [_syncUiStateFromPersisted]);
 
   // ===========================
   //   ACCIONES: Boards
