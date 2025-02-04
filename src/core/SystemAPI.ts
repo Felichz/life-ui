@@ -1,3 +1,6 @@
+import merge from "lodash.merge";
+import { v4 as uuidv4 } from "uuid";
+
 import type {
   PersistedState,
   SystemAPIType,
@@ -180,6 +183,14 @@ class SystemAPI implements SystemAPIType {
   }
 
   /**
+   * Función auxiliar para generar un UUID.
+   * Usa uuidv4 para generar IDs únicos.
+   */
+  private generateUUID(): string {
+    return uuidv4();
+  }
+
+  /**
    * Sincroniza los constraint de desafíos para el tablero actual.
    *
    * Esta función se encarga de combinar los constraint heredados (provenientes del tablero padre)
@@ -205,13 +216,23 @@ class SystemAPI implements SystemAPIType {
   }): Promise<BoardChallengeConstraint[]> {
     const state = await this.getState();
 
+    console.log("_syncChallengeConstraintsCallback", {
+      currentBoard,
+      inheritedConstraints,
+    });
+
     // Lógica original de constraints
     const currentBoardConstraints = currentBoard.constraintList;
     const combinedConstraints = [...inheritedConstraints, ...currentBoardConstraints];
+    console.log("currentBoardConstraints", currentBoardConstraints);
+    console.log("combinedConstraints", combinedConstraints);
 
     const childChallenges = currentBoard.activities
       .map((id) => state.activities[id])
       .filter((activity): activity is ChallengeActivity => activity?.type === "challenge");
+
+    console.log("currentBoard.activities", currentBoard.activities);
+    console.log("childChallenges", childChallenges);
 
     for (const challenge of childChallenges) {
       const updatedConstraints: ChallengeConstraint[] = [];
@@ -224,11 +245,12 @@ class SystemAPI implements SystemAPIType {
           );
 
           if (inheritedConstraint) {
+            console.log("updating inherited constraint because it exists", inheritedConstraint);
             // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propiedades heredables menos el id)
             updatedConstraints.push({
               ...constraint,
               ...inheritedConstraint,
-              id: constraint.id,
+              id: this.generateUUID(),
             });
           }
           // Si no existe, no se agrega (se elimina)
@@ -239,16 +261,16 @@ class SystemAPI implements SystemAPIType {
       }
 
       // Agregar constraints heredados que no estén presentes
-      for (const inheritedConstraint of inheritedConstraints) {
+      for (const constraintToApply of combinedConstraints) {
         const exists = updatedConstraints.some(
-          (uc) => uc.parentConstraintId === inheritedConstraint.id
+          (uc) => uc.parentConstraintId === constraintToApply.id
         );
 
         if (!exists) {
           updatedConstraints.push({
-            ...inheritedConstraint,
-            id: crypto.randomUUID(),
-            parentConstraintId: inheritedConstraint.id,
+            ...constraintToApply,
+            id: this.generateUUID(),
+            parentConstraintId: constraintToApply.id,
             failCount: 0,
             status: "active",
           });
@@ -333,6 +355,8 @@ class SystemAPI implements SystemAPIType {
    * @returns Promise que se resuelve cuando la sincronización de todo el árbol de tableros ha finalizado.
    */
   private async _syncBoardWithChildren(board: Board): Promise<void> {
+    console.log("_syncBoardWithChildren", board);
+
     await this._traverseBoardHierarchy({
       board,
       processBoard: async (currentBoard, { constraints, activityProps }) => {
@@ -344,6 +368,14 @@ class SystemAPI implements SystemAPIType {
         const newProps = await this._syncActivityPropsCallback({
           currentBoard,
           inheritedProps: activityProps,
+        });
+
+        console.log("processBoard", {
+          currentBoard,
+          constraints,
+          newConstraints,
+          activityProps,
+          newProps,
         });
 
         return { constraints: newConstraints, activityProps: newProps };
@@ -368,66 +400,59 @@ class SystemAPI implements SystemAPIType {
     return this._getRootBoard(parentBoard);
   }
 
-  async createBoard(board: Board): Promise<void> {
-    const state = await this.getState();
+  async createBoard(newBoard: Board): Promise<void> {
+    // Obtenemos el estado persistido actual
+    const state = await this.getPersistedState();
 
-    // Si tiene padre, actualizar childrenBoards del padre
-    if (board.parentBoardId) {
-      const parentBoard = state.boards[board.parentBoardId];
+    // Si el board tiene padre, actualizamos el board padre para agregar el id del nuevo board en childrenBoards
+    if (newBoard.parentBoardId) {
+      const parentBoard = await this.getBoard(newBoard.parentBoardId);
       if (parentBoard) {
-        await this.updateBoard({
-          ...parentBoard,
-          childrenBoards: [...(parentBoard.childrenBoards || []), board.id],
-        });
+        // Calculamos los childrenBoards actualizados, garantizando que se mantengan los cambios anteriores
+        const updatedChildrenBoards = Array.isArray(parentBoard.childrenBoards)
+          ? [...parentBoard.childrenBoards, newBoard.id]
+          : [newBoard.id];
+        const updatedParentBoard = { ...parentBoard, childrenBoards: updatedChildrenBoards };
+
+        // Actualizamos el board padre
+        await this.updateBoard(updatedParentBoard);
+
+        const freshParentBoard = await this.getBoard(newBoard.parentBoardId);
+        state.boards[newBoard.parentBoardId] = freshParentBoard!;
       }
     }
 
-    await this.saveState({
-      ...state,
-      boards: { ...state.boards, [board.id]: board },
-    });
+    // Agregamos el nuevo board al estado
+    state.boards[newBoard.id] = newBoard;
+
+    // Guardamos el estado actualizado incluyendo la versión fresca del board padre
+    await this.saveState(state);
   }
 
-  async updateBoard(board: Board): Promise<void> {
+  async updateBoard(boardUpdates: Partial<Board> & { id: BoardId }): Promise<void> {
     const state = await this.getState();
-    const existingBoard = state.boards[board.id];
+    const existingBoard = state.boards[boardUpdates.id];
 
-    if (!existingBoard) return;
-
-    // Si cambió el parentBoardId
-    if (existingBoard.parentBoardId !== board.parentBoardId) {
-      // Eliminar referencia del padre anterior
-      if (existingBoard.parentBoardId) {
-        const oldParent = state.boards[existingBoard.parentBoardId];
-        if (oldParent) {
-          await this.updateBoard({
-            ...oldParent,
-            childrenBoards: oldParent.childrenBoards?.filter((id) => id !== board.id),
-          });
-        }
-      }
-
-      // Agregar referencia al nuevo padre
-      if (board.parentBoardId) {
-        const newParent = state.boards[board.parentBoardId];
-        if (newParent) {
-          await this.updateBoard({
-            ...newParent,
-            childrenBoards: [...(newParent.childrenBoards || []), board.id],
-          });
-        }
-      }
+    if (!existingBoard) {
+      return;
     }
 
-    await this.saveState({
-      ...state,
-      boards: {
-        ...state.boards,
-        [board.id]: board,
-      },
-    });
+    // Utilizamos un merge profundo para combinar los objetos anidados.
+    // Si se proporciona un nuevo constraintList, lo reemplazamos por completo;
+    // de lo contrario, clonamos el existente.
+    const updatedBoard = merge({}, existingBoard, boardUpdates);
 
-    await this._syncBoardWithChildren(board);
+    if (boardUpdates.constraintList !== undefined) {
+      updatedBoard.constraintList = [...boardUpdates.constraintList];
+    } else {
+      updatedBoard.constraintList = [...existingBoard.constraintList];
+    }
+
+    state.boards[boardUpdates.id] = updatedBoard;
+
+    await this.saveState(state);
+
+    await this._syncBoardWithChildren(updatedBoard);
   }
 
   async removeBoard(board: Board): Promise<void> {
@@ -486,6 +511,8 @@ class SystemAPI implements SystemAPIType {
     const { parentBoardId } = activity;
     const state = await this.getState();
 
+    console.log("createActivity");
+
     // Actualizar el estado con la nueva actividad
     const newState: PersistedState = {
       ...state,
@@ -504,9 +531,10 @@ class SystemAPI implements SystemAPIType {
 
     await this.saveState(newState);
 
-    // Sincronizar nuevamente los constraints y propiedades heredadas desde el board root ya que la actividad puede heredar desde el board root
-    const rootBoard = await this._getRootBoard(parentBoard);
+    const updatedState = await this.getState();
+    const updatedParentBoard = updatedState.boards[parentBoardId];
 
+    const rootBoard = await this._getRootBoard(updatedParentBoard);
     await this._syncBoardWithChildren(rootBoard);
   }
 

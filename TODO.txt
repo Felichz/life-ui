@@ -12,6 +12,9 @@ Bugs para fixear:
 
 Features que faltan implementar:
     POC:
+        - Para grooming: Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
+        - La card que muestra la actividad seleccionada actualmente, deberia mostrar la hora estimada de finalizacion de la actividad
+        - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
         - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles
         - Cuando se excede el tiempo limite de un desafio se debe mostrar un modal mostrando las acciones disponibles, esto esta para grooming y clarificacion de que deberia ser posible en este caso
         - Progress bar circular que muestre el flujo de un minuto (quiza se pueda en testmode si el timemultiplier es diferente a 1 para no complicar las cosas, hay que probar)

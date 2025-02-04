@@ -19,6 +19,7 @@ import { Input } from "@shadcn/input";
 import { Label } from "@shadcn/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shadcn/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@shadcn/tooltip";
+import { v4 as uuidv4 } from "uuid";
 
 import ActivityCard from "./ActivityCard";
 import { TimeSelector } from "./TimeSelector";
@@ -267,7 +268,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
     try {
       setIsLoading(true);
-      await engine.board.updateBoard({ ...board, title });
+      await engine.board.updateBoard({ id: board.id, title });
       setIsEditingTitle(false);
       toast({
         title: "Tablero actualizado",
@@ -341,7 +342,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         dayMinuteExpiration: 0,
         penalty: 0,
         failCount: 0,
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         status: "active",
       },
     ]);
@@ -374,7 +375,8 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   const handleUpdateProps = async () => {
     try {
       setIsLoading(true);
-      const updatedProps = {
+      await engine.board.updateBoard({
+        id: board.id,
         activityProps: {
           challenge: editedProps.challenge
             ? {
@@ -385,11 +387,6 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
           discount: editedProps.discount,
         },
         constraintList: editedProps.constraintList,
-      };
-
-      await engine.board.updateBoard({
-        ...board,
-        ...updatedProps,
       });
       setIsEditingProps(false);
       toast({
@@ -454,7 +451,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
   const handleAddNewConstraint = () => {
     const newConstraint: BoardChallengeConstraint = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       type: "expiration",
       dayMinuteExpiration: 60,
       penalty: "100%",
@@ -1226,7 +1223,7 @@ const BoardsColumn: React.FC = () => {
 
   const handleAddConstraint = () => {
     const newConstraint: ExpirationChallengeConstraint = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       type: "expiration",
       dayMinuteExpiration: 0,
       penalty: 0,
