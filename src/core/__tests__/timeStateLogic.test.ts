@@ -5,8 +5,9 @@ import {
   processTimeBatch,
   updateTimeState,
   type TimeStateInput,
+  evaluateConstraints,
 } from "../timeStateLogic";
-import type { Activity, SystemParams } from "../types";
+import type { Activity, SystemParams, ExpirationChallengeConstraint } from "../types";
 
 describe("timeStateLogic", () => {
   describe("getMinutesFromTimestamp", () => {
@@ -495,5 +496,132 @@ describe("timeStateLogic", () => {
     afterEach(() => {
       jest.restoreAllMocks();
     });
+  });
+
+  describe("evaluateConstraints", () => {
+    it("debería mantener los constraints sin cambios cuando no han expirado", () => {
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600, // 10:00
+          penalty: 50,
+          failCount: 0,
+          status: "active",
+        },
+      ];
+
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 500, // 8:20
+        totalTempoReward: 100,
+      });
+
+      expect(result.updatedConstraints).toEqual(constraints);
+      expect(result.failedConstraints).toHaveLength(0);
+    });
+
+    it("debería marcar como fallido un constraint expirado con penalización numérica", () => {
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600, // 10:00
+          penalty: 50,
+          failCount: 0,
+          status: "active",
+        },
+      ];
+
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 601, // 10:01
+        totalTempoReward: 100,
+      });
+
+      expect(result.updatedConstraints[0].status).toBe("failed");
+      expect(result.updatedConstraints[0].failCount).toBe(1);
+      expect(result.failedConstraints).toHaveLength(1);
+      expect(result.failedConstraints[0].penaltyAmount).toBe(50);
+    });
+
+    it("debería calcular correctamente la penalización porcentual", () => {
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600,
+          penalty: "75%",
+          failCount: 0,
+          status: "active",
+        },
+      ];
+
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 601,
+        totalTempoReward: 200,
+      });
+
+      expect(result.failedConstraints[0].penaltyAmount).toBe(150); // 75% de 200
+    });
+
+    it("debería ignorar constraints que ya están fallidos", () => {
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600,
+          penalty: 50,
+          failCount: 1,
+          status: "failed",
+        },
+      ];
+
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 601,
+        totalTempoReward: 100,
+      });
+
+      expect(result.updatedConstraints).toEqual(constraints);
+      expect(result.failedConstraints).toHaveLength(0);
+    });
+
+    it("debería manejar múltiples constraints correctamente", () => {
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600,
+          penalty: 50,
+          failCount: 0,
+          status: "active",
+        },
+        {
+          id: "2",
+          type: "expiration",
+          dayMinuteExpiration: 720,
+          penalty: "100%",
+          failCount: 0,
+          status: "active",
+        },
+      ];
+
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 660, // 11:00
+        totalTempoReward: 100,
+      });
+
+      expect(result.updatedConstraints[0].status).toBe("failed");
+      expect(result.updatedConstraints[1].status).toBe("active");
+      expect(result.failedConstraints).toHaveLength(1);
+      expect(result.failedConstraints[0].penaltyAmount).toBe(50);
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 });
