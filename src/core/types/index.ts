@@ -238,7 +238,7 @@ export interface SystemAPIType {
   getBoard: (boardId: BoardId) => Promise<Board | undefined>;
   getBoards: () => Promise<Board[]>;
   createBoard: (board: Board) => Promise<void>;
-  updateBoard: (board: Board) => Promise<void>;
+  updateBoard: (boardUpdates: Partial<Board> & { id: BoardId }) => Promise<void>;
   removeBoard: (board: Board) => Promise<void>;
 
   // Gestión de actividades

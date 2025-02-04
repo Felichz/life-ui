@@ -6,6 +6,7 @@ import type {
   Activity,
   ActivityId,
   Board,
+  BoardId,
   ChallengeActivity,
   HobbyActivity,
   TempoModificationRecord,
@@ -314,8 +315,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   );
 
   const updateBoard = useCallback(
-    async (board: Board) => {
-      await systemApi.updateBoard(board);
+    async (boardUpdates: Partial<Board> & { id: BoardId }) => {
+      await systemApi.updateBoard(boardUpdates);
 
       await _syncUiStateFromPersisted();
     },

@@ -23,6 +23,7 @@ import { useToast } from "@shadcn/hooks/use-toast";
 import { Input } from "@shadcn/input";
 import { Label } from "@shadcn/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shadcn/select";
+import { v4 as uuidv4 } from "uuid";
 
 import { TimeSelector } from "./TimeSelector";
 
@@ -366,7 +367,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
 
   const handleAddConstraint = () => {
     const newConstraint: ExpirationChallengeConstraint = {
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       type: "expiration",
       dayMinuteExpiration: 0,
       penalty: 0,

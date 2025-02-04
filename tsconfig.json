@@ -23,6 +23,7 @@
       "@shadcn": ["./src/ui/components/shadcn"],
       "@shadcn/*": ["./src/ui/components/shadcn/*"]
     },
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "esModuleInterop": true
   }
 }
