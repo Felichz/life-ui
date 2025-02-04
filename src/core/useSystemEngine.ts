@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { TimeSimulator } from "./TimeSimulator";
-import { updateTimeState } from "./timeStateLogic";
+import { updateTimeState, evaluateConstraints } from "./timeStateLogic";
 import type {
   Activity,
   ActivityId,
@@ -17,6 +17,7 @@ import type {
   CreateBoardInput,
   CreateActivityInput,
   SystemParams,
+  ExpirationChallengeConstraint,
 } from "./types";
 
 import type { UiStateContextValue } from "@/ui/system-context/UiStateContext";
@@ -159,6 +160,67 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     return new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
   }, []);
 
+  const _applyChallengeCriteriaFailed = useCallback(
+    async ({ activity, penaltyAmount }: { activity: ChallengeActivity; penaltyAmount: number }) => {
+      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+
+      const tempoModificationRecord: TempoModificationRecord = {
+        activityId: activity.id,
+        type: "challenge",
+        timestamp: lastUpdateTimestamp,
+        reason: "challengeCriteriaFailed",
+        tempoModification: -penaltyAmount,
+      };
+
+      await systemApi.updateTempoBalance({
+        tempoModificationRecord,
+      });
+    },
+    []
+  );
+
+  const _getAllActivityConstraints = useCallback(async () => {
+    const activities = await systemApi.getActivities();
+    const challengeActivities = activities.filter(
+      (activity): activity is ChallengeActivity => activity.type === "challenge"
+    );
+
+    return challengeActivities.map((activity) => ({
+      activity,
+      constraints: activity.constraintList,
+    }));
+  }, [systemApi]);
+
+  const _evaluateAllChallengeConstraints = useCallback(async () => {
+    const challengeActivitiesWithConstraints = await _getAllActivityConstraints();
+    const currentMinutes = _getMinutesFromTimestamp(timeSimulator.now());
+
+    for (const { activity } of challengeActivitiesWithConstraints) {
+      const { updatedConstraints, failedConstraints } = evaluateConstraints({
+        constraints: activity.constraintList,
+        currentMinutes,
+        totalTempoReward: activity.totalTempoReward,
+      });
+
+      // Actualizamos los constraints en la actividad
+      activity.constraintList = updatedConstraints;
+
+      // Aplicamos las penalizaciones para los constraints que fallaron
+      for (const { penaltyAmount } of failedConstraints) {
+        await _applyChallengeCriteriaFailed({ activity, penaltyAmount });
+      }
+
+      // Se actualiza la actividad en el sistema para persistir los cambios en los constraints
+      await systemApi.updateActivity(activity);
+    }
+  }, [
+    _getAllActivityConstraints,
+    _getMinutesFromTimestamp,
+    timeSimulator,
+    _applyChallengeCriteriaFailed,
+    systemApi,
+  ]);
+
   /**
    * Función privada para actualizar el estado del sistema según el tiempo transcurrido
    */
@@ -184,10 +246,14 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       timeSimulator,
     });
 
-    // Actualizamos la actividad persistida, asegurando que los nuevos minutos activos se guarden
+    // Evaluamos los constraints de todos los desafíos antes de cualquier otra actualización
+    await _evaluateAllChallengeConstraints();
+
+    // Actualizamos la actividad persistida, entre otros procesos
     if (updatedActivity) {
       await systemApi.updateActivity(updatedActivity);
-      // Verificamos si la actividad es de tipo "neutral" o "discount" y su tiempo ha sido completado.
+
+      // Procesar la lógica de deselección u otras reglas según tipo...
       if (
         (updatedActivity.type === "neutral" || updatedActivity.type === "discount") &&
         updatedActivity.minutesActive >= updatedActivity.allowedTime
@@ -211,7 +277,13 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
     // Sincronizamos el estado de la UI con el estado persistido
     await _syncUiStateFromPersisted();
-  }, [endDay, _syncUiStateFromPersisted, timeSimulator, systemApi]);
+  }, [
+    endDay,
+    _syncUiStateFromPersisted,
+    timeSimulator,
+    systemApi,
+    _evaluateAllChallengeConstraints,
+  ]);
 
   const _applyNeutralActivityEarlyCompletionCompensation = useCallback(
     async ({ activity }: { activity: NeutralActivity }) => {
@@ -262,36 +334,6 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     },
     []
   );
-
-  const _applyChallengeCriteriaFailed = useCallback(
-    async ({ activity, penaltyAmount }: { activity: ChallengeActivity; penaltyAmount: number }) => {
-      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
-
-      const tempoModificationRecord: TempoModificationRecord = {
-        activityId: activity.id,
-        type: "challenge",
-        timestamp: lastUpdateTimestamp,
-        reason: "challengeCriteriaFailed",
-        tempoModification: -penaltyAmount,
-      };
-
-      await systemApi.updateTempoBalance({
-        tempoModificationRecord,
-      });
-    },
-    []
-  );
-
-  const _evaluateAllChallengeConstraints = useCallback(
-    async ({ activity }: { activity: ChallengeActivity }) => {},
-    [_applyChallengeCriteriaFailed]
-  );
-
-  // Primero obtiene todas las actividades del state persistido con systemApi.getActivities()
-  // Luego obtiene todos los constraints de todas las actividades
-  const _getAllActivityConstraints = useCallback(async () => {}, []);
-
-  // etc. (Otras funciones "privadas" para la lógica core minuto a minuto o cálculos internos)
 
   /**
    * TERCER BLOQUE: LÓGICA PÚBLICA - ACCIONES DEL USUARIO

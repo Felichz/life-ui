@@ -1,5 +1,10 @@
 import type { TimeSimulator } from "./TimeSimulator";
-import type { Activity, InvestedTimeRecord, SystemParams } from "./types";
+import type {
+  Activity,
+  InvestedTimeRecord,
+  SystemParams,
+  ExpirationChallengeConstraint,
+} from "./types";
 
 // Interfaces para los parámetros de entrada
 export interface TimeStateInput {
@@ -37,6 +42,14 @@ export interface ProcessTimeBatchResult {
   timeRecords: InvestedTimeRecord[];
   updatedActivity?: Activity;
   updatedTimestamp: number;
+}
+
+export interface EvaluateConstraintsResult {
+  updatedConstraints: ExpirationChallengeConstraint[];
+  failedConstraints: {
+    constraint: ExpirationChallengeConstraint;
+    penaltyAmount: number;
+  }[];
 }
 
 /**
@@ -208,6 +221,66 @@ export function processTimeBatch({
   return {
     timeRecords: records,
     updatedTimestamp: baseTimestamp + deltaTime * 60000,
+  };
+}
+
+/**
+ * Evalúa los constraints de una actividad challenge y retorna los resultados
+ * @param constraints Lista de constraints a evaluar
+ * @param currentMinutes Minutos actuales del día
+ * @param totalTempoReward Recompensa total de la actividad (necesario para calcular penalizaciones porcentuales)
+ */
+export function evaluateConstraints({
+  constraints,
+  currentMinutes,
+  totalTempoReward,
+}: {
+  constraints: ExpirationChallengeConstraint[];
+  currentMinutes: number;
+  totalTempoReward: number;
+}): EvaluateConstraintsResult {
+  const updatedConstraints: ExpirationChallengeConstraint[] = [];
+  const failedConstraints: { constraint: ExpirationChallengeConstraint; penaltyAmount: number }[] =
+    [];
+
+  constraints.forEach((constraint) => {
+    // Solo evaluamos constraints de expiración que estén activos
+    if (constraint.type === "expiration" && constraint.status === "active") {
+      if (currentMinutes > constraint.dayMinuteExpiration) {
+        // Se ha vencido el tiempo permitido para este constraint
+
+        // Calcular el monto de la penalización
+        let penaltyAmount = 0;
+        if (typeof constraint.penalty === "number") {
+          penaltyAmount = constraint.penalty;
+        } else if (typeof constraint.penalty === "string") {
+          // Ejemplo: "100%" se interpreta como 100% del totalTempoReward
+          const porcentaje = parseFloat(constraint.penalty.replace("%", ""));
+          penaltyAmount = (porcentaje / 100) * totalTempoReward;
+        }
+
+        // Actualizar el constraint: marcar como fallido y aumentar el contador de fallos
+        const updatedConstraint: ExpirationChallengeConstraint = {
+          ...constraint,
+          failCount: constraint.failCount + 1,
+          status: "failed",
+        };
+
+        updatedConstraints.push(updatedConstraint);
+        failedConstraints.push({ constraint: updatedConstraint, penaltyAmount });
+      } else {
+        // Si no ha fallado, lo mantenemos igual
+        updatedConstraints.push(constraint);
+      }
+    } else {
+      // Si no es de tipo expiración o no está activo, lo mantenemos igual
+      updatedConstraints.push(constraint);
+    }
+  });
+
+  return {
+    updatedConstraints,
+    failedConstraints,
   };
 }
 
