@@ -227,8 +227,9 @@ const TimelineHeader: React.FC = () => {
       <Timeline
         dayStartDate={new Date(uiState.currentDay.date)}
         currentMinute={currentMinute}
-        history={uiState.investedTimeHistory}
+        investedTimeHistory={uiState.investedTimeHistory}
         activities={uiState.activities}
+        tempoModificationHistory={uiState.tempoModificationHistory}
       />
     </div>
   );

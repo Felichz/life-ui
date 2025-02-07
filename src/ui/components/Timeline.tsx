@@ -1,17 +1,33 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import { ResponsiveBullet } from "@nivo/bullet";
-import type { BulletRectsItemProps } from "@nivo/bullet";
+import type { BulletRectsItemProps, BulletMarkersItemProps } from "@nivo/bullet";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "./shadcn/tooltip";
 
-import type { Activity, InvestedTimeRecord } from "@/core/types";
+import type {
+  Activity,
+  InvestedTimeHistory,
+  TempoModificationHistory,
+  TempoModificationRecord,
+} from "@/core/types";
 
 interface TimelineProps {
   dayStartDate: Date;
   currentMinute: number;
-  history: InvestedTimeRecord[];
+  investedTimeHistory: InvestedTimeHistory;
   activities: Activity[];
+  tempoModificationHistory: TempoModificationHistory;
+}
+
+interface MarkerCluster {
+  centerMinute: number;
+  modifications: {
+    record: TempoModificationRecord;
+    minute: number;
+  }[];
+  netModification: number;
+  index?: number;
 }
 
 const getActivityTypeColor = (type: Activity["type"] | "idle" | "remaining"): string => {
@@ -43,16 +59,120 @@ const formatTimeRange = (baseDate: Date, startMinute: number, duration: number):
   })}`;
 };
 
+const getTempoModificationReasonMessage = (reason: TempoModificationRecord["reason"]): string => {
+  switch (reason) {
+    case "challengeCompletionReward":
+      return "Recompensa por completar desafío antes";
+    case "challengeCriteriaFailed":
+      return "Penalización por fallar criterios";
+    case "earlyNeutralActivityCompletionCompensation":
+      return "Compensación por terminar actividad neutral antes";
+    case "earlyDiscountActivityCompletionCompensation":
+      return "Compensación por terminar actividad de descuento antes";
+    default:
+      return "Modificación de tempo";
+  }
+};
+
 const Timeline: React.FC<TimelineProps> = ({
   dayStartDate,
   currentMinute,
-  history,
+  investedTimeHistory,
   activities,
+  tempoModificationHistory,
 }) => {
-  // Transformamos el historial en datos para el bullet chart
+  // Referencia y estado para el ancho del contenedor
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Establecer el ancho inicial
+    setContainerWidth(containerRef.current.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Función para agrupar marcadores cercanos basada en píxeles
+  const getMarkerClusters = React.useMemo((): MarkerCluster[] => {
+    // Umbral en píxeles para agrupar
+    const PIXEL_THRESHOLD = 20;
+    // Si no tenemos ancho, usamos un valor por defecto
+    const effectiveWidth = Math.max(containerWidth - 40, 100); // Restamos los márgenes
+    const clusters: MarkerCluster[] = [];
+
+    // Convertimos todos los registros a minutos y ordenamos
+    const modifications = tempoModificationHistory
+      .map((record) => ({
+        record,
+        minute: Math.floor((record.timestamp - dayStartDate.getTime()) / 60000),
+      }))
+      .sort((a, b) => a.minute - b.minute);
+
+    modifications.forEach((mod) => {
+      // Calcular la posición en píxeles del marker
+      const modPixel = (mod.minute * effectiveWidth) / 960;
+      let added = false;
+
+      for (const cluster of clusters) {
+        // Calculamos la posición en píxeles del centro del cluster
+        const clusterPixel = (cluster.centerMinute * effectiveWidth) / 960;
+
+        if (Math.abs(modPixel - clusterPixel) <= PIXEL_THRESHOLD) {
+          // Añadir al cluster existente
+          cluster.modifications.push(mod);
+          cluster.netModification += mod.record.tempoModification;
+          // Recalcular el centro como promedio
+          const totalMinutes = cluster.modifications.reduce((sum, m) => sum + m.minute, 0);
+          cluster.centerMinute = Math.floor(totalMinutes / cluster.modifications.length);
+          added = true;
+          break;
+        }
+      }
+
+      if (!added) {
+        // Crear nuevo cluster
+        clusters.push({
+          centerMinute: mod.minute,
+          modifications: [mod],
+          netModification: mod.record.tempoModification,
+        });
+      }
+    });
+
+    return clusters;
+  }, [tempoModificationHistory, dayStartDate, containerWidth]);
+
+  // Estado para rastrear qué marker está en hover
+  const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
+
+  // Ordenamos los clusters por cantidad de modificaciones para el renderizado
+  const sortedClusters = React.useMemo(() => {
+    return getMarkerClusters
+      .map((cluster, index) => ({ ...cluster, index }))
+      .sort((a, b) => {
+        // Si hay un cluster en hover, siempre va último (se renderiza encima)
+        if (hoveredMarkerId === a.index) return 1;
+        if (hoveredMarkerId === b.index) return -1;
+        // Si no, ordenamos por cantidad de modificaciones
+        return a.modifications.length - b.modifications.length;
+      });
+  }, [getMarkerClusters, hoveredMarkerId]);
+
+  // Actualizamos bulletData para usar los clusters ordenados
   const bulletData = React.useMemo(() => {
     // Ordenamos el historial por timestamp
-    const sortedHistory = [...history].sort((a, b) => a.timestamp - b.timestamp);
+    const sortedHistory = [...investedTimeHistory].sort((a, b) => a.timestamp - b.timestamp);
 
     // Creamos los rangos a partir de los registros reales
     const ranges: number[] = [];
@@ -72,15 +192,18 @@ const Timeline: React.FC<TimelineProps> = ({
     ranges.push(lastEndMinute);
     ranges.push(960);
 
+    // Reemplazamos los markers con los centros de los clusters ordenados
+    const markers = sortedClusters.map((cluster) => cluster.centerMinute);
+
     return [
       {
         id: "",
         ranges,
         measures: [],
-        markers: [],
+        markers,
       },
     ];
-  }, [history, dayStartDate]);
+  }, [investedTimeHistory, dayStartDate, sortedClusters]);
 
   const CustomRange = ({ x, y, width, height, data }: BulletRectsItemProps) => {
     const startMinute = data.v0;
@@ -97,7 +220,7 @@ const Timeline: React.FC<TimelineProps> = ({
       type = "remaining";
       title = "Tiempo Restante";
     } else {
-      const record = history.find((h) => {
+      const record = investedTimeHistory.find((h) => {
         const recordStartMinute = Math.floor(
           (new Date(h.timestamp).getTime() - dayStartDate.getTime()) / 60000
         );
@@ -143,8 +266,120 @@ const Timeline: React.FC<TimelineProps> = ({
     );
   };
 
-  // Generamos las etiquetas para el eje X de forma que se muestren 16 horas,
-  // comenzando desde el instante exacto de inicio del día (dayStartDate)
+  /* Agrego una constante para la altura interna del gráfico (asumiendo h-24 con márgenes de 20px arriba y abajo -> 96 - 40 = 56) */
+  const CHART_INNER_HEIGHT = 56;
+
+  const CustomMarker = ({
+    x,
+    size,
+    onMouseEnter,
+    onMouseMove,
+    onMouseLeave,
+    data,
+  }: BulletMarkersItemProps) => {
+    const markerMinute = data.value;
+
+    // Encontrar el cluster correspondiente
+    const cluster = sortedClusters.find((c) => c.centerMinute === markerMinute);
+    if (!cluster) return null;
+
+    const isHovered = hoveredMarkerId === cluster.index;
+    const isMultiple = cluster.modifications.length > 1;
+    const baseRadius = size / 3;
+    const clusterRadius = baseRadius * (1 + Math.min(cluster.modifications.length * 0.2, 1));
+    const hoverRadius = clusterRadius * 1.5;
+
+    // Color basado en la modificación neta
+    const markerColor = cluster.netModification >= 0 ? "#10b981" : "#ef4444";
+
+    const handleMouseEnter = (e: React.MouseEvent<SVGGElement>) => {
+      setHoveredMarkerId(cluster.index);
+      e.stopPropagation();
+      if (onMouseEnter) onMouseEnter(data, e as unknown as React.MouseEvent<SVGLineElement>);
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<SVGGElement>) => {
+      e.stopPropagation();
+      if (onMouseMove) onMouseMove(data, e as unknown as React.MouseEvent<SVGLineElement>);
+    };
+
+    const handleMouseLeave = (e: React.MouseEvent<SVGGElement>) => {
+      setHoveredMarkerId(null);
+      e.stopPropagation();
+      if (onMouseLeave) onMouseLeave(data, e as unknown as React.MouseEvent<SVGLineElement>);
+    };
+
+    return (
+      <Tooltip delayDuration={100}>
+        <TooltipTrigger asChild>
+          <g
+            transform={`translate(${x}, ${CHART_INNER_HEIGHT / 2})`}
+            onMouseEnter={handleMouseEnter}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={{ cursor: "pointer" }}
+          >
+            {/* Círculo principal */}
+            <circle
+              cx={0}
+              cy={0}
+              r={isHovered ? hoverRadius : clusterRadius}
+              fill={markerColor}
+              stroke={isHovered ? "#ffffff" : markerColor === "#10b981" ? "#059669" : "#dc2626"}
+              strokeWidth={1.5}
+              style={{
+                transition: "all 0.2s ease",
+                filter: isHovered
+                  ? "drop-shadow(0 2px 4px rgb(0 0 0 / 0.3))"
+                  : "drop-shadow(0 1px 2px rgb(0 0 0 / 0.2))",
+              }}
+            />
+            {/* Indicador de cantidad */}
+            {isMultiple && (
+              <text
+                x={0}
+                y={0}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill="#ffffff"
+                fontSize={clusterRadius * 1.2}
+                fontWeight="bold"
+              >
+                {cluster.modifications.length}
+              </text>
+            )}
+          </g>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="space-y-2 max-w-xs">
+            {cluster.modifications.map((mod, index) => (
+              <div key={index} className={index > 0 ? "pt-2 border-t" : ""}>
+                <p className="font-medium">
+                  {getTempoModificationReasonMessage(mod.record.reason)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Valor: {mod.record.tempoModification}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(mod.record.timestamp).toLocaleTimeString("es-ES", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            ))}
+            {isMultiple && (
+              <div className="pt-2 border-t">
+                <p className="font-medium text-sm">Balance neto: {cluster.netModification}</p>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
+  // Generamos las etiquetas para el eje X
   const numTicks = 16;
   const ticks = Array.from({ length: numTicks + 1 }, (_, i) => {
     const tickDate = new Date(dayStartDate.getTime() + i * 3600000); // 3600000 ms = 1 hora
@@ -152,17 +387,16 @@ const Timeline: React.FC<TimelineProps> = ({
   });
 
   return (
-    <div className="w-full relative">
-      {/* Contenedor del gráfico sin espacio extra para el eje X */}
+    <div ref={containerRef} className="w-full relative">
       <div className="w-full h-24">
         <ResponsiveBullet
           data={bulletData}
           maxValue={960}
-          // Reducimos el margen inferior para que no se reserve espacio para el eje
           margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
           spacing={0}
           titleAlign="start"
           rangeComponent={CustomRange}
+          markerComponent={CustomMarker}
           rangeBorderWidth={0}
           animate={false}
           tooltip={() => null}
@@ -174,7 +408,6 @@ const Timeline: React.FC<TimelineProps> = ({
           }}
         />
       </div>
-      {/* Eje X personalizado posicionado absolutamente */}
       <div className="absolute bottom-0 left-0 w-full flex justify-between px-4 text-xs">
         {ticks.map((tick, index) => (
           <span key={index}>{tick}</span>

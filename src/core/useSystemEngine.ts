@@ -207,16 +207,19 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         totalTempoReward: activity.totalTempoReward,
       });
 
-      // Actualizamos los constraints en la actividad
-      activity.constraintList = updatedConstraints;
+      // Creamos una copia actualizada de la actividad con los nuevos constraints
+      const updatedActivity = {
+        ...activity,
+        constraintList: updatedConstraints,
+      };
 
       // Aplicamos las penalizaciones para los constraints que fallaron
       for (const { penaltyAmount } of failedConstraints) {
-        await _applyChallengeCriteriaFailed({ activity, penaltyAmount });
+        await _applyChallengeCriteriaFailed({ activity: updatedActivity, penaltyAmount });
       }
 
       // Se actualiza la actividad en el sistema para persistir los cambios en los constraints
-      await systemApi.updateActivity(activity);
+      await systemApi.updateActivity(updatedActivity);
     }
   }, [
     _getAllActivityConstraints,
@@ -251,14 +254,11 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       timeSimulator,
     });
 
-    // Evaluamos los constraints de todos los desafíos antes de cualquier otra actualización
-    await _evaluateAllChallengeConstraints();
-
-    // Actualizamos la actividad persistida, entre otros procesos
+    // Primero actualizamos la actividad si existe, para que se persistan los cambios en minutesActive
     if (updatedActivity) {
       await systemApi.updateActivity(updatedActivity);
 
-      // Procesar la lógica de deselección u otras reglas según tipo...
+      // Procesar la lógica de deselección para actividades neutral/discount
       if (
         (updatedActivity.type === "neutral" || updatedActivity.type === "discount") &&
         updatedActivity.minutesActive >= updatedActivity.allowedTime
@@ -266,6 +266,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         await systemApi.unselectActivity();
       }
     }
+
+    // Después evaluamos los constraints de todos los desafíos
+    await _evaluateAllChallengeConstraints();
 
     // Procesamos los registros de tiempo
     for (const record of timeRecords) {
