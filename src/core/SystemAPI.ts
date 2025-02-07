@@ -2,25 +2,30 @@ import merge from "lodash.merge";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
+  Activity,
+  ActivityId,
+  Board,
+  BoardChallengeConstraint,
+  BoardId,
+  ChallengeActivity,
+  ChallengeConstraint,
+  CreateActivityInput,
+  CreateBoardInput,
+  DayState,
+  ExpirationChallengeConstraint,
+  HobbyActivity,
+  InheritableActivityProps,
+  InvestedTimeHistory,
+  InvestedTimeRecord,
+  NeutralActivity,
   PersistedState,
   SystemAPIType,
-  Board,
-  Activity,
-  InvestedTimeRecord,
-  UsefulMetrics,
   SystemParams,
-  DayState,
-  BoardId,
-  ActivityId,
   TempoModificationRecord,
-  InvestedTimeHistory,
-  ChallengeActivity,
-  NeutralActivity,
-  HobbyActivity,
-  BoardChallengeConstraint,
-  ChallengeConstraint,
-  InheritableActivityProps,
+  UsefulMetrics,
 } from "./types";
+
+import { formatLog, formatMultiLog } from "@/lib/utils/logger";
 
 const STORAGE_KEY = "system_state";
 
@@ -216,23 +221,26 @@ class SystemAPI implements SystemAPIType {
   }): Promise<BoardChallengeConstraint[]> {
     const state = await this.getState();
 
-    console.log("_syncChallengeConstraintsCallback", {
-      currentBoard,
-      inheritedConstraints,
+    formatMultiLog({
+      label: "_syncChallengeConstraintsCallback",
+      data: { currentBoard, inheritedConstraints },
     });
 
-    // Lógica original de constraints
-    const currentBoardConstraints = currentBoard.constraintList;
-    const combinedConstraints = [...inheritedConstraints, ...currentBoardConstraints];
-    console.log("currentBoardConstraints", currentBoardConstraints);
-    console.log("combinedConstraints", combinedConstraints);
+    // Combinar los constraints heredados con los del board actual
+    const currentBoardConstraints = currentBoard.constraintList || [];
+    formatLog("currentBoardConstraints", currentBoardConstraints);
+
+    const combinedConstraints = [...currentBoardConstraints];
+    formatLog("combinedConstraints", combinedConstraints);
 
     const childChallenges = currentBoard.activities
       .map((id) => state.activities[id])
       .filter((activity): activity is ChallengeActivity => activity?.type === "challenge");
 
-    console.log("currentBoard.activities", currentBoard.activities);
-    console.log("childChallenges", childChallenges);
+    formatMultiLog(
+      { label: "currentBoard.activities", data: currentBoard.activities },
+      { label: "childChallenges", data: childChallenges }
+    );
 
     for (const challenge of childChallenges) {
       const updatedConstraints: ChallengeConstraint[] = [];
@@ -245,7 +253,7 @@ class SystemAPI implements SystemAPIType {
           );
 
           if (inheritedConstraint) {
-            console.log("updating inherited constraint because it exists", inheritedConstraint);
+            formatLog("updating inherited constraint because it exists", inheritedConstraint);
             // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propiedades heredables menos el id)
             updatedConstraints.push({
               ...constraint,
@@ -355,7 +363,7 @@ class SystemAPI implements SystemAPIType {
    * @returns Promise que se resuelve cuando la sincronización de todo el árbol de tableros ha finalizado.
    */
   private async _syncBoardWithChildren(board: Board): Promise<void> {
-    console.log("_syncBoardWithChildren", board);
+    formatLog("_syncBoardWithChildren", board);
 
     await this._traverseBoardHierarchy({
       board,
@@ -370,13 +378,11 @@ class SystemAPI implements SystemAPIType {
           inheritedProps: activityProps,
         });
 
-        console.log("processBoard", {
-          currentBoard,
-          constraints,
-          newConstraints,
-          activityProps,
-          newProps,
-        });
+        formatMultiLog(
+          { label: "processBoard", data: { currentBoard } },
+          { label: "constraints", data: { constraints, newConstraints } },
+          { label: "activityProps", data: { activityProps, newProps } }
+        );
 
         return { constraints: newConstraints, activityProps: newProps };
       },
@@ -511,7 +517,7 @@ class SystemAPI implements SystemAPIType {
     const { parentBoardId } = activity;
     const state = await this.getState();
 
-    console.log("createActivity");
+    formatLog("createActivity", null);
 
     // Actualizar el estado con la nueva actividad
     const newState: PersistedState = {
@@ -539,7 +545,7 @@ class SystemAPI implements SystemAPIType {
   }
 
   async updateActivity(activityUpdates: Partial<Activity> & { id: ActivityId }): Promise<void> {
-    console.log("systemApi updateActivity", activityUpdates);
+    formatLog("systemApi updateActivity", activityUpdates);
     const state = await this.getState();
 
     if (!state.activities[activityUpdates.id]) return;
@@ -572,7 +578,7 @@ class SystemAPI implements SystemAPIType {
   async removeActivity(activity: Activity): Promise<void> {
     const state = await this.getState();
 
-    console.log("[deleteActivity] Activity a eliminar:", activity);
+    formatLog("deleteActivity - Activity a eliminar", activity);
 
     // Primero eliminamos la actividad del estado
     const { [activity.id]: _, ...remainingActivities } = state.activities;
@@ -585,14 +591,14 @@ class SystemAPI implements SystemAPIType {
     // Luego actualizamos el board padre si existe
     if (activity.parentBoardId) {
       const parentBoard = newState.boards[activity.parentBoardId];
-      console.log("[deleteActivity] Board padre antes de actualizar:", parentBoard);
+      formatLog("deleteActivity - Board padre antes de actualizar", parentBoard);
 
       if (parentBoard) {
         const updatedBoard = {
           ...parentBoard,
           activities: parentBoard.activities.filter((id) => id !== activity.id),
         };
-        console.log("[deleteActivity] Board padre después de filtrar la actividad:", updatedBoard);
+        formatLog("deleteActivity - Board padre después de filtrar la actividad", updatedBoard);
 
         // Actualizamos el board sin llamar a syncBoardWithChildren
         newState.boards[activity.parentBoardId] = updatedBoard;
@@ -600,8 +606,8 @@ class SystemAPI implements SystemAPIType {
 
         // Verificar el estado del board después de la actualización
         const stateAfterUpdate = await this.getState();
-        console.log(
-          "[deleteActivity] Board padre después de update:",
+        formatLog(
+          "deleteActivity - Board padre después de update",
           stateAfterUpdate.boards[activity.parentBoardId]
         );
       }
@@ -609,16 +615,16 @@ class SystemAPI implements SystemAPIType {
 
     // Verificar el estado final
     const finalState = await this.getState();
-    console.log(
-      "[deleteActivity] Estado final - actividad existe?:",
-      !!finalState.activities[activity.id]
+    formatMultiLog(
+      {
+        label: "deleteActivity - Estado final - actividad existe",
+        data: !!finalState.activities[activity.id],
+      },
+      {
+        label: "deleteActivity - Estado final - board padre",
+        data: activity.parentBoardId ? finalState.boards[activity.parentBoardId] : null,
+      }
     );
-    if (activity.parentBoardId) {
-      console.log(
-        "[deleteActivity] Estado final - board padre:",
-        finalState.boards[activity.parentBoardId]
-      );
-    }
   }
 
   async getSelectedActivity(): Promise<Activity | undefined> {

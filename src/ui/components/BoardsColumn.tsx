@@ -36,7 +36,14 @@ import type {
   HobbyActivity,
   BoardChallengeConstraint,
 } from "@/core/types";
+import { formatMultiLog } from "@/lib/utils/logger";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
+
+const formatMinuteToTime = (minute: number) => {
+  const hours = Math.floor(minute / 60);
+  const minutes = minute % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+};
 
 interface BoardItemProps {
   board: Board;
@@ -165,6 +172,10 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
       // Obtenemos las propiedades heredadas del tablero
       const inheritedProps = board.activityProps;
+      formatMultiLog(
+        { label: "Board constraints", data: board.constraintList },
+        { label: "Inherited props", data: inheritedProps }
+      );
 
       const baseActivity: CreateActivityBaseInput = {
         title: newActivityTitle.trim(),
@@ -183,6 +194,10 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
       switch (newActivityType) {
         case "challenge":
+          formatMultiLog(
+            { label: "Creating challenge activity", data: null },
+            { label: "New activity constraints", data: newActivityConstraints }
+          );
           newActivity = {
             ...baseActivity,
             type: "challenge",
@@ -980,6 +995,52 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                         Agregar Criterio
                       </Button>
                     </div>
+
+                    {/* Mostrar los constraints heredados del board */}
+                    {board.constraintList?.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            Heredado
+                          </Badge>
+                        </div>
+                        {board.constraintList.map((constraint) => (
+                          <div
+                            key={constraint.id}
+                            className="space-y-2 p-4 border rounded-lg bg-muted/50"
+                          >
+                            <div className="flex items-center justify-between">
+                              <Label className="text-muted-foreground">Hora de Expiración</Label>
+                              <div className="text-muted-foreground">
+                                {formatMinuteToTime(constraint.dayMinuteExpiration)}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-2">
+                              <Label className="text-muted-foreground">Penalización</Label>
+                              <div className="text-muted-foreground">
+                                {typeof constraint.penalty === "number"
+                                  ? constraint.penalty
+                                  : constraint.penalty}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Separador entre constraints heredados y propios */}
+                    {board.constraintList?.length > 0 && newActivityConstraints.length > 0 && (
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-background px-2 text-muted-foreground">
+                            Criterios Propios
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
                     {newActivityConstraints.map((constraint, index) => (
                       <div key={index} className="space-y-2 p-4 border rounded-lg">

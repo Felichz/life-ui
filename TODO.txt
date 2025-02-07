@@ -1,7 +1,6 @@
 Bugs para fixear:
     - No se muestran los constraints heredados en el modal de creacion de actividad
-    - Laburar bien los constraints y constraint heredados (revisar `Que quiero de los constraint.txt`)
-    - Las horas mostradas en los timelines no son correctas, debe mostrar el rango horario y los minutos que representa
+    - No puedo clickear el checkbox "repetible" en las propiedades de los desafios al editar un board
     - El boton para deseleccionar una actividad no funciona, bueno, parece que la actividad se deselecciona pero la activity card sigue mostrando el boton para deseleccionar, y se sigue mostrando en status en progreso, sera que el ui no se actualiza?
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
     
