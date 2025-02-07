@@ -17,7 +17,6 @@ import type {
   CreateBoardInput,
   CreateActivityInput,
   SystemParams,
-  ExpirationChallengeConstraint,
 } from "./types";
 
 import type { UiStateContextValue } from "@/ui/system-context/UiStateContext";
@@ -82,13 +81,15 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   //            Día
   // ===========================
   const startDay = useCallback(async () => {
+    const now = timeSimulator.now(); // Valor actual de la simulación
     const dayState: DayState = {
-      date: timeSimulator.now(),
-      dayStartMinute: _getMinutesFromTimestamp(timeSimulator.now()),
+      date: now, // Se asigna el timestamp actual
+      dayStartMinute: _getMinutesFromTimestamp(now), // Y el minuto correspondiente
       dayTempoBalance: 0,
     };
 
     await systemApi.startDay(dayState);
+    await systemApi.updateLastUpdateTimestamp(now);
     await _syncUiStateFromPersisted();
   }, [_syncUiStateFromPersisted]);
 
@@ -147,8 +148,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         if (current.updatingSystemState === false) {
           console.log("    starting update because not updating");
           startUpdate();
+        } else {
+          console.log("    already updating system state?");
         }
-        console.log("    already updating system state?");
+
         return current;
       });
     }, timeSimulator.getUpdateInterval());

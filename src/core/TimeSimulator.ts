@@ -87,7 +87,7 @@ export class TimeSimulator {
    */
   getUpdateInterval(): number {
     if (!this.isTestMode || this.timeMultiplier === 0) return 60000;
-    return Math.max(60000 / this.timeMultiplier, 1000); // Mínimo 1000ms para evitar actualizaciones demasiado frecuentes
+    return Math.max(60000 / this.timeMultiplier, 50); // Mínimo 1000ms para evitar actualizaciones demasiado frecuentes
   }
 
   /**
