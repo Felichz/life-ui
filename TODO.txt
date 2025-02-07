@@ -1,5 +1,4 @@
 Bugs para fixear:
-    - Cuando se borra una actividad, no se borra del registro del board padre
     - No se muestran los constraints heredados en el modal de creacion de actividad
     - Laburar bien los constraints y constraint heredados (revisar `Que quiero de los constraint.txt`)
     - Las horas mostradas en los timelines no son correctas, debe mostrar el rango horario y los minutos que representa

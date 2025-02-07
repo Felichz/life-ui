@@ -411,4 +411,43 @@ describe("Herencia de constraints y activity props en el System API", () => {
       updatedActivity.constraintList.find((c) => c.parentConstraintId === "parentConstraint")
     ).toBeUndefined();
   });
+
+  // 6. Eliminación de actividades
+  test("Eliminar actividad actualiza correctamente el board padre", async () => {
+    const parentBoard: Board = {
+      ...baseBoard,
+      id: "parent-board",
+      constraintList: [],
+      activityProps: {},
+    };
+
+    const challengeActivity: ChallengeActivity = {
+      ...baseChallenge,
+      id: "challenge-to-delete",
+      parentBoardId: "parent-board",
+      constraintList: [],
+      inheritedProps: {},
+    } as ChallengeActivity;
+
+    // Crear board y actividad
+    await systemApi.createBoard(parentBoard);
+    await systemApi.createActivity(challengeActivity);
+
+    // Verificar estado inicial
+    let board = await systemApi.getBoard("parent-board");
+    expect(board?.activities).toContain("challenge-to-delete");
+    let activity = await systemApi.getActivity("challenge-to-delete");
+    expect(activity).toBeDefined();
+
+    // Eliminar la actividad
+    await systemApi.removeActivity(challengeActivity);
+
+    // Verificar que la actividad ya no existe
+    activity = await systemApi.getActivity("challenge-to-delete");
+    expect(activity).toBeUndefined();
+
+    // Verificar que el board padre ya no tiene la referencia
+    board = await systemApi.getBoard("parent-board");
+    expect(board?.activities).not.toContain("challenge-to-delete");
+  });
 });

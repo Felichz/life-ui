@@ -572,21 +572,53 @@ class SystemAPI implements SystemAPIType {
   async removeActivity(activity: Activity): Promise<void> {
     const state = await this.getState();
 
-    // Eliminar la referencia del board padre si existe
+    console.log("[deleteActivity] Activity a eliminar:", activity);
+
+    // Primero eliminamos la actividad del estado
+    const { [activity.id]: _, ...remainingActivities } = state.activities;
+    const newState = {
+      ...state,
+      activities: remainingActivities,
+    };
+    await this.saveState(newState);
+
+    // Luego actualizamos el board padre si existe
     if (activity.parentBoardId) {
-      const parentBoard = state.boards[activity.parentBoardId];
+      const parentBoard = newState.boards[activity.parentBoardId];
+      console.log("[deleteActivity] Board padre antes de actualizar:", parentBoard);
 
       if (parentBoard) {
-        await this.updateBoard({
+        const updatedBoard = {
           ...parentBoard,
           activities: parentBoard.activities.filter((id) => id !== activity.id),
-        });
+        };
+        console.log("[deleteActivity] Board padre después de filtrar la actividad:", updatedBoard);
+
+        // Actualizamos el board sin llamar a syncBoardWithChildren
+        newState.boards[activity.parentBoardId] = updatedBoard;
+        await this.saveState(newState);
+
+        // Verificar el estado del board después de la actualización
+        const stateAfterUpdate = await this.getState();
+        console.log(
+          "[deleteActivity] Board padre después de update:",
+          stateAfterUpdate.boards[activity.parentBoardId]
+        );
       }
     }
 
-    // Eliminar la actividad
-    const { [activity.id]: _, ...remainingActivities } = state.activities;
-    await this.saveState({ ...state, activities: remainingActivities });
+    // Verificar el estado final
+    const finalState = await this.getState();
+    console.log(
+      "[deleteActivity] Estado final - actividad existe?:",
+      !!finalState.activities[activity.id]
+    );
+    if (activity.parentBoardId) {
+      console.log(
+        "[deleteActivity] Estado final - board padre:",
+        finalState.boards[activity.parentBoardId]
+      );
+    }
   }
 
   async getSelectedActivity(): Promise<Activity | undefined> {
