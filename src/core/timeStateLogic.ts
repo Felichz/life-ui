@@ -1,10 +1,16 @@
+// Local imports
 import type { TimeSimulator } from "./TimeSimulator";
 import type {
   Activity,
   InvestedTimeRecord,
   SystemParams,
   ExpirationChallengeConstraint,
+  ChallengeActivity,
+  DayState,
 } from "./types";
+
+// External imports
+import { formatMultiLog } from "@/lib/utils/logger";
 
 // Interfaces para los parámetros de entrada
 export interface TimeStateInput {
@@ -81,12 +87,39 @@ export function calculateNewBalances({
 /**
  * Procesa un lote de tiempo para una actividad específica
  */
-export function processTimeBatch({
+export const processTimeBatch = ({
   deltaTime,
   baseTimestamp,
   currentActivity,
   systemParams,
-}: ProcessTimeBatchInput): ProcessTimeBatchResult {
+}: {
+  deltaTime: number;
+  baseTimestamp: number;
+  currentActivity: Activity | undefined;
+  systemParams: SystemParams;
+}): {
+  timeRecords: InvestedTimeRecord[];
+  updatedActivity: Activity | undefined;
+  updatedTimestamp: number;
+} => {
+  formatMultiLog({
+    label: "Procesando Time Batch",
+    data: {
+      deltaTime,
+      baseTimestamp,
+      currentActivity: currentActivity
+        ? {
+            id: currentActivity.id,
+            type: currentActivity.type,
+            status: currentActivity.status,
+            minutesActive: currentActivity.minutesActive,
+            constraintList:
+              currentActivity.type === "challenge" ? currentActivity.constraintList : undefined,
+          }
+        : undefined,
+    },
+  });
+
   const records: InvestedTimeRecord[] = [];
   let activeMinutes = 0;
 
@@ -220,9 +253,10 @@ export function processTimeBatch({
 
   return {
     timeRecords: records,
+    updatedActivity: undefined,
     updatedTimestamp: baseTimestamp + deltaTime * 60000,
   };
-}
+};
 
 /**
  * Evalúa los constraints de una actividad challenge y retorna los resultados
@@ -230,7 +264,7 @@ export function processTimeBatch({
  * @param currentMinutes Minutos actuales del día
  * @param totalTempoReward Recompensa total de la actividad (necesario para calcular penalizaciones porcentuales)
  */
-export function evaluateConstraints({
+export const evaluateConstraints = ({
   constraints,
   currentMinutes,
   totalTempoReward,
@@ -238,12 +272,32 @@ export function evaluateConstraints({
   constraints: ExpirationChallengeConstraint[];
   currentMinutes: number;
   totalTempoReward: number;
-}): EvaluateConstraintsResult {
+}): {
+  updatedConstraints: ExpirationChallengeConstraint[];
+  failedConstraints: Array<{ constraint: ExpirationChallengeConstraint; penaltyAmount: number }>;
+} => {
+  formatMultiLog({
+    label: "Evaluando Constraints",
+    data: { constraints, currentMinutes, totalTempoReward },
+  });
+
   const updatedConstraints: ExpirationChallengeConstraint[] = [];
-  const failedConstraints: { constraint: ExpirationChallengeConstraint; penaltyAmount: number }[] =
-    [];
+  const failedConstraints: Array<{
+    constraint: ExpirationChallengeConstraint;
+    penaltyAmount: number;
+  }> = [];
 
   constraints.forEach((constraint) => {
+    // Solo evaluamos constraints activos
+    if (constraint.status === "failed") {
+      formatMultiLog({
+        label: "Ignorando Constraint Ya Fallido",
+        data: { constraintId: constraint.id },
+      });
+      updatedConstraints.push(constraint);
+      return;
+    }
+
     // Solo evaluamos constraints de expiración que estén activos
     if (constraint.type === "expiration" && constraint.status === "active") {
       if (currentMinutes > constraint.dayMinuteExpiration) {
@@ -282,7 +336,7 @@ export function evaluateConstraints({
     updatedConstraints,
     failedConstraints,
   };
-}
+};
 
 /**
  * Función principal que actualiza el estado del sistema según el tiempo transcurrido

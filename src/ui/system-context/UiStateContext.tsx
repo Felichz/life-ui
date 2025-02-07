@@ -27,7 +27,9 @@ const initialState: UiState = {
   systemParams: {
     passiveTempoConsumptionRate: 0,
     isTestMode: false,
+    timeMultiplier: 0,
   },
+  lastUpdateTimestamp: 0,
 };
 
 export type UiStateContextValue = {
