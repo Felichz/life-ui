@@ -151,6 +151,7 @@ export interface Board {
   activityProps: InheritableActivityProps;
   constraintList: BoardChallengeConstraint[];
   title: string;
+  order?: number; // Orden del tablero dentro de su nivel (solo para tableros raíz)
 }
 
 export interface UsefulMetrics {

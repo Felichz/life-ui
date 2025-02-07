@@ -166,11 +166,113 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     return engine.board.getActivities(board.id);
   }, [board.id, engine.board, uiState.activities]);
 
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    if (board.parentBoardId) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData("text/plain", board.id);
+    e.currentTarget.classList.add("opacity-50");
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove("opacity-50");
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (board.parentBoardId) {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+
+    e.currentTarget.classList.remove("border-t-2", "border-b-2", "border-dashed", "border-primary");
+
+    if (y < height / 2) {
+      e.currentTarget.classList.add("border-t-2", "border-dashed", "border-primary");
+      e.currentTarget.setAttribute("data-insert-position", "before");
+    } else {
+      e.currentTarget.classList.add("border-b-2", "border-dashed", "border-primary");
+      e.currentTarget.setAttribute("data-insert-position", "after");
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove("border-t-2", "border-b-2", "border-dashed", "border-primary");
+    e.currentTarget.removeAttribute("data-insert-position");
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (board.parentBoardId) {
+      e.preventDefault();
+      return;
+    }
+
+    e.preventDefault();
+    e.currentTarget.classList.remove("border-t-2", "border-b-2", "border-dashed", "border-primary");
+
+    const draggedBoardId = e.dataTransfer.getData("text/plain");
+    const targetBoardId = board.id;
+    const insertPosition = e.currentTarget.getAttribute("data-insert-position") || "after";
+    e.currentTarget.removeAttribute("data-insert-position");
+
+    if (draggedBoardId === targetBoardId) return;
+
+    const draggedBoard = uiState.boards.find((b) => b.id === draggedBoardId);
+    if (!draggedBoard || draggedBoard.parentBoardId) return;
+
+    try {
+      setIsLoading(true);
+
+      const rootBoards = uiState.boards.filter((b) => !b.parentBoardId);
+
+      const currentIndex = rootBoards.findIndex((b) => b.id === draggedBoardId);
+      const targetIndex = rootBoards.findIndex((b) => b.id === targetBoardId);
+
+      if (currentIndex === -1 || targetIndex === -1) return;
+
+      const newOrder = [...rootBoards];
+      newOrder.splice(currentIndex, 1);
+      const newTargetIndex =
+        insertPosition === "before"
+          ? currentIndex < targetIndex
+            ? targetIndex - 1
+            : targetIndex
+          : currentIndex < targetIndex
+            ? targetIndex
+            : targetIndex + 1;
+      newOrder.splice(newTargetIndex, 0, draggedBoard);
+
+      for (let i = 0; i < newOrder.length; i++) {
+        await engine.board.updateBoard({
+          id: newOrder[i].id,
+          order: i,
+        });
+      }
+
+      toast({
+        title: "Tablero reordenado",
+        description: "El orden de los tableros se ha actualizado correctamente",
+      });
+    } catch (error) {
+      console.error("Error al reordenar tablero:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo reordenar el tablero",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCreateActivity = async () => {
     try {
       setIsLoading(true);
 
-      // Obtenemos las propiedades heredadas del tablero
       const inheritedProps = board.activityProps;
       formatMultiLog(
         { label: "Board constraints", data: board.constraintList },
@@ -239,7 +341,6 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
       await engine.activity.createActivity(newActivity);
 
-      // Reset form
       setNewActivityTitle("");
       setNewActivityType("neutral");
       setNewActivityAllowedTime(30);
@@ -480,7 +581,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   return (
     <Accordion type="single" collapsible>
       <AccordionItem value={board.id} className="border-none">
-        <div className="flex items-center gap-2 px-2 py-1">
+        <div
+          className="flex items-center gap-2 px-2 py-1"
+          draggable={!board.parentBoardId}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <AccordionTrigger className="flex-1 hover:no-underline py-0">
             <div className="flex items-center gap-2">
               {isEditingTitle ? (
@@ -996,7 +1105,6 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                       </Button>
                     </div>
 
-                    {/* Mostrar los constraints heredados del board */}
                     {board.constraintList?.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
@@ -1025,20 +1133,6 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    )}
-
-                    {/* Separador entre constraints heredados y propios */}
-                    {board.constraintList?.length > 0 && newActivityConstraints.length > 0 && (
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-background px-2 text-muted-foreground">
-                            Criterios Propios
-                          </span>
-                        </div>
                       </div>
                     )}
 
@@ -1159,28 +1253,23 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
           )}
         </div>
 
-        {/* Actividades del tablero actual */}
-        {activities.length > 0 && (
-          <div className="mb-4">
-            {activities.map((activity) => (
-              <ActivityCard key={activity.id} activity={activity} />
-            ))}
-          </div>
-        )}
+        <AccordionContent>
+          {activities.length > 0 && (
+            <div className="mb-4">
+              {activities.map((activity) => (
+                <ActivityCard key={activity.id} activity={activity} />
+              ))}
+            </div>
+          )}
 
-        {/* Subtableros */}
-        {childBoards.length > 0 && (
-          <Accordion type="single" collapsible className="mt-4">
-            {childBoards.map((childBoard) => (
-              <AccordionItem key={childBoard.id} value={childBoard.id}>
-                <AccordionTrigger>{childBoard.title}</AccordionTrigger>
-                <AccordionContent>
-                  <BoardItem board={childBoard} level={level + 1} />
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
+          {childBoards.length > 0 && (
+            <div className="mt-4">
+              {childBoards.map((childBoard) => (
+                <BoardItem key={childBoard.id} board={childBoard} level={level + 1} />
+              ))}
+            </div>
+          )}
+        </AccordionContent>
       </AccordionItem>
     </Accordion>
   );
@@ -1194,40 +1283,36 @@ const BoardsColumn: React.FC = () => {
   const [isCreateBoardDialogOpen, setIsCreateBoardDialogOpen] = React.useState(false);
   const [newBoardTitle, setNewBoardTitle] = React.useState("");
 
-  // Propiedades heredables para Challenge
   const [challengeIsRepetitive, setChallengeIsRepetitive] = React.useState(false);
   const [challengeConstraints, setChallengeConstraints] = React.useState<
     ExpirationChallengeConstraint[]
   >([]);
 
-  // Propiedades heredables para Neutral
   const [neutralIsRepetitive, setNeutralIsRepetitive] = React.useState(false);
   const [neutralAllowedTime, setNeutralAllowedTime] = React.useState(30);
 
-  // Propiedades heredables para Hobby
   const [hobbyIsRepetitive, setHobbyIsRepetitive] = React.useState(false);
   const [hobbyAllowedTime, setHobbyAllowedTime] = React.useState(30);
   const [hobbyConsumptionRate, setHobbyConsumptionRate] = React.useState(0.5);
 
   const rootBoards = React.useMemo(() => {
-    return uiState.boards.filter((board) => !board.parentBoardId);
+    return uiState.boards
+      .filter((board) => !board.parentBoardId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [uiState.boards]);
 
   const handleCreateBoard = async () => {
     try {
       setIsLoading(true);
 
-      // Construir activityProps solo con las propiedades que han sido configuradas
       const activityProps: Board["activityProps"] = {};
 
-      // Challenge props
       if (challengeIsRepetitive || challengeConstraints.length > 0) {
         activityProps.challenge = {
           isRepetitive: challengeIsRepetitive,
         };
       }
 
-      // Neutral props
       if (neutralIsRepetitive || neutralAllowedTime !== 30) {
         activityProps.neutral = {
           isRepetitive: neutralIsRepetitive,
@@ -1235,7 +1320,6 @@ const BoardsColumn: React.FC = () => {
         };
       }
 
-      // Hobby props
       if (hobbyIsRepetitive || hobbyAllowedTime !== 30 || hobbyConsumptionRate !== 0.5) {
         activityProps.discount = {
           isRepetitive: hobbyIsRepetitive,
@@ -1255,7 +1339,6 @@ const BoardsColumn: React.FC = () => {
 
       await engine.board.createBoard(newBoard);
 
-      // Reset form
       setNewBoardTitle("");
       setChallengeIsRepetitive(false);
       setChallengeConstraints([]);
@@ -1358,7 +1441,6 @@ const BoardsColumn: React.FC = () => {
               </div>
 
               <Accordion type="single" collapsible>
-                {/* Propiedades para Desafíos */}
                 <AccordionItem value="challenge">
                   <AccordionTrigger>Propiedades para Desafíos</AccordionTrigger>
                   <AccordionContent>
@@ -1457,7 +1539,6 @@ const BoardsColumn: React.FC = () => {
                   </AccordionContent>
                 </AccordionItem>
 
-                {/* Propiedades para Actividades Neutrales */}
                 <AccordionItem value="neutral">
                   <AccordionTrigger>Propiedades para Actividades Neutrales</AccordionTrigger>
                   <AccordionContent>
@@ -1486,7 +1567,6 @@ const BoardsColumn: React.FC = () => {
                   </AccordionContent>
                 </AccordionItem>
 
-                {/* Propiedades para Hobbies */}
                 <AccordionItem value="hobby">
                   <AccordionTrigger>Propiedades para Hobbies</AccordionTrigger>
                   <AccordionContent>
