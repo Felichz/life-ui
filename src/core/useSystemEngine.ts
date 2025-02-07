@@ -19,6 +19,7 @@ import type {
   SystemParams,
 } from "./types";
 
+import { formatLog } from "@/lib/utils/logger";
 import type { UiStateContextValue } from "@/ui/system-context/UiStateContext";
 
 /**
@@ -54,6 +55,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Función privada para re-sincronizar el UiState tras cada modificación en systemApi.
    */
   const _syncUiStateFromPersisted = useCallback(async () => {
+    formatLog("_syncUiStateFromPersisted", null);
     const persistedState = await systemApi.getPersistedState();
     console.log("= _syncUiStateFromPersisted = ");
 
@@ -228,7 +230,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Función privada para actualizar el estado del sistema según el tiempo transcurrido
    */
   const _updateSystemState = useCallback(async () => {
-    console.log("= START _updateSystemState =");
+    formatLog("START _updateSystemState", null);
     const persistedState = await systemApi.getPersistedState();
     const {
       currentDay,
