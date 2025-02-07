@@ -258,7 +258,9 @@ class SystemAPI implements SystemAPIType {
             updatedConstraints.push({
               ...constraint,
               ...inheritedConstraint,
-              id: this.generateUUID(),
+              id: constraint.id,
+              status: constraint.status,
+              failCount: constraint.failCount,
             });
           }
           // Si no existe, no se agrega (se elimina)
@@ -275,12 +277,17 @@ class SystemAPI implements SystemAPIType {
         );
 
         if (!exists) {
+          // Buscar si ya existía este constraint en la actividad
+          const existingConstraint = challenge.constraintList.find(
+            (c) => c.parentConstraintId === constraintToApply.id
+          );
+
           updatedConstraints.push({
             ...constraintToApply,
-            id: this.generateUUID(),
+            id: existingConstraint?.id || this.generateUUID(),
             parentConstraintId: constraintToApply.id,
-            failCount: 0,
-            status: "active",
+            failCount: existingConstraint?.failCount || 0,
+            status: existingConstraint?.status || "active",
           });
         }
       }
@@ -443,9 +450,6 @@ class SystemAPI implements SystemAPIType {
       return;
     }
 
-    // Utilizamos un merge profundo para combinar los objetos anidados.
-    // Si se proporciona un nuevo constraintList, lo reemplazamos por completo;
-    // de lo contrario, clonamos el existente.
     const updatedBoard = merge({}, existingBoard, boardUpdates);
 
     if (boardUpdates.constraintList !== undefined) {
@@ -458,7 +462,13 @@ class SystemAPI implements SystemAPIType {
 
     await this.saveState(state);
 
-    await this._syncBoardWithChildren(updatedBoard);
+    // Solo sincronizamos si hay cambios en constraintList o activityProps
+    const shouldSync =
+      boardUpdates.constraintList !== undefined || boardUpdates.activityProps !== undefined;
+
+    if (shouldSync) {
+      await this._syncBoardWithChildren(updatedBoard);
+    }
   }
 
   async removeBoard(board: Board): Promise<void> {
