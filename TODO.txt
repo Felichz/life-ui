@@ -1,7 +1,10 @@
+Ahora:
+
 Bugs para fixear:
-    - Se que este es un caso bastante raro pero igual debemos cubrirlo para mantener la robustez del sistema. En este caso por ejemplo son las 11pm y recien ahora comencé el día, hice un desafio con criterio de expiracion establecido en las 00:30am, osea yo esperaba que dentro de una hora y media falle el constraint, pero no, lo que pasó es que apenas le di al botón para crear la actividad, el sistema penalizó el constraint inmediatamente, seguramente haya algun problema en la manera como se calcula el hecho de que ya hayamos pasado el tiempo del constraint o no
-    - No puedo clickear el checkbox "repetible" en las propiedades de los desafios al editar un board
-    - El boton para deseleccionar una actividad no funciona, bueno, parece que la actividad se deselecciona pero la activity card sigue mostrando el boton para deseleccionar, y se sigue mostrando en status en progreso, sera que el ui no se actualiza?
+    - Parece que al reiniciar la pagina se bugea algo, porque no avanza el tiempo de una actividad al tenerla seleccionada o no avanza el flujo de tiempo en general
+    - Al crear una nueva actividad, quiero que aparezca primero en la lista, osea que debe tomar el order 0 o 1, sea cual sea el primero segun la implementacion actual
+    - Si se agrega una actividad dentro de un board y hereda un constraint que a pasó en el día, el constraint no se debe aplicar, solo aplicaría en el caso de que la actividad sea repetible pero a partir del día siguiente
+    - Se que este es un caso bastante raro pero igual debemos cubrirlo para mantener la robustez del sistema. En este caso por ejemplo son las 11pm y recien ahora comencé el día, hice un desafio con criterio de expiracion establecido en las 00:30am, osea yo esperaba que dentro de una hora y media falle el constraint, pero no, lo que pasó es que apenas le di al botón para crear la actividad, el sistema penalizó el constraint inmediatamente, seguramente haya algun problema en la manera como se calcula el hecho de que ya hayamos pasado el tiempo del constraint o no. Bueno de hecho no es tan raro, solo con el hecho de poner en el constraint que la hora es anterior a la actual en el formato de 24h, sin importar si esa hora esta dentro del dia actual, a aplica para cobrar la multa, no se la verdad, la unica manera es investigar como esta funcionando actualmente en el codigo, por ejemplo recien empeze un dia a las 12 del mediodia, el dia termina a las 4am, puse con constraint que falla a la 1am, y nada
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
     
     Faltan testear casos raros que seguramente esten bugeados:
@@ -11,6 +14,7 @@ Bugs para fixear:
 
 Features que faltan implementar:
     POC:
+        - Para grooming: Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
         - Para grooming: Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
         - La card que muestra la actividad seleccionada actualmente, deberia mostrar la hora estimada de finalizacion de la actividad
         - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
@@ -32,6 +36,7 @@ Features que faltan implementar:
         - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad
 
     Para luego:
+        - Agregar sistema de focus interno, hay muchas cosas como actividades, elementos del tempo modification history, etc, que se pueden estar focuseando en la ui desde diferentes elementos, por ejemplo un record de una multa en el timeline, si se focusea me gustaria que se active el focus de esa entidad y como resultado resaltar todos los elementos de la ui que esten relacionados con esa entidad, por ejemplo la notificacion respectiva a esa multa, y la multa dentro de la lista de constraints en la card de la actividad
         - Un nuevo sistema de notificaciones donde se avisen cosas como multas que estan cerca de aplicarse
         - Monitorear cuando estoy en la app y cuando no, pueden ser datos utiles para mostrar
         - Agregar multiples acciones posibles cuando se excede el tiempo de un desafio, hay que pensar como manejar la flexibilidad y adaptabilidad en estos casos

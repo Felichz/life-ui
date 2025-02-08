@@ -238,6 +238,77 @@ const NeutralOrHobbyDetails: React.FC<{ activity: NeutralActivity | HobbyActivit
   );
 };
 
+const getUnselectMessage = (activity: Activity) => {
+  if (activity.type === "challenge") {
+    return "Al deseleccionar un desafío, podrás retomarlo más tarde desde donde lo dejaste.";
+  }
+
+  const remainingTime = activity.allowedTime - activity.minutesActive;
+
+  if (activity.type === "neutral") {
+    return (
+      <>
+        Recibirás una compensación de{" "}
+        <span className="text-green-500 font-medium">+{remainingTime} tempos</span>.
+      </>
+    );
+  }
+
+  if (activity.type === "discount") {
+    const compensation = remainingTime * activity.tempoConsumptionRate;
+    const formattedCompensation = Number.isInteger(compensation)
+      ? compensation.toString()
+      : compensation.toFixed(1);
+
+    return (
+      <>
+        Recibirás una compensación de{" "}
+        <span className="text-green-500 font-medium">+{formattedCompensation} tempos</span> basada
+        en el tiempo restante y la tasa de consumo.
+      </>
+    );
+  }
+};
+
+const getCompleteMessage = (activity: ChallengeActivity) => {
+  const remainingTempos = activity.totalTempoReward - activity.minutesActive;
+  const isEarlyCompletion = activity.minutesActive < activity.totalTempoReward;
+
+  if (isEarlyCompletion) {
+    return (
+      <>
+        <p>¡Excelente! Has completado el desafío antes del tiempo estimado.</p>
+        <p>
+          Recibirás los{" "}
+          <span className="text-green-500 font-medium">+{remainingTempos} tempos</span> restantes de
+          inmediato, en lugar de esperar {remainingTempos} minutos más.
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <p>Has excedido el tiempo estimado para este desafío.</p>
+      <p>
+        Ya has recibido el total de la recompensa ({activity.totalTempoReward} tempos) durante los
+        primeros {activity.totalTempoReward} minutos.
+      </p>
+    </>
+  );
+};
+
+const getFailedConstraintsWarning = (activity: ChallengeActivity) => {
+  if (activity.constraintList.some((c) => c.status === "failed")) {
+    return (
+      <p className="text-destructive mt-2">
+        ¡Atención! Hay criterios fallidos que pueden afectar la modificación de tempo final.
+      </p>
+    );
+  }
+  return null;
+};
+
 const ActivityCard: React.FC<ActivityCardProps> = ({
   activity,
   onDragStart,
@@ -251,6 +322,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [isUnselectDialogOpen, setIsUnselectDialogOpen] = React.useState(false);
   const [editedTitle, setEditedTitle] = React.useState(activity.title);
   const [editedAllowedTime, setEditedAllowedTime] = React.useState(
     "allowedTime" in activity ? activity.allowedTime : 30
@@ -299,7 +371,22 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   };
 
   const handleSelect = () => handleAction(() => engine.activity.selectActivity(activity));
-  const handleUnselect = () => handleAction(() => engine.activity.unselectActivity());
+  const handleUnselect = async () => {
+    try {
+      setIsLoading(true);
+      await engine.activity.unselectActivity();
+      setIsUnselectDialogOpen(false);
+    } catch (error) {
+      console.error("Error en la acción:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Ha ocurrido un error al procesar la acción",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCompleteChallenge = (activity: ChallengeActivity) =>
     handleAction(() =>
@@ -485,7 +572,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
 
         {activity.status === "inProgress" && (
           <>
-            <Dialog>
+            <Dialog open={isUnselectDialogOpen} onOpenChange={setIsUnselectDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="secondary" size="sm" disabled={isLoading}>
                   Deseleccionar
@@ -494,15 +581,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Confirmar Deselección</DialogTitle>
-                  <DialogDescription>
-                    {activity.type === "challenge"
-                      ? "Al deseleccionar un desafío, no recibirás compensación."
-                      : activity.type === "neutral"
-                        ? `Podrías recibir una compensación de ${
-                            activity.allowedTime - activity.minutesActive
-                          } tempos.`
-                        : `Podrías recibir una compensación basada en el tiempo restante y la tasa de consumo.`}
-                  </DialogDescription>
+                  <DialogDescription>{getUnselectMessage(activity)}</DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                   <Button onClick={handleUnselect} disabled={isLoading}>
@@ -523,32 +602,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                   <DialogHeader>
                     <DialogTitle>Confirmar Completado</DialogTitle>
                     <DialogDescription className="space-y-2">
-                      {activity.minutesActive < activity.totalTempoReward ? (
-                        <>
-                          <p>¡Excelente! Has completado el desafío antes del tiempo estimado.</p>
-                          <p>
-                            Recibirás los{" "}
-                            <span className="text-green-500 font-medium">
-                              +{activity.totalTempoReward - activity.minutesActive} tempos
-                            </span>{" "}
-                            restantes de inmediato, en lugar de esperar{" "}
-                            {activity.totalTempoReward - activity.minutesActive} minutos más.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p>Has excedido el tiempo estimado para este desafío.</p>
-                          <p>
-                            Ya has recibido el total de la recompensa ({activity.totalTempoReward}{" "}
-                            tempos) durante los primeros {activity.totalTempoReward} minutos.
-                          </p>
-                        </>
-                      )}
-                      {activity.constraintList.some((c) => c.status === "failed") && (
-                        <p className="text-destructive mt-2">
-                          ¡Atención! Hay criterios fallidos que pueden afectar la recompensa.
-                        </p>
-                      )}
+                      {getCompleteMessage(activity)}
+                      {getFailedConstraintsWarning(activity)}
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>

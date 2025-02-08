@@ -126,8 +126,8 @@ export const processTimeBatch = ({
   if (currentActivity) {
     switch (currentActivity.type) {
       case "challenge": {
-        // Calculamos el tiempo que aún aporta recompensa
-        const remaining = currentActivity.totalTempoReward - currentActivity.minutesActive;
+        // Calculamos el tiempo que aún aporta recompensa usando tempoGeneratingMinutes
+        const remaining = currentActivity.totalTempoReward - currentActivity.tempoGeneratingMinutes;
         const activeMinutes = Math.min(deltaTime, remaining);
         // Los minutos extra serán lo que queda
         const extraMinutes = deltaTime - activeMinutes;
@@ -158,8 +158,9 @@ export const processTimeBatch = ({
           timeRecords: records,
           updatedActivity: {
             ...currentActivity,
-            // Sólo se actualiza minutesActive con los minutos que aportan recompensa
-            minutesActive: currentActivity.minutesActive + activeMinutes,
+            // Actualizamos tanto minutesActive como tempoGeneratingMinutes
+            minutesActive: currentActivity.minutesActive + deltaTime,
+            tempoGeneratingMinutes: currentActivity.tempoGeneratingMinutes + activeMinutes,
             // Se acumulan los extra en la nueva propiedad
             exceededMinutes: (currentActivity.exceededMinutes ?? 0) + extraMinutes,
           },
