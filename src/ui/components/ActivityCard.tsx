@@ -337,6 +337,26 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
     "constraintList" in activity ? [...activity.constraintList] : []
   );
 
+  const isSelected = uiState.selectedActivity?.id === activity.id;
+
+  const getEstimatedEndTime = React.useMemo(() => {
+    if (!isSelected || activity.status !== "inProgress") return null;
+
+    let minutesToAdd = 0;
+
+    if (activity.type === "challenge") {
+      minutesToAdd = activity.totalTempoReward - activity.minutesActive;
+      if (minutesToAdd <= 0) return null;
+    } else if ("allowedTime" in activity) {
+      minutesToAdd = activity.allowedTime - activity.minutesActive;
+    }
+
+    if (minutesToAdd <= 0) return null;
+
+    const endTime = new Date(uiState.lastUpdateTimestamp + minutesToAdd * 60000);
+    return endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  }, [isSelected, activity, uiState.lastUpdateTimestamp]);
+
   const isChallenge = activity.type === "challenge";
   const isNeutral = activity.type === "neutral";
   const isHobby = activity.type === "discount";
@@ -515,7 +535,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
             (activity.minutesActive < activity.totalTempoReward
               ? "border-4 border-green-500"
               : "border-4 border-red-500"))
-      }`}
+      } ${isSelected && activity.type !== "challenge" ? "border-4 border-blue-500" : ""}`}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -530,6 +550,9 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
             <div className="flex gap-2 mt-1">
               <TypeBadge type={activity.type} />
               <StatusBadge status={activity.status} activity={activity} />
+              {isSelected && activity.status === "inProgress" && getEstimatedEndTime && (
+                <Badge variant="outline">Finaliza: {getEstimatedEndTime}</Badge>
+              )}
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setIsEditDialogOpen(true)}>

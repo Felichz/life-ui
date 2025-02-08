@@ -135,6 +135,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   const engine = useSystemEngineContext();
   const { uiState } = useUiStateContext();
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(false);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState(board.title);
   const [isEditingProps, setIsEditingProps] = React.useState(false);
@@ -144,16 +145,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   });
   const [newActivityType, setNewActivityType] = React.useState<
     "neutral" | "challenge" | "discount"
-  >("neutral");
+  >("challenge");
   const [newActivityTitle, setNewActivityTitle] = React.useState("");
   const [newActivityAllowedTime, setNewActivityAllowedTime] = React.useState(30);
   const [newActivityTempoReward, setNewActivityTempoReward] = React.useState(30);
   const [newActivityConsumptionRate, setNewActivityConsumptionRate] = React.useState(0.5);
   const [newActivityIsRepetitive, setNewActivityIsRepetitive] = React.useState(false);
   const [newActivityConstraints, setNewActivityConstraints] = React.useState<
-    Omit<ExpirationChallengeConstraint, "parentConstraintId">[]
+    ExpirationChallengeConstraint[]
   >([]);
-  const [isLoading, setIsLoading] = React.useState(false);
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = React.useState(false);
 
   const childBoards = React.useMemo(() => {
@@ -440,7 +440,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
       await engine.activity.createActivity(newActivity);
 
       setNewActivityTitle("");
-      setNewActivityType("neutral");
+      setNewActivityType("challenge");
       setNewActivityAllowedTime(30);
       setNewActivityTempoReward(30);
       setNewActivityConsumptionRate(0.5);
@@ -592,6 +592,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
       setIsLoading(true);
       await engine.board.updateBoard({
         id: board.id,
+        title: newTitle.trim(),
         activityProps: {
           challenge: editedProps.challenge
             ? {
@@ -753,6 +754,17 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
+                <div className="grid gap-4 mb-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="boardTitle">Título del Tablero</Label>
+                    <Input
+                      id="boardTitle"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Nombre del tablero"
+                    />
+                  </div>
+                </div>
                 <Accordion type="single" collapsible className="w-full">
                   <AccordionItem value="challenge">
                     <AccordionTrigger>Propiedades para Desafíos</AccordionTrigger>
@@ -980,6 +992,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                     Tipo
                   </label>
                   <Select
+                    defaultValue="challenge"
                     value={newActivityType}
                     onValueChange={(value: "neutral" | "challenge" | "discount") =>
                       setNewActivityType(value)
@@ -989,8 +1002,8 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="neutral">Neutral</SelectItem>
                       <SelectItem value="challenge">Desafío</SelectItem>
+                      <SelectItem value="neutral">Neutral</SelectItem>
                       <SelectItem value="discount">Hobby</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1399,18 +1412,17 @@ const BoardsColumn: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isCreateBoardDialogOpen, setIsCreateBoardDialogOpen] = React.useState(false);
   const [newBoardTitle, setNewBoardTitle] = React.useState("");
-
-  const [challengeIsRepetitive, setChallengeIsRepetitive] = React.useState(false);
-  const [challengeConstraints, setChallengeConstraints] = React.useState<
+  const [newActivityType, setNewActivityType] = React.useState<
+    "neutral" | "challenge" | "discount"
+  >("challenge");
+  const [newActivityTitle, setNewActivityTitle] = React.useState("");
+  const [newActivityAllowedTime, setNewActivityAllowedTime] = React.useState(30);
+  const [newActivityTempoReward, setNewActivityTempoReward] = React.useState(30);
+  const [newActivityConsumptionRate, setNewActivityConsumptionRate] = React.useState(0.5);
+  const [newActivityIsRepetitive, setNewActivityIsRepetitive] = React.useState(false);
+  const [newActivityConstraints, setNewActivityConstraints] = React.useState<
     ExpirationChallengeConstraint[]
   >([]);
-
-  const [neutralIsRepetitive, setNeutralIsRepetitive] = React.useState(false);
-  const [neutralAllowedTime, setNeutralAllowedTime] = React.useState(30);
-
-  const [hobbyIsRepetitive, setHobbyIsRepetitive] = React.useState(false);
-  const [hobbyAllowedTime, setHobbyAllowedTime] = React.useState(30);
-  const [hobbyConsumptionRate, setHobbyConsumptionRate] = React.useState(0.5);
 
   const rootBoards = React.useMemo(() => {
     return uiState.boards
@@ -1418,30 +1430,41 @@ const BoardsColumn: React.FC = () => {
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [uiState.boards]);
 
+  React.useEffect(() => {
+    // Asegurarse de que el tipo predeterminado sea "challenge"
+    if (newActivityType !== "challenge") {
+      setNewActivityType("challenge");
+    }
+  }, []);
+
   const handleCreateBoard = async () => {
     try {
       setIsLoading(true);
 
       const activityProps: Board["activityProps"] = {};
 
-      if (challengeIsRepetitive || challengeConstraints.length > 0) {
+      if (newActivityType === "challenge" || newActivityConstraints.length > 0) {
         activityProps.challenge = {
-          isRepetitive: challengeIsRepetitive,
+          isRepetitive: newActivityType === "challenge",
         };
       }
 
-      if (neutralIsRepetitive || neutralAllowedTime !== 30) {
+      if (newActivityType === "neutral" || newActivityAllowedTime !== 30) {
         activityProps.neutral = {
-          isRepetitive: neutralIsRepetitive,
-          allowedTime: neutralAllowedTime,
+          isRepetitive: newActivityType === "neutral",
+          allowedTime: newActivityAllowedTime,
         };
       }
 
-      if (hobbyIsRepetitive || hobbyAllowedTime !== 30 || hobbyConsumptionRate !== 0.5) {
+      if (
+        newActivityType === "discount" ||
+        newActivityAllowedTime !== 30 ||
+        newActivityConsumptionRate !== 0.5
+      ) {
         activityProps.discount = {
-          isRepetitive: hobbyIsRepetitive,
-          allowedTime: hobbyAllowedTime,
-          tempoConsumptionRate: hobbyConsumptionRate,
+          isRepetitive: newActivityType === "discount",
+          allowedTime: newActivityAllowedTime,
+          tempoConsumptionRate: newActivityConsumptionRate,
         };
       }
 
@@ -1451,20 +1474,19 @@ const BoardsColumn: React.FC = () => {
         childrenBoards: [],
         activities: [],
         activityProps,
-        constraintList: challengeConstraints,
+        constraintList: newActivityConstraints,
         isExpanded: true,
       };
 
       await engine.board.createBoard(newBoard);
 
       setNewBoardTitle("");
-      setChallengeIsRepetitive(false);
-      setChallengeConstraints([]);
-      setNeutralIsRepetitive(false);
-      setNeutralAllowedTime(30);
-      setHobbyIsRepetitive(false);
-      setHobbyAllowedTime(30);
-      setHobbyConsumptionRate(0.5);
+      setNewActivityType("challenge");
+      setNewActivityAllowedTime(30);
+      setNewActivityTempoReward(30);
+      setNewActivityConsumptionRate(0.5);
+      setNewActivityIsRepetitive(false);
+      setNewActivityConstraints([]);
       setIsCreateBoardDialogOpen(false);
 
       toast({
@@ -1481,54 +1503,6 @@ const BoardsColumn: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleAddConstraint = () => {
-    const newConstraint: ExpirationChallengeConstraint = {
-      id: uuidv4(),
-      type: "expiration",
-      dayMinuteExpiration: 0,
-      penalty: 0,
-      status: "active",
-      failCount: 0,
-    };
-    setChallengeConstraints([...challengeConstraints, newConstraint]);
-  };
-
-  const handleUpdateConstraint = (
-    index: number,
-    updates: Partial<ExpirationChallengeConstraint>
-  ) => {
-    setChallengeConstraints(
-      challengeConstraints.map((constraint, i) =>
-        i === index ? { ...constraint, ...updates } : constraint
-      )
-    );
-  };
-
-  const handleUpdateConstraintPenalty = (
-    index: number,
-    value: string,
-    type: "fixed" | "percentage"
-  ) => {
-    const penalty = type === "fixed" ? Number(value) : value;
-    handleUpdateConstraint(index, { penalty });
-  };
-
-  const handleRemoveConstraint = (index: number) => {
-    setChallengeConstraints(challengeConstraints.filter((_, i) => i !== index));
-  };
-
-  const handleChallengeRepetitiveChange = (checked: boolean) => {
-    setChallengeIsRepetitive(checked);
-  };
-
-  const handleNeutralRepetitiveChange = (checked: boolean) => {
-    setNeutralIsRepetitive(checked);
-  };
-
-  const handleHobbyRepetitiveChange = (checked: boolean) => {
-    setHobbyIsRepetitive(checked);
   };
 
   return (
@@ -1558,7 +1532,7 @@ const BoardsColumn: React.FC = () => {
                 />
               </div>
 
-              <Accordion type="single" collapsible>
+              <Accordion type="single" collapsible defaultValue="challenge">
                 <AccordionItem value="challenge">
                   <AccordionTrigger>Propiedades para Desafíos</AccordionTrigger>
                   <AccordionContent>
@@ -1566,8 +1540,10 @@ const BoardsColumn: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="challengeIsRepetitive"
-                          checked={challengeIsRepetitive}
-                          onCheckedChange={handleChallengeRepetitiveChange}
+                          checked={newActivityType === "challenge"}
+                          onCheckedChange={(checked) => {
+                            setNewActivityType(checked ? "challenge" : "neutral");
+                          }}
                         />
                         <Label htmlFor="challengeIsRepetitive">Repetible</Label>
                       </div>
@@ -1579,23 +1555,38 @@ const BoardsColumn: React.FC = () => {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={handleAddConstraint}
+                            onClick={() => {
+                              setNewActivityConstraints([
+                                ...newActivityConstraints,
+                                {
+                                  type: "expiration",
+                                  dayMinuteExpiration: 0,
+                                  penalty: 0,
+                                  failCount: 0,
+                                  id: uuidv4(),
+                                  status: "active",
+                                },
+                              ]);
+                            }}
                           >
                             Agregar Criterio
                           </Button>
                         </div>
 
-                        {challengeConstraints.map((constraint, index) => (
+                        {newActivityConstraints.map((constraint, index) => (
                           <div key={index} className="space-y-2 p-4 border rounded-lg">
                             <div className="flex items-center justify-between">
                               <Label>Hora de Expiración</Label>
                               <TimeSelector
                                 value={constraint.dayMinuteExpiration}
-                                onChange={(minutes) =>
-                                  handleUpdateConstraint(index, {
+                                onChange={(minutes) => {
+                                  const newConstraints = [...newActivityConstraints];
+                                  newConstraints[index] = {
+                                    ...newConstraints[index],
                                     dayMinuteExpiration: minutes,
-                                  })
-                                }
+                                  };
+                                  setNewActivityConstraints(newConstraints);
+                                }}
                                 className="w-[230px]"
                               />
                             </div>
@@ -1608,9 +1599,14 @@ const BoardsColumn: React.FC = () => {
                                     type="number"
                                     min="0"
                                     value={constraint.penalty}
-                                    onChange={(e) =>
-                                      handleUpdateConstraintPenalty(index, e.target.value, "fixed")
-                                    }
+                                    onChange={(e) => {
+                                      const newConstraints = [...newActivityConstraints];
+                                      newConstraints[index] = {
+                                        ...newConstraints[index],
+                                        penalty: parseInt(e.target.value),
+                                      };
+                                      setNewActivityConstraints(newConstraints);
+                                    }}
                                     className="w-24"
                                   />
                                 )}
@@ -1620,13 +1616,14 @@ const BoardsColumn: React.FC = () => {
                                       ? constraint.penalty
                                       : "fixed"
                                   }
-                                  onValueChange={(value) =>
-                                    handleUpdateConstraintPenalty(
-                                      index,
-                                      value === "fixed" ? "0" : value,
-                                      value === "fixed" ? "fixed" : "percentage"
-                                    )
-                                  }
+                                  onValueChange={(value) => {
+                                    const newConstraints = [...newActivityConstraints];
+                                    newConstraints[index] = {
+                                      ...newConstraints[index],
+                                      penalty: value === "fixed" ? 0 : value,
+                                    };
+                                    setNewActivityConstraints(newConstraints);
+                                  }}
                                 >
                                   <SelectTrigger className="w-32">
                                     <SelectValue placeholder="Tipo" />
@@ -1645,7 +1642,11 @@ const BoardsColumn: React.FC = () => {
                               type="button"
                               variant="destructive"
                               size="sm"
-                              onClick={() => handleRemoveConstraint(index)}
+                              onClick={() => {
+                                const newConstraints = [...newActivityConstraints];
+                                newConstraints.splice(index, 1);
+                                setNewActivityConstraints(newConstraints);
+                              }}
                               className="mt-2"
                             >
                               Eliminar Criterio
@@ -1664,8 +1665,10 @@ const BoardsColumn: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="neutralIsRepetitive"
-                          checked={neutralIsRepetitive}
-                          onCheckedChange={handleNeutralRepetitiveChange}
+                          checked={newActivityType === "neutral"}
+                          onCheckedChange={(checked) => {
+                            setNewActivityType(checked ? "neutral" : "challenge");
+                          }}
                         />
                         <Label htmlFor="neutralIsRepetitive">Repetible</Label>
                       </div>
@@ -1675,8 +1678,8 @@ const BoardsColumn: React.FC = () => {
                         <Input
                           id="neutralAllowedTime"
                           type="number"
-                          value={neutralAllowedTime}
-                          onChange={(e) => setNeutralAllowedTime(Number(e.target.value))}
+                          value={newActivityAllowedTime}
+                          onChange={(e) => setNewActivityAllowedTime(Number(e.target.value))}
                           min={1}
                           max={960}
                         />
@@ -1692,8 +1695,10 @@ const BoardsColumn: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="hobbyIsRepetitive"
-                          checked={hobbyIsRepetitive}
-                          onCheckedChange={handleHobbyRepetitiveChange}
+                          checked={newActivityType === "discount"}
+                          onCheckedChange={(checked) => {
+                            setNewActivityType(checked ? "discount" : "neutral");
+                          }}
                         />
                         <Label htmlFor="hobbyIsRepetitive">Repetible</Label>
                       </div>
@@ -1703,8 +1708,8 @@ const BoardsColumn: React.FC = () => {
                         <Input
                           id="hobbyAllowedTime"
                           type="number"
-                          value={hobbyAllowedTime}
-                          onChange={(e) => setHobbyAllowedTime(Number(e.target.value))}
+                          value={newActivityAllowedTime}
+                          onChange={(e) => setNewActivityAllowedTime(Number(e.target.value))}
                           min={1}
                           max={960}
                         />
@@ -1715,8 +1720,8 @@ const BoardsColumn: React.FC = () => {
                         <Input
                           id="hobbyConsumptionRate"
                           type="number"
-                          value={hobbyConsumptionRate}
-                          onChange={(e) => setHobbyConsumptionRate(Number(e.target.value))}
+                          value={newActivityConsumptionRate}
+                          onChange={(e) => setNewActivityConsumptionRate(Number(e.target.value))}
                           min={0.1}
                           max={0.9}
                           step={0.1}

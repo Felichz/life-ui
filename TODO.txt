@@ -7,24 +7,22 @@ Bugs para fixear:
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
     
     Faltan testear casos raros que seguramente esten bugeados:
+        - Cuando editamos una actividad mientras esta seleccionada
         - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
         - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
 
+Para grooming:
+    - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
+    - Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
 
 Features que faltan implementar:
     POC:
-        - Para grooming: Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
-        - Para grooming: Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
-        - La card que muestra la actividad seleccionada actualmente, deberia mostrar la hora estimada de finalizacion de la actividad
         - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
         - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles
         - Cuando se excede el tiempo limite de un desafio se debe mostrar un modal mostrando las acciones disponibles, esto esta para grooming y clarificacion de que deberia ser posible en este caso
         - Progress bar circular que muestre el flujo de un minuto (quiza se pueda en testmode si el timemultiplier es diferente a 1 para no complicar las cosas, hay que probar)
-        - Falta borde de actividad seleccionada en la card de tiempo neutral
         - Guardar info de tiempo excedido para cada desafio, es un dato muy util para el usuario
         - Posibilidad de drag and drop de actividades dentro de un mismo board (debe haber un boton de mover para arrastrar)
-        - Quiero que la opcion default seleccionada en el select de tipo de actividad al crear una actividad sea desafio
-        - Input para editar nombre de board en el modal de edicion de board
         - Quiero poder ver la hora estimada de finalizacion de una actividad (la hora del limite definido en las props)
         - Se deben mostrar los crieterias heredados de los board dentro del modal de creacion de actividad y dentro del modal de editar actividades
         - Al finalizar el día debemos guardar información de las actividades repetibles
@@ -41,3 +39,8 @@ Features que faltan implementar:
         - Agregar multiples acciones posibles cuando se excede el tiempo de un desafio, hay que pensar como manejar la flexibilidad y adaptabilidad en estos casos
         - Crear plantillas de boards, configs base para aplicar
 
+        Ideas para el asistente de IA o sugerencias de IA integradas en la UI:
+            Las sugerencias y asistencia de IA deben ayudar al usuario a iterar y mejorar su sistema poco a poco
+            El sistema de IA debe ser capaz de analizar la informacion del usuario todos los dias o en tiempo real y estar ofreciendo sugerencias o dando avisos al usuario constantemente
+            
+            - En la seccion de analisis y estadisticas se podria revisar cuales desafios suelen tener tiempo excedido y decirle al usuario sobre esto, preguntarle al usuario alguna cosa para ver si podemos ajustar algo
