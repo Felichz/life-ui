@@ -102,8 +102,8 @@ interface BaseActivity {
    * Se incrementa cada vez que pasa un minuto y está seleccionada.
    */
   minutesActive: number;
-
   status: ActivityStatus;
+  order?: number; // Orden de la actividad dentro de su tablero
 }
 
 interface TimeLimitedActivity extends BaseActivity {
