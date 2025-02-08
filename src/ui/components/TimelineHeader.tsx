@@ -1,5 +1,6 @@
 import React from "react";
 
+import { Badge } from "./shadcn/badge";
 import { Button } from "./shadcn/button";
 import { Card, CardContent } from "./shadcn/card";
 import {
@@ -50,7 +51,26 @@ const getActivityTypeLabel = (type: Activity["type"]): string => {
 
 const SelectedActivityCard: React.FC<{ activity: Activity }> = ({ activity }) => {
   const systemEngine = useSystemEngineContext();
+  const { uiState } = useUiStateContext();
   const progress = systemEngine.activity.calculateProgress(activity);
+
+  const getEstimatedEndTime = React.useMemo(() => {
+    if (activity.status !== "inProgress") return null;
+
+    let minutesToAdd = 0;
+
+    if (activity.type === "challenge") {
+      minutesToAdd = activity.totalTempoReward - activity.minutesActive;
+      if (minutesToAdd <= 0) return null;
+    } else if ("allowedTime" in activity) {
+      minutesToAdd = activity.allowedTime - activity.minutesActive;
+    }
+
+    if (minutesToAdd <= 0) return null;
+
+    const endTime = new Date(uiState.lastUpdateTimestamp + minutesToAdd * 60000);
+    return endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  }, [activity, uiState.lastUpdateTimestamp]);
 
   const getActivityDetails = () => {
     switch (activity.type) {
@@ -83,15 +103,20 @@ const SelectedActivityCard: React.FC<{ activity: Activity }> = ({ activity }) =>
         <div className="space-y-4">
           <div>
             <h3 className="font-semibold text-lg">{activity.title}</h3>
-            <span
-              className="text-xs px-2 py-1 rounded-full"
-              style={{
-                backgroundColor: getActivityTypeColor(activity.type) + "20",
-                color: getActivityTypeColor(activity.type),
-              }}
-            >
-              {getActivityTypeLabel(activity.type)}
-            </span>
+            <div className="flex gap-2 items-center">
+              <span
+                className="text-xs px-2 py-1 rounded-full"
+                style={{
+                  backgroundColor: getActivityTypeColor(activity.type) + "20",
+                  color: getActivityTypeColor(activity.type),
+                }}
+              >
+                {getActivityTypeLabel(activity.type)}
+              </span>
+              {getEstimatedEndTime && (
+                <Badge variant="outline">Finaliza: {getEstimatedEndTime}</Badge>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
