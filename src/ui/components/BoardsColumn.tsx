@@ -35,6 +35,7 @@ import type {
   NeutralActivity,
   HobbyActivity,
   BoardChallengeConstraint,
+  Activity,
 } from "@/core/types";
 import { formatMultiLog } from "@/lib/utils/logger";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
@@ -163,7 +164,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   }, [board.childrenBoards, uiState.boards]);
 
   const activities = React.useMemo(() => {
-    return engine.board.getActivities(board.id);
+    return engine.board.getActivities(board.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [board.id, engine.board, uiState.activities]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
@@ -263,6 +264,98 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         variant: "destructive",
         title: "Error",
         description: "No se pudo reordenar el tablero",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleActivityDragStart = (e: React.DragEvent<HTMLDivElement>, activity: Activity) => {
+    e.dataTransfer.setData("text/plain", activity.id);
+    e.currentTarget.classList.add("opacity-50");
+  };
+
+  const handleActivityDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove("opacity-50");
+  };
+
+  const handleActivityDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const height = rect.height;
+
+    e.currentTarget.classList.remove("border-t-2", "border-b-2", "border-dashed", "border-primary");
+
+    if (y < height / 2) {
+      e.currentTarget.classList.add("border-t-2", "border-dashed", "border-primary");
+      e.currentTarget.setAttribute("data-insert-position", "before");
+    } else {
+      e.currentTarget.classList.add("border-b-2", "border-dashed", "border-primary");
+      e.currentTarget.setAttribute("data-insert-position", "after");
+    }
+  };
+
+  const handleActivityDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove("border-t-2", "border-b-2", "border-dashed", "border-primary");
+    e.currentTarget.removeAttribute("data-insert-position");
+  };
+
+  const handleActivityDrop = async (
+    e: React.DragEvent<HTMLDivElement>,
+    targetActivity: Activity
+  ) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove("border-t-2", "border-b-2", "border-dashed", "border-primary");
+
+    const draggedActivityId = e.dataTransfer.getData("text/plain");
+    const targetActivityId = targetActivity.id;
+    const insertPosition = e.currentTarget.getAttribute("data-insert-position") || "after";
+    e.currentTarget.removeAttribute("data-insert-position");
+
+    if (draggedActivityId === targetActivityId) return;
+
+    const draggedActivity = activities.find((a) => a.id === draggedActivityId);
+    if (!draggedActivity) return;
+
+    try {
+      setIsLoading(true);
+
+      const boardActivities = activities;
+      const currentIndex = boardActivities.findIndex((a) => a.id === draggedActivityId);
+      const targetIndex = boardActivities.findIndex((a) => a.id === targetActivityId);
+
+      if (currentIndex === -1 || targetIndex === -1) return;
+
+      const newOrder = [...boardActivities];
+      newOrder.splice(currentIndex, 1);
+      const newTargetIndex =
+        insertPosition === "before"
+          ? currentIndex < targetIndex
+            ? targetIndex - 1
+            : targetIndex
+          : currentIndex < targetIndex
+            ? targetIndex
+            : targetIndex + 1;
+      newOrder.splice(newTargetIndex, 0, draggedActivity);
+
+      for (let i = 0; i < newOrder.length; i++) {
+        await engine.activity.updateActivity({
+          id: newOrder[i].id,
+          order: i,
+        });
+      }
+
+      toast({
+        title: "Actividades reordenadas",
+        description: "El orden de las actividades se ha actualizado correctamente",
+      });
+    } catch (error) {
+      console.error("Error al reordenar actividad:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo reordenar la actividad",
       });
     } finally {
       setIsLoading(false);
@@ -1257,7 +1350,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
           {activities.length > 0 && (
             <div className="mb-4">
               {activities.map((activity) => (
-                <ActivityCard key={activity.id} activity={activity} />
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  onDragStart={(e) => handleActivityDragStart(e, activity)}
+                  onDragEnd={handleActivityDragEnd}
+                  onDragOver={handleActivityDragOver}
+                  onDragLeave={handleActivityDragLeave}
+                  onDrop={(e) => handleActivityDrop(e, activity)}
+                />
               ))}
             </div>
           )}

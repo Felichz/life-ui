@@ -35,6 +35,11 @@ type ActivityType = "challenge" | "neutral" | "discount";
 
 interface ActivityCardProps {
   activity: Activity;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
 }
 
 const StatusBadge: React.FC<{ status: ActivityStatus; activity?: Activity }> = ({
@@ -233,7 +238,14 @@ const NeutralOrHobbyDetails: React.FC<{ activity: NeutralActivity | HobbyActivit
   );
 };
 
-const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
+const ActivityCard: React.FC<ActivityCardProps> = ({
+  activity,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}) => {
   const { uiState } = useUiStateContext();
   const engine = useSystemEngineContext();
   const { toast } = useToast();
@@ -417,6 +429,12 @@ const ActivityCard: React.FC<ActivityCardProps> = ({ activity }) => {
               ? "border-4 border-green-500"
               : "border-4 border-red-500"))
       }`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
     >
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
