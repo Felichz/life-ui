@@ -372,12 +372,16 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         { label: "Inherited props", data: inheritedProps }
       );
 
+      const currentActivities = activities.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const lowestOrder = currentActivities.length > 0 ? (currentActivities[0].order ?? 0) - 1 : 0;
+
       const baseActivity: CreateActivityBaseInput = {
         title: newActivityTitle.trim(),
         status: "toDo" as const,
         minutesActive: 0,
         parentBoardId: board.id,
         type: newActivityType,
+        order: lowestOrder,
         isRepetitive:
           inheritedProps.challenge?.isRepetitive ??
           inheritedProps.neutral?.isRepetitive ??
@@ -399,6 +403,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
             totalTempoReward: newActivityTempoReward,
             constraintList: newActivityConstraints,
             isRepetitive: inheritedProps.challenge?.isRepetitive ?? false,
+            tempoGeneratingMinutes: 0,
           };
           break;
         case "neutral":
