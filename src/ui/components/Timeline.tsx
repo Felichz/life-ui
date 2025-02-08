@@ -84,24 +84,8 @@ const Timeline: React.FC<TimelineProps> = ({
   // Referencia y estado para el ancho del contenedor
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // Establecer el ancho inicial
-    setContainerWidth(containerRef.current.getBoundingClientRect().width);
-
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.contentRect) {
-          setContainerWidth(entry.contentRect.width);
-        }
-      }
-    });
-
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, []);
+  const [animatingClusters, setAnimatingClusters] = useState<Record<string, boolean>>({});
+  const prevClustersRef = useRef<MarkerCluster[]>([]);
 
   // Función para agrupar marcadores cercanos basada en píxeles
   const getMarkerClusters = React.useMemo((): MarkerCluster[] => {
@@ -152,6 +136,52 @@ const Timeline: React.FC<TimelineProps> = ({
 
     return clusters;
   }, [tempoModificationHistory, dayStartDate, containerWidth]);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    // Establecer el ancho inicial
+    setContainerWidth(containerRef.current.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Detectar cambios en los clusters
+  useEffect(() => {
+    const currentClusters = getMarkerClusters;
+    const newAnimatingClusters: Record<string, boolean> = {};
+
+    // Comparar clusters actuales con anteriores
+    currentClusters.forEach((cluster: MarkerCluster) => {
+      const prevCluster = prevClustersRef.current.find(
+        (prev) => prev.centerMinute === cluster.centerMinute
+      );
+
+      if (!prevCluster || prevCluster.modifications.length !== cluster.modifications.length) {
+        // Cluster nuevo o modificado
+        newAnimatingClusters[cluster.centerMinute] = true;
+      }
+    });
+
+    if (Object.keys(newAnimatingClusters).length > 0) {
+      setAnimatingClusters(newAnimatingClusters);
+      // Limpiar las animaciones después de que terminen
+      setTimeout(() => {
+        setAnimatingClusters({});
+      }, 300); // Duración de la animación
+    }
+
+    prevClustersRef.current = currentClusters;
+  }, [getMarkerClusters]);
 
   // Estado para rastrear qué marker está en hover
   const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -286,10 +316,11 @@ const Timeline: React.FC<TimelineProps> = ({
     const isHovered = hoveredMarkerId === cluster.index;
     const isMultiple = cluster.modifications.length > 1;
     const baseRadius = size / 3;
+    const smallRadius = baseRadius * 0.6; // Radio para los marcadores pequeños
     const clusterRadius = baseRadius * (1 + Math.min(cluster.modifications.length * 0.2, 1));
     const hoverRadius = clusterRadius * 1.5;
 
-    // Color basado en la modificación neta
+    // Color basado en la modificación neta (para el círculo grande)
     const markerColor = cluster.netModification >= 0 ? "#10b981" : "#ef4444";
 
     const handleMouseEnter = (e: React.MouseEvent<SVGGElement>) => {
@@ -309,6 +340,24 @@ const Timeline: React.FC<TimelineProps> = ({
       if (onMouseLeave) onMouseLeave(data, e as unknown as React.MouseEvent<SVGLineElement>);
     };
 
+    // Calcular posiciones y colores para los marcadores pequeños
+    const getSmallMarkerPositions = () => {
+      const positions: { x: number; y: number; color: string }[] = [];
+      const numMarkers = cluster.modifications.length;
+
+      // Distribuir en forma circular
+      const radius = clusterRadius * 0.6;
+      cluster.modifications.forEach((mod, i) => {
+        const angle = (i * 2 * Math.PI) / numMarkers;
+        positions.push({
+          x: Math.cos(angle) * radius,
+          y: Math.sin(angle) * radius,
+          color: mod.record.tempoModification >= 0 ? "#10b981" : "#ef4444",
+        });
+      });
+      return positions;
+    };
+
     return (
       <Tooltip delayDuration={100}>
         <TooltipTrigger asChild>
@@ -319,13 +368,20 @@ const Timeline: React.FC<TimelineProps> = ({
             onMouseLeave={handleMouseLeave}
             style={{ cursor: "pointer" }}
           >
-            {/* Círculo principal */}
+            {/* Círculo principal o de fondo */}
             <circle
               cx={0}
               cy={0}
               r={isHovered ? hoverRadius : clusterRadius}
               fill={markerColor}
-              stroke={isHovered ? "#ffffff" : markerColor === "#10b981" ? "#059669" : "#dc2626"}
+              opacity={isMultiple && !isHovered ? 0.4 : 1}
+              stroke={
+                isHovered || isMultiple
+                  ? "#ffffff"
+                  : markerColor === "#10b981"
+                    ? "#059669"
+                    : "#dc2626"
+              }
               strokeWidth={1.5}
               style={{
                 transition: "all 0.2s ease",
@@ -334,8 +390,27 @@ const Timeline: React.FC<TimelineProps> = ({
                   : "drop-shadow(0 1px 2px rgb(0 0 0 / 0.2))",
               }}
             />
-            {/* Indicador de cantidad */}
-            {isMultiple && (
+
+            {/* Marcadores pequeños (solo si es múltiple y no está en hover) */}
+            {isMultiple &&
+              !isHovered &&
+              getSmallMarkerPositions().map((pos, index) => (
+                <circle
+                  key={index}
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={smallRadius}
+                  fill={pos.color}
+                  stroke={pos.color === "#10b981" ? "#059669" : "#dc2626"}
+                  strokeWidth={1}
+                  style={{
+                    transition: "all 0.2s ease",
+                  }}
+                />
+              ))}
+
+            {/* Indicador de cantidad en hover */}
+            {isHovered && isMultiple && (
               <text
                 x={0}
                 y={0}
@@ -350,10 +425,20 @@ const Timeline: React.FC<TimelineProps> = ({
             )}
           </g>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent
+          style={{
+            animation: "fadeInScale 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards",
+          }}
+        >
           <div className="space-y-2 max-w-xs">
             {cluster.modifications.map((mod, index) => (
-              <div key={index} className={index > 0 ? "pt-2 border-t" : ""}>
+              <div
+                key={index}
+                className={index > 0 ? "pt-2 border-t" : ""}
+                style={{
+                  animation: `fadeInSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.05}s both`,
+                }}
+              >
                 <p className="font-medium">
                   {getTempoModificationReasonMessage(mod.record.reason)}
                 </p>
@@ -369,7 +454,12 @@ const Timeline: React.FC<TimelineProps> = ({
               </div>
             ))}
             {isMultiple && (
-              <div className="pt-2 border-t">
+              <div
+                className="pt-2 border-t"
+                style={{
+                  animation: "fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
+                }}
+              >
                 <p className="font-medium text-sm">Balance neto: {cluster.netModification}</p>
               </div>
             )}
@@ -388,6 +478,40 @@ const Timeline: React.FC<TimelineProps> = ({
 
   return (
     <div ref={containerRef} className="w-full relative">
+      <style>
+        {`
+          @keyframes fadeInScale {
+            from {
+              opacity: 0;
+              transform: scale(0.8);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
+          }
+
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+
+          @keyframes fadeInSlide {
+            from {
+              opacity: 0;
+              transform: translateY(5px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}
+      </style>
       <div className="w-full h-24">
         <ResponsiveBullet
           data={bulletData}

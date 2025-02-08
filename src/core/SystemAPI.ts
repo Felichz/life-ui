@@ -535,6 +535,14 @@ class SystemAPI implements SystemAPIType {
 
     formatLog("createActivity", null);
 
+    // Asegurarnos de que tempoGeneratingMinutes esté inicializado para desafíos
+    if (activity.type === "challenge") {
+      activity = {
+        ...activity,
+        tempoGeneratingMinutes: 0,
+      };
+    }
+
     // Actualizar el estado con la nueva actividad
     const newState: PersistedState = {
       ...state,

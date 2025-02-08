@@ -493,12 +493,12 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       // Deseleccionar la actividad
       await systemApi.unselectActivity();
 
-      if (activity.minutesActive >= activity.totalTempoReward) {
+      if (activity.tempoGeneratingMinutes >= activity.totalTempoReward) {
         await _syncUiStateFromPersisted();
         return;
       }
 
-      const reward = activity.totalTempoReward - activity.minutesActive;
+      const reward = activity.totalTempoReward - activity.tempoGeneratingMinutes;
 
       const tempoModificationRecord: TempoModificationRecord = {
         activityId: activity.id,
@@ -520,7 +520,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   // Funciones utilitarias
   const calculateActivityProgress = (activity: Activity): number => {
     if (activity.type === "challenge") {
-      return Math.min((activity.minutesActive / activity.totalTempoReward) * 100, 100);
+      return Math.min((activity.tempoGeneratingMinutes / activity.totalTempoReward) * 100, 100);
     }
     return Math.min((activity.minutesActive / activity.allowedTime) * 100, 100);
   };
