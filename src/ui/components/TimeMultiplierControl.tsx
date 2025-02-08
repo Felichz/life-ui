@@ -27,12 +27,15 @@ export const TimeMultiplierControl = () => {
     });
   }, [inputMultiplier, uiState.systemParams, updateSystemParams]);
 
-  const handleQuickApply = useCallback(async () => {
-    await updateSystemParams({
-      ...uiState.systemParams,
-      timeMultiplier: 60,
-    });
-  }, [inputMultiplier, uiState.systemParams, updateSystemParams]);
+  const handleQuickApply = useCallback(
+    async (timeMultiplier: number) => {
+      await updateSystemParams({
+        ...uiState.systemParams,
+        timeMultiplier,
+      });
+    },
+    [uiState.systemParams, updateSystemParams]
+  );
 
   const handleReset = useCallback(async () => {
     await updateSystemParams({
@@ -126,7 +129,7 @@ export const TimeMultiplierControl = () => {
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={handleQuickApply}
+            onClick={() => handleQuickApply(60)}
             disabled={uiState.systemParams.timeMultiplier === 60}
             className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -135,6 +138,21 @@ export const TimeMultiplierControl = () => {
         </TooltipTrigger>
         <TooltipContent>
           <p>Establecer velocidad x60</p>
+        </TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={() => handleQuickApply(1000)}
+            disabled={uiState.systemParams.timeMultiplier === 1000}
+            className="px-3 py-1 text-sm text-white bg-blue-500 rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            x1000
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Establecer velocidad x1000</p>
         </TooltipContent>
       </Tooltip>
 

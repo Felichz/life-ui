@@ -417,26 +417,32 @@ class SystemAPI implements SystemAPIType {
     // Obtenemos el estado persistido actual
     const state = await this.getPersistedState();
 
+    // Aseguramos que isExpanded tenga un valor por defecto
+    const boardToCreate = {
+      ...newBoard,
+      isExpanded: newBoard.isExpanded ?? true,
+    };
+
     // Si el board tiene padre, actualizamos el board padre para agregar el id del nuevo board en childrenBoards
-    if (newBoard.parentBoardId) {
-      const parentBoard = await this.getBoard(newBoard.parentBoardId);
+    if (boardToCreate.parentBoardId) {
+      const parentBoard = await this.getBoard(boardToCreate.parentBoardId);
       if (parentBoard) {
         // Calculamos los childrenBoards actualizados, garantizando que se mantengan los cambios anteriores
         const updatedChildrenBoards = Array.isArray(parentBoard.childrenBoards)
-          ? [...parentBoard.childrenBoards, newBoard.id]
-          : [newBoard.id];
+          ? [...parentBoard.childrenBoards, boardToCreate.id]
+          : [boardToCreate.id];
         const updatedParentBoard = { ...parentBoard, childrenBoards: updatedChildrenBoards };
 
         // Actualizamos el board padre
         await this.updateBoard(updatedParentBoard);
 
-        const freshParentBoard = await this.getBoard(newBoard.parentBoardId);
-        state.boards[newBoard.parentBoardId] = freshParentBoard!;
+        const freshParentBoard = await this.getBoard(boardToCreate.parentBoardId);
+        state.boards[boardToCreate.parentBoardId] = freshParentBoard!;
       }
     }
 
     // Agregamos el nuevo board al estado
-    state.boards[newBoard.id] = newBoard;
+    state.boards[boardToCreate.id] = boardToCreate;
 
     // Guardamos el estado actualizado incluyendo la versión fresca del board padre
     await this.saveState(state);
