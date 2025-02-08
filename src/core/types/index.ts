@@ -152,6 +152,7 @@ export interface Board {
   constraintList: BoardChallengeConstraint[];
   title: string;
   order?: number; // Orden del tablero dentro de su nivel (solo para tableros raíz)
+  isExpanded: boolean; // Estado de expansión del tablero
 }
 
 export interface UsefulMetrics {

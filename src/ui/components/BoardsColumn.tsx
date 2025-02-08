@@ -505,6 +505,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         childrenBoards: [],
         activityProps: {},
         constraintList: [],
+        isExpanded: true,
       };
       await engine.board.createBoard(newBoard);
       toast({
@@ -621,15 +622,14 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   ) => {
     setEditedProps((prev) => ({
       ...prev,
-      activityProps: {
-        challenge: editedProps.challenge
-          ? {
-              isRepetitive: editedProps.challenge.isRepetitive,
-            }
-          : undefined,
-        neutral: editedProps.neutral,
-        discount: editedProps.discount,
-      },
+      challenge: prev.challenge
+        ? {
+            ...prev.challenge,
+            isRepetitive: updates.isRepetitive ?? prev.challenge.isRepetitive,
+          }
+        : {
+            isRepetitive: updates.isRepetitive ?? false,
+          },
       constraintList: updates.constraintList ?? prev.constraintList,
     }));
   };
@@ -672,7 +672,18 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   };
 
   return (
-    <Accordion type="single" collapsible>
+    <Accordion
+      type="single"
+      collapsible
+      value={board.isExpanded ? board.id : undefined}
+      onValueChange={(value) => {
+        const isExpanded = value === board.id;
+        engine.board.updateBoard({
+          id: board.id,
+          isExpanded,
+        });
+      }}
+    >
       <AccordionItem value={board.id} className="border-none">
         <div
           className="flex items-center gap-2 px-2 py-1"
@@ -1436,6 +1447,7 @@ const BoardsColumn: React.FC = () => {
         activities: [],
         activityProps,
         constraintList: challengeConstraints,
+        isExpanded: true,
       };
 
       await engine.board.createBoard(newBoard);

@@ -1,6 +1,5 @@
 Bugs para fixear:
     - Se que este es un caso bastante raro pero igual debemos cubrirlo para mantener la robustez del sistema. En este caso por ejemplo son las 11pm y recien ahora comencé el día, hice un desafio con criterio de expiracion establecido en las 00:30am, osea yo esperaba que dentro de una hora y media falle el constraint, pero no, lo que pasó es que apenas le di al botón para crear la actividad, el sistema penalizó el constraint inmediatamente, seguramente haya algun problema en la manera como se calcula el hecho de que ya hayamos pasado el tiempo del constraint o no
-    - No se muestran los constraints heredados en el modal de creacion de actividad
     - No puedo clickear el checkbox "repetible" en las propiedades de los desafios al editar un board
     - El boton para deseleccionar una actividad no funciona, bueno, parece que la actividad se deselecciona pero la activity card sigue mostrando el boton para deseleccionar, y se sigue mostrando en status en progreso, sera que el ui no se actualiza?
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
