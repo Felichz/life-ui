@@ -59,6 +59,9 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     const persistedState = await systemApi.getPersistedState();
     console.log("= _syncUiStateFromPersisted = ");
 
+    // Sincronizamos el TimeSimulator con el timestamp persistido
+    timeSimulator.syncWithPersistedTimestamp(persistedState.lastUpdateTimestamp);
+
     timeSimulator.setTimeMultiplier(persistedState.systemParams.timeMultiplier);
 
     setUiState((current) => ({
