@@ -21,6 +21,20 @@ export class TimeSimulator {
   }
 
   /**
+   * Sincroniza el simulador con un timestamp persistido
+   * Esto es necesario para mantener la continuidad del tiempo cuando se reinicia la aplicación
+   */
+  syncWithPersistedTimestamp(persistedTimestamp: number): void {
+    const now = Date.now();
+    if (persistedTimestamp > now) {
+      // Si el timestamp persistido es mayor que el actual,
+      // ajustamos el tiempo de inicio de la simulación para mantener la continuidad
+      this.simulationStartTime = persistedTimestamp;
+      this.simulationStartRealTime = now;
+    }
+  }
+
+  /**
    * Activa o desactiva el modo de prueba
    */
   setTestMode(enabled: boolean) {
