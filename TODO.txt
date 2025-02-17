@@ -1,7 +1,8 @@
 Ahora:
+    - Si se agrega una actividad dentro de un board y hereda un constraint que a pasó en el día, el constraint no se debe aplicar, solo aplicaría en el caso de que la actividad sea repetible pero a partir del día siguiente
 
 Bugs para fixear:
-    - Si se agrega una actividad dentro de un board y hereda un constraint que a pasó en el día, el constraint no se debe aplicar, solo aplicaría en el caso de que la actividad sea repetible pero a partir del día siguiente
+    - El checkbox de "Repetible" si esta activo heredado debe estar checked no solo disabled
     - Se que este es un caso bastante raro pero igual debemos cubrirlo para mantener la robustez del sistema. En este caso por ejemplo son las 11pm y recien ahora comencé el día, hice un desafio con criterio de expiracion establecido en las 00:30am, osea yo esperaba que dentro de una hora y media falle el constraint, pero no, lo que pasó es que apenas le di al botón para crear la actividad, el sistema penalizó el constraint inmediatamente, seguramente haya algun problema en la manera como se calcula el hecho de que ya hayamos pasado el tiempo del constraint o no. Bueno de hecho no es tan raro, solo con el hecho de poner en el constraint que la hora es anterior a la actual en el formato de 24h, sin importar si esa hora esta dentro del dia actual, a aplica para cobrar la multa, no se la verdad, la unica manera es investigar como esta funcionando actualmente en el codigo, por ejemplo recien empeze un dia a las 12 del mediodia, el dia termina a las 4am, puse con constraint que falla a la 1am, y nada
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
     

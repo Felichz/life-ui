@@ -28,7 +28,8 @@ describe("Herencia de constraints y activity props en el System API", () => {
     childrenBoards: [],
     activities: [],
     constraintList: [],
-    activityProps: {}, // Se acepta vacío, ya que las propiedades son opcionales
+    activityProps: {},
+    isExpanded: false,
   };
 
   const baseChallenge: Partial<ChallengeActivity> = {
