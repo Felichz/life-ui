@@ -1,5 +1,4 @@
 Ahora:
-    - Si se agrega una actividad dentro de un board y hereda un constraint que a pasó en el día, el constraint no se debe aplicar, solo aplicaría en el caso de que la actividad sea repetible pero a partir del día siguiente
 
 Bugs para fixear:
     - El checkbox de "Repetible" si esta activo heredado debe estar checked no solo disabled

@@ -113,6 +113,7 @@ describe("timeStateLogic", () => {
         inheritedProps: {},
         tempoGeneratingMinutes: 5,
         exceededMinutes: 0,
+        createdAt: baseTimestamp,
       };
 
       const result = processTimeBatch({
@@ -153,6 +154,7 @@ describe("timeStateLogic", () => {
         inheritedProps: {},
         tempoGeneratingMinutes: 8,
         exceededMinutes: 0,
+        createdAt: baseTimestamp,
       };
 
       const result = processTimeBatch({
@@ -198,6 +200,7 @@ describe("timeStateLogic", () => {
         status: "inProgress",
         isRepetitive: false,
         inheritedProps: {},
+        createdAt: baseTimestamp,
       };
 
       const result = processTimeBatch({
@@ -232,6 +235,7 @@ describe("timeStateLogic", () => {
         status: "inProgress",
         isRepetitive: false,
         inheritedProps: {},
+        createdAt: baseTimestamp,
       };
 
       const result = processTimeBatch({
@@ -259,6 +263,7 @@ describe("timeStateLogic", () => {
         isRepetitive: false,
         tempoConsumptionRate: 0.5,
         inheritedProps: {},
+        createdAt: baseTimestamp,
       };
 
       const result = processTimeBatch({
@@ -294,6 +299,7 @@ describe("timeStateLogic", () => {
         isRepetitive: false,
         tempoConsumptionRate: 0.5,
         inheritedProps: {},
+        createdAt: baseTimestamp,
       };
 
       const result = processTimeBatch({
@@ -428,6 +434,7 @@ describe("timeStateLogic", () => {
         constraintList: [],
         inheritedProps: {},
         tempoGeneratingMinutes: 0,
+        createdAt: baseTimestamp,
       };
 
       const input: TimeStateInput = {
@@ -472,6 +479,7 @@ describe("timeStateLogic", () => {
         isRepetitive: false,
         tempoConsumptionRate: 0.5,
         inheritedProps: {},
+        createdAt: baseTimestamp,
       };
 
       const input: TimeStateInput = {
@@ -517,6 +525,21 @@ describe("timeStateLogic", () => {
 
   describe("evaluateConstraints", () => {
     it("debería mantener los constraints sin cambios cuando no han expirado", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 8, 0).getTime(); // 8:00
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 100,
+        minutesActive: 0,
+        status: "inProgress",
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 0,
+      };
+
       const constraints: ExpirationChallengeConstraint[] = [
         {
           id: "1",
@@ -532,6 +555,8 @@ describe("timeStateLogic", () => {
         constraints,
         currentMinutes: 500, // 8:20
         totalTempoReward: 100,
+        activity,
+        currentTimestamp: baseTimestamp,
       });
 
       expect(result.updatedConstraints).toEqual(constraints);
@@ -539,6 +564,21 @@ describe("timeStateLogic", () => {
     });
 
     it("debería marcar como fallido un constraint expirado con penalización numérica", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 8, 0).getTime(); // 8:00
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 100,
+        minutesActive: 0,
+        status: "inProgress",
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 0,
+      };
+
       const constraints: ExpirationChallengeConstraint[] = [
         {
           id: "1",
@@ -550,10 +590,13 @@ describe("timeStateLogic", () => {
         },
       ];
 
+      const currentTimestamp = new Date(2024, 2, 20, 10, 1).getTime(); // 10:01
       const result = evaluateConstraints({
         constraints,
         currentMinutes: 601, // 10:01
         totalTempoReward: 100,
+        activity,
+        currentTimestamp,
       });
 
       expect(result.updatedConstraints[0].status).toBe("failed");
@@ -563,6 +606,21 @@ describe("timeStateLogic", () => {
     });
 
     it("debería calcular correctamente la penalización porcentual", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 8, 0).getTime(); // 8:00
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 200,
+        minutesActive: 0,
+        status: "inProgress",
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 0,
+      };
+
       const constraints: ExpirationChallengeConstraint[] = [
         {
           id: "1",
@@ -574,16 +632,34 @@ describe("timeStateLogic", () => {
         },
       ];
 
+      const currentTimestamp = new Date(2024, 2, 20, 10, 1).getTime(); // 10:01
       const result = evaluateConstraints({
         constraints,
         currentMinutes: 601,
         totalTempoReward: 200,
+        activity,
+        currentTimestamp,
       });
 
       expect(result.failedConstraints[0].penaltyAmount).toBe(150); // 75% de 200
     });
 
     it("debería ignorar constraints que ya están fallidos", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 8, 0).getTime(); // 8:00
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 100,
+        minutesActive: 0,
+        status: "inProgress",
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 0,
+      };
+
       const constraints: ExpirationChallengeConstraint[] = [
         {
           id: "1",
@@ -595,10 +671,13 @@ describe("timeStateLogic", () => {
         },
       ];
 
+      const currentTimestamp = new Date(2024, 2, 20, 10, 1).getTime(); // 10:01
       const result = evaluateConstraints({
         constraints,
         currentMinutes: 601,
         totalTempoReward: 100,
+        activity,
+        currentTimestamp,
       });
 
       expect(result.updatedConstraints).toEqual(constraints);
@@ -606,6 +685,21 @@ describe("timeStateLogic", () => {
     });
 
     it("debería manejar múltiples constraints correctamente", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 8, 0).getTime(); // 8:00
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 100,
+        minutesActive: 0,
+        status: "inProgress",
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 0,
+      };
+
       const constraints: ExpirationChallengeConstraint[] = [
         {
           id: "1",
@@ -625,16 +719,78 @@ describe("timeStateLogic", () => {
         },
       ];
 
+      const currentTimestamp = new Date(2024, 2, 20, 11, 0).getTime(); // 11:00
       const result = evaluateConstraints({
         constraints,
         currentMinutes: 660, // 11:00
         totalTempoReward: 100,
+        activity,
+        currentTimestamp,
       });
 
       expect(result.updatedConstraints[0].status).toBe("failed");
       expect(result.updatedConstraints[1].status).toBe("active");
       expect(result.failedConstraints).toHaveLength(1);
       expect(result.failedConstraints[0].penaltyAmount).toBe(50);
+    });
+
+    it("debería exonerar constraints expirados para actividades creadas después del minuto de expiración en el mismo día", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 10, 0).getTime(); // 10:00
+      const activityCreationTimestamp = new Date(2024, 2, 20, 11, 0).getTime(); // 11:00
+
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 100,
+        minutesActive: 0,
+        status: "inProgress",
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: activityCreationTimestamp,
+        tempoGeneratingMinutes: 0,
+      };
+
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600, // 10:00
+          penalty: 50,
+          failCount: 0,
+          status: "active",
+        },
+      ];
+
+      // Evaluamos a las 12:00 del mismo día
+      const currentTimestamp = new Date(2024, 2, 20, 12, 0).getTime();
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 720, // 12:00
+        totalTempoReward: 100,
+        activity,
+        currentTimestamp,
+      });
+
+      // El constraint no debería fallar porque la actividad se creó después del minuto de expiración
+      expect(result.updatedConstraints[0].status).toBe("active");
+      expect(result.failedConstraints).toHaveLength(0);
+
+      // Evaluamos al día siguiente
+      const nextDayTimestamp = new Date(2024, 2, 21, 12, 0).getTime();
+      const nextDayResult = evaluateConstraints({
+        constraints,
+        currentMinutes: 720, // 12:00
+        totalTempoReward: 100,
+        activity,
+        currentTimestamp: nextDayTimestamp,
+      });
+
+      // Al día siguiente el constraint sí debería fallar
+      expect(nextDayResult.updatedConstraints[0].status).toBe("failed");
+      expect(nextDayResult.failedConstraints).toHaveLength(1);
+      expect(nextDayResult.failedConstraints[0].penaltyAmount).toBe(50);
     });
   });
 
