@@ -269,10 +269,14 @@ export const evaluateConstraints = ({
   constraints,
   currentMinutes,
   totalTempoReward,
+  activity,
+  currentTimestamp,
 }: {
   constraints: ExpirationChallengeConstraint[];
   currentMinutes: number;
   totalTempoReward: number;
+  activity: ChallengeActivity;
+  currentTimestamp: number;
 }): {
   updatedConstraints: ExpirationChallengeConstraint[];
   failedConstraints: Array<{ constraint: ExpirationChallengeConstraint; penaltyAmount: number }>;
@@ -288,6 +292,17 @@ export const evaluateConstraints = ({
     penaltyAmount: number;
   }> = [];
 
+  // Verificar si la actividad fue creada hoy
+  const activityCreationDate = new Date(activity.createdAt);
+  const currentDate = new Date(currentTimestamp);
+  const activityWasCreatedToday =
+    activityCreationDate.getFullYear() === currentDate.getFullYear() &&
+    activityCreationDate.getMonth() === currentDate.getMonth() &&
+    activityCreationDate.getDate() === currentDate.getDate();
+
+  // Obtener el minuto del día en que fue creada la actividad
+  const activityCreationMinute = getMinutesFromTimestamp(activity.createdAt);
+
   constraints.forEach((constraint) => {
     // Solo evaluamos constraints activos
     if (constraint.status === "failed") {
@@ -302,8 +317,21 @@ export const evaluateConstraints = ({
     // Solo evaluamos constraints de expiración que estén activos
     if (constraint.type === "expiration" && constraint.status === "active") {
       if (currentMinutes > constraint.dayMinuteExpiration) {
-        // Se ha vencido el tiempo permitido para este constraint
+        // Verificar si debemos exonerar el constraint
+        const expirationMinuteIsBeforeActivityCreationMinute =
+          constraint.dayMinuteExpiration < activityCreationMinute;
 
+        const shouldExemptConstraint =
+          activityWasCreatedToday && expirationMinuteIsBeforeActivityCreationMinute;
+
+        if (shouldExemptConstraint) {
+          // Si la actividad fue creada hoy después del minuto de expiración,
+          // simplemente mantenemos el constraint sin cambios
+          updatedConstraints.push(constraint);
+          return;
+        }
+
+        // Se ha vencido el tiempo permitido para este constraint
         // Calcular el monto de la penalización
         let penaltyAmount = 0;
         if (typeof constraint.penalty === "number") {

@@ -25,6 +25,7 @@ import ActivityCard from "./ActivityCard";
 import { TimeSelector } from "./TimeSelector";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
+import { TimeSimulator } from "@/core/TimeSimulator";
 import type {
   Board,
   CreateActivityBaseInput,
@@ -387,6 +388,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
           inheritedProps.neutral?.isRepetitive ??
           inheritedProps.discount?.isRepetitive ??
           newActivityIsRepetitive,
+        createdAt: TimeSimulator.getInstance().now(),
       };
 
       let newActivity: CreateActivityInput;

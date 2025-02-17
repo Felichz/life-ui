@@ -202,12 +202,15 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   const _evaluateAllChallengeConstraints = useCallback(async () => {
     const challengeActivitiesWithConstraints = await _getAllActivityConstraints();
     const currentMinutes = _getMinutesFromTimestamp(timeSimulator.now());
+    const currentTimestamp = timeSimulator.now();
 
     for (const { activity } of challengeActivitiesWithConstraints) {
       const { updatedConstraints, failedConstraints } = evaluateConstraints({
         constraints: activity.constraintList,
         currentMinutes,
         totalTempoReward: activity.totalTempoReward,
+        activity,
+        currentTimestamp,
       });
 
       // Creamos una copia actualizada de la actividad con los nuevos constraints

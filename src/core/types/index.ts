@@ -104,6 +104,7 @@ interface BaseActivity {
   minutesActive: number;
   status: ActivityStatus;
   order?: number; // Orden de la actividad dentro de su tablero
+  createdAt: number; // Timestamp de creación de la actividad
 }
 
 interface TimeLimitedActivity extends BaseActivity {
