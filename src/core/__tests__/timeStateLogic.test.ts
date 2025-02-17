@@ -7,7 +7,12 @@ import {
   type TimeStateInput,
   evaluateConstraints,
 } from "../timeStateLogic";
-import type { Activity, SystemParams, ExpirationChallengeConstraint } from "../types";
+import type {
+  Activity,
+  SystemParams,
+  ExpirationChallengeConstraint,
+  ChallengeActivity,
+} from "../types";
 
 describe("timeStateLogic", () => {
   describe("getMinutesFromTimestamp", () => {
@@ -96,7 +101,7 @@ describe("timeStateLogic", () => {
     });
 
     it("debería procesar correctamente una actividad challenge sin exceder el totalTempoReward", () => {
-      const activity: Activity = {
+      const activity: ChallengeActivity = {
         id: "1",
         type: "challenge",
         title: "Test Challenge",
@@ -106,6 +111,8 @@ describe("timeStateLogic", () => {
         isRepetitive: false,
         constraintList: [],
         inheritedProps: {},
+        tempoGeneratingMinutes: 5,
+        exceededMinutes: 0,
       };
 
       const result = processTimeBatch({
@@ -124,14 +131,17 @@ describe("timeStateLogic", () => {
         tempoModification: 3,
         minutesInvested: 3,
       });
-      expect(result.updatedActivity?.minutesActive).toBe(8);
-      expect(result.updatedActivity?.status).toBe("inProgress");
+      const updatedChallenge = result.updatedActivity as ChallengeActivity;
+      // minutesActive debe incrementarse con todo el tiempo
+      expect(updatedChallenge.minutesActive).toBe(8);
+      // tempoGeneratingMinutes debe incrementarse solo con el tiempo efectivo
+      expect(updatedChallenge.tempoGeneratingMinutes).toBe(8);
+      // no hay tiempo excedido aún
+      expect(updatedChallenge.exceededMinutes).toBe(0);
     });
 
     it("debería procesar correctamente una actividad challenge excediendo el totalTempoReward", () => {
-      // Actividad challenge: totalTempoReward = 10 y minutesActive = 8, deltaTime = 5
-      // Se procesan 2 minutos de actividad (para llegar a 10) y 3 minutos idle
-      const activity: Activity = {
+      const activity: ChallengeActivity = {
         id: "1",
         type: "challenge",
         title: "Test Challenge",
@@ -141,6 +151,8 @@ describe("timeStateLogic", () => {
         isRepetitive: false,
         constraintList: [],
         inheritedProps: {},
+        tempoGeneratingMinutes: 8,
+        exceededMinutes: 0,
       };
 
       const result = processTimeBatch({
@@ -167,9 +179,13 @@ describe("timeStateLogic", () => {
         tempoModification: -3,
         minutesInvested: 3,
       });
-      expect(result.updatedActivity?.minutesActive).toBe(10);
-      // Si la lógica actualiza el status a "completed" al alcanzar el total, se puede comprobar:
-      // expect(result.updatedActivity?.status).toBe("completed");
+      const updatedChallenge = result.updatedActivity as ChallengeActivity;
+      // minutesActive debe incrementarse con todo el tiempo (8 + 5 = 13)
+      expect(updatedChallenge.minutesActive).toBe(13);
+      // tempoGeneratingMinutes debe llegar solo hasta totalTempoReward (8 + 2 = 10)
+      expect(updatedChallenge.tempoGeneratingMinutes).toBe(10);
+      // exceededMinutes debe acumular el tiempo extra (3 minutos)
+      expect(updatedChallenge.exceededMinutes).toBe(3);
     });
 
     it("debería procesar correctamente una actividad neutral sin completar la allowedTime", () => {
@@ -401,7 +417,7 @@ describe("timeStateLogic", () => {
       const now = baseTimestamp + 4 * 60000; // 4 minutos después
       jest.spyOn(timeSimulator, "now").mockReturnValue(now);
 
-      const activity: Activity = {
+      const activity: ChallengeActivity = {
         id: "1",
         type: "challenge",
         title: "Test Challenge",
@@ -411,6 +427,7 @@ describe("timeStateLogic", () => {
         isRepetitive: false,
         constraintList: [],
         inheritedProps: {},
+        tempoGeneratingMinutes: 0,
       };
 
       const input: TimeStateInput = {

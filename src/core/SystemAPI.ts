@@ -230,7 +230,8 @@ class SystemAPI implements SystemAPIType {
     const currentBoardConstraints = currentBoard.constraintList || [];
     formatLog("currentBoardConstraints", currentBoardConstraints);
 
-    const combinedConstraints = [...currentBoardConstraints];
+    // Acumulamos los constraints heredados y los del board actual, manteniendo el orden de herencia
+    const combinedConstraints = [...currentBoardConstraints, ...inheritedConstraints];
     formatLog("combinedConstraints", combinedConstraints);
 
     const childChallenges = currentBoard.activities
@@ -245,56 +246,44 @@ class SystemAPI implements SystemAPIType {
     for (const challenge of childChallenges) {
       const updatedConstraints: ChallengeConstraint[] = [];
 
+      // Primero mantenemos los constraints que no tienen parentConstraintId
       for (const constraint of challenge.constraintList) {
-        if (constraint.parentConstraintId) {
-          // Buscar el constraint heredado correspondiente
-          const inheritedConstraint = inheritedConstraints.find(
-            (ic) => ic.id === constraint.parentConstraintId
-          );
-
-          if (inheritedConstraint) {
-            formatLog("updating inherited constraint because it exists", inheritedConstraint);
-            // Actualizar type, penalty, y dayMinuteExpiration (basicamente todas las propiedades heredables menos el id)
-            updatedConstraints.push({
-              ...constraint,
-              ...inheritedConstraint,
-              id: constraint.id,
-              status: constraint.status,
-              failCount: constraint.failCount,
-            });
-          }
-          // Si no existe, no se agrega (se elimina)
-        } else {
-          // Mantener constraints sin parent
+        if (!constraint.parentConstraintId) {
           updatedConstraints.push(constraint);
         }
       }
 
-      // Agregar constraints heredados que no estén presentes
+      // Luego procesamos los constraints heredados
       for (const constraintToApply of combinedConstraints) {
-        const exists = updatedConstraints.some(
-          (uc) => uc.parentConstraintId === constraintToApply.id
+        // Buscar si ya existía este constraint en la actividad
+        const existingConstraint = challenge.constraintList.find(
+          (c) => c.parentConstraintId === constraintToApply.id
         );
 
-        if (!exists) {
-          // Buscar si ya existía este constraint en la actividad
-          const existingConstraint = challenge.constraintList.find(
-            (c) => c.parentConstraintId === constraintToApply.id
-          );
-
+        // Si existe, actualizamos sus propiedades
+        if (existingConstraint) {
+          updatedConstraints.push({
+            ...existingConstraint,
+            ...constraintToApply,
+            id: existingConstraint.id,
+            parentConstraintId: constraintToApply.id,
+            status: existingConstraint.status,
+            failCount: existingConstraint.failCount,
+          });
+        } else {
+          // Si no existe, creamos uno nuevo
           updatedConstraints.push({
             ...constraintToApply,
-            id: existingConstraint?.id || this.generateUUID(),
+            id: this.generateUUID(),
             parentConstraintId: constraintToApply.id,
-            failCount: existingConstraint?.failCount || 0,
-            status: existingConstraint?.status || "active",
+            failCount: 0,
+            status: "active",
           });
         }
       }
 
       // Actualizar el challenge con los nuevos constraint
       challenge.constraintList = updatedConstraints;
-
       await this.updateActivity(challenge);
     }
 
