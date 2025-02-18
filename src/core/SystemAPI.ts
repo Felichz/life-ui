@@ -23,6 +23,8 @@ import type {
   SystemParams,
   TempoModificationRecord,
   UsefulMetrics,
+  DayRecord,
+  DayDatabase,
 } from "./types";
 
 import { formatLog, formatMultiLog } from "@/lib/utils/logger";
@@ -54,6 +56,7 @@ const defaultState: PersistedState = {
   },
   lastUpdateTimestamp: Date.now(),
   selectedActivity: undefined,
+  dayDatabase: [],
 };
 
 class StorageWrapper {
@@ -141,12 +144,22 @@ class SystemAPI implements SystemAPIType {
     await this.saveState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
   }
 
-  async endDay(): Promise<void> {
-    const currentState = await this.getState();
+  async endDay(dayRecord: DayRecord): Promise<void> {
+    const state = await this.getState();
+
+    if (state.lifecycleState !== "dayInProgress" || !state.currentDay) {
+      throw new Error("No hay un día en progreso para finalizar");
+    }
+
+    // Actualizar el estado persistido
     await this.saveState({
-      ...currentState,
-      currentDay: undefined,
+      ...state,
       lifecycleState: "dayNotStarted",
+      currentDay: undefined,
+      dayDatabase: [...state.dayDatabase, dayRecord],
+      // Reiniciar los historiales del día
+      investedTimeHistory: [],
+      tempoModificationHistory: [],
     });
   }
 
@@ -820,6 +833,32 @@ class SystemAPI implements SystemAPIType {
   async updateLastUpdateTimestamp(timestamp: number): Promise<void> {
     const state = await this.getState();
     await this.saveState({ ...state, lastUpdateTimestamp: timestamp });
+  }
+
+  async getDayDatabase(): Promise<DayDatabase> {
+    const state = await this.getState();
+    return state.dayDatabase;
+  }
+
+  async getDayRecord(date: number): Promise<DayRecord | undefined> {
+    const state = await this.getState();
+    return state.dayDatabase.find((record) => {
+      const recordDate = new Date(record.dayState.date);
+      const targetDate = new Date(date);
+      return (
+        recordDate.getFullYear() === targetDate.getFullYear() &&
+        recordDate.getMonth() === targetDate.getMonth() &&
+        recordDate.getDate() === targetDate.getDate()
+      );
+    });
+  }
+
+  async getDayRecordsInRange(startDate: number, endDate: number): Promise<DayDatabase> {
+    const state = await this.getState();
+    return state.dayDatabase.filter((record) => {
+      const recordDate = record.dayState.date;
+      return recordDate >= startDate && recordDate <= endDate;
+    });
   }
 
   async clearAllData(): Promise<void> {

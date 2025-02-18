@@ -1,4 +1,3 @@
-import { TimeSimulator } from "../TimeSimulator";
 import {
   getMinutesFromTimestamp,
   calculateNewBalances,
@@ -6,12 +5,18 @@ import {
   updateTimeState,
   type TimeStateInput,
   evaluateConstraints,
-} from "../timeStateLogic";
+  createDayRecord,
+} from "../businessLogic";
+import { TimeSimulator } from "../TimeSimulator";
 import type {
   Activity,
   SystemParams,
   ExpirationChallengeConstraint,
   ChallengeActivity,
+  DayState,
+  InvestedTimeHistory,
+  TempoModificationHistory,
+  UsefulMetrics,
 } from "../types";
 
 describe("timeStateLogic", () => {
@@ -735,7 +740,6 @@ describe("timeStateLogic", () => {
     });
 
     it("debería exonerar constraints expirados para actividades creadas después del minuto de expiración en el mismo día", () => {
-      const baseTimestamp = new Date(2024, 2, 20, 10, 0).getTime(); // 10:00
       const activityCreationTimestamp = new Date(2024, 2, 20, 11, 0).getTime(); // 11:00
 
       const activity: ChallengeActivity = {
@@ -796,5 +800,152 @@ describe("timeStateLogic", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+});
+
+describe("createDayRecord", () => {
+  const baseTimestamp = new Date(2024, 2, 20, 10, 0).getTime();
+
+  const mockDayState: DayState = {
+    date: baseTimestamp,
+    dayStartMinute: 600,
+    dayTempoBalance: 100,
+  };
+
+  const mockInvestedTimeHistory: InvestedTimeHistory = [
+    {
+      status: "activity",
+      activityId: "1",
+      type: "challenge",
+      timestamp: baseTimestamp,
+      tempoModification: 10,
+      minutesInvested: 10,
+    },
+  ];
+
+  const mockTempoModificationHistory: TempoModificationHistory = [
+    {
+      activityId: "1",
+      type: "challenge",
+      timestamp: baseTimestamp,
+      reason: "challengeCompletionReward",
+      tempoModification: 50,
+    },
+  ];
+
+  const mockUsefulMetrics: UsefulMetrics = {
+    totalGeneratedTemposEver: 1000,
+    totalMinutesInvested: {
+      intrinsicProductivity: 100,
+      challenges: 200,
+      hobbies: 300,
+      rest: 400,
+      other: 0,
+    },
+  };
+
+  it("debería crear un registro de día correctamente sin actividades repetibles", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge No Repetible",
+        isRepetitive: false,
+        minutesActive: 30,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 30,
+      } as ChallengeActivity,
+    ];
+
+    const result = createDayRecord({
+      currentDay: mockDayState,
+      activities: mockActivities,
+      investedTimeHistory: mockInvestedTimeHistory,
+      tempoModificationHistory: mockTempoModificationHistory,
+      usefulMetrics: mockUsefulMetrics,
+    });
+
+    expect(result.dayState).toEqual(mockDayState);
+    expect(result.investedTimeHistory).toEqual(mockInvestedTimeHistory);
+    expect(result.tempoModificationHistory).toEqual(mockTempoModificationHistory);
+    expect(result.usefulMetrics).toEqual(mockUsefulMetrics);
+    expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(0);
+  });
+
+  it("debería incluir el estado final de actividades repetibles", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge Repetible",
+        isRepetitive: true,
+        minutesActive: 30,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 30,
+        exceededMinutes: 0,
+      } as ChallengeActivity,
+      {
+        id: "2",
+        type: "neutral",
+        title: "Neutral Repetible",
+        isRepetitive: true,
+        minutesActive: 45,
+        status: "completed",
+        allowedTime: 60,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      },
+    ];
+
+    const result = createDayRecord({
+      currentDay: mockDayState,
+      activities: mockActivities,
+      investedTimeHistory: mockInvestedTimeHistory,
+      tempoModificationHistory: mockTempoModificationHistory,
+      usefulMetrics: mockUsefulMetrics,
+    });
+
+    // Verificar que se incluyeron ambas actividades repetibles
+    expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(2);
+
+    // Verificar el estado final de la actividad challenge
+    const challengeState = result.repeatableActivitiesFinalState["1"] as Partial<ChallengeActivity>;
+    expect(challengeState).toBeDefined();
+    expect(challengeState.type).toBe("challenge");
+    expect(challengeState.minutesActive).toBe(30);
+    expect(challengeState.status).toBe("completed");
+    expect(challengeState.tempoGeneratingMinutes).toBe(30);
+    expect(challengeState.exceededMinutes).toBe(0);
+
+    // Verificar el estado final de la actividad neutral
+    const neutralState = result.repeatableActivitiesFinalState["2"];
+    expect(neutralState).toBeDefined();
+    expect(neutralState.type).toBe("neutral");
+    expect(neutralState.minutesActive).toBe(45);
+    expect(neutralState.status).toBe("completed");
+  });
+
+  it("debería manejar correctamente una lista vacía de actividades", () => {
+    const result = createDayRecord({
+      currentDay: mockDayState,
+      activities: [],
+      investedTimeHistory: mockInvestedTimeHistory,
+      tempoModificationHistory: mockTempoModificationHistory,
+      usefulMetrics: mockUsefulMetrics,
+    });
+
+    expect(result.dayState).toEqual(mockDayState);
+    expect(result.investedTimeHistory).toEqual(mockInvestedTimeHistory);
+    expect(result.tempoModificationHistory).toEqual(mockTempoModificationHistory);
+    expect(result.usefulMetrics).toEqual(mockUsefulMetrics);
+    expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(0);
   });
 });

@@ -16,6 +16,8 @@ Para grooming:
 
 Features que faltan implementar:
     POC:
+        - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
+
         - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
         - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles
         - Cuando se excede el tiempo limite de un desafio se debe mostrar un modal mostrando las acciones disponibles, esto esta para grooming y clarificacion de que deberia ser posible en este caso
@@ -24,8 +26,6 @@ Features que faltan implementar:
         - Posibilidad de drag and drop de actividades dentro de un mismo board (debe haber un boton de mover para arrastrar)
         - Quiero poder ver la hora estimada de finalizacion de una actividad (la hora del limite definido en las props)
         - Se deben mostrar los crieterias heredados de los board dentro del modal de creacion de actividad y dentro del modal de editar actividades
-        - Al finalizar el día debemos guardar información de las actividades repetibles
-        - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
         - Implementar algun concepto que ayude a evitar malos habitos, capaz incentivando si se evita un mal habito en el dia, o penalizar si se hace el mal habito, o capaz una combinacion de los dos
         - Me gustaria que las notificaciones se muestren mejor en ui, quiero que se vea el titulo de la actividad seleccionada (clickeable que te lleve a la activity card por id del html), y que muestre los tempos actuales al momento de la notificacion
         - Quiero que el timeline muestre horas con 0 minutos, por ejemplo 12:00, 12:30, 13:00, etc, las unicas horas "no exactas" serian la del inicio del dia y finalizacion del dia
