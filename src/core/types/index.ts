@@ -204,7 +204,7 @@ export interface DayRecord {
    * Estado final de las actividades repetibles al cierre del día.
    * Se indexa por el ActivityId para permitir búsquedas rápidas.
    */
-  repeatableActivitiesFinalState: Record<ActivityId, Partial<Activity>>;
+  activitiesFinalState: Record<ActivityId, Partial<Activity>>;
   /** Métricas útiles calculadas para ese día */
   usefulMetrics: UsefulMetrics;
 }

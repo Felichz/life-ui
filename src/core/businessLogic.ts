@@ -491,16 +491,53 @@ export function createDayRecord({
     dayState: currentDay,
     investedTimeHistory,
     tempoModificationHistory,
-    repeatableActivitiesFinalState: {},
+    activitiesFinalState: {},
     usefulMetrics,
   };
 
-  // Recopilar el estado final de las actividades repetibles
+  // Recopilar el estado final de todas las actividades
   for (const activity of activities) {
-    if (activity.isRepetitive) {
-      dayRecord.repeatableActivitiesFinalState[activity.id] = activity;
-    }
+    dayRecord.activitiesFinalState[activity.id] = activity;
   }
 
   return dayRecord;
+}
+
+/**
+ * Procesa las actividades al final del día, clasificándolas en actividades a eliminar y actividades a reiniciar
+ * @param activities Lista de actividades a procesar
+ * @returns Objeto con las actividades clasificadas y sus estados actualizados
+ */
+export function processActivitiesAtDayEnd(activities: Activity[]): {
+  activitiesToRemove: Activity[];
+  activitiesToReset: Array<Partial<Activity> & { id: string }>;
+} {
+  const activitiesToRemove: Activity[] = [];
+  const activitiesToReset: Array<Partial<Activity> & { id: string }> = [];
+
+  for (const activity of activities) {
+    if (!activity.isRepetitive) {
+      activitiesToRemove.push(activity);
+    } else {
+      // Preparar la actualización para actividades repetibles
+      const resetState: Partial<Activity> & { id: string } = {
+        id: activity.id,
+        status: "toDo",
+        minutesActive: 0,
+      };
+
+      // Agregar propiedades específicas para desafíos
+      if (activity.type === "challenge") {
+        (resetState as Partial<ChallengeActivity>).tempoGeneratingMinutes = 0;
+        (resetState as Partial<ChallengeActivity>).exceededMinutes = 0;
+      }
+
+      activitiesToReset.push(resetState);
+    }
+  }
+
+  return {
+    activitiesToRemove,
+    activitiesToReset,
+  };
 }
