@@ -6,6 +6,7 @@ import {
   type TimeStateInput,
   evaluateConstraints,
   createDayRecord,
+  processActivitiesAtDayEnd,
 } from "../businessLogic";
 import { TimeSimulator } from "../TimeSimulator";
 import type {
@@ -17,6 +18,7 @@ import type {
   InvestedTimeHistory,
   TempoModificationHistory,
   UsefulMetrics,
+  NeutralActivity,
 } from "../types";
 
 describe("timeStateLogic", () => {
@@ -886,7 +888,7 @@ describe("createDayRecord", () => {
     },
   };
 
-  it("debería crear un registro de día correctamente sin actividades repetibles", () => {
+  it("debería crear un registro de día correctamente con actividades no repetibles", () => {
     const mockActivities: Activity[] = [
       {
         id: "1",
@@ -915,7 +917,8 @@ describe("createDayRecord", () => {
     expect(result.investedTimeHistory).toEqual(mockInvestedTimeHistory);
     expect(result.tempoModificationHistory).toEqual(mockTempoModificationHistory);
     expect(result.usefulMetrics).toEqual(mockUsefulMetrics);
-    expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(0);
+    expect(Object.keys(result.activitiesFinalState)).toHaveLength(1);
+    expect(result.activitiesFinalState["1"]).toEqual(mockActivities[0]);
   });
 
   it("debería incluir el estado final de actividades repetibles", () => {
@@ -956,11 +959,11 @@ describe("createDayRecord", () => {
     });
 
     // Verificar que se incluyeron ambas actividades repetibles
-    expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(2);
+    expect(Object.keys(result.activitiesFinalState)).toHaveLength(2);
 
     // Verificar que las actividades repetibles se almacenaron completas
-    expect(result.repeatableActivitiesFinalState["1"]).toEqual(mockActivities[0]);
-    expect(result.repeatableActivitiesFinalState["2"]).toEqual(mockActivities[1]);
+    expect(result.activitiesFinalState["1"]).toEqual(mockActivities[0]);
+    expect(result.activitiesFinalState["2"]).toEqual(mockActivities[1]);
   });
 
   it("debería manejar correctamente una lista vacía de actividades", () => {
@@ -976,6 +979,153 @@ describe("createDayRecord", () => {
     expect(result.investedTimeHistory).toEqual(mockInvestedTimeHistory);
     expect(result.tempoModificationHistory).toEqual(mockTempoModificationHistory);
     expect(result.usefulMetrics).toEqual(mockUsefulMetrics);
-    expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(0);
+    expect(Object.keys(result.activitiesFinalState)).toHaveLength(0);
+  });
+});
+
+describe("processActivitiesAtDayEnd", () => {
+  const baseTimestamp = new Date(2024, 2, 20, 10, 0).getTime();
+
+  it("debería clasificar correctamente las actividades repetibles y no repetibles", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge No Repetible",
+        isRepetitive: false,
+        minutesActive: 30,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 30,
+      } as ChallengeActivity,
+      {
+        id: "2",
+        type: "neutral",
+        title: "Neutral Repetible",
+        isRepetitive: true,
+        minutesActive: 45,
+        status: "completed",
+        allowedTime: 60,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      } as NeutralActivity,
+      {
+        id: "3",
+        type: "challenge",
+        title: "Challenge Repetible",
+        isRepetitive: true,
+        minutesActive: 100,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 100,
+        exceededMinutes: 20,
+      } as ChallengeActivity,
+    ];
+
+    const result = processActivitiesAtDayEnd(mockActivities);
+
+    // Verificar actividades a eliminar
+    expect(result.activitiesToRemove).toHaveLength(1);
+    expect(result.activitiesToRemove[0].id).toBe("1");
+    expect(result.activitiesToRemove[0].isRepetitive).toBe(false);
+
+    // Verificar actividades a reiniciar
+    expect(result.activitiesToReset).toHaveLength(2);
+
+    // Verificar reinicio de actividad neutral
+    const resetNeutral = result.activitiesToReset.find((a) => a.id === "2");
+    expect(resetNeutral).toEqual({
+      id: "2",
+      status: "toDo",
+      minutesActive: 0,
+    });
+
+    // Verificar reinicio de desafío
+    const resetChallenge = result.activitiesToReset.find((a) => a.id === "3");
+    expect(resetChallenge).toEqual({
+      id: "3",
+      status: "toDo",
+      minutesActive: 0,
+      tempoGeneratingMinutes: 0,
+      exceededMinutes: 0,
+    });
+  });
+
+  it("debería manejar correctamente una lista vacía de actividades", () => {
+    const result = processActivitiesAtDayEnd([]);
+    expect(result.activitiesToRemove).toHaveLength(0);
+    expect(result.activitiesToReset).toHaveLength(0);
+  });
+
+  it("debería manejar correctamente una lista solo con actividades no repetibles", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge No Repetible 1",
+        isRepetitive: false,
+        minutesActive: 30,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 30,
+      } as ChallengeActivity,
+      {
+        id: "2",
+        type: "neutral",
+        title: "Neutral No Repetible",
+        isRepetitive: false,
+        minutesActive: 45,
+        status: "completed",
+        allowedTime: 60,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      } as NeutralActivity,
+    ];
+
+    const result = processActivitiesAtDayEnd(mockActivities);
+    expect(result.activitiesToRemove).toHaveLength(2);
+    expect(result.activitiesToReset).toHaveLength(0);
+  });
+
+  it("debería manejar correctamente una lista solo con actividades repetibles", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge Repetible 1",
+        isRepetitive: true,
+        minutesActive: 100,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 100,
+      } as ChallengeActivity,
+      {
+        id: "2",
+        type: "neutral",
+        title: "Neutral Repetible",
+        isRepetitive: true,
+        minutesActive: 45,
+        status: "completed",
+        allowedTime: 60,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      } as NeutralActivity,
+    ];
+
+    const result = processActivitiesAtDayEnd(mockActivities);
+    expect(result.activitiesToRemove).toHaveLength(0);
+    expect(result.activitiesToReset).toHaveLength(2);
   });
 });

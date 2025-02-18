@@ -4,6 +4,7 @@ import {
   createDayRecord as createDayRecordPure,
   evaluateConstraints,
   updateTimeState,
+  processActivitiesAtDayEnd,
 } from "./businessLogic";
 import { TimeSimulator } from "./TimeSimulator";
 import type {
@@ -132,6 +133,20 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
     // Crear el registro del día usando la función pura
     const dayRecord = await createCurrentDayRecord();
+
+    // Procesar las actividades antes de finalizar el día
+    const activities = Object.values(persistedState.activities);
+    const { activitiesToRemove, activitiesToReset } = processActivitiesAtDayEnd(activities);
+
+    // Eliminar las actividades no repetibles
+    for (const activity of activitiesToRemove) {
+      await systemApi.removeActivity(activity);
+    }
+
+    // Reiniciar el estado de las actividades repetibles
+    for (const activityUpdate of activitiesToReset) {
+      await systemApi.updateActivity(activityUpdate);
+    }
 
     await systemApi.endDay(dayRecord);
     await _syncUiStateFromPersisted();
