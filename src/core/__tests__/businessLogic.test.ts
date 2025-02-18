@@ -19,7 +19,6 @@ import type {
   TempoModificationHistory,
   UsefulMetrics,
   NeutralActivity,
-  HobbyActivity,
 } from "../types";
 
 describe("timeStateLogic", () => {
@@ -960,7 +959,7 @@ describe("createDayRecord", () => {
         tempoConsumptionRate: 0.5,
         inheritedProps: {},
         createdAt: baseTimestamp,
-      } as HobbyActivity,
+      },
     ];
 
     const result = createDayRecord({
@@ -1186,7 +1185,7 @@ describe("processActivitiesAtDayEnd", () => {
     expect(result.activitiesToReset).toHaveLength(2);
   });
 
-  it("debería reiniciar los constraints de las actividades challenge repetibles", () => {
+  it("debería reiniciar los constraints fallidos de las actividades challenge repetibles", () => {
     const mockActivities: Activity[] = [
       {
         id: "1",
@@ -1204,6 +1203,7 @@ describe("processActivitiesAtDayEnd", () => {
             penalty: 50,
             failCount: 2,
             status: "failed",
+            parentConstraintId: "parent1",
           },
           {
             id: "constraint2",
@@ -1211,7 +1211,8 @@ describe("processActivitiesAtDayEnd", () => {
             dayMinuteExpiration: 960,
             penalty: "100%",
             failCount: 1,
-            status: "active",
+            status: "failed",
+            parentConstraintId: "parent2",
           },
         ],
         inheritedProps: {},
@@ -1227,9 +1228,26 @@ describe("processActivitiesAtDayEnd", () => {
     const resetActivity = activitiesToReset[0] as Partial<ChallengeActivity>;
     expect(resetActivity.constraintList).toBeDefined();
     expect(resetActivity.constraintList).toHaveLength(2);
-    expect(resetActivity.constraintList![0].status).toBe("active");
-    expect(resetActivity.constraintList![0].failCount).toBe(0);
-    expect(resetActivity.constraintList![1].status).toBe("active");
-    expect(resetActivity.constraintList![1].failCount).toBe(0);
+
+    // Verificamos el primer constraint
+    const originalActivity = mockActivities[0] as ChallengeActivity;
+    expect(resetActivity.constraintList![0]).toEqual({
+      ...originalActivity.constraintList[0],
+      status: "active",
+      failCount: 0,
+    });
+
+    // Verificamos el segundo constraint
+    expect(resetActivity.constraintList![1]).toEqual({
+      ...originalActivity.constraintList[1],
+      status: "active",
+      failCount: 0,
+    });
+
+    // Verificamos que se mantienen las propiedades importantes
+    expect(resetActivity.constraintList![0].parentConstraintId).toBe("parent1");
+    expect(resetActivity.constraintList![0].dayMinuteExpiration).toBe(720);
+    expect(resetActivity.constraintList![1].parentConstraintId).toBe("parent2");
+    expect(resetActivity.constraintList![1].dayMinuteExpiration).toBe(960);
   });
 });

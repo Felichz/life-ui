@@ -529,10 +529,11 @@ export function processActivitiesAtDayEnd(activities: Activity[]): {
 
         // Reiniciar los constraints solo si existen en la actividad original
         if ("constraintList" in activity && activity.constraintList.length > 0) {
+          // Aseguramos que cada constraint mantiene sus propiedades originales pero reinicia su estado
           resetChallenge.constraintList = activity.constraintList.map((constraint) => ({
-            ...constraint,
-            status: "active",
-            failCount: 0,
+            ...constraint, // Mantener todas las propiedades originales
+            status: "active", // Reiniciar estado
+            failCount: 0, // Reiniciar contador de fallos
           }));
         }
       }
