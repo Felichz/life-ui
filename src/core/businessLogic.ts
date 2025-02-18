@@ -290,6 +290,14 @@ export const evaluateConstraints = ({
     data: { constraints, currentMinutes, totalTempoReward },
   });
 
+  // Si la actividad está completada, retornamos los constraints sin cambios y sin fallos
+  if (activity.status === "completed") {
+    return {
+      updatedConstraints: constraints,
+      failedConstraints: [],
+    };
+  }
+
   const updatedConstraints: ExpirationChallengeConstraint[] = [];
   const failedConstraints: Array<{
     constraint: ExpirationChallengeConstraint;
@@ -490,16 +498,7 @@ export function createDayRecord({
   // Recopilar el estado final de las actividades repetibles
   for (const activity of activities) {
     if (activity.isRepetitive) {
-      dayRecord.repeatableActivitiesFinalState[activity.id] = {
-        id: activity.id,
-        type: activity.type,
-        minutesActive: activity.minutesActive,
-        status: activity.status,
-        ...(activity.type === "challenge" && {
-          tempoGeneratingMinutes: activity.tempoGeneratingMinutes,
-          exceededMinutes: activity.exceededMinutes,
-        }),
-      };
+      dayRecord.repeatableActivitiesFinalState[activity.id] = activity;
     }
   }
 
