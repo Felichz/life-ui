@@ -503,11 +503,6 @@ export function createDayRecord({
   return dayRecord;
 }
 
-/**
- * Procesa las actividades al final del día, clasificándolas en actividades a eliminar y actividades a reiniciar
- * @param activities Lista de actividades a procesar
- * @returns Objeto con las actividades clasificadas y sus estados actualizados
- */
 export function processActivitiesAtDayEnd(activities: Activity[]): {
   activitiesToRemove: Activity[];
   activitiesToReset: Array<Partial<Activity> & { id: string }>;
@@ -528,8 +523,18 @@ export function processActivitiesAtDayEnd(activities: Activity[]): {
 
       // Agregar propiedades específicas para desafíos
       if (activity.type === "challenge") {
-        (resetState as Partial<ChallengeActivity>).tempoGeneratingMinutes = 0;
-        (resetState as Partial<ChallengeActivity>).exceededMinutes = 0;
+        const resetChallenge = resetState as Partial<ChallengeActivity>;
+        resetChallenge.tempoGeneratingMinutes = 0;
+        resetChallenge.exceededMinutes = 0;
+
+        // Reiniciar los constraints solo si existen en la actividad original
+        if ("constraintList" in activity && activity.constraintList.length > 0) {
+          resetChallenge.constraintList = activity.constraintList.map((constraint) => ({
+            ...constraint,
+            status: "active",
+            failCount: 0,
+          }));
+        }
       }
 
       activitiesToReset.push(resetState);
