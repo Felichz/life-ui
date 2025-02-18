@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
+import {
+  createDayRecord as createDayRecordPure,
+  evaluateConstraints,
+  updateTimeState,
+} from "./businessLogic";
 import { TimeSimulator } from "./TimeSimulator";
-import { updateTimeState, evaluateConstraints } from "./timeStateLogic";
 import type {
   Activity,
   ActivityId,
@@ -17,6 +21,7 @@ import type {
   CreateBoardInput,
   CreateActivityInput,
   SystemParams,
+  DayRecord,
 } from "./types";
 
 import { formatLog } from "@/lib/utils/logger";
@@ -98,10 +103,39 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     await _syncUiStateFromPersisted();
   }, [_syncUiStateFromPersisted]);
 
+  /**
+   * Crea un registro del día actual con toda la información relevante
+   */
+  const createCurrentDayRecord = useCallback(async (): Promise<DayRecord> => {
+    const persistedState = await systemApi.getPersistedState();
+
+    if (!persistedState.currentDay) {
+      throw new Error("No hay un día activo para crear el registro");
+    }
+
+    // Crear el registro base del día usando la función pura de businessLogic
+    return createDayRecordPure({
+      currentDay: persistedState.currentDay,
+      activities: Object.values(persistedState.activities),
+      investedTimeHistory: persistedState.investedTimeHistory,
+      tempoModificationHistory: persistedState.tempoModificationHistory,
+      usefulMetrics: persistedState.usefulMetrics,
+    });
+  }, [systemApi]);
+
   const endDay = useCallback(async () => {
-    await systemApi.endDay();
+    const persistedState = await systemApi.getPersistedState();
+
+    if (!persistedState.currentDay) {
+      throw new Error("No hay un día activo para crear el registro");
+    }
+
+    // Crear el registro del día usando la función pura
+    const dayRecord = await createCurrentDayRecord();
+
+    await systemApi.endDay(dayRecord);
     await _syncUiStateFromPersisted();
-  }, [_syncUiStateFromPersisted]);
+  }, [_syncUiStateFromPersisted, createCurrentDayRecord]);
 
   /**
    * PRIMER BLOQUE: Efectos de inicialización y sincronización

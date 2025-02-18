@@ -7,6 +7,10 @@ import type {
   ExpirationChallengeConstraint,
   ChallengeActivity,
   DayState,
+  InvestedTimeHistory,
+  TempoModificationHistory,
+  UsefulMetrics,
+  DayRecord,
 } from "./types";
 
 // External imports
@@ -454,4 +458,50 @@ export function updateTimeState({
     updatedTimestamp,
     updatedActivity,
   };
+}
+
+/**
+ * Crea un registro del día con toda la información relevante
+ * @param params Parámetros necesarios para crear el registro del día
+ * @returns DayRecord con la información del día
+ */
+export function createDayRecord({
+  currentDay,
+  activities,
+  investedTimeHistory,
+  tempoModificationHistory,
+  usefulMetrics,
+}: {
+  currentDay: DayState;
+  activities: Activity[];
+  investedTimeHistory: InvestedTimeHistory;
+  tempoModificationHistory: TempoModificationHistory;
+  usefulMetrics: UsefulMetrics;
+}): DayRecord {
+  // Crear el registro base del día
+  const dayRecord: DayRecord = {
+    dayState: currentDay,
+    investedTimeHistory,
+    tempoModificationHistory,
+    repeatableActivitiesFinalState: {},
+    usefulMetrics,
+  };
+
+  // Recopilar el estado final de las actividades repetibles
+  for (const activity of activities) {
+    if (activity.isRepetitive) {
+      dayRecord.repeatableActivitiesFinalState[activity.id] = {
+        id: activity.id,
+        type: activity.type,
+        minutesActive: activity.minutesActive,
+        status: activity.status,
+        ...(activity.type === "challenge" && {
+          tempoGeneratingMinutes: activity.tempoGeneratingMinutes,
+          exceededMinutes: activity.exceededMinutes,
+        }),
+      };
+    }
+  }
+
+  return dayRecord;
 }

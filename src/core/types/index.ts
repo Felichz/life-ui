@@ -193,6 +193,25 @@ export type DayState = {
   dayTempoBalance: number;
 };
 
+export interface DayRecord {
+  /** Estado resumen del día, que incluye la fecha y otros datos (como el minuto de inicio, balance, etc.) */
+  dayState: DayState;
+  /** Historial de tiempo invertido durante ese día */
+  investedTimeHistory: InvestedTimeHistory;
+  /** Historial de modificaciones de tempo durante ese día */
+  tempoModificationHistory: TempoModificationHistory;
+  /**
+   * Estado final de las actividades repetibles al cierre del día.
+   * Se indexa por el ActivityId para permitir búsquedas rápidas.
+   */
+  repeatableActivitiesFinalState: Record<ActivityId, Partial<Activity>>;
+  /** Métricas útiles calculadas para ese día */
+  usefulMetrics: UsefulMetrics;
+}
+
+/** La base de datos de días se modela como un array de DayRecord */
+export type DayDatabase = DayRecord[];
+
 export type PersistedDayState =
   | {
       lifecycleState: "dayInProgress";
@@ -221,6 +240,10 @@ export type PersistedState = {
    * Se usa para calcular el tiempo transcurrido cuando la app se reactiva
    */
   lastUpdateTimestamp: number;
+  /**
+   * Base de datos que almacena el historial de días completados
+   */
+  dayDatabase: DayDatabase;
 } & PersistedDayState;
 
 export type CreateActivityInput =
@@ -236,7 +259,7 @@ export interface SystemAPIType {
   // Gestión del ciclo de vida del sistema
   getLifecycleState: () => Promise<PersistedState["lifecycleState"]>;
   startDay: (currentDay: DayState) => Promise<void>;
-  endDay: () => Promise<void>;
+  endDay: (dayRecord: DayRecord) => Promise<void>;
 
   // Gestión de tableros (Boards)
   getBoard: (boardId: BoardId) => Promise<Board | undefined>;
@@ -300,6 +323,24 @@ export interface SystemAPIType {
    * Borra toda la data persistida. Solo disponible en modo de prueba.
    */
   clearAllData: () => Promise<void>;
+
+  /**
+   * Obtiene toda la base de datos de días
+   */
+  getDayDatabase: () => Promise<DayDatabase>;
+
+  /**
+   * Obtiene el registro de un día específico
+   * @param date Timestamp del día a buscar
+   */
+  getDayRecord: (date: number) => Promise<DayRecord | undefined>;
+
+  /**
+   * Obtiene los registros de días en un rango de fechas
+   * @param startDate Timestamp inicial del rango
+   * @param endDate Timestamp final del rango
+   */
+  getDayRecordsInRange: (startDate: number, endDate: number) => Promise<DayDatabase>;
 }
 
 // Este es estado del sistema que se mantiene en la ui, se mantiene en el SystemContext
