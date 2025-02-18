@@ -19,6 +19,7 @@ import type {
   TempoModificationHistory,
   UsefulMetrics,
   NeutralActivity,
+  HobbyActivity,
 } from "../types";
 
 describe("timeStateLogic", () => {
@@ -917,8 +918,64 @@ describe("createDayRecord", () => {
     expect(result.investedTimeHistory).toEqual(mockInvestedTimeHistory);
     expect(result.tempoModificationHistory).toEqual(mockTempoModificationHistory);
     expect(result.usefulMetrics).toEqual(mockUsefulMetrics);
+    // Verificar que se guarden todas las actividades
     expect(Object.keys(result.activitiesFinalState)).toHaveLength(1);
     expect(result.activitiesFinalState["1"]).toEqual(mockActivities[0]);
+  });
+
+  it("debería guardar todas las actividades en el estado final", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge No Repetible",
+        isRepetitive: false,
+        minutesActive: 30,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 30,
+      } as ChallengeActivity,
+      {
+        id: "2",
+        type: "neutral",
+        title: "Neutral Repetible",
+        isRepetitive: true,
+        minutesActive: 45,
+        status: "completed",
+        allowedTime: 60,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      } as NeutralActivity,
+      {
+        id: "3",
+        type: "discount",
+        title: "Hobby No Repetible",
+        isRepetitive: false,
+        minutesActive: 20,
+        status: "completed",
+        allowedTime: 30,
+        tempoConsumptionRate: 0.5,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      } as HobbyActivity,
+    ];
+
+    const result = createDayRecord({
+      currentDay: mockDayState,
+      activities: mockActivities,
+      investedTimeHistory: mockInvestedTimeHistory,
+      tempoModificationHistory: mockTempoModificationHistory,
+      usefulMetrics: mockUsefulMetrics,
+    });
+
+    // Verificar que se guarden todas las actividades, independientemente de si son repetibles o no
+    expect(Object.keys(result.activitiesFinalState)).toHaveLength(3);
+    expect(result.activitiesFinalState["1"]).toEqual(mockActivities[0]);
+    expect(result.activitiesFinalState["2"]).toEqual(mockActivities[1]);
+    expect(result.activitiesFinalState["3"]).toEqual(mockActivities[2]);
   });
 
   it("debería incluir el estado final de actividades repetibles", () => {
@@ -1127,5 +1184,52 @@ describe("processActivitiesAtDayEnd", () => {
     const result = processActivitiesAtDayEnd(mockActivities);
     expect(result.activitiesToRemove).toHaveLength(0);
     expect(result.activitiesToReset).toHaveLength(2);
+  });
+
+  it("debería reiniciar los constraints de las actividades challenge repetibles", () => {
+    const mockActivities: Activity[] = [
+      {
+        id: "1",
+        type: "challenge",
+        title: "Challenge Repetible",
+        isRepetitive: true,
+        minutesActive: 30,
+        status: "completed",
+        totalTempoReward: 100,
+        constraintList: [
+          {
+            id: "constraint1",
+            type: "expiration",
+            dayMinuteExpiration: 720,
+            penalty: 50,
+            failCount: 2,
+            status: "failed",
+          },
+          {
+            id: "constraint2",
+            type: "expiration",
+            dayMinuteExpiration: 960,
+            penalty: "100%",
+            failCount: 1,
+            status: "active",
+          },
+        ],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 30,
+        exceededMinutes: 0,
+      } as ChallengeActivity,
+    ];
+
+    const { activitiesToReset } = processActivitiesAtDayEnd(mockActivities);
+
+    expect(activitiesToReset).toHaveLength(1);
+    const resetActivity = activitiesToReset[0] as Partial<ChallengeActivity>;
+    expect(resetActivity.constraintList).toBeDefined();
+    expect(resetActivity.constraintList).toHaveLength(2);
+    expect(resetActivity.constraintList![0].status).toBe("active");
+    expect(resetActivity.constraintList![0].failCount).toBe(0);
+    expect(resetActivity.constraintList![1].status).toBe("active");
+    expect(resetActivity.constraintList![1].failCount).toBe(0);
   });
 });
