@@ -796,6 +796,48 @@ describe("timeStateLogic", () => {
       expect(nextDayResult.failedConstraints).toHaveLength(1);
       expect(nextDayResult.failedConstraints[0].penaltyAmount).toBe(50);
     });
+
+    it("no debería evaluar constraints cuando la actividad está completada", () => {
+      const baseTimestamp = new Date(2024, 2, 20, 8, 0).getTime(); // 8:00
+      const activity: ChallengeActivity = {
+        id: "1",
+        type: "challenge",
+        title: "Test Challenge",
+        totalTempoReward: 100,
+        minutesActive: 100,
+        status: "completed", // Actividad completada
+        isRepetitive: true,
+        constraintList: [],
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+        tempoGeneratingMinutes: 100,
+      };
+
+      const constraints: ExpirationChallengeConstraint[] = [
+        {
+          id: "1",
+          type: "expiration",
+          dayMinuteExpiration: 600, // 10:00
+          penalty: 50,
+          failCount: 0,
+          status: "active",
+        },
+      ];
+
+      const currentTimestamp = new Date(2024, 2, 20, 11, 0).getTime(); // 11:00 (después de la expiración)
+      const result = evaluateConstraints({
+        constraints,
+        currentMinutes: 660, // 11:00
+        totalTempoReward: 100,
+        activity,
+        currentTimestamp,
+      });
+
+      // Los constraints deberían permanecer sin cambios
+      expect(result.updatedConstraints).toEqual(constraints);
+      // No deberían haber constraints fallidos
+      expect(result.failedConstraints).toHaveLength(0);
+    });
   });
 
   afterEach(() => {
@@ -916,21 +958,9 @@ describe("createDayRecord", () => {
     // Verificar que se incluyeron ambas actividades repetibles
     expect(Object.keys(result.repeatableActivitiesFinalState)).toHaveLength(2);
 
-    // Verificar el estado final de la actividad challenge
-    const challengeState = result.repeatableActivitiesFinalState["1"] as Partial<ChallengeActivity>;
-    expect(challengeState).toBeDefined();
-    expect(challengeState.type).toBe("challenge");
-    expect(challengeState.minutesActive).toBe(30);
-    expect(challengeState.status).toBe("completed");
-    expect(challengeState.tempoGeneratingMinutes).toBe(30);
-    expect(challengeState.exceededMinutes).toBe(0);
-
-    // Verificar el estado final de la actividad neutral
-    const neutralState = result.repeatableActivitiesFinalState["2"];
-    expect(neutralState).toBeDefined();
-    expect(neutralState.type).toBe("neutral");
-    expect(neutralState.minutesActive).toBe(45);
-    expect(neutralState.status).toBe("completed");
+    // Verificar que las actividades repetibles se almacenaron completas
+    expect(result.repeatableActivitiesFinalState["1"]).toEqual(mockActivities[0]);
+    expect(result.repeatableActivitiesFinalState["2"]).toEqual(mockActivities[1]);
   });
 
   it("debería manejar correctamente una lista vacía de actividades", () => {
