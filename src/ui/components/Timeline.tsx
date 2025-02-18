@@ -4,6 +4,7 @@ import { ResponsiveBullet } from "@nivo/bullet";
 import type { BulletRectsItemProps, BulletMarkersItemProps } from "@nivo/bullet";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "./shadcn/tooltip";
+import { useTheme } from "../providers/theme-provider";
 
 import type {
   Activity,
@@ -30,7 +31,10 @@ interface MarkerCluster {
   index?: number;
 }
 
-const getActivityTypeColor = (type: Activity["type"] | "idle" | "remaining"): string => {
+const getActivityTypeColor = (
+  type: Activity["type"] | "idle" | "remaining",
+  isDark: boolean
+): string => {
   switch (type) {
     case "challenge":
       return "#3b82f6"; // blue-500
@@ -39,11 +43,11 @@ const getActivityTypeColor = (type: Activity["type"] | "idle" | "remaining"): st
     case "discount":
       return "#8b5cf6"; // violet-500
     case "idle":
-      return "#94a3b8"; // slate-400
+      return isDark ? "#374151" : "#94a3b8"; // dark: gray-700, light: slate-400
     case "remaining":
-      return "#e5e7eb"; // gray-200
+      return isDark ? "#1f2937" : "#e5e7eb"; // dark: gray-800, light: gray-200
     default:
-      return "#94a3b8"; // slate-400
+      return isDark ? "#374151" : "#94a3b8"; // dark: gray-700, light: slate-400
   }
 };
 
@@ -81,6 +85,9 @@ const Timeline: React.FC<TimelineProps> = ({
   activities,
   tempoModificationHistory,
 }) => {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   // Referencia y estado para el ancho del contenedor
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -279,14 +286,14 @@ const Timeline: React.FC<TimelineProps> = ({
             y={y}
             width={width}
             height={height}
-            fill={getActivityTypeColor(type)}
+            fill={getActivityTypeColor(type, isDark)}
             opacity={startMinute > currentMinute ? 0.3 : 1}
             className="transition-opacity duration-200 hover:opacity-80"
           />
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent className="bg-popover border-border shadow-lg">
           <div className="space-y-1">
-            <p className="font-medium">{title}</p>
+            <p className="font-medium text-popover-foreground">{title}</p>
             <p className="text-sm text-muted-foreground">
               {formatTimeRange(dayStartDate, startMinute, endMinute - startMinute)}
             </p>
@@ -426,6 +433,7 @@ const Timeline: React.FC<TimelineProps> = ({
           </g>
         </TooltipTrigger>
         <TooltipContent
+          className="bg-popover border-border shadow-lg"
           style={{
             animation: "fadeInScale 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards",
           }}
@@ -434,12 +442,12 @@ const Timeline: React.FC<TimelineProps> = ({
             {cluster.modifications.map((mod, index) => (
               <div
                 key={index}
-                className={index > 0 ? "pt-2 border-t" : ""}
+                className={`${index > 0 ? "pt-2 border-t border-border" : ""}`}
                 style={{
                   animation: `fadeInSlide 0.2s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.05}s both`,
                 }}
               >
-                <p className="font-medium">
+                <p className="font-medium text-popover-foreground">
                   {getTempoModificationReasonMessage(mod.record.reason)}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -455,12 +463,14 @@ const Timeline: React.FC<TimelineProps> = ({
             ))}
             {isMultiple && (
               <div
-                className="pt-2 border-t"
+                className="pt-2 border-t border-border"
                 style={{
                   animation: "fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
                 }}
               >
-                <p className="font-medium text-sm">Balance neto: {cluster.netModification}</p>
+                <p className="font-medium text-sm text-popover-foreground">
+                  Balance neto: {cluster.netModification}
+                </p>
               </div>
             )}
           </div>

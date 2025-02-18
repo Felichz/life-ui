@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./shadcn/dialog";
+import { ThemeToggle } from "./theme-toggle";
 import Timeline from "./Timeline";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
@@ -182,23 +183,26 @@ const TimelineHeader: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>Comenzar Día</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Comenzar Día</DialogTitle>
-              <DialogDescription>
-                ¿Deseas comenzar un nuevo día? Se iniciará con la hora actual y durará 960 minutos
-                (16 horas).
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={() => systemEngine.day.startDay()}>Comenzar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>Comenzar Día</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Comenzar Día</DialogTitle>
+                <DialogDescription>
+                  ¿Deseas comenzar un nuevo día? Se iniciará con la hora actual y durará 960 minutos
+                  (16 horas).
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={() => systemEngine.day.startDay()}>Comenzar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
     );
   }
@@ -232,20 +236,23 @@ const TimelineHeader: React.FC = () => {
           {uiState.selectedActivity && <SelectedActivityCard activity={uiState.selectedActivity} />}
         </div>
 
-        <Card className="w-fit">
-          <CardContent className="p-4">
-            <div className="flex gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Tempo del Día</p>
-                <p className="text-lg font-semibold">{uiState.currentDay.dayTempoBalance}</p>
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+          <Card className="w-fit">
+            <CardContent className="p-4">
+              <div className="flex gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Tempo del Día</p>
+                  <p className="text-lg font-semibold">{uiState.currentDay.dayTempoBalance}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Tempo Total</p>
+                  <p className="text-lg font-semibold">{uiState.totalTempoBalance}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Tempo Total</p>
-                <p className="text-lg font-semibold">{uiState.totalTempoBalance}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Timeline */}
