@@ -23,6 +23,8 @@ import type {
   CreateActivityInput,
   SystemParams,
   DayRecord,
+  InheritableActivityProps,
+  BoardChallengeConstraint,
 } from "./types";
 
 import { formatLog } from "@/lib/utils/logger";
@@ -667,6 +669,28 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     await _updateSystemState();
   }, [_updateSystemState]);
 
+  /**
+   * Obtiene todas las propiedades heredadas para un tablero específico
+   * Útil para inicializar valores por defecto al crear actividades en un tablero
+   */
+  const getInheritedPropsForBoard = useCallback(
+    async (boardId: BoardId): Promise<InheritableActivityProps> => {
+      return systemApi.getInheritedPropsForBoard(boardId);
+    },
+    [systemApi]
+  );
+
+  /**
+   * Obtiene todas las restricciones heredadas para un tablero específico
+   * Útil para aplicar constraints por defecto al crear actividades de tipo challenge
+   */
+  const getInheritedConstraintsForBoard = useCallback(
+    async (boardId: BoardId): Promise<BoardChallengeConstraint[]> => {
+      return systemApi.getInheritedConstraintsForBoard(boardId);
+    },
+    [systemApi]
+  );
+
   // ===========================
   // DEVOLVEMOS SOLO LAS FUNCIONES "PÚBLICAS"
   // ===========================
@@ -680,6 +704,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       updateBoard,
       removeBoard,
       getActivities: getActivitiesByBoard,
+      getInheritedProps: getInheritedPropsForBoard,
+      getInheritedConstraints: getInheritedConstraintsForBoard,
     },
     activity: {
       createActivity,
