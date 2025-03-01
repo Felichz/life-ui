@@ -415,6 +415,127 @@ class SystemAPI implements SystemAPIType {
     return this._getRootBoard(parentBoard);
   }
 
+  /**
+   * Obtiene todas las propiedades heredadas para un board específico, recorriendo la jerarquía
+   * desde el board raíz hasta el board especificado.
+   *
+   * Esta función es útil para conocer de antemano qué propiedades heredará una actividad
+   * que se cree en el board especificado.
+   *
+   * @param boardId - ID del board para el cual se quieren obtener las propiedades heredadas
+   * @returns Objeto con todas las propiedades heredadas combinadas
+   */
+  async getInheritedPropsForBoard(boardId: BoardId): Promise<InheritableActivityProps> {
+    const board = await this.getBoard(boardId);
+    if (!board) {
+      return {} as InheritableActivityProps;
+    }
+
+    // Si no tiene padre, solo devuelve sus propias propiedades
+    if (!board.parentBoardId) {
+      return board.activityProps;
+    }
+
+    // Obtener el board raíz
+    const rootBoard = await this._getRootBoard(board);
+
+    // Lista de boards en el camino desde la raíz hasta el board objetivo
+    const boardsInPath: BoardId[] = [];
+    let currentBoard: Board | undefined = board;
+
+    // Construir el camino desde el board objetivo hasta la raíz
+    while (currentBoard) {
+      boardsInPath.unshift(currentBoard.id);
+      if (currentBoard.id === rootBoard.id) break;
+
+      currentBoard = currentBoard.parentBoardId
+        ? await this.getBoard(currentBoard.parentBoardId)
+        : undefined;
+    }
+
+    // Inicializar propiedades heredadas
+    const inheritedProps: InheritableActivityProps = {
+      challenge: {},
+      neutral: {},
+      discount: {},
+    };
+
+    // Recorrer el camino desde la raíz hasta el board objetivo
+    for (const id of boardsInPath) {
+      const boardInPath = await this.getBoard(id);
+      if (boardInPath) {
+        // Combinar propiedades
+        inheritedProps.challenge = {
+          ...inheritedProps.challenge,
+          ...boardInPath.activityProps.challenge,
+        };
+        inheritedProps.neutral = {
+          ...inheritedProps.neutral,
+          ...boardInPath.activityProps.neutral,
+        };
+        inheritedProps.discount = {
+          ...inheritedProps.discount,
+          ...boardInPath.activityProps.discount,
+        };
+      }
+    }
+
+    return inheritedProps;
+  }
+
+  /**
+   * Obtiene todos los constraints heredados para un board específico, recorriendo la jerarquía
+   * desde el board raíz hasta el board especificado.
+   *
+   * Esta función es útil para conocer de antemano qué constraints heredará una actividad de tipo challenge
+   * que se cree en el board especificado.
+   *
+   * @param boardId - ID del board para el cual se quieren obtener los constraints heredados
+   * @returns Array con todos los constraints heredados combinados
+   */
+  async getInheritedConstraintsForBoard(boardId: BoardId): Promise<BoardChallengeConstraint[]> {
+    const board = await this.getBoard(boardId);
+    if (!board) {
+      return [];
+    }
+
+    // Si no tiene padre, solo devuelve sus propios constraints
+    if (!board.parentBoardId) {
+      return board.constraintList;
+    }
+
+    // Obtener el board raíz
+    const rootBoard = await this._getRootBoard(board);
+
+    // Lista de boards en el camino desde la raíz hasta el board objetivo
+    const boardsInPath: BoardId[] = [];
+    let currentBoard: Board | undefined = board;
+
+    // Construir el camino desde el board objetivo hasta la raíz
+    while (currentBoard) {
+      boardsInPath.unshift(currentBoard.id);
+      if (currentBoard.id === rootBoard.id) break;
+
+      currentBoard = currentBoard.parentBoardId
+        ? await this.getBoard(currentBoard.parentBoardId)
+        : undefined;
+    }
+
+    // Acumular todos los constraints en el camino
+    const combinedConstraints: BoardChallengeConstraint[] = [];
+
+    // Recorrer el camino desde la raíz hasta el board objetivo
+    for (const id of boardsInPath) {
+      const boardInPath = await this.getBoard(id);
+      if (boardInPath && boardInPath.constraintList && boardInPath.constraintList.length > 0) {
+        // Añadir constraints
+        combinedConstraints.push(...boardInPath.constraintList);
+      }
+    }
+
+    return combinedConstraints;
+  }
+
   async createBoard(newBoard: Board): Promise<void> {
     // Obtenemos el estado persistido actual
     const state = await this.getPersistedState();

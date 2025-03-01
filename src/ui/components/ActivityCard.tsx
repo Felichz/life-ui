@@ -333,9 +333,28 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   const [editedConsumptionRate, setEditedConsumptionRate] = React.useState(
     "tempoConsumptionRate" in activity ? activity.tempoConsumptionRate : 0.5
   );
-  const [editedConstraints, setEditedConstraints] = React.useState<ExpirationChallengeConstraint[]>(
-    "constraintList" in activity ? [...activity.constraintList] : []
-  );
+
+  // Función para formatear minutos a formato de hora HH:MM
+  const formatMinuteToTime = (minute: number) => {
+    const hours = Math.floor(minute / 60);
+    const minutes = minute % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  };
+
+  // Separamos los constraints heredados de los personalizados
+  const inheritedConstraints = React.useMemo(() => {
+    if (activity.type !== "challenge") return [];
+    return (activity as ChallengeActivity).constraintList.filter((c) => !!c.parentConstraintId);
+  }, [activity]);
+
+  const customConstraints = React.useMemo(() => {
+    if (activity.type !== "challenge") return [];
+    return (activity as ChallengeActivity).constraintList.filter((c) => !c.parentConstraintId);
+  }, [activity]);
+
+  // Solo inicializamos los constraints personalizados para edición
+  const [editedConstraints, setEditedConstraints] =
+    React.useState<ExpirationChallengeConstraint[]>(customConstraints);
 
   const isSelected = uiState.selectedActivity?.id === activity.id;
 
@@ -429,13 +448,20 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
       let activityUpdates: Partial<Activity> & { id: string };
 
       switch (activity.type) {
-        case "challenge":
+        case "challenge": {
+          // Combinamos los constraints personalizados editados con los heredados originales
+          const combinedConstraints = [
+            ...editedConstraints,
+            ...inheritedConstraints, // Mantenemos los constraints heredados sin cambios
+          ];
+
           activityUpdates = {
             ...baseUpdates,
             totalTempoReward: editedTempoReward,
-            constraintList: editedConstraints,
+            constraintList: combinedConstraints,
           };
           break;
+        }
         case "neutral":
           activityUpdates = {
             ...baseUpdates,
@@ -701,6 +727,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                   onChange={(e) => setEditedAllowedTime(Number(e.target.value))}
                   min={1}
                   max={960}
+                  disabled={isAllowedTimeInherited}
+                  className={isAllowedTimeInherited ? "bg-muted" : ""}
                 />
               </div>
             )}
@@ -721,16 +749,44 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <Label>Criterios de Aceptación</Label>
-                    {areConstraintsInherited && (
-                      <Badge variant="outline" className="text-[10px]">
-                        Heredados
-                      </Badge>
-                    )}
                     <Button type="button" variant="outline" size="sm" onClick={handleAddConstraint}>
                       Agregar Criterio
                     </Button>
                   </div>
 
+                  {/* Mostrar los constraints heredados primero, como elementos no editables */}
+                  {inheritedConstraints.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">
+                          Criterios Heredados
+                        </Badge>
+                      </div>
+                      {inheritedConstraints.map((constraint) => (
+                        <div
+                          key={constraint.id}
+                          className="space-y-2 p-4 border rounded-lg bg-muted/50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <Label className="text-muted-foreground">Hora de Expiración</Label>
+                            <div className="text-muted-foreground">
+                              {formatMinuteToTime(constraint.dayMinuteExpiration)}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-2">
+                            <Label className="text-muted-foreground">Penalización</Label>
+                            <div className="text-muted-foreground">
+                              {typeof constraint.penalty === "number"
+                                ? constraint.penalty
+                                : constraint.penalty}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Luego mostrar los constraints personalizados que se pueden editar */}
                   {editedConstraints.map((constraint, index) => (
                     <div key={index} className="space-y-2 p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
@@ -818,6 +874,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                   min={0.1}
                   max={0.9}
                   step={0.1}
+                  disabled={isConsumptionRateInherited}
+                  className={isConsumptionRateInherited ? "bg-muted" : ""}
                 />
               </div>
             )}

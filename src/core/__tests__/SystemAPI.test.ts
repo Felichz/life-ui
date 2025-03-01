@@ -451,4 +451,320 @@ describe("Herencia de constraints y activity props en el System API", () => {
     board = await systemApi.getBoard("parent-board");
     expect(board?.activities).not.toContain("challenge-to-delete");
   });
+
+  // Tests para los nuevos métodos getInheritedPropsForBoard y getInheritedConstraintsForBoard
+
+  // 7. Test para getInheritedPropsForBoard con board sin padres
+  test("getInheritedPropsForBoard retorna las propiedades de un board sin padres", async () => {
+    // Board sin padres con propiedades específicas
+    const rootBoard: Board = {
+      ...baseBoard,
+      id: "solo-board",
+      activityProps: {
+        challenge: { isRepetitive: true },
+        neutral: { allowedTime: 60 },
+        discount: { tempoConsumptionRate: 0.5 },
+      },
+      constraintList: [],
+    };
+
+    await systemApi.createBoard(rootBoard);
+
+    // Obtener propiedades heredadas (que son solo las propias)
+    const inheritedProps = await systemApi.getInheritedPropsForBoard("solo-board");
+
+    // Verificar que se devuelven exactamente las mismas propiedades
+    expect(inheritedProps).toEqual({
+      challenge: { isRepetitive: true },
+      neutral: { allowedTime: 60 },
+      discount: { tempoConsumptionRate: 0.5 },
+    });
+  });
+
+  // 8. Test para getInheritedPropsForBoard con jerarquía simple
+  test("getInheritedPropsForBoard combina propiedades de un board y su padre", async () => {
+    // Board padre con propiedades para challenge
+    const parentBoard: Board = {
+      ...baseBoard,
+      id: "parent-board-props",
+      activityProps: {
+        challenge: { isRepetitive: true },
+        neutral: { allowedTime: 60 },
+      },
+      constraintList: [],
+    };
+
+    // Board hijo con propiedades para discount
+    const childBoard: Board = {
+      ...baseBoard,
+      id: "child-board-props",
+      parentBoardId: "parent-board-props",
+      activityProps: {
+        discount: { tempoConsumptionRate: 0.5 },
+      },
+      constraintList: [],
+    };
+
+    await systemApi.createBoard(parentBoard);
+    await systemApi.createBoard(childBoard);
+
+    // Obtener propiedades heredadas para el board hijo
+    const inheritedProps = await systemApi.getInheritedPropsForBoard("child-board-props");
+
+    // Verificar combinación de propiedades de ambos boards
+    expect(inheritedProps).toEqual({
+      challenge: { isRepetitive: true },
+      neutral: { allowedTime: 60 },
+      discount: { tempoConsumptionRate: 0.5 },
+    });
+  });
+
+  // 9. Test para getInheritedPropsForBoard con jerarquía compleja y sobrescritura
+  test("getInheritedPropsForBoard maneja correctamente la sobrescritura en jerarquía compleja", async () => {
+    // Board abuelo con propiedades iniciales
+    const grandparentBoard: Board = {
+      ...baseBoard,
+      id: "grandparent-board-props",
+      activityProps: {
+        challenge: { isRepetitive: false },
+        neutral: { allowedTime: 30 },
+        discount: { tempoConsumptionRate: 0.7 },
+      },
+      constraintList: [],
+    };
+
+    // Board padre que sobrescribe algunas propiedades
+    const parentBoard: Board = {
+      ...baseBoard,
+      id: "parent-board-props",
+      parentBoardId: "grandparent-board-props",
+      activityProps: {
+        challenge: { isRepetitive: true },
+        neutral: { allowedTime: 60 },
+      },
+      constraintList: [],
+    };
+
+    // Board hijo que sobrescribe otras propiedades
+    const childBoard: Board = {
+      ...baseBoard,
+      id: "child-board-props",
+      parentBoardId: "parent-board-props",
+      activityProps: {
+        discount: { tempoConsumptionRate: 0.5 },
+      },
+      constraintList: [],
+    };
+
+    await systemApi.createBoard(grandparentBoard);
+    await systemApi.createBoard(parentBoard);
+    await systemApi.createBoard(childBoard);
+
+    // Obtener propiedades heredadas para el board hijo
+    const inheritedProps = await systemApi.getInheritedPropsForBoard("child-board-props");
+
+    // Verificar combinación con sobrescritura correcta
+    expect(inheritedProps).toEqual({
+      challenge: { isRepetitive: true }, // Del padre (sobrescribe al abuelo)
+      neutral: { allowedTime: 60 }, // Del padre (sobrescribe al abuelo)
+      discount: { tempoConsumptionRate: 0.5 }, // Del hijo (sobrescribe al abuelo)
+    });
+  });
+
+  // 10. Test para getInheritedConstraintsForBoard con board sin padres
+  test("getInheritedConstraintsForBoard retorna los constraints de un board sin padres", async () => {
+    // Board sin padres con constraints específicos
+    const rootBoard: Board = {
+      ...baseBoard,
+      id: "solo-board-constraints",
+      constraintList: [
+        {
+          id: "rootConstraint1",
+          type: "expiration",
+          dayMinuteExpiration: 120,
+          penalty: 10,
+        },
+        {
+          id: "rootConstraint2",
+          type: "expiration",
+          dayMinuteExpiration: 180,
+          penalty: 20,
+        },
+      ],
+      activityProps: {},
+    };
+
+    await systemApi.createBoard(rootBoard);
+
+    // Obtener constraints heredados (que son solo los propios)
+    const inheritedConstraints =
+      await systemApi.getInheritedConstraintsForBoard("solo-board-constraints");
+
+    // Verificar que se devuelven exactamente los mismos constraints
+    expect(inheritedConstraints).toHaveLength(2);
+    expect(inheritedConstraints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "rootConstraint1",
+          dayMinuteExpiration: 120,
+          penalty: 10,
+        }),
+        expect.objectContaining({
+          id: "rootConstraint2",
+          dayMinuteExpiration: 180,
+          penalty: 20,
+        }),
+      ])
+    );
+  });
+
+  // 11. Test para getInheritedConstraintsForBoard con jerarquía simple
+  test("getInheritedConstraintsForBoard combina constraints de un board y su padre", async () => {
+    // Board padre con un constraint
+    const parentBoard: Board = {
+      ...baseBoard,
+      id: "parent-board-constraints",
+      constraintList: [
+        {
+          id: "parentConstraint",
+          type: "expiration",
+          dayMinuteExpiration: 60,
+          penalty: 5,
+        },
+      ],
+      activityProps: {},
+    };
+
+    // Board hijo con otro constraint
+    const childBoard: Board = {
+      ...baseBoard,
+      id: "child-board-constraints",
+      parentBoardId: "parent-board-constraints",
+      constraintList: [
+        {
+          id: "childConstraint",
+          type: "expiration",
+          dayMinuteExpiration: 90,
+          penalty: "50%",
+        },
+      ],
+      activityProps: {},
+    };
+
+    await systemApi.createBoard(parentBoard);
+    await systemApi.createBoard(childBoard);
+
+    // Obtener constraints heredados para el board hijo
+    const inheritedConstraints =
+      await systemApi.getInheritedConstraintsForBoard("child-board-constraints");
+
+    // Verificar combinación de constraints de ambos boards
+    expect(inheritedConstraints).toHaveLength(2);
+    expect(inheritedConstraints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "childConstraint",
+          dayMinuteExpiration: 90,
+          penalty: "50%",
+        }),
+        expect.objectContaining({
+          id: "parentConstraint",
+          dayMinuteExpiration: 60,
+          penalty: 5,
+        }),
+      ])
+    );
+  });
+
+  // 12. Test para getInheritedConstraintsForBoard con jerarquía compleja
+  test("getInheritedConstraintsForBoard combina constraints en jerarquía compleja", async () => {
+    // Board abuelo con un constraint
+    const grandparentBoard: Board = {
+      ...baseBoard,
+      id: "grandparent-board-constraints",
+      constraintList: [
+        {
+          id: "grandparentConstraint",
+          type: "expiration",
+          dayMinuteExpiration: 150,
+          penalty: 15,
+        },
+      ],
+      activityProps: {},
+    };
+
+    // Board padre con otro constraint
+    const parentBoard: Board = {
+      ...baseBoard,
+      id: "parent-board-constraints",
+      parentBoardId: "grandparent-board-constraints",
+      constraintList: [
+        {
+          id: "parentConstraint",
+          type: "expiration",
+          dayMinuteExpiration: 100,
+          penalty: 10,
+        },
+      ],
+      activityProps: {},
+    };
+
+    // Board hijo con otro constraint más
+    const childBoard: Board = {
+      ...baseBoard,
+      id: "child-board-constraints",
+      parentBoardId: "parent-board-constraints",
+      constraintList: [
+        {
+          id: "childConstraint",
+          type: "expiration",
+          dayMinuteExpiration: 80,
+          penalty: 5,
+        },
+      ],
+      activityProps: {},
+    };
+
+    await systemApi.createBoard(grandparentBoard);
+    await systemApi.createBoard(parentBoard);
+    await systemApi.createBoard(childBoard);
+
+    // Obtener constraints heredados para el board hijo
+    const inheritedConstraints =
+      await systemApi.getInheritedConstraintsForBoard("child-board-constraints");
+
+    // Verificar combinación de constraints de todos los boards
+    expect(inheritedConstraints).toHaveLength(3);
+    expect(inheritedConstraints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "childConstraint",
+          dayMinuteExpiration: 80,
+          penalty: 5,
+        }),
+        expect.objectContaining({
+          id: "parentConstraint",
+          dayMinuteExpiration: 100,
+          penalty: 10,
+        }),
+        expect.objectContaining({
+          id: "grandparentConstraint",
+          dayMinuteExpiration: 150,
+          penalty: 15,
+        }),
+      ])
+    );
+  });
+
+  // 13. Test para caso borde - board no existente
+  test("getInheritedPropsForBoard y getInheritedConstraintsForBoard manejan correctamente boards inexistentes", async () => {
+    // Intentar obtener propiedades de un board que no existe
+    const inheritedProps = await systemApi.getInheritedPropsForBoard("non-existent-board");
+    expect(inheritedProps).toEqual({}); // Debe retornar un objeto vacío
+
+    // Intentar obtener constraints de un board que no existe
+    const inheritedConstraints =
+      await systemApi.getInheritedConstraintsForBoard("non-existent-board");
+    expect(inheritedConstraints).toEqual([]); // Debe retornar un array vacío
+  });
 });

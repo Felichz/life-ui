@@ -268,6 +268,10 @@ export interface SystemAPIType {
   updateBoard: (boardUpdates: Partial<Board> & { id: BoardId }) => Promise<void>;
   removeBoard: (board: Board) => Promise<void>;
 
+  // Obtener propiedades y constraints heredados
+  getInheritedPropsForBoard: (boardId: BoardId) => Promise<InheritableActivityProps>;
+  getInheritedConstraintsForBoard: (boardId: BoardId) => Promise<BoardChallengeConstraint[]>;
+
   // Gestión de actividades
   getActivity: (activityId: ActivityId) => Promise<Activity | undefined>;
   getActivities: () => Promise<Activity[]>;

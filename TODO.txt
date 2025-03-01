@@ -6,6 +6,7 @@ Bugs para fixear:
     - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
     
     Faltan testear casos raros que seguramente esten bugeados:
+        - Que pasa cuando hay un desafio seleccionado sin completar y termina el dia?
         - Cuando editamos una actividad mientras esta seleccionada
         - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
         - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
@@ -16,7 +17,16 @@ Para grooming:
 
 Features que faltan implementar:
     POC:
+        - Al comenzar el dia se debe mostrar un modal para establecer el passive tempo consumption ratio, dependiendo de cuanto de mi creo que puedo dar en el dia, el valor ingresado en el ui debe ser un porcentaje restringido entre 0% y 200% siendo el default 100% en caso de ser el primer dia de la historia, pero en caso de que ya haya un historial creado se debe establecer como default el valor del dia anterior, si ayer puse que podia dar un 50% de mi energia, entonces mostramos 50% como default, lo que seria un consumption rate de 0.5
+
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
+
+        - El modal de creacion de actividad debe incluir las propiedades heredadas de todos los board padres no solo del padre directo, debe reflejar la realidad que se vera despues de crear la actividad de verdad, se deberia obtener la informacion de la misma fuente
+
+        - Al crear nuevo subtablero tambien se debe mostrar el modal de crear board
+        - Debe ser posible borrar sub tableros
+        - El modal de crear board tambien debe mostrar las propiedades heredadas de los board padres como en el modal de creacion de actividad
+
 
         - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
         - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles

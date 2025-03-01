@@ -37,6 +37,7 @@ import type {
   HobbyActivity,
   BoardChallengeConstraint,
   Activity,
+  InheritableActivityProps,
 } from "@/core/types";
 import { formatMultiLog } from "@/lib/utils/logger";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
@@ -156,6 +157,11 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     ExpirationChallengeConstraint[]
   >([]);
   const [isCreateActivityDialogOpen, setIsCreateActivityDialogOpen] = React.useState(false);
+  const [inheritedProps, setInheritedProps] = React.useState<InheritableActivityProps>({});
+  const [inheritedConstraints, setInheritedConstraints] = React.useState<
+    BoardChallengeConstraint[]
+  >([]);
+  const [isLoadingInheritedData, setIsLoadingInheritedData] = React.useState(false);
 
   const childBoards = React.useMemo(() => {
     if (!board.childrenBoards) return [];
@@ -363,13 +369,36 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     }
   };
 
+  const handleActivityTypeChange = (type: "neutral" | "challenge" | "discount") => {
+    setNewActivityType(type);
+
+    if (type === "challenge" && inheritedProps.challenge) {
+      setNewActivityIsRepetitive(inheritedProps.challenge.isRepetitive ?? false);
+      // No añadimos los constraints heredados aquí, ya que se mostrarán separadamente
+      // Limpiamos los constraints añadidos manualmente al cambiar el tipo
+      setNewActivityConstraints([]);
+    } else if (type === "neutral" && inheritedProps.neutral) {
+      setNewActivityIsRepetitive(inheritedProps.neutral.isRepetitive ?? false);
+      if (inheritedProps.neutral.allowedTime) {
+        setNewActivityAllowedTime(inheritedProps.neutral.allowedTime);
+      }
+    } else if (type === "discount" && inheritedProps.discount) {
+      setNewActivityIsRepetitive(inheritedProps.discount.isRepetitive ?? false);
+      if (inheritedProps.discount.allowedTime) {
+        setNewActivityAllowedTime(inheritedProps.discount.allowedTime);
+      }
+      if (inheritedProps.discount.tempoConsumptionRate) {
+        setNewActivityConsumptionRate(inheritedProps.discount.tempoConsumptionRate);
+      }
+    }
+  };
+
   const handleCreateActivity = async () => {
     try {
       setIsLoading(true);
 
-      const inheritedProps = board.activityProps;
       formatMultiLog(
-        { label: "Board constraints", data: board.constraintList },
+        { label: "Board constraints", data: inheritedConstraints },
         { label: "Inherited props", data: inheritedProps }
       );
 
@@ -383,31 +412,45 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         parentBoardId: board.id,
         type: newActivityType,
         order: lowestOrder,
-        isRepetitive:
-          inheritedProps.challenge?.isRepetitive ??
-          inheritedProps.neutral?.isRepetitive ??
-          inheritedProps.discount?.isRepetitive ??
-          newActivityIsRepetitive,
+        isRepetitive: inheritedProps[newActivityType]?.isRepetitive ?? newActivityIsRepetitive,
         createdAt: TimeSimulator.getInstance().now(),
       };
 
       let newActivity: CreateActivityInput;
 
       switch (newActivityType) {
-        case "challenge":
+        case "challenge": {
+          // Preparamos la lista de constraints combinando los heredados y personalizados
+          const combinedConstraints: ExpirationChallengeConstraint[] = [
+            // Los constraints personalizados añadidos por el usuario
+            ...newActivityConstraints,
+            // Los constraints heredados, mapeados para incluir el parentConstraintId
+            ...inheritedConstraints.map((inheritedConstraint) => ({
+              id: uuidv4(),
+              parentConstraintId: inheritedConstraint.id,
+              type: inheritedConstraint.type as "expiration",
+              dayMinuteExpiration: inheritedConstraint.dayMinuteExpiration,
+              penalty: inheritedConstraint.penalty,
+              status: "active" as const,
+              failCount: 0,
+            })),
+          ];
+
           formatMultiLog(
             { label: "Creating challenge activity", data: null },
-            { label: "New activity constraints", data: newActivityConstraints }
+            { label: "New activity constraints", data: combinedConstraints }
           );
+
           newActivity = {
             ...baseActivity,
             type: "challenge",
             totalTempoReward: newActivityTempoReward,
-            constraintList: newActivityConstraints,
+            constraintList: combinedConstraints,
             isRepetitive: inheritedProps.challenge?.isRepetitive ?? false,
             tempoGeneratingMinutes: 0,
           };
           break;
+        }
         case "neutral":
           newActivity = {
             ...baseActivity,
@@ -678,6 +721,51 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
       constraintList: [...editedProps.constraintList, newConstraint],
     });
   };
+
+  React.useEffect(() => {
+    if (isCreateActivityDialogOpen) {
+      const fetchInheritedData = async () => {
+        setIsLoadingInheritedData(true);
+        try {
+          const props = await engine.board.getInheritedProps(board.id);
+          setInheritedProps(props);
+
+          const constraints = await engine.board.getInheritedConstraints(board.id);
+          setInheritedConstraints(constraints);
+
+          if (props[newActivityType]) {
+            if (newActivityType === "challenge" && props.challenge) {
+              setNewActivityIsRepetitive(props.challenge.isRepetitive ?? false);
+            } else if (newActivityType === "neutral" && props.neutral) {
+              setNewActivityIsRepetitive(props.neutral.isRepetitive ?? false);
+              if (props.neutral.allowedTime) {
+                setNewActivityAllowedTime(props.neutral.allowedTime);
+              }
+            } else if (newActivityType === "discount" && props.discount) {
+              setNewActivityIsRepetitive(props.discount.isRepetitive ?? false);
+              if (props.discount.allowedTime) {
+                setNewActivityAllowedTime(props.discount.allowedTime);
+              }
+              if (props.discount.tempoConsumptionRate) {
+                setNewActivityConsumptionRate(props.discount.tempoConsumptionRate);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error al cargar datos heredados:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No se pudieron cargar las propiedades heredadas",
+          });
+        } finally {
+          setIsLoadingInheritedData(false);
+        }
+      };
+
+      fetchInheritedData();
+    }
+  }, [isCreateActivityDialogOpen, board.id, engine.board, newActivityType, toast]);
 
   return (
     <Accordion
@@ -974,203 +1062,66 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <label htmlFor="title" className="text-sm font-medium">
-                    Título
-                  </label>
-                  <Input
-                    id="title"
-                    value={newActivityTitle}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setNewActivityTitle(e.target.value)
-                    }
-                    placeholder="Título de la actividad"
-                  />
+              {isLoadingInheritedData ? (
+                <div className="flex justify-center items-center py-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-2">Cargando propiedades heredadas...</span>
                 </div>
-
-                <div className="grid gap-2">
-                  <label htmlFor="type" className="text-sm font-medium">
-                    Tipo
-                  </label>
-                  <Select
-                    defaultValue="challenge"
-                    value={newActivityType}
-                    onValueChange={(value: "neutral" | "challenge" | "discount") =>
-                      setNewActivityType(value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="challenge">Desafío</SelectItem>
-                      <SelectItem value="neutral">Neutral</SelectItem>
-                      <SelectItem value="discount">Hobby</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <TooltipProvider>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="isRepetitive"
-                        disabled={
-                          (newActivityType === "neutral" &&
-                            board.activityProps.neutral?.isRepetitive !== undefined) ||
-                          (newActivityType === "challenge" &&
-                            board.activityProps.challenge?.isRepetitive !== undefined) ||
-                          (newActivityType === "discount" &&
-                            board.activityProps.discount?.isRepetitive !== undefined)
-                        }
-                        checked={
-                          newActivityType === "neutral"
-                            ? (board.activityProps.neutral?.isRepetitive ?? newActivityIsRepetitive)
-                            : newActivityType === "challenge"
-                              ? (board.activityProps.challenge?.isRepetitive ??
-                                newActivityIsRepetitive)
-                              : (board.activityProps.discount?.isRepetitive ??
-                                newActivityIsRepetitive)
-                        }
-                        onCheckedChange={(checked) =>
-                          setNewActivityIsRepetitive(checked as boolean)
-                        }
-                      />
-                      <Label htmlFor="isRepetitive" className="text-sm font-medium">
-                        Repetible
-                      </Label>
-                      {((newActivityType === "neutral" &&
-                        board.activityProps.neutral?.isRepetitive !== undefined) ||
-                        (newActivityType === "challenge" &&
-                          board.activityProps.challenge?.isRepetitive !== undefined) ||
-                        (newActivityType === "discount" &&
-                          board.activityProps.discount?.isRepetitive !== undefined)) && (
-                        <Badge variant="outline" className="text-[10px]">
-                          Heredado
-                        </Badge>
-                      )}
-                    </div>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="inline-flex">
-                          {((newActivityType === "neutral" &&
-                            board.activityProps.neutral?.isRepetitive !== undefined) ||
-                            (newActivityType === "challenge" &&
-                              board.activityProps.challenge?.isRepetitive !== undefined) ||
-                            (newActivityType === "discount" &&
-                              board.activityProps.discount?.isRepetitive !== undefined)) && (
-                            <span className="sr-only">Info</span>
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {((newActivityType === "neutral" &&
-                          board.activityProps.neutral?.isRepetitive !== undefined) ||
-                          (newActivityType === "challenge" &&
-                            board.activityProps.challenge?.isRepetitive !== undefined) ||
-                          (newActivityType === "discount" &&
-                            board.activityProps.discount?.isRepetitive !== undefined)) && (
-                          <p>
-                            Esta propiedad está heredada del tablero padre y no puede ser modificada
-                          </p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-
-                {(newActivityType === "neutral" || newActivityType === "discount") && (
+              ) : (
+                <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <TooltipProvider>
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="allowedTime" className="text-sm font-medium">
-                          Tiempo Permitido (minutos)
-                        </label>
-                        {((newActivityType === "neutral" &&
-                          board.activityProps.neutral?.allowedTime) ||
-                          (newActivityType === "discount" &&
-                            board.activityProps.discount?.allowedTime)) && (
-                          <Badge variant="outline" className="text-[10px]">
-                            Heredado
-                          </Badge>
-                        )}
-                      </div>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div>
-                            <Input
-                              id="allowedTime"
-                              type="number"
-                              value={
-                                newActivityType === "neutral"
-                                  ? (board.activityProps.neutral?.allowedTime ??
-                                    newActivityAllowedTime)
-                                  : (board.activityProps.discount?.allowedTime ??
-                                    newActivityAllowedTime)
-                              }
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                setNewActivityAllowedTime(Number(e.target.value))
-                              }
-                              min={1}
-                              max={960}
-                              disabled={Boolean(
-                                (newActivityType === "neutral" &&
-                                  board.activityProps.neutral?.allowedTime) ||
-                                  (newActivityType === "discount" &&
-                                    board.activityProps.discount?.allowedTime)
-                              )}
-                              className={
-                                (newActivityType === "neutral" &&
-                                  board.activityProps.neutral?.allowedTime) ||
-                                (newActivityType === "discount" &&
-                                  board.activityProps.discount?.allowedTime)
-                                  ? "bg-muted"
-                                  : ""
-                              }
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {((newActivityType === "neutral" &&
-                            board.activityProps.neutral?.allowedTime) ||
-                            (newActivityType === "discount" &&
-                              board.activityProps.discount?.allowedTime)) && (
-                            <p>
-                              Este valor está heredado del tablero padre y no puede ser modificado
-                            </p>
-                          )}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-
-                {newActivityType === "challenge" && (
-                  <div className="grid gap-2">
-                    <label htmlFor="tempoReward" className="text-sm font-medium">
-                      Recompensa Total (tempos)
+                    <label htmlFor="title" className="text-sm font-medium">
+                      Título
                     </label>
                     <Input
-                      id="tempoReward"
-                      type="number"
-                      value={newActivityTempoReward}
+                      id="title"
+                      value={newActivityTitle}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setNewActivityTempoReward(Number(e.target.value))
+                        setNewActivityTitle(e.target.value)
                       }
-                      min={1}
+                      placeholder="Título de la actividad"
                     />
                   </div>
-                )}
 
-                {newActivityType === "discount" && (
                   <div className="grid gap-2">
+                    <label htmlFor="type" className="text-sm font-medium">
+                      Tipo
+                    </label>
+                    <Select
+                      defaultValue="challenge"
+                      value={newActivityType}
+                      onValueChange={(value: "neutral" | "challenge" | "discount") =>
+                        handleActivityTypeChange(value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="challenge">Desafío</SelectItem>
+                        <SelectItem value="neutral">Neutral</SelectItem>
+                        <SelectItem value="discount">Hobby</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <TooltipProvider>
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="consumptionRate" className="text-sm font-medium">
-                          Tasa de Consumo (0-1)
-                        </label>
-                        {board.activityProps.discount?.tempoConsumptionRate && (
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="isRepetitive"
+                          disabled={inheritedProps[newActivityType]?.isRepetitive !== undefined}
+                          checked={
+                            inheritedProps[newActivityType]?.isRepetitive ?? newActivityIsRepetitive
+                          }
+                          onCheckedChange={(checked) =>
+                            setNewActivityIsRepetitive(checked as boolean)
+                          }
+                        />
+                        <Label htmlFor="isRepetitive" className="text-sm font-medium">
+                          Repetible
+                        </Label>
+                        {inheritedProps[newActivityType]?.isRepetitive !== undefined && (
                           <Badge variant="outline" className="text-[10px]">
                             Heredado
                           </Badge>
@@ -1178,166 +1129,275 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                       </div>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div>
-                            <Input
-                              id="consumptionRate"
-                              type="number"
-                              value={
-                                board.activityProps.discount?.tempoConsumptionRate ??
-                                newActivityConsumptionRate
-                              }
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                setNewActivityConsumptionRate(Number(e.target.value))
-                              }
-                              min={0.1}
-                              max={0.9}
-                              step={0.1}
-                              disabled={
-                                board.activityProps.discount?.tempoConsumptionRate !== undefined
-                              }
-                              className={
-                                board.activityProps.discount?.tempoConsumptionRate !== undefined
-                                  ? "bg-muted"
-                                  : ""
-                              }
-                            />
+                          <div className="inline-flex">
+                            {inheritedProps[newActivityType]?.isRepetitive !== undefined && (
+                              <span className="sr-only">Info</span>
+                            )}
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          {board.activityProps.discount?.tempoConsumptionRate !== undefined && (
+                          {inheritedProps[newActivityType]?.isRepetitive !== undefined && (
                             <p>
-                              Este valor está heredado del tablero padre y no puede ser modificado
+                              Esta propiedad está heredada del tablero padre y no puede ser
+                              modificada
                             </p>
                           )}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                )}
 
-                {newActivityType === "challenge" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label>Criterios de Aceptación</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAddActivityConstraint}
-                      >
-                        Agregar Criterio
-                      </Button>
-                    </div>
-
-                    {board.constraintList?.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px]">
-                            Heredado
-                          </Badge>
-                        </div>
-                        {board.constraintList.map((constraint) => (
-                          <div
-                            key={constraint.id}
-                            className="space-y-2 p-4 border rounded-lg bg-muted/50"
-                          >
-                            <div className="flex items-center justify-between">
-                              <Label className="text-muted-foreground">Hora de Expiración</Label>
-                              <div className="text-muted-foreground">
-                                {formatMinuteToTime(constraint.dayMinuteExpiration)}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <Label className="text-muted-foreground">Penalización</Label>
-                              <div className="text-muted-foreground">
-                                {typeof constraint.penalty === "number"
-                                  ? constraint.penalty
-                                  : constraint.penalty}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {newActivityConstraints.map((constraint, index) => (
-                      <div key={index} className="space-y-2 p-4 border rounded-lg">
+                  {(newActivityType === "neutral" || newActivityType === "discount") && (
+                    <div className="grid gap-2">
+                      <TooltipProvider>
                         <div className="flex items-center justify-between">
-                          <Label>Hora de Expiración</Label>
-                          <TimeSelector
-                            value={constraint.dayMinuteExpiration}
-                            onChange={(minutes) =>
-                              handleUpdateActivityConstraint(index, {
-                                dayMinuteExpiration: minutes,
-                              })
-                            }
-                            className="w-[230px]"
-                          />
+                          <label htmlFor="allowedTime" className="text-sm font-medium">
+                            Tiempo Permitido (minutos)
+                          </label>
+                          {inheritedProps[newActivityType]?.allowedTime !== undefined && (
+                            <Badge variant="outline" className="text-[10px]">
+                              Heredado
+                            </Badge>
+                          )}
                         </div>
-
-                        <div className="flex items-center justify-between mt-2">
-                          <Label>Penalización</Label>
-                          <div className="flex items-center gap-2">
-                            {typeof constraint.penalty === "number" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
                               <Input
+                                id="allowedTime"
                                 type="number"
-                                min="0"
-                                value={constraint.penalty}
-                                onChange={(e) =>
-                                  handleUpdateActivityConstraintPenalty(
-                                    index,
-                                    e.target.value,
-                                    "fixed"
-                                  )
+                                value={
+                                  inheritedProps[newActivityType]?.allowedTime ??
+                                  newActivityAllowedTime
                                 }
-                                className="w-24"
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  setNewActivityAllowedTime(Number(e.target.value))
+                                }
+                                min={1}
+                                max={960}
+                                disabled={
+                                  inheritedProps[newActivityType]?.allowedTime !== undefined
+                                }
+                                className={
+                                  inheritedProps[newActivityType]?.allowedTime !== undefined
+                                    ? "bg-muted"
+                                    : ""
+                                }
                               />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {inheritedProps[newActivityType]?.allowedTime !== undefined && (
+                              <p>
+                                Este valor está heredado del tablero padre y no puede ser modificado
+                              </p>
                             )}
-                            <Select
-                              value={
-                                typeof constraint.penalty === "string"
-                                  ? constraint.penalty
-                                  : "fixed"
-                              }
-                              onValueChange={(value) =>
-                                handleUpdateActivityConstraintPenalty(
-                                  index,
-                                  value === "fixed" ? "0" : value,
-                                  value === "fixed" ? "fixed" : "percentage"
-                                )
-                              }
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue placeholder="Tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="fixed">Valor Fijo</SelectItem>
-                                <SelectItem value="100%">100%</SelectItem>
-                                <SelectItem value="50%">50%</SelectItem>
-                                <SelectItem value="25%">25%</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
 
+                  {newActivityType === "challenge" && (
+                    <div className="grid gap-2">
+                      <label htmlFor="tempoReward" className="text-sm font-medium">
+                        Recompensa Total (tempos)
+                      </label>
+                      <Input
+                        id="tempoReward"
+                        type="number"
+                        value={newActivityTempoReward}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setNewActivityTempoReward(Number(e.target.value))
+                        }
+                        min={1}
+                      />
+                    </div>
+                  )}
+
+                  {newActivityType === "discount" && (
+                    <div className="grid gap-2">
+                      <TooltipProvider>
+                        <div className="flex items-center justify-between">
+                          <label htmlFor="consumptionRate" className="text-sm font-medium">
+                            Tasa de Consumo (0-1)
+                          </label>
+                          {inheritedProps.discount?.tempoConsumptionRate !== undefined && (
+                            <Badge variant="outline" className="text-[10px]">
+                              Heredado
+                            </Badge>
+                          )}
+                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Input
+                                id="consumptionRate"
+                                type="number"
+                                value={
+                                  inheritedProps.discount?.tempoConsumptionRate ??
+                                  newActivityConsumptionRate
+                                }
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  setNewActivityConsumptionRate(Number(e.target.value))
+                                }
+                                min={0.1}
+                                max={0.9}
+                                step={0.1}
+                                disabled={
+                                  inheritedProps.discount?.tempoConsumptionRate !== undefined
+                                }
+                                className={
+                                  inheritedProps.discount?.tempoConsumptionRate !== undefined
+                                    ? "bg-muted"
+                                    : ""
+                                }
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {inheritedProps.discount?.tempoConsumptionRate !== undefined && (
+                              <p>
+                                Este valor está heredado del tablero padre y no puede ser modificado
+                              </p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  )}
+
+                  {newActivityType === "challenge" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label>Criterios de Aceptación</Label>
                         <Button
                           type="button"
-                          variant="destructive"
+                          variant="outline"
                           size="sm"
-                          onClick={() => handleRemoveActivityConstraint(index)}
-                          className="mt-2"
+                          onClick={handleAddActivityConstraint}
                         >
-                          Eliminar Criterio
+                          Agregar Criterio
                         </Button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+
+                      {inheritedConstraints.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              Criterios Heredados
+                            </Badge>
+                          </div>
+                          {inheritedConstraints.map((constraint) => (
+                            <div
+                              key={constraint.id}
+                              className="space-y-2 p-4 border rounded-lg bg-muted/50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <Label className="text-muted-foreground">Hora de Expiración</Label>
+                                <div className="text-muted-foreground">
+                                  {formatMinuteToTime(constraint.dayMinuteExpiration)}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between mt-2">
+                                <Label className="text-muted-foreground">Penalización</Label>
+                                <div className="text-muted-foreground">
+                                  {typeof constraint.penalty === "number"
+                                    ? constraint.penalty
+                                    : constraint.penalty}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {newActivityConstraints
+                        .filter(
+                          (c) => !inheritedConstraints.some((ic) => ic.id === c.parentConstraintId)
+                        )
+                        .map((constraint, index) => (
+                          <div key={index} className="space-y-2 p-4 border rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <Label>Hora de Expiración</Label>
+                              <TimeSelector
+                                value={constraint.dayMinuteExpiration}
+                                onChange={(minutes) =>
+                                  handleUpdateActivityConstraint(index, {
+                                    dayMinuteExpiration: minutes,
+                                  })
+                                }
+                                className="w-[230px]"
+                              />
+                            </div>
+
+                            <div className="flex items-center justify-between mt-2">
+                              <Label>Penalización</Label>
+                              <div className="flex items-center gap-2">
+                                {typeof constraint.penalty === "number" && (
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={constraint.penalty}
+                                    onChange={(e) =>
+                                      handleUpdateActivityConstraintPenalty(
+                                        index,
+                                        e.target.value,
+                                        "fixed"
+                                      )
+                                    }
+                                    className="w-24"
+                                  />
+                                )}
+                                <Select
+                                  value={
+                                    typeof constraint.penalty === "string"
+                                      ? constraint.penalty
+                                      : "fixed"
+                                  }
+                                  onValueChange={(value) =>
+                                    handleUpdateActivityConstraintPenalty(
+                                      index,
+                                      value === "fixed" ? "0" : value,
+                                      value === "fixed" ? "fixed" : "percentage"
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue placeholder="Tipo" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="fixed">Valor Fijo</SelectItem>
+                                    <SelectItem value="100%">100%</SelectItem>
+                                    <SelectItem value="50%">50%</SelectItem>
+                                    <SelectItem value="25%">25%</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleRemoveActivityConstraint(index)}
+                              className="mt-2"
+                            >
+                              Eliminar Criterio
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <DialogFooter>
-                <Button onClick={handleCreateActivity} disabled={isLoading}>
-                  Crear
+                <Button
+                  onClick={handleCreateActivity}
+                  disabled={isLoading || isLoadingInheritedData}
+                >
+                  {isLoading ? "Creando..." : "Crear"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1433,7 +1493,6 @@ const BoardsColumn: React.FC = () => {
   }, [uiState.boards]);
 
   React.useEffect(() => {
-    // Asegurarse de que el tipo predeterminado sea "challenge"
     if (newActivityType !== "challenge") {
       setNewActivityType("challenge");
     }
