@@ -162,6 +162,30 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     BoardChallengeConstraint[]
   >([]);
   const [isLoadingInheritedData, setIsLoadingInheritedData] = React.useState(false);
+  const [isCreateSubBoardDialogOpen, setIsCreateSubBoardDialogOpen] = React.useState(false);
+  const [newSubBoardTitle, setNewSubBoardTitle] = React.useState("");
+  const [newSubBoardProps, setNewSubBoardProps] = React.useState<{
+    activityProps: Board["activityProps"];
+    constraintList: BoardChallengeConstraint[];
+  }>({
+    activityProps: {},
+    constraintList: [],
+  });
+  const [newSubBoardActivityType, setNewSubBoardActivityType] = React.useState<
+    "neutral" | "challenge" | "discount"
+  >("challenge");
+  const [newSubBoardActivityAllowedTime, setNewSubBoardActivityAllowedTime] = React.useState(30);
+  const [newSubBoardActivityConsumptionRate, setNewSubBoardActivityConsumptionRate] =
+    React.useState(0.5);
+  const [newSubBoardActivityConstraints, setNewSubBoardActivityConstraints] = React.useState<
+    ExpirationChallengeConstraint[]
+  >([]);
+  const [inheritedSubBoardProps, setInheritedSubBoardProps] =
+    React.useState<InheritableActivityProps>({});
+  const [inheritedSubBoardConstraints, setInheritedSubBoardConstraints] = React.useState<
+    BoardChallengeConstraint[]
+  >([]);
+  const [isLoadingSubBoardInheritedData, setIsLoadingSubBoardInheritedData] = React.useState(false);
 
   const childBoards = React.useMemo(() => {
     if (!board.childrenBoards) return [];
@@ -548,16 +572,54 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   const handleCreateSubBoard = async () => {
     try {
       setIsLoading(true);
+
+      const activityProps: Board["activityProps"] = {};
+
+      if (newSubBoardActivityType === "challenge" || newSubBoardActivityConstraints.length > 0) {
+        activityProps.challenge = {
+          isRepetitive: newSubBoardActivityType === "challenge",
+        };
+      }
+
+      if (newSubBoardActivityType === "neutral" || newSubBoardActivityAllowedTime !== 30) {
+        activityProps.neutral = {
+          isRepetitive: newSubBoardActivityType === "neutral",
+          allowedTime: newSubBoardActivityAllowedTime,
+        };
+      }
+
+      if (
+        newSubBoardActivityType === "discount" ||
+        newSubBoardActivityAllowedTime !== 30 ||
+        newSubBoardActivityConsumptionRate !== 0.5
+      ) {
+        activityProps.discount = {
+          isRepetitive: newSubBoardActivityType === "discount",
+          allowedTime: newSubBoardActivityAllowedTime,
+          tempoConsumptionRate: newSubBoardActivityConsumptionRate,
+        };
+      }
+
       const newBoard: CreateBoardInput = {
-        title: "Nuevo Subtablero",
+        title: newSubBoardTitle.trim() || "Nuevo Subtablero",
         parentBoardId: board.id,
         activities: [],
         childrenBoards: [],
-        activityProps: {},
-        constraintList: [],
+        activityProps: activityProps,
+        constraintList: newSubBoardActivityConstraints,
         isExpanded: true,
       };
+
       await engine.board.createBoard(newBoard);
+
+      // Reiniciar estados
+      setNewSubBoardTitle("");
+      setNewSubBoardActivityType("challenge");
+      setNewSubBoardActivityAllowedTime(30);
+      setNewSubBoardActivityConsumptionRate(0.5);
+      setNewSubBoardActivityConstraints([]);
+      setIsCreateSubBoardDialogOpen(false);
+
       toast({
         title: "Subtablero creado",
         description: "El subtablero se ha creado correctamente",
@@ -572,6 +634,35 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddSubBoardConstraint = () => {
+    setNewSubBoardActivityConstraints([
+      ...newSubBoardActivityConstraints,
+      {
+        type: "expiration",
+        dayMinuteExpiration: 0,
+        penalty: 0,
+        failCount: 0,
+        id: uuidv4(),
+        status: "active",
+      },
+    ]);
+  };
+
+  const handleUpdateSubBoardConstraint = (
+    index: number,
+    updates: Partial<ExpirationChallengeConstraint>
+  ) => {
+    setNewSubBoardActivityConstraints(
+      newSubBoardActivityConstraints.map((constraint, i) =>
+        i === index ? { ...constraint, ...updates } : constraint
+      )
+    );
+  };
+
+  const handleRemoveSubBoardConstraint = (index: number) => {
+    setNewSubBoardActivityConstraints(newSubBoardActivityConstraints.filter((_, i) => i !== index));
   };
 
   const handleRemoveBoard = async () => {
@@ -766,6 +857,60 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
       fetchInheritedData();
     }
   }, [isCreateActivityDialogOpen, board.id, engine.board, newActivityType, toast]);
+
+  React.useEffect(() => {
+    if (isCreateSubBoardDialogOpen) {
+      const fetchInheritedData = async () => {
+        setIsLoadingSubBoardInheritedData(true);
+        try {
+          const props = await engine.board.getInheritedProps(board.id);
+          setInheritedSubBoardProps(props);
+
+          const constraints = await engine.board.getInheritedConstraints(board.id);
+          setInheritedSubBoardConstraints(constraints);
+
+          if (props[newSubBoardActivityType]) {
+            if (newSubBoardActivityType === "challenge" && props.challenge) {
+              // Propiedades de desafío heredadas
+              setNewSubBoardActivityType(
+                props.challenge.isRepetitive ? "challenge" : newSubBoardActivityType
+              );
+            } else if (newSubBoardActivityType === "neutral" && props.neutral) {
+              // Propiedades neutrales heredadas
+              setNewSubBoardActivityType(
+                props.neutral.isRepetitive ? "neutral" : newSubBoardActivityType
+              );
+              if (props.neutral.allowedTime) {
+                setNewSubBoardActivityAllowedTime(props.neutral.allowedTime);
+              }
+            } else if (newSubBoardActivityType === "discount" && props.discount) {
+              // Propiedades de hobby heredadas
+              setNewSubBoardActivityType(
+                props.discount.isRepetitive ? "discount" : newSubBoardActivityType
+              );
+              if (props.discount.allowedTime) {
+                setNewSubBoardActivityAllowedTime(props.discount.allowedTime);
+              }
+              if (props.discount.tempoConsumptionRate) {
+                setNewSubBoardActivityConsumptionRate(props.discount.tempoConsumptionRate);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error al cargar datos heredados para subtablero:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "No se pudieron cargar las propiedades heredadas para el subtablero",
+          });
+        } finally {
+          setIsLoadingSubBoardInheritedData(false);
+        }
+      };
+
+      fetchInheritedData();
+    }
+  }, [isCreateSubBoardDialogOpen, board.id, engine.board, newSubBoardActivityType, toast]);
 
   return (
     <Accordion
@@ -1402,9 +1547,470 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" size="sm" onClick={handleCreateSubBoard} disabled={isLoading}>
-            Nuevo Subtablero
-          </Button>
+          <Dialog open={isCreateSubBoardDialogOpen} onOpenChange={setIsCreateSubBoardDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={isLoading}>
+                Nuevo Subtablero
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Nuevo Subtablero</DialogTitle>
+                <DialogDescription>
+                  Configura las propiedades que heredarán las actividades dentro de este subtablero.
+                </DialogDescription>
+              </DialogHeader>
+
+              {isLoadingSubBoardInheritedData ? (
+                <div className="flex justify-center items-center py-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-2">Cargando propiedades heredadas...</span>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid gap-2">
+                    <Label htmlFor="subBoardTitle">Título</Label>
+                    <Input
+                      id="subBoardTitle"
+                      value={newSubBoardTitle}
+                      onChange={(e) => setNewSubBoardTitle(e.target.value)}
+                      placeholder="Nombre del subtablero"
+                    />
+                  </div>
+
+                  <Accordion type="single" collapsible defaultValue="challenge">
+                    <AccordionItem value="challenge">
+                      <AccordionTrigger>Propiedades para Desafíos</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <TooltipProvider>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id="subBoardChallengeIsRepetitive"
+                                  checked={newSubBoardActivityType === "challenge"}
+                                  disabled={
+                                    inheritedSubBoardProps.challenge?.isRepetitive !== undefined
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    setNewSubBoardActivityType(checked ? "challenge" : "neutral");
+                                  }}
+                                />
+                                <Label htmlFor="subBoardChallengeIsRepetitive">Repetible</Label>
+                                {inheritedSubBoardProps.challenge?.isRepetitive !== undefined && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Heredado
+                                  </Badge>
+                                )}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="inline-flex">
+                                    {inheritedSubBoardProps.challenge?.isRepetitive !==
+                                      undefined && <span className="sr-only">Info</span>}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {inheritedSubBoardProps.challenge?.isRepetitive !== undefined && (
+                                    <p>
+                                      Esta propiedad está heredada del tablero padre y no puede ser
+                                      modificada
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <Label>Criterios de Aceptación</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleAddSubBoardConstraint}
+                              >
+                                Agregar Criterio
+                              </Button>
+                            </div>
+
+                            {inheritedSubBoardConstraints.length > 0 && (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Criterios Heredados
+                                  </Badge>
+                                </div>
+                                {inheritedSubBoardConstraints.map((constraint) => (
+                                  <div
+                                    key={constraint.id}
+                                    className="space-y-2 p-4 border rounded-lg bg-muted/50"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-muted-foreground">
+                                        Hora de Expiración
+                                      </Label>
+                                      <div className="text-muted-foreground">
+                                        {formatMinuteToTime(constraint.dayMinuteExpiration)}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <Label className="text-muted-foreground">Penalización</Label>
+                                      <div className="text-muted-foreground">
+                                        {typeof constraint.penalty === "number"
+                                          ? constraint.penalty
+                                          : constraint.penalty}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {newSubBoardActivityConstraints.map((constraint, index) => (
+                              <div key={index} className="space-y-2 p-4 border rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <Label>Hora de Expiración</Label>
+                                  <TimeSelector
+                                    value={constraint.dayMinuteExpiration}
+                                    onChange={(minutes) => {
+                                      handleUpdateSubBoardConstraint(index, {
+                                        dayMinuteExpiration: minutes,
+                                      });
+                                    }}
+                                    className="w-[230px]"
+                                  />
+                                </div>
+
+                                <div className="flex items-center justify-between mt-2">
+                                  <Label>Penalización</Label>
+                                  <div className="flex items-center gap-2">
+                                    {typeof constraint.penalty === "number" && (
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={constraint.penalty}
+                                        onChange={(e) => {
+                                          const newConstraints = [
+                                            ...newSubBoardActivityConstraints,
+                                          ];
+                                          newConstraints[index] = {
+                                            ...newConstraints[index],
+                                            penalty: parseInt(e.target.value),
+                                          };
+                                          setNewSubBoardActivityConstraints(newConstraints);
+                                        }}
+                                        className="w-24"
+                                      />
+                                    )}
+                                    <Select
+                                      value={
+                                        typeof constraint.penalty === "string"
+                                          ? constraint.penalty
+                                          : "fixed"
+                                      }
+                                      onValueChange={(value) => {
+                                        const newConstraints = [...newSubBoardActivityConstraints];
+                                        newConstraints[index] = {
+                                          ...newConstraints[index],
+                                          penalty: value === "fixed" ? 0 : value,
+                                        };
+                                        setNewSubBoardActivityConstraints(newConstraints);
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-32">
+                                        <SelectValue placeholder="Tipo" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="fixed">Valor Fijo</SelectItem>
+                                        <SelectItem value="100%">100%</SelectItem>
+                                        <SelectItem value="50%">50%</SelectItem>
+                                        <SelectItem value="25%">25%</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleRemoveSubBoardConstraint(index)}
+                                  className="mt-2"
+                                >
+                                  Eliminar Criterio
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="neutral">
+                      <AccordionTrigger>Propiedades para Actividades Neutrales</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <TooltipProvider>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id="subBoardNeutralIsRepetitive"
+                                  checked={newSubBoardActivityType === "neutral"}
+                                  disabled={
+                                    inheritedSubBoardProps.neutral?.isRepetitive !== undefined
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    setNewSubBoardActivityType(checked ? "neutral" : "challenge");
+                                  }}
+                                />
+                                <Label htmlFor="subBoardNeutralIsRepetitive">Repetible</Label>
+                                {inheritedSubBoardProps.neutral?.isRepetitive !== undefined && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Heredado
+                                  </Badge>
+                                )}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="inline-flex">
+                                    {inheritedSubBoardProps.neutral?.isRepetitive !== undefined && (
+                                      <span className="sr-only">Info</span>
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {inheritedSubBoardProps.neutral?.isRepetitive !== undefined && (
+                                    <p>
+                                      Esta propiedad está heredada del tablero padre y no puede ser
+                                      modificada
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <TooltipProvider>
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="subBoardNeutralAllowedTime">
+                                  Tiempo Permitido (minutos)
+                                </Label>
+                                {inheritedSubBoardProps.neutral?.allowedTime !== undefined && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Heredado
+                                  </Badge>
+                                )}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div>
+                                    <Input
+                                      id="subBoardNeutralAllowedTime"
+                                      type="number"
+                                      value={
+                                        inheritedSubBoardProps.neutral?.allowedTime ??
+                                        newSubBoardActivityAllowedTime
+                                      }
+                                      onChange={(e) =>
+                                        setNewSubBoardActivityAllowedTime(Number(e.target.value))
+                                      }
+                                      min={1}
+                                      max={960}
+                                      disabled={
+                                        inheritedSubBoardProps.neutral?.allowedTime !== undefined
+                                      }
+                                      className={
+                                        inheritedSubBoardProps.neutral?.allowedTime !== undefined
+                                          ? "bg-muted"
+                                          : ""
+                                      }
+                                    />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {inheritedSubBoardProps.neutral?.allowedTime !== undefined && (
+                                    <p>
+                                      Este valor está heredado del tablero padre y no puede ser
+                                      modificado
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="hobby">
+                      <AccordionTrigger>Propiedades para Hobbies</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <TooltipProvider>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id="subBoardHobbyIsRepetitive"
+                                  checked={newSubBoardActivityType === "discount"}
+                                  disabled={
+                                    inheritedSubBoardProps.discount?.isRepetitive !== undefined
+                                  }
+                                  onCheckedChange={(checked) => {
+                                    setNewSubBoardActivityType(checked ? "discount" : "neutral");
+                                  }}
+                                />
+                                <Label htmlFor="subBoardHobbyIsRepetitive">Repetible</Label>
+                                {inheritedSubBoardProps.discount?.isRepetitive !== undefined && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Heredado
+                                  </Badge>
+                                )}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="inline-flex">
+                                    {inheritedSubBoardProps.discount?.isRepetitive !==
+                                      undefined && <span className="sr-only">Info</span>}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {inheritedSubBoardProps.discount?.isRepetitive !== undefined && (
+                                    <p>
+                                      Esta propiedad está heredada del tablero padre y no puede ser
+                                      modificada
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <TooltipProvider>
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="subBoardHobbyAllowedTime">
+                                  Tiempo Permitido (minutos)
+                                </Label>
+                                {inheritedSubBoardProps.discount?.allowedTime !== undefined && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Heredado
+                                  </Badge>
+                                )}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div>
+                                    <Input
+                                      id="subBoardHobbyAllowedTime"
+                                      type="number"
+                                      value={
+                                        inheritedSubBoardProps.discount?.allowedTime ??
+                                        newSubBoardActivityAllowedTime
+                                      }
+                                      onChange={(e) =>
+                                        setNewSubBoardActivityAllowedTime(Number(e.target.value))
+                                      }
+                                      min={1}
+                                      max={960}
+                                      disabled={
+                                        inheritedSubBoardProps.discount?.allowedTime !== undefined
+                                      }
+                                      className={
+                                        inheritedSubBoardProps.discount?.allowedTime !== undefined
+                                          ? "bg-muted"
+                                          : ""
+                                      }
+                                    />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {inheritedSubBoardProps.discount?.allowedTime !== undefined && (
+                                    <p>
+                                      Este valor está heredado del tablero padre y no puede ser
+                                      modificado
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <TooltipProvider>
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="subBoardHobbyConsumptionRate">
+                                  Tasa de Consumo (0-1)
+                                </Label>
+                                {inheritedSubBoardProps.discount?.tempoConsumptionRate !==
+                                  undefined && (
+                                  <Badge variant="outline" className="text-[10px]">
+                                    Heredado
+                                  </Badge>
+                                )}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div>
+                                    <Input
+                                      id="subBoardHobbyConsumptionRate"
+                                      type="number"
+                                      value={
+                                        inheritedSubBoardProps.discount?.tempoConsumptionRate ??
+                                        newSubBoardActivityConsumptionRate
+                                      }
+                                      onChange={(e) =>
+                                        setNewSubBoardActivityConsumptionRate(
+                                          Number(e.target.value)
+                                        )
+                                      }
+                                      min={0.1}
+                                      max={0.9}
+                                      step={0.1}
+                                      disabled={
+                                        inheritedSubBoardProps.discount?.tempoConsumptionRate !==
+                                        undefined
+                                      }
+                                      className={
+                                        inheritedSubBoardProps.discount?.tempoConsumptionRate !==
+                                        undefined
+                                          ? "bg-muted"
+                                          : ""
+                                      }
+                                    />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {inheritedSubBoardProps.discount?.tempoConsumptionRate !==
+                                    undefined && (
+                                    <p>
+                                      Este valor está heredado del tablero padre y no puede ser
+                                      modificado
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button
+                  onClick={handleCreateSubBoard}
+                  disabled={isLoading || isLoadingSubBoardInheritedData}
+                >
+                  Crear
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {!board.parentBoardId && (
             <Dialog>
               <DialogTrigger asChild>
