@@ -6,6 +6,7 @@ import type {
   HobbyActivity,
   NeutralActivity,
   ExpirationChallengeConstraint,
+  SystemParams,
 } from "@core/types";
 import { Badge } from "@shadcn/badge";
 import { Button } from "@shadcn/button";
@@ -213,9 +214,16 @@ const NeutralOrHobbyDetails: React.FC<{ activity: NeutralActivity | HobbyActivit
   activity,
 }) => {
   const engine = useSystemEngineContext();
+  const { uiState } = useUiStateContext();
   if (activity.type !== "neutral" && activity.type !== "discount") return null;
 
   const progress = engine.activity.calculateProgress(activity);
+
+  // Calcular tasa efectiva para hobbies (solo si es tipo discount)
+  const effectiveRate =
+    activity.type === "discount"
+      ? activity.tempoConsumptionRate * uiState.systemParams.passiveTempoConsumptionRate
+      : 0;
 
   return (
     <div className="mt-2 text-sm">
@@ -233,12 +241,20 @@ const NeutralOrHobbyDetails: React.FC<{ activity: NeutralActivity | HobbyActivit
           />
         </div>
       </div>
-      {activity.type === "discount" && <p>Tasa: -{activity.tempoConsumptionRate} tempo/min</p>}
+      {activity.type === "discount" && (
+        <div>
+          <p>Tasa base: -{activity.tempoConsumptionRate} tempo/min</p>
+          <p>Tasa efectiva: -{effectiveRate.toFixed(2)} tempo/min</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            (Energía día: {uiState.systemParams.passiveTempoConsumptionRate * 100}%)
+          </p>
+        </div>
+      )}
     </div>
   );
 };
 
-const getUnselectMessage = (activity: Activity) => {
+const getUnselectMessage = (activity: Activity, systemParams: SystemParams) => {
   if (activity.type === "challenge") {
     return "Al deseleccionar un desafío, podrás retomarlo más tarde desde donde lo dejaste.";
   }
@@ -255,7 +271,14 @@ const getUnselectMessage = (activity: Activity) => {
   }
 
   if (activity.type === "discount") {
-    const compensation = remainingTime * activity.tempoConsumptionRate;
+    // Calcular la compensación correctamente: tiempo no utilizado * ahorro por minuto
+    // Ahorro por minuto = tasa consumo pasivo - (tasa consumo pasivo * tasa consumo hobby)
+    const compensationFactor =
+      systemParams.passiveTempoConsumptionRate -
+      systemParams.passiveTempoConsumptionRate * activity.tempoConsumptionRate;
+
+    const compensation = remainingTime * compensationFactor;
+
     const formattedCompensation = Number.isInteger(compensation)
       ? compensation.toString()
       : compensation.toFixed(1);
@@ -376,7 +399,6 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
     return endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   }, [isSelected, activity, uiState.lastUpdateTimestamp]);
 
-  const isChallenge = activity.type === "challenge";
   const isNeutral = activity.type === "neutral";
   const isHobby = activity.type === "discount";
   const isNeutralOrHobby = isNeutral || isHobby;
@@ -387,10 +409,6 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
 
   const isConsumptionRateInherited = React.useMemo(() => {
     return isHobby && activity.inheritedProps?.tempoConsumptionRate !== undefined;
-  }, [activity]);
-
-  const areConstraintsInherited = React.useMemo(() => {
-    return isChallenge && activity.constraintList.some((c) => !!c.parentConstraintId);
   }, [activity]);
 
   const handleAction = async (action: () => Promise<void>) => {
@@ -634,7 +652,9 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                                     {(
                                       (uiState.selectedActivity.allowedTime -
                                         uiState.selectedActivity.minutesActive) *
-                                      uiState.selectedActivity.tempoConsumptionRate
+                                      (uiState.systemParams.passiveTempoConsumptionRate -
+                                        uiState.systemParams.passiveTempoConsumptionRate *
+                                          uiState.selectedActivity.tempoConsumptionRate)
                                     ).toFixed(1)}{" "}
                                     tempos)
                                   </span>
@@ -679,7 +699,9 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Confirmar Deselección</DialogTitle>
-                  <DialogDescription>{getUnselectMessage(activity)}</DialogDescription>
+                  <DialogDescription>
+                    {getUnselectMessage(activity, uiState.systemParams)}
+                  </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                   <Button onClick={handleUnselect} disabled={isLoading}>

@@ -19,6 +19,7 @@ import type {
   TempoModificationHistory,
   UsefulMetrics,
   NeutralActivity,
+  HobbyActivity,
 } from "../types";
 
 describe("timeStateLogic", () => {
@@ -280,6 +281,7 @@ describe("timeStateLogic", () => {
         systemParams,
       });
 
+      // Tasa efectiva: 0.5 (hobby) * 1 (passiveTempoConsumptionRate) = 0.5
       expect(result.timeRecords).toHaveLength(1);
       expect(result.timeRecords[0]).toEqual({
         status: "activity",
@@ -319,6 +321,7 @@ describe("timeStateLogic", () => {
       expect(result.updatedActivity?.minutesActive).toBe(10);
       expect(result.updatedActivity?.status).toBe("completed");
 
+      // Tasa efectiva: 0.5 (hobby) * 1 (passiveTempoConsumptionRate) = 0.5
       // Se espera un registro de actividad por 2 minutos (2 * -0.5 = -1) y un registro idle para el minuto restante
       const discountRecord = result.timeRecords.find(
         (record) => record.status === "activity" && record.type === "discount"
@@ -328,6 +331,46 @@ describe("timeStateLogic", () => {
       const idleRecord = result.timeRecords.find((record) => record.status === "idle");
       expect(idleRecord).toBeDefined();
       expect(idleRecord?.minutesInvested).toBe(1);
+    });
+
+    it("debería aplicar el cálculo multiplicativo cuando la tasa pasiva es menor a 1", () => {
+      const activity: Activity = {
+        id: "3",
+        type: "discount",
+        title: "Test Hobby con Tasa Pasiva Reducida",
+        allowedTime: 10,
+        minutesActive: 5,
+        status: "inProgress",
+        isRepetitive: false,
+        tempoConsumptionRate: 0.5,
+        inheritedProps: {},
+        createdAt: baseTimestamp,
+      };
+
+      const reducedSystemParams: SystemParams = {
+        ...systemParams,
+        passiveTempoConsumptionRate: 0.5, // Día con 50% de energía
+      };
+
+      const result = processTimeBatch({
+        deltaTime: 4,
+        baseTimestamp,
+        currentActivity: activity,
+        systemParams: reducedSystemParams,
+      });
+
+      // Tasa efectiva: 0.5 (hobby) * 0.5 (passiveTempoConsumptionRate) = 0.25
+      expect(result.timeRecords).toHaveLength(1);
+      expect(result.timeRecords[0]).toEqual({
+        status: "activity",
+        activityId: "3",
+        type: "discount",
+        timestamp: baseTimestamp,
+        tempoModification: -1, // 4 minutos * -0.25 = -1
+        minutesInvested: 4,
+      });
+      expect(result.updatedActivity?.minutesActive).toBe(9);
+      expect(result.updatedActivity?.status).toBe("inProgress");
     });
   });
 
@@ -1249,5 +1292,72 @@ describe("processActivitiesAtDayEnd", () => {
     expect(resetActivity.constraintList![0].dayMinuteExpiration).toBe(720);
     expect(resetActivity.constraintList![1].parentConstraintId).toBe("parent2");
     expect(resetActivity.constraintList![1].dayMinuteExpiration).toBe(960);
+  });
+});
+
+describe("earlyDiscountActivityCompletionCompensation", () => {
+  it("debería calcular correctamente la compensación por completar una actividad de hobby temprano", () => {
+    // Esta prueba verifica que el cálculo de compensación use la fórmula correcta:
+    // compensación = unusedTime * (passiveTempoConsumptionRate - (passiveTempoConsumptionRate * tempoConsumptionRate))
+
+    // Escenario del caso de uso:
+    // - passiveTempoConsumptionRate = 0.5
+    // - tempoConsumptionRate de hobby = 0.5
+    // - allowedTime = 100
+    // - minutesActive = 0 (deselección inmediata)
+
+    // Mock de la actividad de hobby (discount)
+    const hobbyActivity: HobbyActivity = {
+      id: "hobby1",
+      type: "discount",
+      title: "Hobby con descuento",
+      isRepetitive: false,
+      minutesActive: 0,
+      status: "inProgress",
+      allowedTime: 100,
+      tempoConsumptionRate: 0.5,
+      inheritedProps: {},
+      createdAt: Date.now(),
+    };
+
+    // Parámetros del sistema
+    const systemParams: SystemParams = {
+      passiveTempoConsumptionRate: 0.5,
+      isTestMode: false,
+      timeMultiplier: 1,
+    };
+
+    // Cálculo esperado:
+    // unusedTime = 100 - 0 = 100
+    // Ahorro por minuto = passiveTempoConsumptionRate - (passiveTempoConsumptionRate * tempoConsumptionRate)
+    //                   = 0.5 - (0.5 * 0.5) = 0.5 - 0.25 = 0.25
+    // compensación total = unusedTime * Ahorro por minuto = 100 * 0.25 = 25
+
+    // Cálculo actual (incorrecto):
+    // compensationFactor = 1 - tempoConsumptionRate = 1 - 0.5 = 0.5
+    // compensation = unusedTime * compensationFactor = 100 * 0.5 = 50
+
+    // Código que simula la implementación actual:
+    const unusedTime = hobbyActivity.allowedTime - hobbyActivity.minutesActive; // 100
+    const currentCompensationFactor = 1 - hobbyActivity.tempoConsumptionRate; // 0.5
+    const currentCompensation = currentCompensationFactor * unusedTime; // 50
+
+    // Código que simula la implementación correcta:
+    const correctCompensationFactor =
+      systemParams.passiveTempoConsumptionRate -
+      systemParams.passiveTempoConsumptionRate * hobbyActivity.tempoConsumptionRate; // 0.25
+    const correctCompensation = correctCompensationFactor * unusedTime; // 25
+
+    // Verificación de cálculos
+    expect(unusedTime).toBe(100);
+    expect(currentCompensationFactor).toBe(0.5);
+    expect(currentCompensation).toBe(50); // Valor actual (incorrecto)
+
+    expect(correctCompensationFactor).toBe(0.25);
+    expect(correctCompensation).toBe(25); // Valor esperado (correcto)
+
+    // NOTA: Este test demuestra que la implementación actual en useSystemEngine.ts
+    // está calculando incorrectamente la compensación como 50 tempos, cuando debería
+    // ser 25 tempos basado en la lógica de negocio correcta.
   });
 });

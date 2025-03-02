@@ -253,19 +253,22 @@ const Timeline: React.FC<TimelineProps> = ({
     let type: Activity["type"] | "idle" | "remaining" = "idle";
     let title = "Inactivo";
 
+    // Guardamos el registro para usarlo tanto en la lógica como en el render
+    const record = !isRemainingTime
+      ? investedTimeHistory.find((h) => {
+          const recordStartMinute = Math.floor(
+            (new Date(h.timestamp).getTime() - dayStartDate.getTime()) / 60000
+          );
+          return (
+            startMinute === recordStartMinute && endMinute === recordStartMinute + h.minutesInvested
+          );
+        })
+      : undefined;
+
     if (isRemainingTime) {
       type = "remaining";
       title = "Tiempo Restante";
     } else {
-      const record = investedTimeHistory.find((h) => {
-        const recordStartMinute = Math.floor(
-          (new Date(h.timestamp).getTime() - dayStartDate.getTime()) / 60000
-        );
-        return (
-          startMinute === recordStartMinute && endMinute === recordStartMinute + h.minutesInvested
-        );
-      });
-
       if (!record) {
         return null;
       }
@@ -297,6 +300,11 @@ const Timeline: React.FC<TimelineProps> = ({
             <p className="text-sm text-muted-foreground">
               {formatTimeRange(dayStartDate, startMinute, endMinute - startMinute)}
             </p>
+            {type !== "remaining" && record && (
+              <p className="text-sm text-muted-foreground">
+                Modificación de tempo: {record.tempoModification}
+              </p>
+            )}
           </div>
         </TooltipContent>
       </Tooltip>

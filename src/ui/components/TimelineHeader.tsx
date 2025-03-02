@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 import { Badge } from "./shadcn/badge";
 import { Button } from "./shadcn/button";
@@ -14,9 +14,10 @@ import {
 } from "./shadcn/dialog";
 import { ThemeToggle } from "./theme-toggle";
 import Timeline from "./Timeline";
+import PassiveTempoConsumptionRatioModal from "./PassiveTempoConsumptionRatioModal";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
-import type { Activity } from "@/core/types";
+import type { Activity, SystemParams } from "@/core/types";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
 
 const formatTime = (minutes: number): string => {
@@ -157,6 +158,7 @@ const SelectedActivityCard: React.FC<{ activity: Activity }> = ({ activity }) =>
 const TimelineHeader: React.FC = () => {
   const { uiState } = useUiStateContext();
   const systemEngine = useSystemEngineContext();
+  const [showEnergyModal, setShowEnergyModal] = useState(false);
 
   const { remainingTime, endTime, currentMinute } = systemEngine.day.calculateProgress(
     uiState.currentDay
@@ -167,6 +169,28 @@ const TimelineHeader: React.FC = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // Obtener la tasa de consumo del día anterior (si existe)
+  const getPreviousDayRate = () => {
+    // Obtenemos la tasa de consumo actual como valor por defecto
+    return uiState.systemParams.passiveTempoConsumptionRate;
+  };
+
+  const handleStartDay = async (rate?: number) => {
+    if (rate !== undefined) {
+      // Primero actualizamos el parámetro de tasa de consumo
+      await systemEngine.updateSystemParams({
+        ...uiState.systemParams,
+        passiveTempoConsumptionRate: rate,
+      });
+    }
+    // Luego iniciamos el día
+    await systemEngine.day.startDay();
+  };
+
+  const handleConfirmEnergyRate = async (rate: number) => {
+    await handleStartDay(rate);
   };
 
   if (!uiState.currentDay) {
@@ -185,23 +209,15 @@ const TimelineHeader: React.FC = () => {
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>Comenzar Día</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Comenzar Día</DialogTitle>
-                <DialogDescription>
-                  ¿Deseas comenzar un nuevo día? Se iniciará con la hora actual y durará 960 minutos
-                  (16 horas).
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onClick={() => systemEngine.day.startDay()}>Comenzar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setShowEnergyModal(true)}>Comenzar Día</Button>
+
+          {/* Modal para establecer la tasa de consumo de energía */}
+          <PassiveTempoConsumptionRatioModal
+            isOpen={showEnergyModal}
+            onClose={() => setShowEnergyModal(false)}
+            onConfirm={handleConfirmEnergyRate}
+            previousDayRate={getPreviousDayRate()}
+          />
         </div>
       </div>
     );
