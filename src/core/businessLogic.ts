@@ -83,8 +83,8 @@ export function calculateNewBalances({
   tempoModification: number;
 }): { newDayTempoBalance: number; newTotalTempoBalance: number } {
   return {
-    newDayTempoBalance: currentDayBalance + tempoModification,
-    newTotalTempoBalance: totalBalance + tempoModification,
+    newDayTempoBalance: Number((currentDayBalance + tempoModification).toFixed(2)),
+    newTotalTempoBalance: Number((totalBalance + tempoModification).toFixed(2)),
   };
 }
 
@@ -213,6 +213,10 @@ export const processTimeBatch = ({
         activeMinutes = Math.min(deltaTime, remaining);
         const idleMinutes = deltaTime - activeMinutes;
 
+        // Calcular tasa de consumo multiplicativa (hobby × pasiva)
+        const effectiveConsumptionRate =
+          currentActivity.tempoConsumptionRate * systemParams.passiveTempoConsumptionRate;
+
         // Registrar tiempo con descuento
         if (activeMinutes > 0) {
           records.push({
@@ -220,7 +224,7 @@ export const processTimeBatch = ({
             activityId: currentActivity.id,
             type: "discount",
             timestamp: baseTimestamp,
-            tempoModification: activeMinutes * -currentActivity.tempoConsumptionRate,
+            tempoModification: activeMinutes * -effectiveConsumptionRate,
             minutesInvested: activeMinutes,
           });
         }

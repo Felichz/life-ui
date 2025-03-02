@@ -400,16 +400,19 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
   const _applyDiscountActivityEarlyCompletionCompensation = useCallback(
     async ({ activity }: { activity: HobbyActivity }) => {
-      const { lastUpdateTimestamp } = await systemApi.getPersistedState();
+      const { lastUpdateTimestamp, systemParams } = await systemApi.getPersistedState();
 
       // Calculamos el tiempo restante no utilizado
       const unusedTime = activity.allowedTime - activity.minutesActive;
 
-      // Calculamos el factor de compensación basado en la tasa de consumo
-      // Si tempoConsumptionRate es 0.6, entonces el factor será 0.4 (1 - 0.6)
-      const compensationFactor = 1 - activity.tempoConsumptionRate;
+      // Calculamos el ahorro por minuto (diferencia entre consumo pasivo normal y consumo con descuento)
+      // Consumo pasivo normal: passiveTempoConsumptionRate
+      // Consumo con descuento: passiveTempoConsumptionRate * tempoConsumptionRate
+      const compensationFactor =
+        systemParams.passiveTempoConsumptionRate -
+        systemParams.passiveTempoConsumptionRate * activity.tempoConsumptionRate;
 
-      // La compensación final es el tiempo no utilizado multiplicado por el factor
+      // La compensación final es el tiempo no utilizado multiplicado por el ahorro por minuto
       const compensation = compensationFactor * unusedTime;
 
       const tempoModificationRecord: TempoModificationRecord = {

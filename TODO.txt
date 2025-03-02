@@ -12,8 +12,6 @@ Para grooming:
 
 Features que faltan implementar:
     POC:
-        - Al comenzar el dia se debe mostrar un modal para establecer el passive tempo consumption ratio, dependiendo de cuanto de mi creo que puedo dar en el dia, el valor ingresado en el ui debe ser un porcentaje restringido entre 0% y 200% siendo el default 100% en caso de ser el primer dia de la historia, pero en caso de que ya haya un historial creado se debe establecer como default el valor del dia anterior, si ayer puse que podia dar un 50% de mi energia, entonces mostramos 50% como default, lo que seria un consumption rate de 0.5
-
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
 
         - El modal de creacion de actividad debe incluir las propiedades heredadas de todos los board padres no solo del padre directo, debe reflejar la realidad que se vera despues de crear la actividad de verdad, se deberia obtener la informacion de la misma fuente

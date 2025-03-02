@@ -958,9 +958,13 @@ class SystemAPI implements SystemAPIType {
 
     const prevDayTempoBalance = currentDay?.dayTempoBalance ?? 0;
 
+    // Aplicamos redondeo a dos decimales máximo
+    const newTotalTempoBalance = Number((state.totalTempoBalance + tempoModification).toFixed(2));
+    const newDayTempoBalance = Number((prevDayTempoBalance + tempoModification).toFixed(2));
+
     return {
-      totalTempoBalance: state.totalTempoBalance + tempoModification,
-      dayTempoBalance: prevDayTempoBalance + tempoModification,
+      totalTempoBalance: newTotalTempoBalance,
+      dayTempoBalance: newDayTempoBalance,
     };
   }
 
