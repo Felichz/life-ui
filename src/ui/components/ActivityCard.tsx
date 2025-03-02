@@ -604,10 +604,59 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Confirmar Selección</DialogTitle>
-                <DialogDescription>
-                  {uiState.selectedActivity
-                    ? "Ya hay una actividad en progreso. Se deseleccionará la actividad actual y se seleccionará esta nueva."
-                    : "¿Deseas comenzar esta actividad?"}
+                <DialogDescription className="space-y-2">
+                  {uiState.selectedActivity ? (
+                    <>
+                      <p>Ya hay una actividad en progreso. Al seleccionar esta nueva:</p>
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>
+                          La actividad actual "{uiState.selectedActivity.title}" será deseleccionada
+                        </li>
+                        {(uiState.selectedActivity.type === "neutral" ||
+                          uiState.selectedActivity.type === "discount") &&
+                          uiState.selectedActivity.minutesActive <
+                            uiState.selectedActivity.allowedTime && (
+                            <li>
+                              Se aplicará la compensación correspondiente por tiempo no utilizado
+                              {uiState.selectedActivity.type === "neutral" ? (
+                                <span className="text-green-500 font-medium">
+                                  {" "}
+                                  (+
+                                  {uiState.selectedActivity.allowedTime -
+                                    uiState.selectedActivity.minutesActive}{" "}
+                                  tempos)
+                                </span>
+                              ) : (
+                                uiState.selectedActivity.type === "discount" && (
+                                  <span className="text-green-500 font-medium">
+                                    {" "}
+                                    (+
+                                    {(
+                                      (uiState.selectedActivity.allowedTime -
+                                        uiState.selectedActivity.minutesActive) *
+                                      uiState.selectedActivity.tempoConsumptionRate
+                                    ).toFixed(1)}{" "}
+                                    tempos)
+                                  </span>
+                                )
+                              )}
+                            </li>
+                          )}
+                        {(uiState.selectedActivity.type === "neutral" ||
+                          uiState.selectedActivity.type === "discount") &&
+                          uiState.selectedActivity.minutesActive >=
+                            uiState.selectedActivity.allowedTime && (
+                            <li>
+                              La actividad actual se marcará como completada al haber usado todo su
+                              tiempo
+                            </li>
+                          )}
+                        <li>La nueva actividad "{activity.title}" se establecerá como activa</li>
+                      </ul>
+                    </>
+                  ) : (
+                    "¿Deseas comenzar esta actividad?"
+                  )}
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

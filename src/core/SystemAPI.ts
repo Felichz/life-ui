@@ -785,11 +785,66 @@ class SystemAPI implements SystemAPIType {
   async setSelectedActivity(activity: Activity): Promise<void> {
     const state = await this.getState();
 
-    await this.saveState({ ...state, selectedActivity: activity?.id });
+    // Si hay una actividad seleccionada actualmente, vamos a asegurarnos
+    // de que se actualice su estado antes de establecer la nueva
+    if (state.selectedActivity) {
+      const currentActivity = state.activities[state.selectedActivity];
+
+      // Determinar si la actividad actual debería marcarse como completada
+      if (currentActivity) {
+        let shouldMarkAsCompleted = false;
+
+        if (currentActivity.type === "neutral" || currentActivity.type === "discount") {
+          // Siempre marcamos como completed las actividades neutral y discount al cambiar de actividad
+          shouldMarkAsCompleted = true;
+
+          // Si debe marcarse como completada, actualizamos su estado
+          if (shouldMarkAsCompleted) {
+            state.activities[currentActivity.id] = {
+              ...state.activities[currentActivity.id],
+              status: "completed",
+            };
+          }
+        }
+      }
+    }
+
+    // Ahora establecemos la nueva actividad seleccionada
+    await this.saveState({ ...state, selectedActivity: activity.id });
   }
 
   async unselectActivity(): Promise<void> {
     const state = await this.getState();
+
+    // Si hay una actividad seleccionada actualmente
+    if (state.selectedActivity) {
+      const currentActivity = state.activities[state.selectedActivity];
+
+      // Determinar si la actividad actual debería marcarse como completada
+      if (currentActivity) {
+        let shouldMarkAsCompleted = false;
+
+        if (currentActivity.type === "neutral" || currentActivity.type === "discount") {
+          // Siempre marcamos como completed las actividades neutral y discount al deseleccionar
+          shouldMarkAsCompleted = true;
+
+          // Si debe marcarse como completada, actualizamos su estado
+          if (shouldMarkAsCompleted) {
+            state.activities[currentActivity.id] = {
+              ...state.activities[currentActivity.id],
+              status: "completed",
+            };
+          }
+        } else if (currentActivity.type === "challenge") {
+          // Para actividades challenge, marcamos como toDo al deseleccionar
+          state.activities[currentActivity.id] = {
+            ...state.activities[currentActivity.id],
+            status: "toDo",
+          };
+        }
+      }
+    }
+
     await this.saveState({ ...state, selectedActivity: undefined });
   }
 
