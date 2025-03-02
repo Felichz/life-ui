@@ -133,11 +133,18 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   }, [systemApi]);
 
   const endDay = useCallback(async () => {
-    const persistedState = await systemApi.getPersistedState();
+    let persistedState = await systemApi.getPersistedState();
 
     if (!persistedState.currentDay) {
       throw new Error("No hay un día activo para crear el registro");
     }
+
+    // Si hay una actividad seleccionada, deseleccionarla al finalizar el día
+    if (persistedState.selectedActivity) {
+      await unselectCurrentyActivity();
+    }
+
+    persistedState = await systemApi.getPersistedState();
 
     // Crear el registro del día usando la función pura
     const dayRecord = await createCurrentDayRecord();
@@ -494,7 +501,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   /**
    * Seleccionar o quitar selección de actividad:
    */
-  const unselectActivity = useCallback(async () => {
+  const unselectCurrentyActivity = useCallback(async () => {
     // Obtenemos la actividad actual antes de deseleccionarla
     const currentActivity = await systemApi.getSelectedActivity();
 
@@ -558,7 +565,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       // Si hay una actividad seleccionada, aplicamos la lógica de deselección
       if (currentActivity) {
-        await unselectActivity();
+        await unselectCurrentyActivity();
       }
 
       // Primero actualizamos el estado de la actividad a "inProgress"
@@ -572,7 +579,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       await _syncUiStateFromPersisted();
     },
-    [_syncUiStateFromPersisted, unselectActivity]
+    [_syncUiStateFromPersisted, unselectCurrentyActivity]
   );
 
   /**
@@ -754,7 +761,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       updateActivity,
       removeActivity,
       selectActivity,
-      unselectActivity,
+      unselectCurrentyActivity,
       completeChallenge,
       calculateProgress: calculateActivityProgress,
       validate: validateNewActivity,

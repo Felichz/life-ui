@@ -413,7 +413,7 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   const handleUnselect = async () => {
     try {
       setIsLoading(true);
-      await engine.activity.unselectActivity();
+      await engine.activity.unselectCurrentyActivity();
       setIsUnselectDialogOpen(false);
     } catch (error) {
       console.error("Error en la acción:", error);

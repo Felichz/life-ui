@@ -174,6 +174,11 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   const [newSubBoardActivityType, setNewSubBoardActivityType] = React.useState<
     "neutral" | "challenge" | "discount"
   >("challenge");
+  const [repeatableSubBoardTypes, setRepeatableSubBoardTypes] = React.useState({
+    challenge: false,
+    neutral: false,
+    discount: false,
+  });
   const [newSubBoardActivityAllowedTime, setNewSubBoardActivityAllowedTime] = React.useState(30);
   const [newSubBoardActivityConsumptionRate, setNewSubBoardActivityConsumptionRate] =
     React.useState(0.5);
@@ -575,26 +580,26 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
       const activityProps: Board["activityProps"] = {};
 
-      if (newSubBoardActivityType === "challenge" || newSubBoardActivityConstraints.length > 0) {
+      if (repeatableSubBoardTypes.challenge || newSubBoardActivityConstraints.length > 0) {
         activityProps.challenge = {
-          isRepetitive: newSubBoardActivityType === "challenge",
+          isRepetitive: repeatableSubBoardTypes.challenge,
         };
       }
 
-      if (newSubBoardActivityType === "neutral" || newSubBoardActivityAllowedTime !== 30) {
+      if (repeatableSubBoardTypes.neutral || newSubBoardActivityAllowedTime !== 30) {
         activityProps.neutral = {
-          isRepetitive: newSubBoardActivityType === "neutral",
+          isRepetitive: repeatableSubBoardTypes.neutral,
           allowedTime: newSubBoardActivityAllowedTime,
         };
       }
 
       if (
-        newSubBoardActivityType === "discount" ||
+        repeatableSubBoardTypes.discount ||
         newSubBoardActivityAllowedTime !== 30 ||
         newSubBoardActivityConsumptionRate !== 0.5
       ) {
         activityProps.discount = {
-          isRepetitive: newSubBoardActivityType === "discount",
+          isRepetitive: repeatableSubBoardTypes.discount,
           allowedTime: newSubBoardActivityAllowedTime,
           tempoConsumptionRate: newSubBoardActivityConsumptionRate,
         };
@@ -615,6 +620,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
       // Reiniciar estados
       setNewSubBoardTitle("");
       setNewSubBoardActivityType("challenge");
+      setRepeatableSubBoardTypes({ challenge: false, neutral: false, discount: false });
       setNewSubBoardActivityAllowedTime(30);
       setNewSubBoardActivityConsumptionRate(0.5);
       setNewSubBoardActivityConstraints([]);
@@ -1588,12 +1594,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                               <div className="flex items-center gap-2">
                                 <Checkbox
                                   id="subBoardChallengeIsRepetitive"
-                                  checked={newSubBoardActivityType === "challenge"}
+                                  checked={repeatableSubBoardTypes.challenge}
                                   disabled={
                                     inheritedSubBoardProps.challenge?.isRepetitive !== undefined
                                   }
                                   onCheckedChange={(checked) => {
-                                    setNewSubBoardActivityType(checked ? "challenge" : "neutral");
+                                    setRepeatableSubBoardTypes({
+                                      ...repeatableSubBoardTypes,
+                                      challenge: checked as boolean,
+                                    });
                                   }}
                                 />
                                 <Label htmlFor="subBoardChallengeIsRepetitive">Repetible</Label>
@@ -1757,12 +1766,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                               <div className="flex items-center gap-2">
                                 <Checkbox
                                   id="subBoardNeutralIsRepetitive"
-                                  checked={newSubBoardActivityType === "neutral"}
+                                  checked={repeatableSubBoardTypes.neutral}
                                   disabled={
                                     inheritedSubBoardProps.neutral?.isRepetitive !== undefined
                                   }
                                   onCheckedChange={(checked) => {
-                                    setNewSubBoardActivityType(checked ? "neutral" : "challenge");
+                                    setRepeatableSubBoardTypes({
+                                      ...repeatableSubBoardTypes,
+                                      neutral: checked as boolean,
+                                    });
                                   }}
                                 />
                                 <Label htmlFor="subBoardNeutralIsRepetitive">Repetible</Label>
@@ -1854,12 +1866,15 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                               <div className="flex items-center gap-2">
                                 <Checkbox
                                   id="subBoardHobbyIsRepetitive"
-                                  checked={newSubBoardActivityType === "discount"}
+                                  checked={repeatableSubBoardTypes.discount}
                                   disabled={
                                     inheritedSubBoardProps.discount?.isRepetitive !== undefined
                                   }
                                   onCheckedChange={(checked) => {
-                                    setNewSubBoardActivityType(checked ? "discount" : "neutral");
+                                    setRepeatableSubBoardTypes({
+                                      ...repeatableSubBoardTypes,
+                                      discount: checked as boolean,
+                                    });
                                   }}
                                 />
                                 <Label htmlFor="subBoardHobbyIsRepetitive">Repetible</Label>
@@ -2083,6 +2098,11 @@ const BoardsColumn: React.FC = () => {
   const [newActivityType, setNewActivityType] = React.useState<
     "neutral" | "challenge" | "discount"
   >("challenge");
+  const [repeatableTypes, setRepeatableTypes] = React.useState({
+    challenge: false,
+    neutral: false,
+    discount: false,
+  });
   const [newActivityTitle, setNewActivityTitle] = React.useState("");
   const [newActivityAllowedTime, setNewActivityAllowedTime] = React.useState(30);
   const [newActivityTempoReward, setNewActivityTempoReward] = React.useState(30);
@@ -2110,26 +2130,26 @@ const BoardsColumn: React.FC = () => {
 
       const activityProps: Board["activityProps"] = {};
 
-      if (newActivityType === "challenge" || newActivityConstraints.length > 0) {
+      if (repeatableTypes.challenge || newActivityConstraints.length > 0) {
         activityProps.challenge = {
-          isRepetitive: newActivityType === "challenge",
+          isRepetitive: repeatableTypes.challenge,
         };
       }
 
-      if (newActivityType === "neutral" || newActivityAllowedTime !== 30) {
+      if (repeatableTypes.neutral || newActivityAllowedTime !== 30) {
         activityProps.neutral = {
-          isRepetitive: newActivityType === "neutral",
+          isRepetitive: repeatableTypes.neutral,
           allowedTime: newActivityAllowedTime,
         };
       }
 
       if (
-        newActivityType === "discount" ||
+        repeatableTypes.discount ||
         newActivityAllowedTime !== 30 ||
         newActivityConsumptionRate !== 0.5
       ) {
         activityProps.discount = {
-          isRepetitive: newActivityType === "discount",
+          isRepetitive: repeatableTypes.discount,
           allowedTime: newActivityAllowedTime,
           tempoConsumptionRate: newActivityConsumptionRate,
         };
@@ -2149,6 +2169,7 @@ const BoardsColumn: React.FC = () => {
 
       setNewBoardTitle("");
       setNewActivityType("challenge");
+      setRepeatableTypes({ challenge: false, neutral: false, discount: false });
       setNewActivityAllowedTime(30);
       setNewActivityTempoReward(30);
       setNewActivityConsumptionRate(0.5);
@@ -2207,9 +2228,12 @@ const BoardsColumn: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="challengeIsRepetitive"
-                          checked={newActivityType === "challenge"}
+                          checked={repeatableTypes.challenge}
                           onCheckedChange={(checked) => {
-                            setNewActivityType(checked ? "challenge" : "neutral");
+                            setRepeatableTypes({
+                              ...repeatableTypes,
+                              challenge: checked as boolean,
+                            });
                           }}
                         />
                         <Label htmlFor="challengeIsRepetitive">Repetible</Label>
@@ -2332,9 +2356,12 @@ const BoardsColumn: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="neutralIsRepetitive"
-                          checked={newActivityType === "neutral"}
+                          checked={repeatableTypes.neutral}
                           onCheckedChange={(checked) => {
-                            setNewActivityType(checked ? "neutral" : "challenge");
+                            setRepeatableTypes({
+                              ...repeatableTypes,
+                              neutral: checked as boolean,
+                            });
                           }}
                         />
                         <Label htmlFor="neutralIsRepetitive">Repetible</Label>
@@ -2362,9 +2389,12 @@ const BoardsColumn: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="hobbyIsRepetitive"
-                          checked={newActivityType === "discount"}
+                          checked={repeatableTypes.discount}
                           onCheckedChange={(checked) => {
-                            setNewActivityType(checked ? "discount" : "neutral");
+                            setRepeatableTypes({
+                              ...repeatableTypes,
+                              discount: checked as boolean,
+                            });
                           }}
                         />
                         <Label htmlFor="hobbyIsRepetitive">Repetible</Label>
