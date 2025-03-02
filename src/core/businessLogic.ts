@@ -275,12 +275,14 @@ export const evaluateConstraints = ({
   totalTempoReward,
   activity,
   currentTimestamp,
+  dayStartMinute,
 }: {
   constraints: ExpirationChallengeConstraint[];
   currentMinutes: number;
   totalTempoReward: number;
   activity: ChallengeActivity;
   currentTimestamp: number;
+  dayStartMinute?: number; // Nuevo parámetro opcional: minuto del día en que comenzó el día
 }): {
   updatedConstraints: ExpirationChallengeConstraint[];
   failedConstraints: Array<{ constraint: ExpirationChallengeConstraint; penaltyAmount: number }>;
@@ -329,15 +331,23 @@ export const evaluateConstraints = ({
     // Solo evaluamos constraints de expiración que estén activos
     if (constraint.type === "expiration" && constraint.status === "active") {
       if (currentMinutes > constraint.dayMinuteExpiration) {
-        // Verificar si debemos exonerar el constraint
+        // 1. Verificar si debemos exonerar por creación tardía de la actividad
         const expirationMinuteIsBeforeActivityCreationMinute =
           constraint.dayMinuteExpiration < activityCreationMinute;
 
-        const shouldExemptConstraint =
+        const shouldExemptConstraintDueToCreationTime =
           activityWasCreatedToday && expirationMinuteIsBeforeActivityCreationMinute;
+
+        // 2. Verificar si debemos exonerar por inicio tardío del día
+        const expirationMinuteIsBeforeDayStartMinute =
+          dayStartMinute !== undefined && constraint.dayMinuteExpiration < dayStartMinute;
+
+        const shouldExemptConstraint =
+          shouldExemptConstraintDueToCreationTime || expirationMinuteIsBeforeDayStartMinute;
 
         if (shouldExemptConstraint) {
           // Si la actividad fue creada hoy después del minuto de expiración,
+          // o si el día comenzó después del minuto de expiración,
           // simplemente mantenemos el constraint sin cambios
           updatedConstraints.push(constraint);
           return;

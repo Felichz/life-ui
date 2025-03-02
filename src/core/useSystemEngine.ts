@@ -72,22 +72,28 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
     timeSimulator.setTimeMultiplier(persistedState.systemParams.timeMultiplier);
 
-    setUiState((current) => ({
-      ...current,
-      lifecycleState: persistedState.lifecycleState,
-      currentDay: persistedState.currentDay,
-      totalTempoBalance: persistedState.totalTempoBalance,
-      investedTimeHistory: persistedState.investedTimeHistory,
-      tempoModificationHistory: persistedState.tempoModificationHistory,
-      selectedActivity: persistedState.selectedActivity
-        ? persistedState.activities[persistedState.selectedActivity]
-        : undefined,
-      boards: Object.values(persistedState.boards),
-      activities: Object.values(persistedState.activities),
-      usefulMetrics: persistedState.usefulMetrics,
-      systemParams: persistedState.systemParams,
-      lastUpdateTimestamp: persistedState.lastUpdateTimestamp,
-    }));
+    setUiState((current) => {
+      const output = {
+        ...current,
+        lifecycleState: persistedState.lifecycleState,
+        currentDay: persistedState.currentDay,
+        totalTempoBalance: persistedState.totalTempoBalance,
+        investedTimeHistory: persistedState.investedTimeHistory,
+        tempoModificationHistory: persistedState.tempoModificationHistory,
+        selectedActivity: persistedState.selectedActivity
+          ? persistedState.activities[persistedState.selectedActivity]
+          : undefined,
+        boards: Object.values(persistedState.boards),
+        activities: Object.values(persistedState.activities),
+        usefulMetrics: persistedState.usefulMetrics,
+        systemParams: persistedState.systemParams,
+        lastUpdateTimestamp: persistedState.lastUpdateTimestamp,
+      };
+
+      console.log("synced uiState", output);
+
+      return output;
+    });
   }, [setUiState]);
 
   // ===========================
@@ -147,6 +153,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
     // Reiniciar el estado de las actividades repetibles
     for (const activityUpdate of activitiesToReset) {
+      console.log("activityUpdate", activityUpdate);
       await systemApi.updateActivity(activityUpdate);
     }
 
@@ -251,6 +258,13 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   }, [systemApi]);
 
   const _evaluateAllChallengeConstraints = useCallback(async () => {
+    const persistedState = await systemApi.getPersistedState();
+
+    // Verificamos si hay un día activo
+    if (!persistedState.currentDay) {
+      return; // No evaluamos constraints si no hay un día activo
+    }
+
     const challengeActivitiesWithConstraints = await _getAllActivityConstraints();
     const currentMinutes = _getMinutesFromTimestamp(timeSimulator.now());
     const currentTimestamp = timeSimulator.now();
@@ -262,6 +276,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
         totalTempoReward: activity.totalTempoReward,
         activity,
         currentTimestamp,
+        dayStartMinute: persistedState.currentDay.dayStartMinute,
       });
 
       // Creamos una copia actualizada de la actividad con los nuevos constraints
@@ -300,6 +315,11 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       totalTempoBalance,
       selectedActivity,
     } = persistedState;
+
+    // Si no hay un día activo, no procesamos nada
+    if (!currentDay) {
+      return;
+    }
 
     const currentActivity = selectedActivity ? activities[selectedActivity] : undefined;
     const { shouldEndDay, timeRecords, updatedTimestamp, updatedActivity } = updateTimeState({
