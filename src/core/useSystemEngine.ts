@@ -494,8 +494,73 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
   /**
    * Seleccionar o quitar selección de actividad:
    */
+  const unselectActivity = useCallback(async () => {
+    // Obtenemos la actividad actual antes de deseleccionarla
+    const currentActivity = await systemApi.getSelectedActivity();
+
+    // Deseleccionamos la actividad
+    await systemApi.unselectActivity();
+
+    // Si hay una actividad seleccionada, aplicamos la lógica según su tipo
+    if (currentActivity) {
+      let shouldMarkAsCompleted = false;
+
+      switch (currentActivity.type) {
+        case "neutral": {
+          // Para actividades neutrales, compensamos si hay tiempo restante
+          if (currentActivity.minutesActive < currentActivity.allowedTime) {
+            await _applyNeutralActivityEarlyCompletionCompensation({
+              activity: currentActivity,
+            });
+          }
+          // Siempre marcamos como completed al deseleccionar
+          shouldMarkAsCompleted = true;
+          break;
+        }
+        case "discount": {
+          // Para actividades hobby/discount, compensamos según la tasa de consumo
+          if (currentActivity.minutesActive < currentActivity.allowedTime) {
+            await _applyDiscountActivityEarlyCompletionCompensation({
+              activity: currentActivity,
+            });
+          }
+          // Siempre marcamos como completed al deseleccionar
+          shouldMarkAsCompleted = true;
+          break;
+        }
+        case "challenge": {
+          // Para desafíos, simplemente deseleccionamos sin compensación
+          break;
+        }
+      }
+
+      // Si debe marcarse como completada, actualizamos su estado
+      if (shouldMarkAsCompleted) {
+        await systemApi.updateActivity({
+          id: currentActivity.id,
+          status: "completed",
+        });
+      }
+    }
+
+    // Sincronizamos el estado UI
+    await _syncUiStateFromPersisted();
+  }, [
+    _syncUiStateFromPersisted,
+    _applyNeutralActivityEarlyCompletionCompensation,
+    _applyDiscountActivityEarlyCompletionCompensation,
+  ]);
+
   const selectActivity = useCallback(
     async (activity: Activity) => {
+      // Verificar si hay una actividad seleccionada actualmente
+      const currentActivity = await systemApi.getSelectedActivity();
+
+      // Si hay una actividad seleccionada, aplicamos la lógica de deselección
+      if (currentActivity) {
+        await unselectActivity();
+      }
+
       // Primero actualizamos el estado de la actividad a "inProgress"
       await systemApi.updateActivity({
         id: activity.id,
@@ -507,51 +572,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
 
       await _syncUiStateFromPersisted();
     },
-    [_syncUiStateFromPersisted]
+    [_syncUiStateFromPersisted, unselectActivity]
   );
-
-  const unselectActivity = useCallback(async () => {
-    // Obtenemos la actividad actual antes de deseleccionarla
-    const currentActivity = await systemApi.getSelectedActivity();
-
-    // Deseleccionamos la actividad
-    await systemApi.unselectActivity();
-
-    // Si hay una actividad seleccionada, aplicamos la lógica según su tipo
-    if (currentActivity) {
-      switch (currentActivity.type) {
-        case "neutral": {
-          // Para actividades neutrales, compensamos si hay tiempo restante
-          if (currentActivity.minutesActive < currentActivity.allowedTime) {
-            await _applyNeutralActivityEarlyCompletionCompensation({
-              activity: currentActivity,
-            });
-          }
-          break;
-        }
-        case "discount": {
-          // Para actividades hobby/discount, compensamos según la tasa de consumo
-          if (currentActivity.minutesActive < currentActivity.allowedTime) {
-            await _applyDiscountActivityEarlyCompletionCompensation({
-              activity: currentActivity,
-            });
-          }
-          break;
-        }
-        case "challenge": {
-          // Para desafíos, simplemente deseleccionamos sin compensación
-          break;
-        }
-      }
-    }
-
-    // Sincronizamos el estado UI
-    await _syncUiStateFromPersisted();
-  }, [
-    _syncUiStateFromPersisted,
-    _applyNeutralActivityEarlyCompletionCompensation,
-    _applyDiscountActivityEarlyCompletionCompensation,
-  ]);
 
   /**
    * Completar un challenge manualmente (acción del usuario).

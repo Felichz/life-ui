@@ -1,6 +1,18 @@
 import { systemApi } from "@core/SystemAPI";
 
-import type { Board, ChallengeActivity } from "../types";
+import type { Board, ChallengeActivity, NeutralActivity, HobbyActivity } from "../types";
+
+// Helpers para la creación de boards y actividades
+const baseBoard: Board = {
+  id: "base-board",
+  title: "Base Board",
+  parentBoardId: undefined,
+  childrenBoards: [],
+  activities: [],
+  constraintList: [],
+  activityProps: {},
+  isExpanded: false,
+};
 
 describe("Herencia de constraints y activity props en el System API", () => {
   // Antes de cada prueba, forzamos el modo test y limpiamos la data
@@ -19,18 +31,6 @@ describe("Herencia de constraints y activity props en el System API", () => {
       dayStartMinute: 0,
     });
   });
-
-  // Helpers para la creación de boards y actividades
-  const baseBoard: Board = {
-    id: "base-board",
-    title: "Base Board",
-    parentBoardId: undefined,
-    childrenBoards: [],
-    activities: [],
-    constraintList: [],
-    activityProps: {},
-    isExpanded: false,
-  };
 
   const baseChallenge: Partial<ChallengeActivity> = {
     id: "base-challenge",
@@ -766,5 +766,326 @@ describe("Herencia de constraints y activity props en el System API", () => {
     const inheritedConstraints =
       await systemApi.getInheritedConstraintsForBoard("non-existent-board");
     expect(inheritedConstraints).toEqual([]); // Debe retornar un array vacío
+  });
+});
+
+// Nuevos tests para verificar la deselección de actividades
+describe("Deselección de actividades", () => {
+  // Antes de cada prueba, forzamos el modo test y limpiamos la data
+  beforeEach(async () => {
+    // Activar modo de prueba para permitir `clearAllData`
+    await systemApi.updateSystemParams({
+      isTestMode: true,
+      passiveTempoConsumptionRate: 1,
+      timeMultiplier: 1,
+    });
+
+    await systemApi.clearAllData();
+    await systemApi.startDay({
+      dayTempoBalance: 0,
+      date: Date.now(),
+      dayStartMinute: 0,
+    });
+  });
+
+  // Test para verificar que una actividad neutral se marca como completed al deseleccionarla
+  test("unselectActivity marca actividad neutral como completed al deseleccionarla", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad neutral
+    const neutralActivity: NeutralActivity = {
+      id: "neutral-activity",
+      parentBoardId: "board-test",
+      type: "neutral",
+      title: "Actividad Neutral",
+      isRepetitive: false,
+      minutesActive: 10, // Menos que el tiempo permitido
+      status: "inProgress",
+      allowedTime: 30,
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+    await systemApi.createActivity(neutralActivity);
+
+    // Seleccionar la actividad
+    await systemApi.setSelectedActivity(neutralActivity);
+
+    // Verificar que está seleccionada
+    const selectedBefore = await systemApi.getSelectedActivity();
+    expect(selectedBefore?.id).toBe("neutral-activity");
+
+    // Deseleccionar la actividad
+    await systemApi.unselectActivity();
+
+    // Verificar que ya no está seleccionada
+    const selectedAfter = await systemApi.getSelectedActivity();
+    expect(selectedAfter).toBeUndefined();
+
+    // Verificar que la actividad se marcó como completed
+    const activityAfter = await systemApi.getActivity("neutral-activity");
+    expect(activityAfter?.status).toBe("completed");
+  });
+
+  // Test para verificar que una actividad discount (hobby) se marca como completed al deseleccionarla
+  test("unselectActivity marca actividad discount como completed al deseleccionarla", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad discount
+    const discountActivity: HobbyActivity = {
+      id: "discount-activity",
+      parentBoardId: "board-test",
+      type: "discount",
+      title: "Actividad Discount",
+      isRepetitive: false,
+      minutesActive: 15, // Menos que el tiempo permitido
+      status: "inProgress",
+      allowedTime: 60,
+      tempoConsumptionRate: 0.5,
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+    await systemApi.createActivity(discountActivity);
+
+    // Seleccionar la actividad
+    await systemApi.setSelectedActivity(discountActivity);
+
+    // Verificar que está seleccionada
+    const selectedBefore = await systemApi.getSelectedActivity();
+    expect(selectedBefore?.id).toBe("discount-activity");
+
+    // Deseleccionar la actividad
+    await systemApi.unselectActivity();
+
+    // Verificar que ya no está seleccionada
+    const selectedAfter = await systemApi.getSelectedActivity();
+    expect(selectedAfter).toBeUndefined();
+
+    // Verificar que la actividad se marcó como completed
+    const activityAfter = await systemApi.getActivity("discount-activity");
+    expect(activityAfter?.status).toBe("completed");
+  });
+
+  // Test para verificar que una actividad challenge NO se marca como completed al deseleccionarla
+  test("unselectActivity NO marca actividad challenge como completed al deseleccionarla", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad challenge
+    const challengeActivity: ChallengeActivity = {
+      id: "challenge-activity",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Actividad Challenge",
+      isRepetitive: false,
+      minutesActive: 20,
+      status: "inProgress",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 20,
+      constraintList: [],
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+    await systemApi.createActivity(challengeActivity);
+
+    // Seleccionar la actividad
+    await systemApi.setSelectedActivity(challengeActivity);
+
+    // Verificar que está seleccionada
+    const selectedBefore = await systemApi.getSelectedActivity();
+    expect(selectedBefore?.id).toBe("challenge-activity");
+
+    // Deseleccionar la actividad
+    await systemApi.unselectActivity();
+
+    // Verificar que ya no está seleccionada
+    const selectedAfter = await systemApi.getSelectedActivity();
+    expect(selectedAfter).toBeUndefined();
+  });
+
+  // Test para verificar que el estado de una actividad challenge cambia a "toDo" al deseleccionarla
+  test("unselectActivity cambia el estado de una actividad challenge a toDo", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test-todo",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad challenge
+    const challengeActivity: ChallengeActivity = {
+      id: "challenge-activity-todo",
+      parentBoardId: "board-test-todo",
+      type: "challenge",
+      title: "Actividad Challenge Estado",
+      isRepetitive: false,
+      minutesActive: 20,
+      status: "inProgress",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 20,
+      constraintList: [],
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+    await systemApi.createActivity(challengeActivity);
+
+    // Seleccionar la actividad
+    await systemApi.setSelectedActivity(challengeActivity);
+
+    // Verificar que está seleccionada y con estado "inProgress"
+    const selectedBefore = await systemApi.getSelectedActivity();
+    expect(selectedBefore?.id).toBe("challenge-activity-todo");
+    expect(selectedBefore?.status).toBe("inProgress");
+
+    // Deseleccionar la actividad
+    await systemApi.unselectActivity();
+
+    // Verificar que ya no está seleccionada
+    const selectedAfter = await systemApi.getSelectedActivity();
+    expect(selectedAfter).toBeUndefined();
+
+    // Verificar que el estado de la actividad cambió a "toDo"
+    const updatedActivity = await systemApi.getActivity("challenge-activity-todo");
+    expect(updatedActivity?.status).toBe("toDo");
+  });
+
+  // Test para verificar que al seleccionar una nueva actividad, la anterior neutral se marca como completed
+  test("setSelectedActivity marca actividad neutral anterior como completed", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear dos actividades
+    const neutralActivity: NeutralActivity = {
+      id: "neutral-activity",
+      parentBoardId: "board-test",
+      type: "neutral",
+      title: "Actividad Neutral",
+      isRepetitive: false,
+      minutesActive: 10,
+      status: "inProgress",
+      allowedTime: 30,
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+
+    const challengeActivity: ChallengeActivity = {
+      id: "challenge-activity",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Actividad Challenge",
+      isRepetitive: false,
+      minutesActive: 0,
+      status: "toDo",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 0,
+      constraintList: [],
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+
+    await systemApi.createActivity(neutralActivity);
+    await systemApi.createActivity(challengeActivity);
+
+    // Seleccionar la actividad neutral
+    await systemApi.setSelectedActivity(neutralActivity);
+
+    // Verificar que está seleccionada
+    const selectedBefore = await systemApi.getSelectedActivity();
+    expect(selectedBefore?.id).toBe("neutral-activity");
+
+    // Ahora seleccionar la segunda actividad
+    await systemApi.setSelectedActivity(challengeActivity);
+
+    // Verificar que la nueva actividad está seleccionada
+    const selectedAfter = await systemApi.getSelectedActivity();
+    expect(selectedAfter?.id).toBe("challenge-activity");
+
+    // Verificar que la actividad neutral se marcó como completed
+    const neutralAfter = await systemApi.getActivity("neutral-activity");
+    expect(neutralAfter?.status).toBe("completed");
+  });
+
+  // Test para verificar que al seleccionar una nueva actividad, la anterior discount se marca como completed
+  test("setSelectedActivity marca actividad discount anterior como completed", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear dos actividades
+    const discountActivity: HobbyActivity = {
+      id: "discount-activity",
+      parentBoardId: "board-test",
+      type: "discount",
+      title: "Actividad Discount",
+      isRepetitive: false,
+      minutesActive: 15,
+      status: "inProgress",
+      allowedTime: 60,
+      tempoConsumptionRate: 0.5,
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+
+    const challengeActivity: ChallengeActivity = {
+      id: "challenge-activity",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Actividad Challenge",
+      isRepetitive: false,
+      minutesActive: 0,
+      status: "toDo",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 0,
+      constraintList: [],
+      createdAt: Date.now(),
+      inheritedProps: {},
+    };
+
+    await systemApi.createActivity(discountActivity);
+    await systemApi.createActivity(challengeActivity);
+
+    // Seleccionar la actividad discount
+    await systemApi.setSelectedActivity(discountActivity);
+
+    // Verificar que está seleccionada
+    const selectedBefore = await systemApi.getSelectedActivity();
+    expect(selectedBefore?.id).toBe("discount-activity");
+
+    // Ahora seleccionar la segunda actividad
+    await systemApi.setSelectedActivity(challengeActivity);
+
+    // Verificar que la nueva actividad está seleccionada
+    const selectedAfter = await systemApi.getSelectedActivity();
+    expect(selectedAfter?.id).toBe("challenge-activity");
+
+    // Verificar que la actividad discount se marcó como completed
+    const discountAfter = await systemApi.getActivity("discount-activity");
+    expect(discountAfter?.status).toBe("completed");
   });
 });
