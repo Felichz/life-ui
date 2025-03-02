@@ -1,10 +1,7 @@
 Ahora:
 
 Bugs para fixear:
-    - Cuando tengo seleccionado un desafio, y le doy al boton de seleccionar de otra actividad, se debe marcar el desafio como completado y se debe ejecutar la logica de desafio completado, debe funcionar bien para cada tipo de actividad, en el caso de actividades neutrales o de hobby simplemente se deben aplicar la compensacion
-    
     Faltan testear casos raros que seguramente esten bugeados:
-        - Que pasa cuando hay un desafio seleccionado sin completar y termina el dia?
         - Cuando editamos una actividad mientras esta seleccionada
         - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
         - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
