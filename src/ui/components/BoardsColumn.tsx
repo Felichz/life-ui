@@ -2026,36 +2026,34 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          {!board.parentBoardId && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="destructive" size="sm" disabled={isLoading}>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={isLoading}>
+                Eliminar
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmar Eliminación</DialogTitle>
+                <DialogDescription>
+                  ¿Estás seguro de que deseas eliminar este tablero?
+                  {(activities.length > 0 || childBoards.length > 0) && (
+                    <p className="text-destructive mt-2">
+                      ¡Atención! Se eliminarán también{" "}
+                      {activities.length > 0 && `${activities.length} actividades`}
+                      {activities.length > 0 && childBoards.length > 0 && " y "}
+                      {childBoards.length > 0 && `${childBoards.length} subtableros`}.
+                    </p>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={handleRemoveBoard} disabled={isLoading} variant="destructive">
                   Eliminar
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Confirmar Eliminación</DialogTitle>
-                  <DialogDescription>
-                    ¿Estás seguro de que deseas eliminar este tablero?
-                    {(activities.length > 0 || childBoards.length > 0) && (
-                      <p className="text-destructive mt-2">
-                        ¡Atención! Se eliminarán también{" "}
-                        {activities.length > 0 && `${activities.length} actividades`}
-                        {activities.length > 0 && childBoards.length > 0 && " y "}
-                        {childBoards.length > 0 && `${childBoards.length} subtableros`}.
-                      </p>
-                    )}
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button onClick={handleRemoveBoard} disabled={isLoading} variant="destructive">
-                    Eliminar
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <AccordionContent>
