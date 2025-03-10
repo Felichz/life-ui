@@ -191,43 +191,43 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     }
   }, [uiState.systemParams.timeMultiplier, uiState.systemParams.isTestMode]);
 
+  const startUpdate = async () => {
+    setUiState((current) => ({
+      ...current,
+      updatingSystemState: true,
+    }));
+
+    await _updateSystemState();
+
+    setUiState((current) => ({
+      ...current,
+      updatingSystemState: false,
+    }));
+  };
+
   // Ejecuta la lógica de evaluación base cada un minuto (o cada segundo en modo prueba)
-  useEffect(() => {
-    console.log(`start new minute useEffect for an ${timeSimulator.getUpdateInterval()} interval`);
+  // useEffect(() => {
+  //   console.log(`start new minute useEffect for an ${timeSimulator.getUpdateInterval()} interval`);
 
-    const startUpdate = async () => {
-      setUiState((current) => ({
-        ...current,
-        updatingSystemState: true,
-      }));
+  //   console.log(`we're setting the interval at ${timeSimulator.getUpdateInterval()}ms`);
 
-      await _updateSystemState();
+  //   const interval = setInterval(() => {
+  //     console.log("  interval iteration");
 
-      setUiState((current) => ({
-        ...current,
-        updatingSystemState: false,
-      }));
-    };
+  //     setUiState((current) => {
+  //       if (current.updatingSystemState === false) {
+  //         console.log("    starting update because not updating");
+  //         startUpdate();
+  //       } else {
+  //         console.log("    already updating system state?");
+  //       }
 
-    console.log(`we're setting the interval at ${timeSimulator.getUpdateInterval()}ms`);
+  //       return current;
+  //     });
+  //   }, timeSimulator.getUpdateInterval());
 
-    const interval = setInterval(() => {
-      console.log("  interval iteration");
-
-      setUiState((current) => {
-        if (current.updatingSystemState === false) {
-          console.log("    starting update because not updating");
-          startUpdate();
-        } else {
-          console.log("    already updating system state?");
-        }
-
-        return current;
-      });
-    }, timeSimulator.getUpdateInterval());
-
-    return () => clearInterval(interval);
-  }, [timeSimulator.getUpdateInterval()]);
+  //   return () => clearInterval(interval);
+  // }, [timeSimulator.getUpdateInterval()]);
 
   const _getMinutesFromTimestamp = useCallback((timestamp: number) => {
     return new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
@@ -312,8 +312,8 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
    * Función privada para actualizar el estado del sistema según el tiempo transcurrido
    */
   const _updateSystemState = useCallback(async () => {
-    formatLog("START _updateSystemState", null);
     const persistedState = await systemApi.getPersistedState();
+
     const {
       currentDay,
       lastUpdateTimestamp,
@@ -329,6 +329,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     }
 
     const currentActivity = selectedActivity ? activities[selectedActivity] : undefined;
+
     const { shouldEndDay, timeRecords, updatedTimestamp, updatedActivity } = updateTimeState({
       currentDay,
       lastUpdateTimestamp,
@@ -376,6 +377,33 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     systemApi,
     _evaluateAllChallengeConstraints,
   ]);
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+
+    const scheduleNextMinute = () => {
+      const timeUntilNext = Math.max(50, timeSimulator.getTimeUntilNextMinute());
+      console.log("(next minute logic) Programando próximo minuto en", timeUntilNext, "ms");
+
+      timeout = setTimeout(async () => {
+        console.log("(next minute logic) ¡Nuevo minuto alcanzado!");
+
+        await startUpdate();
+
+        scheduleNextMinute();
+      }, timeUntilNext);
+
+      return timeout;
+    };
+
+    // Iniciar la cadena
+    scheduleNextMinute();
+
+    return () => {
+      console.log("Limpiando timeout pendiente");
+      clearTimeout(timeout);
+    };
+  }, [timeSimulator.getTimeMultiplier()]);
 
   const _applyNeutralActivityEarlyCompletionCompensation = useCallback(
     async ({ activity }: { activity: NeutralActivity }) => {
@@ -774,5 +802,10 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
     clearAllData: useCallback(async () => {
       await systemApi.clearAllData();
     }, []),
+    time: {
+      getCurrentSecond: () => timeSimulator.getCurrentSecond(),
+      getTimeUntilNextSecond: () => timeSimulator.getTimeUntilNextSecond(),
+      getMinuteProgress: () => timeSimulator.getMinuteProgress(),
+    },
   };
 };

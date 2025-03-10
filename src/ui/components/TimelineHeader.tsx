@@ -1,24 +1,83 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
+import PassiveTempoConsumptionRatioModal from "./PassiveTempoConsumptionRatioModal";
 import { Badge } from "./shadcn/badge";
 import { Button } from "./shadcn/button";
 import { Card, CardContent } from "./shadcn/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "./shadcn/dialog";
 import { ThemeToggle } from "./theme-toggle";
 import Timeline from "./Timeline";
-import PassiveTempoConsumptionRatioModal from "./PassiveTempoConsumptionRatioModal";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
-import type { Activity, SystemParams } from "@/core/types";
+import type { Activity } from "@/core/types";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
+
+// Componente para el progress bar circular
+const MinuteProgressCircle: React.FC = () => {
+  const [progress, setProgress] = useState(0);
+  const systemEngine = useSystemEngineContext();
+  const { uiState } = useUiStateContext();
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const updateProgress = () => {
+      // Obtener el progreso actual del minuto (0-100%)
+      const currentProgress = systemEngine.time.getMinuteProgress();
+      setProgress(currentProgress);
+
+      // Calcular cuánto tiempo falta para el próximo segundo
+      const timeUntilNextUpdate = Math.max(16, systemEngine.time.getTimeUntilNextSecond());
+
+      // Programar la próxima actualización
+      timeoutId = setTimeout(() => {
+        updateProgress();
+      }, timeUntilNextUpdate);
+    };
+
+    // Iniciar la cadena de actualizaciones
+    updateProgress();
+
+    return () => {
+      // Limpiar el timeout al desmontar
+      clearTimeout(timeoutId);
+    };
+  }, [uiState.systemParams.timeMultiplier]);
+
+  // Calcular propiedades del círculo
+  const radius = 15;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center">
+      <svg width="36" height="36" viewBox="0 0 40 40">
+        {/* Círculo de fondo */}
+        <circle
+          cx="20"
+          cy="20"
+          r={radius}
+          fill="transparent"
+          stroke="currentColor"
+          strokeOpacity="0.2"
+          strokeWidth="5"
+        />
+        {/* Círculo de progreso */}
+        <circle
+          cx="20"
+          cy="20"
+          r={radius}
+          fill="transparent"
+          stroke="currentColor"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          transform="rotate(-90 20 20)"
+        />
+      </svg>
+    </div>
+  );
+};
 
 const formatTime = (minutes: number): string => {
   const hours = Math.floor(minutes / 60);
@@ -239,7 +298,12 @@ const TimelineHeader: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Hora Actual</p>
-                  <p className="text-lg font-semibold">{formatCurrentDateTime(currentDateTime)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-lg font-semibold">
+                      {formatCurrentDateTime(currentDateTime)}
+                    </p>
+                    <MinuteProgressCircle />
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Finaliza</p>
