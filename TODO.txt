@@ -16,6 +16,7 @@ Features que faltan implementar:
 
         - El modal de crear board tambien debe mostrar las propiedades heredadas de los board padres como en el modal de creacion de actividad
 
+        - Se debe permitir al usuario elegir una hora de finalizacion del dia, por ejemplo si el user empezo tarde el dia por alguna razon tipo 12am no queremos forzarlo a laburar un dia hasta las 4am eso va en contra los principios filosoficos y el objetivo de la app.
 
         - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
         - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles

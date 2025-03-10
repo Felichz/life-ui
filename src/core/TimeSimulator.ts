@@ -122,4 +122,79 @@ export class TimeSimulator {
     this.simulationStartTime += this.getTimeIncrement();
     this.simulationStartRealTime = now;
   }
+
+  /**
+   * Calcula el tiempo en milisegundos hasta el próximo minuto completo basado en el tiempo simulado.
+   */
+  getTimeUntilNextMinute(): number {
+    const currentSimulatedTime = this.now();
+
+    // Calcular el tiempo transcurrido desde el inicio de la simulación
+    const elapsedTime = currentSimulatedTime - this.simulationStartTime;
+
+    // Calcular cuántos minutos completos han pasado desde el inicio
+    const completeMinutes = Math.floor(elapsedTime / 60000);
+
+    // Calcular el timestamp del próximo minuto completo
+    const nextMinuteTime = this.simulationStartTime + (completeMinutes + 1) * 60000;
+
+    // Calcular cuánto tiempo simulado falta hasta el próximo minuto
+    let timeUntilNextMinute = nextMinuteTime - currentSimulatedTime;
+
+    // Ajustar el tiempo considerando el multiplicador cuando estamos en modo prueba
+    if (this.isTestMode && this.timeMultiplier > 0) {
+      // Convertir el tiempo simulado a tiempo real dividiendo por el multiplicador
+      timeUntilNextMinute = timeUntilNextMinute / this.timeMultiplier;
+    }
+
+    return timeUntilNextMinute;
+  }
+
+  /**
+   * Obtiene el segundo actual (0-59) basado en el tiempo simulado actual
+   * Esta función se usa para calcular el progreso del círculo de minutos
+   */
+  getCurrentSecond(): number {
+    const currentSimulatedTime = this.now();
+
+    const elapsedTime = currentSimulatedTime - this.simulationStartTime;
+
+    // Calcular los milisegundos transcurridos en el minuto actual
+    const millisInCurrentMinute = elapsedTime % 60000;
+
+    // Convertir a segundos (0-59)
+    const currentSecond = Math.floor(millisInCurrentMinute / 1000);
+
+    return currentSecond;
+  }
+
+  /**
+   * Calcula el tiempo en milisegundos hasta el próximo segundo basado en el tiempo simulado.
+   */
+  getTimeUntilNextSecond(): number {
+    const currentSimulatedTime = this.now();
+
+    // Calcular milisegundos transcurridos dentro del segundo actual
+    const millisInCurrentSecond = currentSimulatedTime % 1000;
+
+    // Calcular cuánto tiempo simulado falta hasta el próximo segundo
+    let timeUntilNextSecond = 1000 - millisInCurrentSecond;
+
+    // Ajustar el tiempo considerando el multiplicador cuando estamos en modo prueba
+    if (this.isTestMode && this.timeMultiplier > 0) {
+      // Convertir el tiempo simulado a tiempo real dividiendo por el multiplicador
+      timeUntilNextSecond = timeUntilNextSecond / this.timeMultiplier;
+    }
+
+    return timeUntilNextSecond;
+  }
+
+  /**
+   * Obtiene el progreso dentro del minuto actual (0-100%)
+   */
+  getMinuteProgress(): number {
+    const currentSecond = this.getCurrentSecond();
+    const millisInCurrentSecond = this.now() % 1000;
+    return ((currentSecond * 1000 + millisInCurrentSecond) / 60000) * 100;
+  }
 }
