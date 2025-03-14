@@ -1,13 +1,6 @@
 import React from "react";
 
-import type {
-  Activity,
-  ChallengeActivity,
-  HobbyActivity,
-  NeutralActivity,
-  ExpirationChallengeConstraint,
-  SystemParams,
-} from "@core/types";
+import type { Activity, ChallengeActivity, HobbyActivity, NeutralActivity } from "@core/types";
 import { Badge } from "@shadcn/badge";
 import { Button } from "@shadcn/button";
 import { Card, CardContent, CardFooter } from "@shadcn/card";
@@ -20,13 +13,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@shadcn/dialog";
-import { useToast } from "@shadcn/hooks/use-toast";
 import { Input } from "@shadcn/input";
 import { Label } from "@shadcn/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shadcn/select";
-import { v4 as uuidv4 } from "uuid";
 
-import { TimeSelector } from "./TimeSelector";
+import { TimeSelector } from "../TimeSelector";
+import {
+  useActivityActions,
+  useActivityEdit,
+  useConstraintsManagement,
+  useActivityProgress,
+} from "./hooks";
+import {
+  formatMinuteToTime,
+  formatConstraintPenalty,
+  getStatusColor,
+  getStatusLabel,
+  getTypeLabel,
+  getUnselectMessage,
+  getCompleteMessage,
+  getFailedConstraintsWarning,
+  getEstimatedEndTime,
+  isPropertyInherited,
+} from "./utils";
 
 import { useSystemEngineContext } from "@/core/SystemEngineContext";
 import { useUiStateContext } from "@/ui/system-context/useUiStateContext";
@@ -47,43 +56,6 @@ const StatusBadge: React.FC<{ status: ActivityStatus; activity?: Activity }> = (
   status,
   activity,
 }) => {
-  const getStatusColor = (status: ActivityStatus, activity?: Activity) => {
-    if (activity?.type === "challenge") {
-      if (status === "completed") {
-        return "bg-blue-500";
-      }
-      if (status === "inProgress") {
-        const isGeneratingTempo =
-          activity.minutesActive < (activity as ChallengeActivity).totalTempoReward;
-        return isGeneratingTempo ? "bg-green-500" : "bg-red-500";
-      }
-    }
-
-    switch (status) {
-      case "toDo":
-        return "";
-      case "inProgress":
-        return "bg-blue-500";
-      case "completed":
-        return "bg-green-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getStatusLabel = (status: ActivityStatus) => {
-    switch (status) {
-      case "toDo":
-        return "Por hacer";
-      case "inProgress":
-        return "En progreso";
-      case "completed":
-        return "Completada";
-      default:
-        return "Desconocido";
-    }
-  };
-
   return (
     <Badge
       className={getStatusColor(status, activity)}
@@ -95,40 +67,13 @@ const StatusBadge: React.FC<{ status: ActivityStatus; activity?: Activity }> = (
 };
 
 const TypeBadge: React.FC<{ type: ActivityType }> = ({ type }) => {
-  const getTypeLabel = (type: ActivityType) => {
-    switch (type) {
-      case "challenge":
-        return "Desafío";
-      case "neutral":
-        return "Neutral";
-      case "discount":
-        return "Hobby";
-      default:
-        return "Desconocido";
-    }
-  };
-
   return <Badge variant="secondary">{getTypeLabel(type)}</Badge>;
 };
 
 const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity }) => {
-  const engine = useSystemEngineContext();
-  const progress = engine.activity.calculateProgress(activity);
+  const { progress } = useActivityProgress(activity);
 
   const activityConstraints = activity.constraintList;
-
-  const formatConstraintPenalty = (penalty: number | string | undefined) => {
-    if (!penalty) return "Sin penalización";
-    if (typeof penalty === "string") return penalty;
-    return `-${penalty} tempos`;
-  };
-
-  const formatMinuteToTime = (minute: number) => {
-    const hours = Math.floor(minute / 60);
-    const minutes = minute % 60;
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-  };
-
   const isGeneratingTempo = activity.minutesActive < activity.totalTempoReward;
   const exceededMinutes = activity.exceededMinutes ?? 0;
 
@@ -173,7 +118,7 @@ const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity 
         <div className="mt-2">
           <p className="font-medium mb-1">Criterios de Aceptación:</p>
           <div className="space-y-2">
-            {activityConstraints.map((constraint, index) => {
+            {activityConstraints.map((constraint) => {
               if (constraint.type === "expiration") {
                 return (
                   <div
@@ -213,13 +158,11 @@ const ChallengeDetails: React.FC<{ activity: ChallengeActivity }> = ({ activity 
 const NeutralOrHobbyDetails: React.FC<{ activity: NeutralActivity | HobbyActivity }> = ({
   activity,
 }) => {
-  const engine = useSystemEngineContext();
   const { uiState } = useUiStateContext();
   if (activity.type !== "neutral" && activity.type !== "discount") return null;
 
-  const progress = engine.activity.calculateProgress(activity);
+  const { progress } = useActivityProgress(activity);
 
-  // Calcular tasa efectiva para hobbies (solo si es tipo discount)
   const effectiveRate =
     activity.type === "discount"
       ? activity.tempoConsumptionRate * uiState.systemParams.passiveTempoConsumptionRate
@@ -254,84 +197,6 @@ const NeutralOrHobbyDetails: React.FC<{ activity: NeutralActivity | HobbyActivit
   );
 };
 
-const getUnselectMessage = (activity: Activity, systemParams: SystemParams) => {
-  if (activity.type === "challenge") {
-    return "Al deseleccionar un desafío, podrás retomarlo más tarde desde donde lo dejaste.";
-  }
-
-  const remainingTime = activity.allowedTime - activity.minutesActive;
-
-  if (activity.type === "neutral") {
-    return (
-      <>
-        Recibirás una compensación de{" "}
-        <span className="text-green-500 font-medium">+{remainingTime} tempos</span>.
-      </>
-    );
-  }
-
-  if (activity.type === "discount") {
-    // Calcular la compensación correctamente: tiempo no utilizado * ahorro por minuto
-    // Ahorro por minuto = tasa consumo pasivo - (tasa consumo pasivo * tasa consumo hobby)
-    const compensationFactor =
-      systemParams.passiveTempoConsumptionRate -
-      systemParams.passiveTempoConsumptionRate * activity.tempoConsumptionRate;
-
-    const compensation = remainingTime * compensationFactor;
-
-    const formattedCompensation = Number.isInteger(compensation)
-      ? compensation.toString()
-      : compensation.toFixed(1);
-
-    return (
-      <>
-        Recibirás una compensación de{" "}
-        <span className="text-green-500 font-medium">+{formattedCompensation} tempos</span> basada
-        en el tiempo restante y la tasa de consumo.
-      </>
-    );
-  }
-};
-
-const getCompleteMessage = (activity: ChallengeActivity) => {
-  const remainingTempos = activity.totalTempoReward - activity.minutesActive;
-  const isEarlyCompletion = activity.minutesActive < activity.totalTempoReward;
-
-  if (isEarlyCompletion) {
-    return (
-      <>
-        <p>¡Excelente! Has completado el desafío antes del tiempo estimado.</p>
-        <p>
-          Recibirás los{" "}
-          <span className="text-green-500 font-medium">+{remainingTempos} tempos</span> restantes de
-          inmediato, en lugar de esperar {remainingTempos} minutos más.
-        </p>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <p>Has excedido el tiempo estimado para este desafío.</p>
-      <p>
-        Ya has recibido el total de la recompensa ({activity.totalTempoReward} tempos) durante los
-        primeros {activity.totalTempoReward} minutos.
-      </p>
-    </>
-  );
-};
-
-const getFailedConstraintsWarning = (activity: ChallengeActivity) => {
-  if (activity.constraintList.some((c) => c.status === "failed")) {
-    return (
-      <p className="text-destructive mt-2">
-        ¡Atención! Hay criterios fallidos que pueden afectar la modificación de tempo final.
-      </p>
-    );
-  }
-  return null;
-};
-
 const ActivityCard: React.FC<ActivityCardProps> = ({
   activity,
   onDragStart,
@@ -341,233 +206,47 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
   onDrop,
 }) => {
   const { uiState } = useUiStateContext();
-  const engine = useSystemEngineContext();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = React.useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
   const [isUnselectDialogOpen, setIsUnselectDialogOpen] = React.useState(false);
-  const [editedTitle, setEditedTitle] = React.useState(activity.title);
-  const [editedAllowedTime, setEditedAllowedTime] = React.useState(
-    "allowedTime" in activity ? activity.allowedTime : 30
-  );
-  const [editedTempoReward, setEditedTempoReward] = React.useState(
-    "totalTempoReward" in activity ? activity.totalTempoReward : 30
-  );
-  const [editedConsumptionRate, setEditedConsumptionRate] = React.useState(
-    "tempoConsumptionRate" in activity ? activity.tempoConsumptionRate : 0.5
-  );
 
-  // Función para formatear minutos a formato de hora HH:MM
-  const formatMinuteToTime = (minute: number) => {
-    const hours = Math.floor(minute / 60);
-    const minutes = minute % 60;
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-  };
+  const { isLoading, handleSelect, handleUnselect, handleCompleteChallenge, handleDelete } =
+    useActivityActions(activity);
 
-  // Separamos los constraints heredados de los personalizados
-  const inheritedConstraints = React.useMemo(() => {
-    if (activity.type !== "challenge") return [];
-    return (activity as ChallengeActivity).constraintList.filter((c) => !!c.parentConstraintId);
-  }, [activity]);
+  const {
+    editedTitle,
+    editedAllowedTime,
+    editedTempoReward,
+    editedConsumptionRate,
+    editedConstraints,
+    setEditedTitle,
+    setEditedAllowedTime,
+    setEditedTempoReward,
+    setEditedConsumptionRate,
+    setEditedConstraints,
+    handleUpdateActivity,
+  } = useActivityEdit(activity);
 
-  const customConstraints = React.useMemo(() => {
-    if (activity.type !== "challenge") return [];
-    return (activity as ChallengeActivity).constraintList.filter((c) => !c.parentConstraintId);
-  }, [activity]);
-
-  // Solo inicializamos los constraints personalizados para edición
-  const [editedConstraints, setEditedConstraints] =
-    React.useState<ExpirationChallengeConstraint[]>(customConstraints);
+  const {
+    handleAddConstraint,
+    handleUpdateConstraint,
+    handleRemoveConstraint,
+    handleUpdateConstraintPenalty,
+  } = useConstraintsManagement(editedConstraints, setEditedConstraints);
 
   const isSelected = uiState.selectedActivity?.id === activity.id;
-
-  const getEstimatedEndTime = React.useMemo(() => {
-    if (!isSelected || activity.status !== "inProgress") return null;
-
-    let minutesToAdd = 0;
-
-    if (activity.type === "challenge") {
-      minutesToAdd = activity.totalTempoReward - activity.minutesActive;
-      if (minutesToAdd <= 0) return null;
-    } else if ("allowedTime" in activity) {
-      minutesToAdd = activity.allowedTime - activity.minutesActive;
-    }
-
-    if (minutesToAdd <= 0) return null;
-
-    const endTime = new Date(uiState.lastUpdateTimestamp + minutesToAdd * 60000);
-    return endTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  }, [isSelected, activity, uiState.lastUpdateTimestamp]);
-
+  const estimatedEndTime = getEstimatedEndTime(activity, isSelected, uiState.lastUpdateTimestamp);
   const isNeutral = activity.type === "neutral";
   const isHobby = activity.type === "discount";
   const isNeutralOrHobby = isNeutral || isHobby;
 
-  const isAllowedTimeInherited = React.useMemo(() => {
-    return isNeutralOrHobby && activity.inheritedProps?.allowedTime !== undefined;
-  }, [activity]);
-
-  const isConsumptionRateInherited = React.useMemo(() => {
-    return isHobby && activity.inheritedProps?.tempoConsumptionRate !== undefined;
-  }, [activity]);
-
-  const handleAction = async (action: () => Promise<void>) => {
-    try {
-      setIsLoading(true);
-      await action();
-    } catch (error) {
-      console.error("Error en la acción:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Ha ocurrido un error al procesar la acción",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSelect = () => handleAction(() => engine.activity.selectActivity(activity));
-  const handleUnselect = async () => {
-    try {
-      setIsLoading(true);
-      await engine.activity.unselectCurrentyActivity();
-      setIsUnselectDialogOpen(false);
-    } catch (error) {
-      console.error("Error en la acción:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Ha ocurrido un error al procesar la acción",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCompleteChallenge = (activity: ChallengeActivity) =>
-    handleAction(() =>
-      engine.activity.completeChallenge({
-        activity,
-      })
-    );
-
-  const handleDelete = () => handleAction(() => engine.activity.removeActivity(activity));
-
-  const handleUpdateActivity = async () => {
-    try {
-      setIsLoading(true);
-
-      const baseUpdates = {
-        id: activity.id,
-        title: editedTitle.trim(),
-      };
-
-      let activityUpdates: Partial<Activity> & { id: string };
-
-      switch (activity.type) {
-        case "challenge": {
-          // Combinamos los constraints personalizados editados con los heredados originales
-          const combinedConstraints = [
-            ...editedConstraints,
-            ...inheritedConstraints, // Mantenemos los constraints heredados sin cambios
-          ];
-
-          activityUpdates = {
-            ...baseUpdates,
-            totalTempoReward: editedTempoReward,
-            constraintList: combinedConstraints,
-          };
-          break;
-        }
-        case "neutral":
-          activityUpdates = {
-            ...baseUpdates,
-            allowedTime: editedAllowedTime,
-          };
-          break;
-        case "discount":
-          activityUpdates = {
-            ...baseUpdates,
-            allowedTime: editedAllowedTime,
-            tempoConsumptionRate: editedConsumptionRate,
-          };
-          break;
-        default:
-          throw new Error("Tipo de actividad inválido");
-      }
-
-      // Validamos que los campos actualizados sean válidos
-      const updatedActivity = { ...activity, ...activityUpdates };
-
-      if (!engine.activity.validate(updatedActivity)) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Los datos de la actividad son inválidos",
-        });
-        return;
-      }
-
-      await engine.activity.updateActivity(activityUpdates);
-      setIsEditDialogOpen(false);
-
-      toast({
-        title: "Actividad actualizada",
-        description: "La actividad se ha actualizado correctamente",
-      });
-    } catch (error) {
-      console.error("Error al actualizar actividad:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo actualizar la actividad",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddConstraint = () => {
-    const newConstraint: ExpirationChallengeConstraint = {
-      id: uuidv4(),
-      type: "expiration",
-      dayMinuteExpiration: 0,
-      penalty: 0,
-      status: "active",
-      failCount: 0,
-    };
-    setEditedConstraints([...editedConstraints, newConstraint]);
-  };
-
-  const handleUpdateConstraint = (
-    index: number,
-    updates: Partial<ExpirationChallengeConstraint>
-  ) => {
-    setEditedConstraints(
-      editedConstraints.map((constraint, i) =>
-        i === index ? { ...constraint, ...updates } : constraint
-      )
-    );
-  };
-
-  const handleRemoveConstraint = (index: number) => {
-    setEditedConstraints(editedConstraints.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateConstraintPenalty = (
-    index: number,
-    penalty: string,
-    type: "fixed" | "percentage"
-  ) => {
-    setEditedConstraints(
-      editedConstraints.map((constraint, i) =>
-        i === index
-          ? { ...constraint, penalty: type === "fixed" ? parseInt(penalty) : penalty }
-          : constraint
-      )
-    );
-  };
+  const isAllowedTimeInherited = isPropertyInherited(
+    activity,
+    "allowedTime" as keyof typeof activity.inheritedProps
+  );
+  const isConsumptionRateInherited = isPropertyInherited(
+    activity,
+    "tempoConsumptionRate" as keyof typeof activity.inheritedProps
+  );
 
   return (
     <Card
@@ -594,8 +273,8 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
             <div className="flex gap-2 mt-1">
               <TypeBadge type={activity.type} />
               <StatusBadge status={activity.status} activity={activity} />
-              {isSelected && activity.status === "inProgress" && getEstimatedEndTime && (
-                <Badge variant="outline">Finaliza: {getEstimatedEndTime}</Badge>
+              {isSelected && activity.status === "inProgress" && estimatedEndTime && (
+                <Badge variant="outline">Finaliza: {estimatedEndTime}</Badge>
               )}
             </div>
           </div>
@@ -825,39 +504,6 @@ const ActivityCard: React.FC<ActivityCardProps> = ({
                     </Button>
                   </div>
 
-                  {/* Mostrar los constraints heredados primero, como elementos no editables */}
-                  {inheritedConstraints.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          Criterios Heredados
-                        </Badge>
-                      </div>
-                      {inheritedConstraints.map((constraint) => (
-                        <div
-                          key={constraint.id}
-                          className="space-y-2 p-4 border rounded-lg bg-muted/50"
-                        >
-                          <div className="flex items-center justify-between">
-                            <Label className="text-muted-foreground">Hora de Expiración</Label>
-                            <div className="text-muted-foreground">
-                              {formatMinuteToTime(constraint.dayMinuteExpiration)}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <Label className="text-muted-foreground">Penalización</Label>
-                            <div className="text-muted-foreground">
-                              {typeof constraint.penalty === "number"
-                                ? constraint.penalty
-                                : constraint.penalty}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Luego mostrar los constraints personalizados que se pueden editar */}
                   {editedConstraints.map((constraint, index) => (
                     <div key={index} className="space-y-2 p-4 border rounded-lg">
                       <div className="flex items-center justify-between">

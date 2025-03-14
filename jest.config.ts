@@ -13,6 +13,7 @@ const config: Config = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^@core/(.*)$": "<rootDir>/src/core/$1",
+    "^@shadcn/(.*)$": "<rootDir>/src/ui/components/shadcn/$1",
   },
 };
 
