@@ -1,35 +1,43 @@
-Ahora:
+POC
+    Bugs para fixear
+        - Ningun desafio se esta marcando como completado
+        - Se hereda la propiedad is repetitive cuando el checkbox en el form del board esta deseleccionado
+        - La compensacion por completar un desafio antes esta mal calculada
 
-Bugs para fixear:
-    Faltan testear casos raros que seguramente esten bugeados:
-        - Cuando editamos una actividad mientras esta seleccionada
-        - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
-        - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
+        Faltan testear casos raros que seguramente esten bugeados:
+            - Cuando editamos una actividad mientras esta seleccionada
+            - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
+            - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
 
-Para grooming:
-    - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
-    - Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
+    Para grooming
+        - Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
+            - Necesito poder empezar una actividad como laburar o jugar lol sin saber cuando va a terminar y tener la posibilidad de marcar el fin de la tarea manualmente
+            - Algunas tareas se benefician de un timebox especifico con un objetivo especifico lograble pero otras son mas indefinidas como solo laburar
+            - Creo que deberia dar la opcion de marcar el tiempo extra como tiempo incluido en la tarea en caso de que haya subestimado el tiempo que iba a tomar la tarea, y que ese tiempo excedido se guarde como informacion de la actividad y que se muestre de un color ligeramente diferente en la grafica, para asi poder visualizar mejor cuanto tiempo extra me tomo y cuanto subestimé la estimación original, pero en ese caso puedo marcar los tempos como neutrales o dar una compensación parcial o extender la recompensa total de la actividad cubriendo todo el tiempo, que tambien puede tener sentido, esto esta para grooming
+        - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
 
-Features que faltan implementar:
-    POC:
+    Features que faltan implementar
+        - Falta indentacion para visualizar mejor los sub board
+
+        - Que se muestre en el timeline cual fue la actividad de cada constraint o bono
+
+        - Mostrar futuros constraint en el timeline
+
+        - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad
+
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
-
-        - El modal de crear board tambien debe mostrar las propiedades heredadas de los board padres como en el modal de creacion de actividad
+        
+        - Quiero que se puedan ver las constraint futuras en el timeline para tener una manera sencilla y clara de ver si esta por fallar una
 
         - Se debe permitir al usuario elegir una hora de finalizacion del dia, por ejemplo si el user empezo tarde el dia por alguna razon tipo 12am no queremos forzarlo a laburar un dia hasta las 4am eso va en contra los principios filosoficos y el objetivo de la app.
 
         - Implementar indicadores útiles de estado de la app, como el "Punto de Libertad" (revisar chat con claude)
         - Actualizar la ui para mostrar las actividades completadas en un panel separado en el lado derecho de la pantalla, en el lado izquierdo mostrar las actividades para hacer, las disponibles, y en el lado de arriba una seccion horizontal entera para la actividad actual seleccionada y todas las opciones/acciones disponibles
         - Cuando se excede el tiempo limite de un desafio se debe mostrar un modal mostrando las acciones disponibles, esto esta para grooming y clarificacion de que deberia ser posible en este caso
-        - Progress bar circular que muestre el flujo de un minuto (quiza se pueda en testmode si el timemultiplier es diferente a 1 para no complicar las cosas, hay que probar)
         - Guardar info de tiempo excedido para cada desafio, es un dato muy util para el usuario
         - Posibilidad de drag and drop de actividades dentro de un mismo board (debe haber un boton de mover para arrastrar)
-        - Quiero poder ver la hora estimada de finalizacion de una actividad (la hora del limite definido en las props)
-        - Se deben mostrar los crieterias heredados de los board dentro del modal de creacion de actividad y dentro del modal de editar actividades
         - Implementar algun concepto que ayude a evitar malos habitos, capaz incentivando si se evita un mal habito en el dia, o penalizar si se hace el mal habito, o capaz una combinacion de los dos
         - Me gustaria que las notificaciones se muestren mejor en ui, quiero que se vea el titulo de la actividad seleccionada (clickeable que te lleve a la activity card por id del html), y que muestre los tempos actuales al momento de la notificacion
-        - Quiero que el timeline muestre horas con 0 minutos, por ejemplo 12:00, 12:30, 13:00, etc, las unicas horas "no exactas" serian la del inicio del dia y finalizacion del dia
-        - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad
 
     Para luego:
         - Agregar sistema de focus interno, hay muchas cosas como actividades, elementos del tempo modification history, etc, que se pueden estar focuseando en la ui desde diferentes elementos, por ejemplo un record de una multa en el timeline, si se focusea me gustaria que se active el focus de esa entidad y como resultado resaltar todos los elementos de la ui que esten relacionados con esa entidad, por ejemplo la notificacion respectiva a esa multa, y la multa dentro de la lista de constraints en la card de la actividad
