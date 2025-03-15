@@ -105,6 +105,11 @@ interface BaseActivity {
   status: ActivityStatus;
   order?: number; // Orden de la actividad dentro de su tablero
   createdAt: number; // Timestamp de creación de la actividad
+  /**
+   * Contador de cuántas veces ha sido completada la actividad
+   * @default 0
+   */
+  completeCount: number;
 }
 
 interface TimeLimitedActivity extends BaseActivity {
