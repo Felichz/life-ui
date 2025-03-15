@@ -401,12 +401,20 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
   const handleActivityTypeChange = (type: "neutral" | "challenge" | "discount") => {
     setNewActivityType(type);
 
-    if (type === "challenge" && inheritedProps.challenge) {
+    if (
+      type === "challenge" &&
+      inheritedProps.challenge &&
+      inheritedProps.challenge.isRepetitive !== undefined
+    ) {
       setNewActivityIsRepetitive(inheritedProps.challenge.isRepetitive ?? false);
       // No añadimos los constraints heredados aquí, ya que se mostrarán separadamente
       // Limpiamos los constraints añadidos manualmente al cambiar el tipo
       setNewActivityConstraints([]);
-    } else if (type === "neutral" && inheritedProps.neutral) {
+    } else if (
+      type === "neutral" &&
+      inheritedProps.neutral &&
+      inheritedProps.neutral.isRepetitive !== undefined
+    ) {
       setNewActivityIsRepetitive(inheritedProps.neutral.isRepetitive ?? false);
       if (inheritedProps.neutral.allowedTime) {
         setNewActivityAllowedTime(inheritedProps.neutral.allowedTime);
@@ -579,15 +587,18 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
       const activityProps: Board["activityProps"] = {};
 
-      if (repeatableSubBoardTypes.challenge || newSubBoardActivityConstraints.length > 0) {
+      if (repeatableSubBoardTypes.challenge) {
         activityProps.challenge = {
-          isRepetitive: repeatableSubBoardTypes.challenge,
+          isRepetitive: true,
         };
+      } else if (newSubBoardActivityConstraints.length > 0) {
+        // Solo agregamos la propiedad challenge si hay constraints pero no establecemos isRepetitive
+        activityProps.challenge = {};
       }
 
       if (repeatableSubBoardTypes.neutral || newSubBoardActivityAllowedTime !== 30) {
         activityProps.neutral = {
-          isRepetitive: repeatableSubBoardTypes.neutral,
+          ...(repeatableSubBoardTypes.neutral ? { isRepetitive: true } : {}),
           allowedTime: newSubBoardActivityAllowedTime,
         };
       }
@@ -598,7 +609,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         newSubBoardActivityConsumptionRate !== 0.5
       ) {
         activityProps.discount = {
-          isRepetitive: repeatableSubBoardTypes.discount,
+          ...(repeatableSubBoardTypes.discount ? { isRepetitive: true } : {}),
           allowedTime: newSubBoardActivityAllowedTime,
           tempoConsumptionRate: newSubBoardActivityConsumptionRate,
         };
@@ -830,14 +841,26 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
           setInheritedConstraints(constraints);
 
           if (props[newActivityType]) {
-            if (newActivityType === "challenge" && props.challenge) {
+            if (
+              newActivityType === "challenge" &&
+              props.challenge &&
+              props.challenge.isRepetitive !== undefined
+            ) {
               setNewActivityIsRepetitive(props.challenge.isRepetitive ?? false);
-            } else if (newActivityType === "neutral" && props.neutral) {
+            } else if (
+              newActivityType === "neutral" &&
+              props.neutral &&
+              props.neutral.isRepetitive !== undefined
+            ) {
               setNewActivityIsRepetitive(props.neutral.isRepetitive ?? false);
               if (props.neutral.allowedTime) {
                 setNewActivityAllowedTime(props.neutral.allowedTime);
               }
-            } else if (newActivityType === "discount" && props.discount) {
+            } else if (
+              newActivityType === "discount" &&
+              props.discount &&
+              props.discount.isRepetitive !== undefined
+            ) {
               setNewActivityIsRepetitive(props.discount.isRepetitive ?? false);
               if (props.discount.allowedTime) {
                 setNewActivityAllowedTime(props.discount.allowedTime);
@@ -875,12 +898,20 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
           setInheritedSubBoardConstraints(constraints);
 
           if (props[newSubBoardActivityType]) {
-            if (newSubBoardActivityType === "challenge" && props.challenge) {
+            if (
+              newSubBoardActivityType === "challenge" &&
+              props.challenge &&
+              props.challenge.isRepetitive !== undefined
+            ) {
               // Propiedades de desafío heredadas
               setNewSubBoardActivityType(
                 props.challenge.isRepetitive ? "challenge" : newSubBoardActivityType
               );
-            } else if (newSubBoardActivityType === "neutral" && props.neutral) {
+            } else if (
+              newSubBoardActivityType === "neutral" &&
+              props.neutral &&
+              props.neutral.isRepetitive !== undefined
+            ) {
               // Propiedades neutrales heredadas
               setNewSubBoardActivityType(
                 props.neutral.isRepetitive ? "neutral" : newSubBoardActivityType
@@ -888,7 +919,11 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
               if (props.neutral.allowedTime) {
                 setNewSubBoardActivityAllowedTime(props.neutral.allowedTime);
               }
-            } else if (newSubBoardActivityType === "discount" && props.discount) {
+            } else if (
+              newSubBoardActivityType === "discount" &&
+              props.discount &&
+              props.discount.isRepetitive !== undefined
+            ) {
               // Propiedades de hobby heredadas
               setNewSubBoardActivityType(
                 props.discount.isRepetitive ? "discount" : newSubBoardActivityType
@@ -2127,15 +2162,18 @@ const BoardsColumn: React.FC = () => {
 
       const activityProps: Board["activityProps"] = {};
 
-      if (repeatableTypes.challenge || newActivityConstraints.length > 0) {
+      if (repeatableTypes.challenge) {
         activityProps.challenge = {
-          isRepetitive: repeatableTypes.challenge,
+          isRepetitive: true,
         };
+      } else if (newActivityConstraints.length > 0) {
+        // Solo agregamos la propiedad challenge si hay constraints pero no establecemos isRepetitive
+        activityProps.challenge = {};
       }
 
       if (repeatableTypes.neutral || newActivityAllowedTime !== 30) {
         activityProps.neutral = {
-          isRepetitive: repeatableTypes.neutral,
+          ...(repeatableTypes.neutral ? { isRepetitive: true } : {}),
           allowedTime: newActivityAllowedTime,
         };
       }
@@ -2146,7 +2184,7 @@ const BoardsColumn: React.FC = () => {
         newActivityConsumptionRate !== 0.5
       ) {
         activityProps.discount = {
-          isRepetitive: repeatableTypes.discount,
+          ...(repeatableTypes.discount ? { isRepetitive: true } : {}),
           allowedTime: newActivityAllowedTime,
           tempoConsumptionRate: newActivityConsumptionRate,
         };

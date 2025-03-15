@@ -1,7 +1,4 @@
 POC
-    Bugs para fixear
-        - Se hereda la propiedad is repetitive cuando el checkbox en el form del board esta deseleccionado
-
     Features que faltan implementar
         - Falta indentacion para visualizar mejor los sub board
 
