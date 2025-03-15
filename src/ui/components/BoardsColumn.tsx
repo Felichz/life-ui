@@ -968,7 +968,11 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
     >
       <AccordionItem value={board.id} className="border-none">
         <div
-          className="flex items-center gap-2 px-2 py-1"
+          className={`flex items-center gap-2 px-2 py-1 ${
+            level > 0
+              ? `ml-${level * 8} border-l-2 border-l-${level % 3 === 1 ? "primary" : level % 3 === 2 ? "secondary" : "accent"} pl-2`
+              : ""
+          }`}
           draggable={!board.parentBoardId}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -1010,7 +1014,14 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
                   </Button>
                 </div>
               ) : (
-                <span className="text-sm font-medium">{board.title}</span>
+                <span className="text-sm font-medium">
+                  {level > 0 && (
+                    <span className="text-muted-foreground mr-1">
+                      {Array(level).fill("─").join("")}➤
+                    </span>
+                  )}
+                  {board.title}
+                </span>
               )}
             </div>
           </AccordionTrigger>
@@ -2093,7 +2104,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
 
         <AccordionContent>
           {activities.length > 0 && (
-            <div className="mb-4">
+            <div className={`mb-4 ${level > 0 ? `ml-${level * 8 + 4}` : ""}`}>
               {activities.map((activity) => (
                 <ActivityCard
                   key={activity.id}
