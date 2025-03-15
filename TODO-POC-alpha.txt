@@ -1,7 +1,5 @@
 POC
     Features que faltan implementar
-        - Falta indentacion para visualizar mejor los sub board
-
         - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad
         
         - Quiero que se puedan ver las constraint futuras en el timeline para tener una manera sencilla y clara de ver si esta por fallar una

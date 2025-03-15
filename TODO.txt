@@ -15,8 +15,6 @@ POC
         - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
 
     Features que faltan implementar
-        - Falta indentacion para visualizar mejor los sub board
-
         - Que se muestre en el timeline cual fue la actividad de cada constraint o bono
 
         - Mostrar futuros constraint en el timeline
