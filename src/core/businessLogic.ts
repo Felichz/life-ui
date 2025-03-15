@@ -533,6 +533,8 @@ export function processActivitiesAtDayEnd(activities: Activity[]): {
         id: activity.id,
         status: "toDo",
         minutesActive: 0,
+        // Mantenemos el contador de completados
+        completeCount: activity.completeCount,
       };
 
       // Agregar propiedades específicas para desafíos

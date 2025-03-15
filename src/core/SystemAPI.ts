@@ -729,6 +729,12 @@ class SystemAPI implements SystemAPIType {
       };
     }
 
+    // Asegurarnos de que completeCount esté inicializado
+    activity = {
+      ...activity,
+      completeCount: 0,
+    };
+
     // Actualizar el estado con la nueva actividad
     const newState: PersistedState = {
       ...state,
@@ -889,7 +895,11 @@ class SystemAPI implements SystemAPIType {
       ...state,
       activities: {
         ...state.activities,
-        [activityToComplete.id]: { ...activityToComplete, status: "completed" },
+        [activityToComplete.id]: {
+          ...activityToComplete,
+          status: "completed",
+          completeCount: (activityToComplete.completeCount || 0) + 1,
+        },
       },
       selectedActivity: undefined,
     });
@@ -915,6 +925,7 @@ class SystemAPI implements SystemAPIType {
             state.activities[currentActivity.id] = {
               ...state.activities[currentActivity.id],
               status: "completed",
+              completeCount: (currentActivity.completeCount || 0) + 1,
             };
           }
         } else if (currentActivity.type === "challenge") {
