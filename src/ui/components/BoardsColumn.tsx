@@ -446,6 +446,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         title: newActivityTitle.trim(),
         status: "toDo" as const,
         minutesActive: 0,
+        completeCount: 0,
         parentBoardId: board.id,
         type: newActivityType,
         order: lowestOrder,
