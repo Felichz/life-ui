@@ -622,13 +622,7 @@ export const useSystemEngine = ({ uiState, setUiState, systemApi }: SystemEngine
       const { lastUpdateTimestamp } = await systemApi.getPersistedState();
 
       // Actualizar el estado de la actividad a completada
-      await systemApi.updateActivity({
-        id: activity.id,
-        status: "completed",
-      });
-
-      // Deseleccionar la actividad
-      await systemApi.unselectActivity();
+      await systemApi.completeActivity();
 
       if (activity.tempoGeneratingMinutes >= activity.totalTempoReward) {
         await _syncUiStateFromPersisted();

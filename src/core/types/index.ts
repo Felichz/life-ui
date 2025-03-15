@@ -281,6 +281,7 @@ export interface SystemAPIType {
 
   getSelectedActivity: () => Promise<Activity | undefined>;
   setSelectedActivity: (activity: Activity) => Promise<void>;
+  completeActivity: () => Promise<void>;
   unselectActivity: () => Promise<void>;
 
   // Gestión de Tempo
