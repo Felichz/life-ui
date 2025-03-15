@@ -1,6 +1,7 @@
 POC
     Bugs para fixear
         - La compensacion por completar un desafio antes esta mal calculada
+        - No se muestra bien la herencia de is repetitive en el modal de creacion de sub board y edicion de sub board
 
         Faltan testear casos raros que seguramente esten bugeados:
             - Cuando editamos una actividad mientras esta seleccionada
