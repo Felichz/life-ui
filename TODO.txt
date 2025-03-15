@@ -1,5 +1,6 @@
 POC
     Bugs para fixear
+        - Cuando se edita un constraint de un subboard parece que las actividades hijas no heredan los constraint del board root
         - La compensacion por completar un desafio antes esta mal calculada
         - No se muestra bien la herencia de is repetitive en el modal de creacion de sub board y edicion de sub board
 
@@ -8,7 +9,9 @@ POC
             - Cuando se elimina un board, se deben eliminar todas las actividades hijas de este board incluyendo sub boards
             - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
 
-    Para grooming
+    Para pensar/grooming
+        - Evaluar implementación de "criterios de priorización" definidos por el usuario para un board dado, y luego dentro de ese board será obligatorio definir para cada actividad cual es el valor de 0 a 100 de relevancia para cada criterio de priorización heredado de los board padres, entonces el sistema puede ordenar automáticamente cada board por prioridad según sus los criterios de priorización.
+        - Evaluar la posibilidad de eliminar el concepto de constraints y multas a favor de motivacion en base a bonos con expiración
         - Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
             - Necesito poder empezar una actividad como laburar o jugar lol sin saber cuando va a terminar y tener la posibilidad de marcar el fin de la tarea manualmente
             - Algunas tareas se benefician de un timebox especifico con un objetivo especifico lograble pero otras son mas indefinidas como solo laburar
@@ -16,11 +19,18 @@ POC
         - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
 
     Features que faltan implementar
+        - Posiblidad de marcar desafios como "skipeables" (exonera multas y constraints)
+
+        - Si una tarea se comienza antes de un constraint de expiracion y se logra completar, entonces no se cobra el constraint
+
+        - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad. Quiero que se pueda definir un limite de repeticiones por dia, eso seria util para descansos.
+
         - Que se muestre en el timeline cual fue la actividad de cada constraint o bono
+
+        - Posiblidad de marcar un intervalo de tiempo "inactivo" ya pasado como otro tipo de actividad, y que el sistema haga la reevaluación en base puramente en el timeline completo actualizado. Habría que adaptar la logica de batch para que siempre se hagan evaluaciones del timeline del día completo desde el comienzo.
 
         - Mostrar futuros constraint en el timeline
 
-        - Quiero desafios que se puedan repetir en un mismo dia, por ejemplo un desafio de 25 minutos (un pomodoro) para dedicar tiempos al laburo, sin saber cuantas veces se va a hacer en el dia, aqui esta la flexibilidad
 
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
         
