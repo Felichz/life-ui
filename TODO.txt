@@ -1,6 +1,5 @@
 POC
     Bugs para fixear
-        - Ningun desafio se esta marcando como completado
         - Se hereda la propiedad is repetitive cuando el checkbox en el form del board esta deseleccionado
         - La compensacion por completar un desafio antes esta mal calculada
 
