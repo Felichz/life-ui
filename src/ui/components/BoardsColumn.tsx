@@ -441,7 +441,7 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
         parentBoardId: board.id,
         type: newActivityType,
         order: lowestOrder,
-        isRepetitive: inheritedProps[newActivityType]?.isRepetitive ?? newActivityIsRepetitive,
+        isRepetitive: newActivityIsRepetitive ?? inheritedProps[newActivityType]?.isRepetitive,
         createdAt: TimeSimulator.getInstance().now(),
       };
 
@@ -475,7 +475,6 @@ const BoardItem: React.FC<BoardItemProps> = ({ board, level = 0 }) => {
             type: "challenge",
             totalTempoReward: newActivityTempoReward,
             constraintList: combinedConstraints,
-            isRepetitive: inheritedProps.challenge?.isRepetitive ?? false,
             tempoGeneratingMinutes: 0,
           };
           break;

@@ -138,7 +138,68 @@ class SystemAPI implements SystemAPIType {
 
   async startDay(currentDay: DayState): Promise<void> {
     const currentState = await this.getState();
-    await this.saveState({ ...currentState, currentDay, lifecycleState: "dayInProgress" });
+
+    // Verificar si hay actividades repetibles que necesitan ser restauradas
+    // Esto solo ocurre si hay registros de días anteriores
+    if (currentState.dayDatabase.length > 0) {
+      // Obtener el último registro del día
+      const lastDayRecord = currentState.dayDatabase[currentState.dayDatabase.length - 1];
+
+      // Restaurar las actividades repetibles desde el último día
+      const activitiesFinalState = lastDayRecord.activitiesFinalState;
+
+      const repetitiveActivities = Object.values(activitiesFinalState)
+        .filter((activity: Partial<Activity>) => activity.isRepetitive)
+        .map((activity: Partial<Activity>) => ({
+          id: activity.id,
+          title: activity.title,
+          type: activity.type,
+          isRepetitive: activity.isRepetitive,
+        }));
+
+      formatLog("Restaurando actividades repetibles del día anterior", repetitiveActivities);
+
+      // Filtrar solo las actividades repetibles que aún no existen en el estado actual
+      for (const activityId in activitiesFinalState) {
+        const activity = activitiesFinalState[activityId] as Activity;
+
+        // Solo restaurar actividades repetibles que no existan ya en el estado actual
+        if (activity.isRepetitive && !currentState.activities[activityId]) {
+          // Crear una copia de la actividad con estado reiniciado
+          const restoredActivity: Activity = {
+            ...activity,
+            status: "toDo",
+            minutesActive: 0,
+            // Reiniciar propiedades específicas según el tipo
+            ...(activity.type === "challenge"
+              ? {
+                  tempoGeneratingMinutes: 0,
+                  exceededMinutes: 0,
+                  constraintList: activity.constraintList?.map((constraint) => ({
+                    ...constraint,
+                    status: "active",
+                  })),
+                }
+              : {}),
+          } as Activity;
+
+          formatLog("Actividad repetible restaurada", {
+            id: restoredActivity.id,
+            title: restoredActivity.title,
+            type: restoredActivity.type,
+          });
+
+          // Agregar la actividad restaurada al estado actual
+          currentState.activities[activityId] = restoredActivity;
+        }
+      }
+    }
+
+    await this.saveState({
+      ...currentState,
+      currentDay,
+      lifecycleState: "dayInProgress",
+    });
   }
 
   async endDay(dayRecord: DayRecord): Promise<void> {
@@ -157,6 +218,11 @@ class SystemAPI implements SystemAPIType {
       // Reiniciar los historiales del día
       investedTimeHistory: [],
       tempoModificationHistory: [],
+      // Eliminar todas las actividades del estado persistido
+      // para que puedan ser restauradas correctamente al iniciar un nuevo día
+      activities: {},
+      // Eliminar la actividad seleccionada
+      selectedActivity: undefined,
     });
   }
 
@@ -653,7 +719,7 @@ class SystemAPI implements SystemAPIType {
     const { parentBoardId } = activity;
     const state = await this.getState();
 
-    formatLog("createActivity", null);
+    formatLog("createActivity", activity);
 
     // Asegurarnos de que tempoGeneratingMinutes esté inicializado para desafíos
     if (activity.type === "challenge") {
