@@ -1,6 +1,5 @@
 POC
     Bugs para fixear
-        - Se hereda la propiedad is repetitive cuando el checkbox en el form del board esta deseleccionado
         - La compensacion por completar un desafio antes esta mal calculada
 
         Faltan testear casos raros que seguramente esten bugeados:
