@@ -9,10 +9,7 @@ import type {
   BoardId,
   ChallengeActivity,
   ChallengeConstraint,
-  CreateActivityInput,
-  CreateBoardInput,
   DayState,
-  ExpirationChallengeConstraint,
   HobbyActivity,
   InheritableActivityProps,
   InvestedTimeHistory,
@@ -811,6 +808,25 @@ class SystemAPI implements SystemAPIType {
 
     // Ahora establecemos la nueva actividad seleccionada
     await this.saveState({ ...state, selectedActivity: activity.id });
+  }
+
+  async completeActivity(): Promise<void> {
+    const state = await this.getState();
+
+    const { selectedActivity } = state;
+
+    if (!selectedActivity) return;
+
+    const activityToComplete = state.activities[selectedActivity];
+
+    await this.saveState({
+      ...state,
+      activities: {
+        ...state.activities,
+        [activityToComplete.id]: { ...activityToComplete, status: "completed" },
+      },
+      selectedActivity: undefined,
+    });
   }
 
   async unselectActivity(): Promise<void> {
