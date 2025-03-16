@@ -1,5 +1,6 @@
 POC
     Bugs para fixear
+        - Dar click en guardar no cierra el modal
         - Las actividades no-repetibles solo deben ser eliminadas del día siguiente si fueron completadas
         - Cuando se edita un constraint de un subboard parece que las actividades hijas no heredan los constraint del board root
         - La compensacion por completar un desafio antes esta mal calculada
@@ -45,7 +46,6 @@ POC
         - Posiblidad de marcar un intervalo de tiempo "inactivo" ya pasado como otro tipo de actividad, y que el sistema haga la reevaluación en base puramente en el timeline completo actualizado. Habría que adaptar la logica de batch para que siempre se hagan evaluaciones del timeline del día completo desde el comienzo.
 
         - Mostrar futuros constraint en el timeline
-
 
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
         
