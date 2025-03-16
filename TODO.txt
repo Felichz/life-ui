@@ -10,8 +10,14 @@ POC
             - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
 
     Para pensar/grooming
+        - Introducir concepto de momentum y mostrarlo como un número en tiempo real
+        - Como logramos un balance entre esfuerzo y recompensa/descanso/ocio?
+            - Quiza podemos extraer datos como el porcentaje de tiempo del dia en desafios vs tiempo de descanso/ocio
         - Evaluar implementación de "criterios de priorización" definidos por el usuario para un board dado, y luego dentro de ese board será obligatorio definir para cada actividad cual es el valor de 0 a 100 de relevancia para cada criterio de priorización heredado de los board padres, entonces el sistema puede ordenar automáticamente cada board por prioridad según sus los criterios de priorización.
         - Evaluar la posibilidad de eliminar el concepto de constraints y multas a favor de motivacion en base a bonos con expiración
+            - Principio filosofico del sistema: El sistema motiva sin castigar
+            - Cuando tienen sentido las multas en vez de bono como mecanismo de feedback?
+                - Quiza las multas tienen sentido en casos de tareas urgentes o que queremos obligarnos a hacer?
         - Manejar mejor el caso de tiempo excedido en desafios, la manera de registrarlo como informacion util para toma de decisiones y la posibilidad de tomar decisiones
             - Necesito poder empezar una actividad como laburar o jugar lol sin saber cuando va a terminar y tener la posibilidad de marcar el fin de la tarea manualmente
             - Algunas tareas se benefician de un timebox especifico con un objetivo especifico lograble pero otras son mas indefinidas como solo laburar
@@ -19,6 +25,14 @@ POC
         - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
 
     Features que faltan implementar
+        - Agregar un segundo timeline donde poner la expectativa de lo que quiero hacer en el dia donde se puedan agregar tareas a futuro, eso estaria bueno persistirlo para luego poder ver los dias anteriores lo que realmente hice y compraralo con lo que tenia en mente hacer, asi que estaria bueno persistir 
+
+        - Para visualizar el tiempo invertido en un dia entero se puede usar un pie chart
+
+        - Mostrar el tempo positivo del dia como una barra en el centro del timeline que va hacia futuro, si tengo 60 de tempo la barra cubriria toda la proxima hora   
+
+        - Agregar hora de expiracion para actividades de tipo hobby o neutral
+
         - Posiblidad de marcar desafios como "skipeables" (exonera multas y constraints)
 
         - Si una tarea se comienza antes de un constraint de expiracion y se logra completar, entonces no se cobra el constraint
