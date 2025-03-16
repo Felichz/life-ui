@@ -49,6 +49,8 @@ POC
 
         - Bonos, por ej tempos extra por completar cierta actividad dentro de un rango de tiempo
         
+        - Posibilidad de hacer drag & drop de una actividad de un board a otro
+
         - Quiero que se puedan ver las constraint futuras en el timeline para tener una manera sencilla y clara de ver si esta por fallar una
 
         - Se debe permitir al usuario elegir una hora de finalizacion del dia, por ejemplo si el user empezo tarde el dia por alguna razon tipo 12am no queremos forzarlo a laburar un dia hasta las 4am eso va en contra los principios filosoficos y el objetivo de la app.
