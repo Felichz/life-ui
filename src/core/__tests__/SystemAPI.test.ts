@@ -810,6 +810,7 @@ describe("Deselección de actividades", () => {
       allowedTime: 30,
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
     await systemApi.createActivity(neutralActivity);
 
@@ -855,6 +856,7 @@ describe("Deselección de actividades", () => {
       tempoConsumptionRate: 0.5,
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
     await systemApi.createActivity(discountActivity);
 
@@ -901,6 +903,7 @@ describe("Deselección de actividades", () => {
       constraintList: [],
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
     await systemApi.createActivity(challengeActivity);
 
@@ -943,6 +946,7 @@ describe("Deselección de actividades", () => {
       constraintList: [],
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
     await systemApi.createActivity(challengeActivity);
 
@@ -988,6 +992,7 @@ describe("Deselección de actividades", () => {
       allowedTime: 30,
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
 
     const challengeActivity: ChallengeActivity = {
@@ -1003,6 +1008,7 @@ describe("Deselección de actividades", () => {
       constraintList: [],
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
 
     await systemApi.createActivity(neutralActivity);
@@ -1050,6 +1056,7 @@ describe("Deselección de actividades", () => {
       tempoConsumptionRate: 0.5,
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
 
     const challengeActivity: ChallengeActivity = {
@@ -1065,6 +1072,7 @@ describe("Deselección de actividades", () => {
       constraintList: [],
       createdAt: Date.now(),
       inheritedProps: {},
+      completeCount: 0,
     };
 
     await systemApi.createActivity(discountActivity);
@@ -1087,5 +1095,549 @@ describe("Deselección de actividades", () => {
     // Verificar que la actividad discount se marcó como completed
     const discountAfter = await systemApi.getActivity("discount-activity");
     expect(discountAfter?.status).toBe("completed");
+  });
+});
+
+// Nuevos tests para verificar la funcionalidad de startDay
+describe("Funcionalidad de startDay", () => {
+  // Antes de cada prueba, forzamos el modo test y limpiamos la data
+  beforeEach(async () => {
+    // Activar modo de prueba para permitir `clearAllData`
+    await systemApi.updateSystemParams({
+      isTestMode: true,
+      passiveTempoConsumptionRate: 1,
+      timeMultiplier: 1,
+    });
+
+    await systemApi.clearAllData();
+  });
+
+  // Test para verificar que startDay cambia el estado del sistema correctamente
+  test("startDay cambia el estado del sistema a dayInProgress", async () => {
+    // Verificar estado inicial
+    const initialState = await systemApi.getLifecycleState();
+    expect(initialState).toBe("dayNotStarted");
+
+    // Iniciar el día
+    await systemApi.startDay({
+      dayTempoBalance: 10,
+      date: Date.now(),
+      dayStartMinute: 480, // 8:00 AM
+    });
+
+    // Verificar que el estado cambió
+    const newState = await systemApi.getLifecycleState();
+    expect(newState).toBe("dayInProgress");
+
+    // Verificar que se guardó la información del día
+    const currentDay = await systemApi.getCurrentDay();
+    expect(currentDay).toBeDefined();
+    expect(currentDay?.dayTempoBalance).toBe(10);
+    expect(currentDay?.dayStartMinute).toBe(480);
+  });
+
+  // Test para verificar que startDay no restaura actividades si no hay días anteriores
+  test("startDay no restaura actividades cuando no hay días anteriores", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Iniciar el día
+    await systemApi.startDay({
+      dayTempoBalance: 0,
+      date: Date.now(),
+      dayStartMinute: 0,
+    });
+
+    // Verificar que no hay actividades (porque no había días anteriores)
+    const activities = await systemApi.getActivities();
+    expect(activities.length).toBe(0);
+  });
+
+  // Test para verificar que startDay restaura actividades repetitivas del día anterior
+  test("startDay restaura actividades repetitivas del día anterior", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad repetitiva
+    const repetitiveActivity: ChallengeActivity = {
+      id: "repetitive-challenge",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Actividad Repetitiva",
+      isRepetitive: true,
+      minutesActive: 30,
+      status: "completed",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 30,
+      constraintList: [
+        {
+          id: "constraint-1",
+          type: "expiration",
+          dayMinuteExpiration: 120,
+          penalty: 10,
+          status: "active",
+          failCount: 2,
+        },
+      ],
+      createdAt: Date.now(),
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    // Crear una actividad no repetitiva
+    const nonRepetitiveActivity: NeutralActivity = {
+      id: "non-repetitive-neutral",
+      parentBoardId: "board-test",
+      type: "neutral",
+      title: "Actividad No Repetitiva",
+      isRepetitive: false,
+      minutesActive: 15,
+      status: "completed",
+      allowedTime: 30,
+      createdAt: Date.now(),
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    await systemApi.createActivity(repetitiveActivity);
+    await systemApi.createActivity(nonRepetitiveActivity);
+
+    // Iniciar y finalizar un día para crear un registro en dayDatabase
+    await systemApi.startDay({
+      dayTempoBalance: 0,
+      date: Date.now() - 86400000, // Ayer
+      dayStartMinute: 0,
+    });
+
+    // Finalizar el día con las actividades en su estado final
+    await systemApi.endDay({
+      dayState: {
+        dayTempoBalance: 100,
+        date: Date.now() - 86400000,
+        dayStartMinute: 0,
+      },
+      activitiesFinalState: {
+        "repetitive-challenge": repetitiveActivity,
+        "non-repetitive-neutral": nonRepetitiveActivity,
+      },
+      usefulMetrics: {
+        totalGeneratedTemposEver: 100,
+        totalMinutesInvested: {
+          intrinsicProductivity: 0,
+          challenges: 30,
+          hobbies: 0,
+          rest: 15,
+          other: 0,
+        },
+      },
+      investedTimeHistory: [],
+      tempoModificationHistory: [],
+    });
+
+    // Verificar que no hay actividades después de finalizar el día
+    let activities = await systemApi.getActivities();
+    expect(activities.length).toBe(0);
+
+    // Iniciar un nuevo día
+    await systemApi.startDay({
+      dayTempoBalance: 100,
+      date: Date.now(),
+      dayStartMinute: 0,
+    });
+
+    // Verificar que solo se restauró la actividad repetitiva
+    activities = await systemApi.getActivities();
+    expect(activities.length).toBe(1);
+
+    // Verificar que la actividad restaurada es la repetitiva
+    const restoredActivity = activities[0];
+    expect(restoredActivity.id).toBe("repetitive-challenge");
+    expect(restoredActivity.isRepetitive).toBe(true);
+
+    // Verificar que se reiniciaron los valores de la actividad
+    expect(restoredActivity.status).toBe("toDo");
+    expect(restoredActivity.minutesActive).toBe(0);
+
+    // Verificar que se reiniciaron los constraints
+    if (restoredActivity.type === "challenge") {
+      expect(restoredActivity.tempoGeneratingMinutes).toBe(0);
+      expect(restoredActivity.constraintList[0].status).toBe("active");
+    }
+
+    // Verificar que la actividad no repetitiva no se restauró
+    const nonRepetitiveExists = activities.some((a) => a.id === "non-repetitive-neutral");
+    expect(nonRepetitiveExists).toBe(false);
+  });
+
+  // Test para verificar que startDay no restaura actividades repetitivas que ya existen
+  test("startDay no restaura actividades repetitivas que ya existen en el estado actual", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad repetitiva para el día anterior
+    const repetitiveActivity: ChallengeActivity = {
+      id: "repetitive-challenge",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Actividad Repetitiva",
+      isRepetitive: true,
+      minutesActive: 30,
+      status: "completed",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 30,
+      constraintList: [],
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    await systemApi.createActivity(repetitiveActivity);
+
+    // Iniciar y finalizar un día para crear un registro en dayDatabase
+    await systemApi.startDay({
+      dayTempoBalance: 0,
+      date: Date.now() - 86400000, // Ayer
+      dayStartMinute: 0,
+    });
+
+    // Finalizar el día con la actividad en su estado final
+    await systemApi.endDay({
+      dayState: {
+        dayTempoBalance: 100,
+        date: Date.now() - 86400000,
+        dayStartMinute: 0,
+      },
+      activitiesFinalState: {
+        "repetitive-challenge": repetitiveActivity,
+      },
+      usefulMetrics: {
+        totalGeneratedTemposEver: 100,
+        totalMinutesInvested: {
+          intrinsicProductivity: 0,
+          challenges: 30,
+          hobbies: 0,
+          rest: 0,
+          other: 0,
+        },
+      },
+      investedTimeHistory: [],
+      tempoModificationHistory: [],
+    });
+
+    // Crear manualmente la misma actividad repetitiva antes de iniciar el nuevo día
+    // (simulando que el usuario la creó manualmente)
+    const manuallyCreatedActivity: ChallengeActivity = {
+      id: "repetitive-challenge",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Actividad Repetitiva Modificada", // Título diferente
+      isRepetitive: true,
+      minutesActive: 0,
+      status: "toDo",
+      totalTempoReward: 150, // Valor diferente
+      tempoGeneratingMinutes: 0,
+      constraintList: [],
+      createdAt: Date.now(),
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    await systemApi.createActivity(manuallyCreatedActivity);
+
+    // Verificar que la actividad existe antes de iniciar el día
+    let activities = await systemApi.getActivities();
+    expect(activities.length).toBe(1);
+    expect(activities[0].title).toBe("Actividad Repetitiva Modificada");
+    expect((activities[0] as ChallengeActivity).totalTempoReward).toBe(150);
+
+    // Iniciar un nuevo día
+    await systemApi.startDay({
+      dayTempoBalance: 100,
+      date: Date.now(),
+      dayStartMinute: 0,
+    });
+
+    // Verificar que la actividad manual no fue sobrescrita por la restauración
+    activities = await systemApi.getActivities();
+    expect(activities.length).toBe(1);
+    expect(activities[0].title).toBe("Actividad Repetitiva Modificada");
+    expect((activities[0] as ChallengeActivity).totalTempoReward).toBe(150);
+  });
+
+  // Test para verificar que startDay restaura múltiples actividades repetitivas
+  test("startDay restaura múltiples actividades repetitivas correctamente", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear varias actividades repetitivas de diferentes tipos
+    const repetitiveChallenge: ChallengeActivity = {
+      id: "repetitive-challenge",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Desafío Repetitivo",
+      isRepetitive: true,
+      minutesActive: 30,
+      status: "completed",
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 30,
+      constraintList: [],
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    const repetitiveNeutral: NeutralActivity = {
+      id: "repetitive-neutral",
+      parentBoardId: "board-test",
+      type: "neutral",
+      title: "Neutral Repetitiva",
+      isRepetitive: true,
+      minutesActive: 15,
+      status: "completed",
+      allowedTime: 30,
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    const repetitiveDiscount: HobbyActivity = {
+      id: "repetitive-discount",
+      parentBoardId: "board-test",
+      type: "discount",
+      title: "Hobby Repetitivo",
+      isRepetitive: true,
+      minutesActive: 20,
+      status: "completed",
+      allowedTime: 60,
+      tempoConsumptionRate: 0.5,
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    await systemApi.createActivity(repetitiveChallenge);
+    await systemApi.createActivity(repetitiveNeutral);
+    await systemApi.createActivity(repetitiveDiscount);
+
+    // Iniciar y finalizar un día para crear un registro en dayDatabase
+    await systemApi.startDay({
+      dayTempoBalance: 0,
+      date: Date.now() - 86400000, // Ayer
+      dayStartMinute: 0,
+    });
+
+    // Finalizar el día con las actividades en su estado final
+    await systemApi.endDay({
+      dayState: {
+        dayTempoBalance: 100,
+        date: Date.now() - 86400000,
+        dayStartMinute: 0,
+      },
+      activitiesFinalState: {
+        "repetitive-challenge": repetitiveChallenge,
+        "repetitive-neutral": repetitiveNeutral,
+        "repetitive-discount": repetitiveDiscount,
+      },
+      usefulMetrics: {
+        totalGeneratedTemposEver: 100,
+        totalMinutesInvested: {
+          intrinsicProductivity: 0,
+          challenges: 30,
+          hobbies: 20,
+          rest: 15,
+          other: 0,
+        },
+      },
+      investedTimeHistory: [],
+      tempoModificationHistory: [],
+    });
+
+    // Verificar que no hay actividades después de finalizar el día
+    let activities = await systemApi.getActivities();
+    expect(activities.length).toBe(0);
+
+    // Iniciar un nuevo día
+    await systemApi.startDay({
+      dayTempoBalance: 100,
+      date: Date.now(),
+      dayStartMinute: 0,
+    });
+
+    // Verificar que se restauraron todas las actividades repetitivas
+    activities = await systemApi.getActivities();
+    expect(activities.length).toBe(3);
+
+    // Verificar que todas las actividades están en estado toDo y con minutesActive = 0
+    activities.forEach((activity) => {
+      expect(activity.status).toBe("toDo");
+      expect(activity.minutesActive).toBe(0);
+    });
+
+    // Verificar que cada tipo de actividad se restauró correctamente
+    const restoredChallenge = activities.find((a) => a.id === "repetitive-challenge");
+    const restoredNeutral = activities.find((a) => a.id === "repetitive-neutral");
+    const restoredDiscount = activities.find((a) => a.id === "repetitive-discount");
+
+    expect(restoredChallenge).toBeDefined();
+    expect(restoredNeutral).toBeDefined();
+    expect(restoredDiscount).toBeDefined();
+
+    // Verificar propiedades específicas por tipo
+    if (restoredChallenge?.type === "challenge") {
+      expect(restoredChallenge.tempoGeneratingMinutes).toBe(0);
+    }
+  });
+
+  // Test para verificar que startDay restaura actividades no repetibles incompletas pero no las completadas
+  test("startDay restaura actividades no repetibles incompletas pero no las completadas", async () => {
+    // Crear un board
+    const board = {
+      ...baseBoard,
+      id: "board-test",
+      activityProps: {},
+    };
+    await systemApi.createBoard(board);
+
+    // Crear una actividad no repetible incompleta (toDo)
+    const incompleteActivity: ChallengeActivity = {
+      id: "incomplete-challenge",
+      parentBoardId: "board-test",
+      type: "challenge",
+      title: "Desafío Incompleto",
+      isRepetitive: false,
+      minutesActive: 10,
+      status: "toDo", // Estado incompleto
+      totalTempoReward: 100,
+      tempoGeneratingMinutes: 10,
+      constraintList: [],
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 0,
+    };
+
+    // Crear una actividad no repetible en progreso
+    const inProgressActivity: NeutralActivity = {
+      id: "inprogress-neutral",
+      parentBoardId: "board-test",
+      type: "neutral",
+      title: "Neutral En Progreso",
+      isRepetitive: false,
+      minutesActive: 15,
+      status: "inProgress", // Estado incompleto
+      allowedTime: 30,
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 0,
+    };
+
+    // Crear una actividad no repetible completada
+    const completedActivity: HobbyActivity = {
+      id: "completed-discount",
+      parentBoardId: "board-test",
+      type: "discount",
+      title: "Hobby Completado",
+      isRepetitive: false,
+      minutesActive: 20,
+      status: "completed", // Estado completado
+      allowedTime: 60,
+      tempoConsumptionRate: 0.5,
+      createdAt: Date.now() - 86400000,
+      inheritedProps: {},
+      completeCount: 1,
+    };
+
+    await systemApi.createActivity(incompleteActivity);
+    await systemApi.createActivity(inProgressActivity);
+    await systemApi.createActivity(completedActivity);
+
+    // Iniciar y finalizar un día para crear un registro en dayDatabase
+    await systemApi.startDay({
+      dayTempoBalance: 0,
+      date: Date.now() - 86400000, // Ayer
+      dayStartMinute: 0,
+    });
+
+    // Finalizar el día con las actividades en su estado final
+    await systemApi.endDay({
+      dayState: {
+        dayTempoBalance: 100,
+        date: Date.now() - 86400000,
+        dayStartMinute: 0,
+      },
+      activitiesFinalState: {
+        "incomplete-challenge": incompleteActivity,
+        "inprogress-neutral": inProgressActivity,
+        "completed-discount": completedActivity,
+      },
+      usefulMetrics: {
+        totalGeneratedTemposEver: 100,
+        totalMinutesInvested: {
+          intrinsicProductivity: 0,
+          challenges: 10,
+          hobbies: 20,
+          rest: 15,
+          other: 0,
+        },
+      },
+      investedTimeHistory: [],
+      tempoModificationHistory: [],
+    });
+
+    // Verificar que no hay actividades después de finalizar el día
+    let activities = await systemApi.getActivities();
+    expect(activities.length).toBe(0);
+
+    // Iniciar un nuevo día
+    await systemApi.startDay({
+      dayTempoBalance: 100,
+      date: Date.now(),
+      dayStartMinute: 0,
+    });
+
+    // Verificar que se restauraron solo las actividades incompletas
+    activities = await systemApi.getActivities();
+    expect(activities.length).toBe(2); // Solo las dos actividades incompletas
+
+    // Verificar que las actividades incompletas se restauraron
+    const restoredIncomplete = activities.find((a) => a.id === "incomplete-challenge");
+    const restoredInProgress = activities.find((a) => a.id === "inprogress-neutral");
+    const restoredCompleted = activities.find((a) => a.id === "completed-discount");
+
+    expect(restoredIncomplete).toBeDefined();
+    expect(restoredInProgress).toBeDefined();
+    expect(restoredCompleted).toBeUndefined(); // No debe existir
+
+    // Verificar que se mantuvieron los estados originales
+    expect(restoredIncomplete?.status).toBe("toDo");
+    expect(restoredInProgress?.status).toBe("toDo"); // Debería reiniciarse a toDo
+
+    // Verificar que se mantuvieron los valores de minutesActive
+    expect(restoredIncomplete?.minutesActive).toBe(10);
+    expect(restoredInProgress?.minutesActive).toBe(15);
+
+    // Verificar propiedades específicas por tipo
+    if (restoredIncomplete?.type === "challenge") {
+      expect(restoredIncomplete.tempoGeneratingMinutes).toBe(10);
+    }
   });
 });

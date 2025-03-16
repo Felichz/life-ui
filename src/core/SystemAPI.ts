@@ -145,11 +145,16 @@ class SystemAPI implements SystemAPIType {
       // Obtener el último registro del día
       const lastDayRecord = currentState.dayDatabase[currentState.dayDatabase.length - 1];
 
-      // Restaurar las actividades repetibles desde el último día
+      // Restaurar las actividades repetibles y no repetibles incompletas desde el último día
       const activitiesFinalState = lastDayRecord.activitiesFinalState;
 
-      const repetitiveActivities = Object.values(activitiesFinalState)
-        .filter((activity: Partial<Activity>) => activity.isRepetitive)
+      // Filtrar actividades que deben ser restauradas:
+      // 1. Actividades repetitivas (sin importar su estado)
+      // 2. Actividades no repetitivas que no estén completadas
+      const activitiesToRestore = Object.values(activitiesFinalState)
+        .filter(
+          (activity: Partial<Activity>) => activity.isRepetitive || activity.status !== "completed"
+        )
         .map((activity: Partial<Activity>) => ({
           id: activity.id,
           title: activity.title,
@@ -157,23 +162,29 @@ class SystemAPI implements SystemAPIType {
           isRepetitive: activity.isRepetitive,
         }));
 
-      formatLog("Restaurando actividades repetibles del día anterior", repetitiveActivities);
+      formatLog("Restaurando actividades repetibles del día anterior", activitiesToRestore);
 
       // Filtrar solo las actividades repetibles que aún no existen en el estado actual
       for (const activityId in activitiesFinalState) {
         const activity = activitiesFinalState[activityId] as Activity;
 
-        // Solo restaurar actividades repetibles que no existan ya en el estado actual
-        if (activity.isRepetitive && !currentState.activities[activityId]) {
+        // Solo restaurar actividades que cumplan con los criterios y que no existan ya en el estado actual
+        if (
+          (activity.isRepetitive || activity.status !== "completed") &&
+          !currentState.activities[activityId]
+        ) {
           // Crear una copia de la actividad con estado reiniciado
           const restoredActivity: Activity = {
             ...activity,
             status: "toDo",
-            minutesActive: 0,
+            // Mantener los valores originales para actividades no repetibles incompletas
+            minutesActive: activity.isRepetitive ? 0 : activity.minutesActive,
             // Reiniciar propiedades específicas según el tipo
             ...(activity.type === "challenge"
               ? {
-                  tempoGeneratingMinutes: 0,
+                  tempoGeneratingMinutes: activity.isRepetitive
+                    ? 0
+                    : (activity as ChallengeActivity).tempoGeneratingMinutes,
                   exceededMinutes: 0,
                   constraintList: activity.constraintList?.map((constraint) => ({
                     ...constraint,
