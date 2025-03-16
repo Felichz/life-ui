@@ -1,5 +1,6 @@
 POC
     Bugs para fixear
+        - Las actividades no-repetibles solo deben ser eliminadas del día siguiente si fueron completadas
         - Cuando se edita un constraint de un subboard parece que las actividades hijas no heredan los constraint del board root
         - La compensacion por completar un desafio antes esta mal calculada
         - No se muestra bien la herencia de is repetitive en el modal de creacion de sub board y edicion de sub board
