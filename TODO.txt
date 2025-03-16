@@ -12,6 +12,7 @@ POC
             - Cuando el dia comienza tan tarde que sumando los 960 minutos nos pasamos de 1440
 
     Para pensar/grooming
+        - Implementar rachas para actividades repetibles, quiza con bonos por racha, para pequeños habitos que queremos normalizar
         - Introducir concepto de momentum y mostrarlo como un número en tiempo real
         - Como logramos un balance entre esfuerzo y recompensa/descanso/ocio?
             - Quiza podemos extraer datos como el porcentaje de tiempo del dia en desafios vs tiempo de descanso/ocio
@@ -27,6 +28,8 @@ POC
         - Agregar la posibilidad de exonerar intervalos de tiempo en el dia para casos donde me despierto tarde por ejemplo a mediodia, ya que no queiro que la app me obligue a estar activo hasta las 4am, actualmente el sistema me cobraria tiempo hasta las 4am, estaria bueno agregar una regla de exoneracion para exonerar todo el tiempo a partir de las 12 del mediodia.
 
     Features que faltan implementar
+        - Agregar descripciones para las actividades
+
         - Agregar un segundo timeline donde poner la expectativa de lo que quiero hacer en el dia donde se puedan agregar tareas a futuro, eso estaria bueno persistirlo para luego poder ver los dias anteriores lo que realmente hice y compraralo con lo que tenia en mente hacer, asi que estaria bueno persistir 
 
         - Para visualizar el tiempo invertido en un dia entero se puede usar un pie chart
