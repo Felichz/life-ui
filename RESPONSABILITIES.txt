@@ -1,0 +1,25 @@
+Responsabilidades del usuario:
+- Declarar el inicio y finalización de actividades
+- Actualizar sus variables de estado subjetivas cuando la aplicación lo solicite
+- Definir sus actividades, timeboxes y estimaciones de tiempo
+- Establecer requisitos de energía/estado para sus diferentes actividades
+- Respetar y gestionar sus propios límites de tiempo
+- Tomar las decisiones finales sobre qué actividades realizar
+- Crear y ajustar sus rutinas según sus propias necesidades
+- Definir los rangos de tiempo para actividades de duración flexible
+- Decidir cuándo tomar descansos y por cuánto tiempo
+- Interpretar y aplicar los insights proporcionados por la aplicación
+
+Responsabilidades de la app:
+- Registrar con precisión los tiempos de actividades y descansos
+- Visualizar la información de manera clara y accesible
+- Mostrar comparaciones entre tiempos estimados y reales
+- Detectar patrones en los datos del usuario
+- Sugerir distribuciones óptimas de actividades basadas en patrones históricos
+- Proporcionar notificaciones sutiles sobre límites de tiempo
+- Solicitar actualizaciones de variables subjetivas en momentos oportunos
+- Identificar correlaciones entre actividades y cambios en estados subjetivos
+- Generar insights personalizados basados en los datos recopilados
+- Adaptarse a los hábitos y preferencias del usuario con el tiempo
+- Mostrar tendencias en el manejo del tiempo y energía
+- Proporcionar sugerencias de descansos basadas en evidencia personal
