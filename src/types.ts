@@ -139,34 +139,34 @@ type TimeboxedActivityProps = {
   };
 };
 
-type ActivityTypes =
+export type ActivityTypes =
   | GoalOrientedActivityProps
   | FlexibleDurationActivityProps
   | TimeboxedActivityProps;
 
-type Activity = BaseActivity & ActivityTypes;
+export type Activity = BaseActivity & ActivityTypes;
 
 /**
  * Time Block represents a predefined time range in the user's day
  */
-// export interface TimeBlock {
-//   /** Unique identifier for the time block */
-//   id: BlockId;
-//   /** User-defined title for the block */
-//   title: string;
-//   /** Start time in minutes from midnight (0-1440) */
-//   startMinute: number;
-//   /** End time in minutes from midnight (0-1440) */
-//   endMinute: number;
-//   /** Activities assigned to this block */
-//   activityIds: ActivityId[];
-//   /** Block color for visual representation */
-//   color: string;
-//   /** Whether this block is currently active based on current time */
-//   isActive?: boolean;
-//   /** Day pattern this block appears in (weekdays, weekend, etc.) */
-//   dayPattern?: DayPatternConfig;
-// }
+export interface TimeBlock {
+  /** Unique identifier for the time block */
+  id: BlockId;
+  /** User-defined title for the block */
+  title: string;
+  /** Start time in minutes from midnight (0-1440) */
+  startMinute: number;
+  /** End time in minutes from midnight (0-1440) */
+  endMinute: number;
+  /** Activity instances assigned to this block */
+  activityInstances: Activity[];
+  /** Block color for visual representation */
+  color: string;
+  /** Whether this block is currently active based on current time */
+  isActive?: boolean;
+  /** Day pattern this block appears in (weekdays, weekend, etc.) */
+  // dayPattern?: DayPatternConfig;
+}
 
 /**
  * Action Plan is a predefined collection of activities with optional ordering
