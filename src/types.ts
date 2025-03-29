@@ -1,4 +1,5 @@
 // Type definitions for Qualia Control - Life UI System
+// Commented types are left for future implementations
 
 /**
  * Unique identifiers for all entity types in the system
@@ -8,9 +9,12 @@ export type ActivityId = string; // ID for activity instance in the day
 export type BlockId = string; // ID for time block
 export type ActionPlanId = string; // ID for action plan
 export type CustomVariableId = string; // ID for custom variable
+export type EventTemplateId = string; // ID for discrete event
 export type EventId = string; // ID for discrete event
 export type InterruptionCauseId = string; // ID for interruption cause
 export type SnapshotId = string; // ID for variable snapshot
+
+type UnixTimestamp = number;
 
 /**
  * Activity Types as defined in the system
@@ -39,198 +43,166 @@ type TimeboxMode =
 export type SystemActivityType = "autopilot" | "meditation" | "consciousRest";
 
 /**
- * Base properties for any activity instance in the system
+ * Activity type, this can be a template or an instance
+ *
+ * If the `instance` prop is present, this is an instance, if not, this is a template
  */
-interface BaseActivity {
-  /** Unique identifier for the activity */
-  id: ActivityId;
-  /** Reference to template this activity was created from */
-  templateId: ActivityTemplateId;
+type BaseActivity = {
   /** User-defined title for the activity */
   title: string;
   /** Optional detailed description */
   description?: string;
   /** Type of activity defining its time handling behavior */
   type: ActivityType;
-  /** Current status of the activity */
-  status: ActivityStatus;
   /** User-defined tags for organization */
   tags: string[];
   /** Icon identifier for visual representation */
   iconId: string;
-  /** Whether this activity is recurring/reusable */
-  isRecurring: boolean;
+  /** Reference to template this activity was created from, always defined */
+  templateId: ActivityTemplateId;
+  /** Current status of the activity */
+  status: ActivityStatus;
   /** Optional parent action plan this activity belongs to */
   parentActionPlanId?: ActionPlanId;
-  /** Created timestamp */
-  createdAt: number;
-  /** Updated timestamp */
-  updatedAt: number;
   /** Time block this activity is assigned to */
   assignedBlockId?: BlockId;
-  /** Activity order within its assigned block or todo column */
-  order?: number;
-  /** Timestamp when activity was started (if applicable) */
-  startTime?: number;
-  /** Timestamp when activity was completed (if applicable) */
-  endTime?: number;
-}
+  /** Whether this is a system activity */
+  systemActivity?: boolean;
+  /** Only for instances */
+  instance?: {
+    /** Unique identifier for the activity instance */
+    id: ActivityId;
+    /** Timestamp when activity was started (if applicable) */
+    startTime?: UnixTimestamp;
+    /** Timestamp when activity was completed or interrupted (if applicable) */
+    endTime?: UnixTimestamp;
+    /** Only for instances: Minutes spent in this activity */
+    minutes?: number;
+  };
+};
 
 /**
  * Activity with a clear objective and estimated completion time
  */
-export interface GoalOrientedActivity extends BaseActivity {
+type GoalOrientedActivityProps = {
   type: "goalOriented";
-  /** Estimated minutes to complete the activity (~45 means approximately 45 minutes) */
-  estimatedMinutes: number;
-  /** Actual minutes spent on the activity (only set when completed) */
-  actualMinutes?: number;
-  /** Variance between estimated and actual time (actualMinutes - estimatedMinutes) */
-  timeVariance?: number;
-}
+  dynamicProps: {
+    /** Estimated minutes to complete the activity (~45 means approximately 45 minutes) */
+    estimatedMinutes: number;
+  };
+  instance?: BaseActivity["instance"] & {
+    type: "goalOriented";
+    /** Actual minutes spent on the activity (only set when completed) */
+    actualMinutes?: number;
+    /** Variance between estimated and actual time (actualMinutes - estimatedMinutes) */
+    timeVariance?: number;
+  };
+};
 
 /**
  * Activity with flexible duration within an expected range
  */
-export interface FlexibleDurationActivity extends BaseActivity {
+type FlexibleDurationActivityProps = {
   type: "flexibleDuration";
-  /** Minimum expected minutes for the activity */
-  minExpectedMinutes: number;
-  /** Maximum expected minutes for the activity */
-  maxExpectedMinutes: number;
-  /** Actual minutes spent on the activity (only set when completed) */
-  actualMinutes?: number;
-  /** Whether the actual time fell within the expected range */
-  withinExpectedRange?: boolean;
-}
+  dynamicProps: {
+    /** Minimum expected minutes for the activity */
+    minExpectedMinutes: number;
+    /** Maximum expected minutes for the activity */
+    maxExpectedMinutes: number;
+  };
+  instance?: BaseActivity["instance"] & {
+    /** Actual minutes spent on the activity (only set when completed) */
+    actualMinutes?: number;
+    /** Whether the actual time fell within the expected range */
+    withinExpectedRange?: boolean;
+  };
+};
 
 /**
  * Activity with deliberate time constraints (timebox)
  */
-export interface TimeboxedActivity extends BaseActivity {
+type TimeboxedActivityProps = {
   type: "timeboxed";
-  /** Specific timebox configuration */
-  timeboxConfig: TimeboxMode;
-  /** Actual minutes spent on the activity (only set when completed) */
-  actualMinutes?: number;
-  /** Minutes of voluntary extension beyond the initial timebox */
-  extensionMinutes?: number;
-  /** Whether the user completed the minimum required time */
-  metMinimumRequirement?: boolean;
-  /** Whether the user stayed within maximum time limit */
-  stayedWithinMaximum?: boolean;
-}
+  dynamicProps: {
+    /** Specific timebox configuration */
+    timeboxConfig: TimeboxMode;
+  };
+  instance?: BaseActivity["instance"] & {
+    /** Actual minutes spent on the activity (only set when completed) */
+    actualMinutes?: number;
+    /** Minutes of voluntary extension beyond the initial timebox */
+    extensionMinutes?: number;
+    /** Whether the user completed the minimum required time */
+    metMinimumRequirement?: boolean;
+    /** Whether the user stayed within maximum time limit */
+    stayedWithinMaximum?: boolean;
+  };
+};
 
-/**
- * Universal system activities (autopilot, meditation, conscious rest)
- */
-export interface SystemActivity extends BaseActivity {
-  /** Type is flexible to match the base types but more specific in systemActivityType */
-  type: ActivityType;
-  /** Specific system activity type */
-  systemActivityType: SystemActivityType;
-  /** Minutes spent in this system activity state */
-  minutes?: number;
-}
+type ActivityTypes =
+  | GoalOrientedActivityProps
+  | FlexibleDurationActivityProps
+  | TimeboxedActivityProps;
 
-/**
- * Union type of all possible activities
- */
-export type Activity =
-  | GoalOrientedActivity
-  | FlexibleDurationActivity
-  | TimeboxedActivity
-  | SystemActivity;
-
-/**
- * Activity Template stored in the library (immutable properties + default dynamic properties)
- */
-export interface ActivityTemplate {
-  /** Unique identifier for the template */
-  id: ActivityTemplateId;
-  /** User-defined title for the activity */
-  title: string;
-  /** Optional detailed description */
-  description?: string;
-  /** Type of activity defining its time handling behavior */
-  type: ActivityType;
-  /** User-defined tags for organization */
-  tags: string[];
-  /** Icon identifier for visual representation */
-  iconId: string;
-  /** Whether activities created from this template are recurring by default */
-  defaultIsRecurring: boolean;
-  /** Created timestamp */
-  createdAt: number;
-  /** Updated timestamp */
-  updatedAt: number;
-
-  /** Default dynamic properties based on activity type */
-  dynamicDefaults:
-    | { type: "goalOriented"; estimatedMinutes: number }
-    | { type: "flexibleDuration"; minExpectedMinutes: number; maxExpectedMinutes: number }
-    | { type: "timeboxed"; timeboxConfig: TimeboxMode }
-    | { type: "system"; systemActivityType: SystemActivityType };
-}
+type Activity = BaseActivity & ActivityTypes;
 
 /**
  * Time Block represents a predefined time range in the user's day
  */
-export interface TimeBlock {
-  /** Unique identifier for the time block */
-  id: BlockId;
-  /** User-defined title for the block */
-  title: string;
-  /** Start time in minutes from midnight (0-1440) */
-  startMinute: number;
-  /** End time in minutes from midnight (0-1440) */
-  endMinute: number;
-  /** Activities assigned to this block */
-  activityIds: ActivityId[];
-  /** Block color for visual representation */
-  color: string;
-  /** Whether this block is currently active based on current time */
-  isActive?: boolean;
-  /** Day pattern this block appears in (weekdays, weekend, etc.) */
-  dayPattern?: DayPatternConfig;
-}
+// export interface TimeBlock {
+//   /** Unique identifier for the time block */
+//   id: BlockId;
+//   /** User-defined title for the block */
+//   title: string;
+//   /** Start time in minutes from midnight (0-1440) */
+//   startMinute: number;
+//   /** End time in minutes from midnight (0-1440) */
+//   endMinute: number;
+//   /** Activities assigned to this block */
+//   activityIds: ActivityId[];
+//   /** Block color for visual representation */
+//   color: string;
+//   /** Whether this block is currently active based on current time */
+//   isActive?: boolean;
+//   /** Day pattern this block appears in (weekdays, weekend, etc.) */
+//   dayPattern?: DayPatternConfig;
+// }
 
 /**
  * Action Plan is a predefined collection of activities with optional ordering
  */
-export interface ActionPlan {
-  /** Unique identifier for the action plan */
-  id: ActionPlanId;
-  /** User-defined title for the action plan */
-  title: string;
-  /** Optional detailed description */
-  description?: string;
-  /** Activities included in this action plan */
-  activities: {
-    /** Reference to activity template */
-    templateId: ActivityTemplateId;
-    /** Optional position in sequence (1-based, null for unordered) */
-    order?: number | null;
-    /** Override for dynamic properties */
-    dynamicOverrides?:
-      | { type: "goalOriented"; estimatedMinutes: number }
-      | { type: "flexibleDuration"; minExpectedMinutes: number; maxExpectedMinutes: number }
-      | { type: "timeboxed"; timeboxConfig: TimeboxMode };
-  }[];
-  /** Created timestamp */
-  createdAt: number;
-  /** Updated timestamp */
-  updatedAt: number;
-}
+// export interface ActionPlan {
+//   /** Unique identifier for the action plan */
+//   id: ActionPlanId;
+//   /** User-defined title for the action plan */
+//   title: string;
+//   /** Optional detailed description */
+//   description?: string;
+//   /** Activities included in this action plan */
+//   activities: {
+//     /** Reference to activity template */
+//     templateId: ActivityTemplateId;
+//     /** Optional position in sequence (1-based, null for unordered) */
+//     order?: number | null;
+//     /** Override for dynamic properties */
+//     dynamicOverrides?:
+//       | { type: "goalOriented"; estimatedMinutes: number }
+//       | { type: "flexibleDuration"; minExpectedMinutes: number; maxExpectedMinutes: number }
+//       | { type: "timeboxed"; timeboxConfig: TimeboxMode };
+//   }[];
+//   /** Created timestamp */
+//   /** Updated timestamp */
+//   updatedAt: number;
+// }
 
 /**
  * Day Pattern Configuration for determining which days certain configurations apply to
  */
-export type DayPatternConfig =
-  | { pattern: "weekdays" }
-  | { pattern: "weekend" }
-  | { pattern: "everyday" }
-  | { pattern: "specific"; days: number[] }; // 0-6 representing Sunday-Saturday
+// export type DayPatternConfig =
+//   | { pattern: "weekdays" }
+//   | { pattern: "weekend" }
+//   | { pattern: "everyday" }
+//   | { pattern: "specific"; days: number[] }; // 0-6 representing Sunday-Saturday
 
 /**
  * User-defined Custom Variable for tracking subjective states
@@ -246,16 +218,12 @@ export interface CustomVariable {
   minValue: number;
   /** Maximum value on the scale */
   maxValue: number;
-  /** Whether higher values are better (affects visualization) */
+  /** Whether higher values are good or bad */
   isHigherBetter: boolean;
   /** Icon identifier for visual representation */
   iconId: string;
   /** Color for visual representation */
   color: string;
-  /** Created timestamp */
-  createdAt: number;
-  /** Updated timestamp */
-  updatedAt: number;
 }
 
 /**
@@ -265,7 +233,7 @@ export interface VariableSnapshot {
   /** Unique identifier for the snapshot */
   id: SnapshotId;
   /** Timestamp when snapshot was taken */
-  timestamp: number;
+  timestamp: UnixTimestamp;
   /** All variable values in this snapshot */
   variables: {
     /** ID of the variable */
@@ -286,45 +254,44 @@ export interface VariableSnapshot {
 }
 
 /**
- * Event represents a discrete occurrence (like taking medication)
+ * Event represents a discrete occurrence (like taking medication), this can be a template or an instance
+ *
+ * If the `instance` prop is present, this is an instance, if not, this is a template
  */
 export interface DiscreteEvent {
   /** Unique identifier for the event */
-  id: EventId;
+  templateId: EventTemplateId;
   /** User-defined title for the event */
   title: string;
   /** Optional detailed description */
   description?: string;
-  /** Timestamp when event occurred */
-  timestamp: number;
+  instance?: {
+    /** Unique identifier for the event */
+    id: EventId;
+    /** Timestamp when event occurred */
+    timestamp: UnixTimestamp;
+  };
   /** User-defined tags for organization */
   tags: string[];
-  /** Related variable snapshot taken at event time (if any) */
-  relatedSnapshotId?: string;
   /** Icon identifier for visual representation */
   iconId: string;
   /** Expected delay before effects (in minutes, if applicable) */
-  expectedEffectDelay?: number;
-  /** Expected duration of effects (in minutes, if applicable) */
-  expectedEffectDuration?: number;
+  //   expectedEffectDelay?: number;
+  //   /** Expected duration of effects (in minutes, if applicable) */
+  //   expectedEffectDuration?: number;
 }
 
 /**
  * Interruption Cause tracks reasons activities are interrupted
+ * We only register interruptions that the user considers avoidable and actionable
  */
 export interface InterruptionCause {
   /** Unique identifier for the cause */
   id: InterruptionCauseId;
   /** User-defined title for the cause */
   title: string;
-  /** Whether this cause is avoidable in the future */
-  isAvoidable: boolean;
   /** Count of how many times this cause has occurred */
   occurrenceCount: number;
-  /** Created timestamp */
-  createdAt: number;
-  /** Updated timestamp */
-  updatedAt: number;
 }
 
 /**
@@ -334,13 +301,13 @@ export interface InterruptedActivity {
   /** ID of the interrupted activity */
   activityId: ActivityId;
   /** When the interruption occurred */
-  timestamp: number;
+  timestamp: UnixTimestamp;
   /** ID of the cause of interruption */
   causeId: InterruptionCauseId;
   /** Minutes spent before interruption */
   minutesBeforeInterruption: number;
-  /** Percentage of estimated/expected completion */
-  completionPercentage?: number;
+  /** Minutes left to complete the activity or reach the min estimation */
+  minutesLeft?: number;
   /** User notes about this interruption */
   notes?: string;
 }
@@ -352,7 +319,7 @@ export interface ActivitySatisfaction {
   /** ID of the activity being rated */
   activityId: ActivityId;
   /** When the rating was recorded */
-  timestamp: number;
+  timestamp: UnixTimestamp;
   /** Satisfaction score (1-10) */
   satisfactionScore: number;
   /** Perceived value score (1-10) */
@@ -366,54 +333,39 @@ export interface ActivitySatisfaction {
  */
 export interface MomentumRecord {
   /** Timestamp for this momentum measurement */
-  timestamp: number;
+  timestamp: UnixTimestamp;
   /** Momentum value (0-100) */
   value: number;
-  /** Factors that influenced this momentum value */
-  contributingFactors: {
-    /** Factor type (consecutive activities, breaks, etc.) */
-    factor: string;
-    /** Impact magnitude (positive or negative) */
-    impact: number;
-  }[];
 }
 
-/**
- * Day State contains summary information about the day
- */
-export interface DayState {
-  /** Date represented as timestamp (midnight of the day) */
-  date: number;
-  /** Block assignments for this specific day */
-  blocks: TimeBlock[];
-  /** Activities assigned to specific blocks or todo column */
-  activities: Activity[];
-  /** Snapshots taken during this day */
-  variableSnapshots: VariableSnapshot[];
-  /** Events recorded during this day */
-  events: DiscreteEvent[];
-  /** Interruptions that occurred during this day */
-  interruptions: InterruptedActivity[];
-  /** Activity satisfaction ratings for this day */
-  satisfactionRatings: ActivitySatisfaction[];
-  /** Momentum records for this day */
-  momentumRecords: MomentumRecord[];
-  /** Total productive minutes for this day */
-  totalProductiveMinutes: number;
-  /** Total autopilot minutes for this day */
-  totalAutopilotMinutes: number;
-  /** Total conscious rest minutes for this day */
-  totalConsciousRestMinutes: number;
-  /** Total meditation minutes for this day */
-  totalMeditationMinutes: number;
-}
+export type History = {
+  variableHistory: VariableSnapshot[];
+  activityHistory: Activity[];
+  eventHistory: DiscreteEvent[];
+  interruptionHistory: InterruptedActivity[];
+  satisfactionHistory: ActivitySatisfaction[];
+  momentumHistory: MomentumRecord[];
+};
+
+export type TimeDistribution = {
+  /** Percentage in objective activities */
+  objective: number;
+  /** Percentage in flexible activities */
+  flexible: number;
+  /** Percentage in timebox activities */
+  timebox: number;
+  /** Percentage in autopilot state */
+  autopilot: number;
+  /** Percentage in conscious rest */
+  consciousRest: number;
+  /** Percentage in meditation */
+  meditation: number;
+};
 
 /**
  * Daily Summary stored in the day database
  */
 export interface DailySummary {
-  /** Date represented as timestamp (midnight of the day) */
-  date: number;
   /** Total number of activities completed */
   activitiesCompleted: number;
   /** Total number of activities interrupted */
@@ -425,64 +377,70 @@ export interface DailySummary {
   /** Average value perception score for the day */
   averageValuePerception: number;
   /** Percentage of day spent in each activity type */
-  timeDistribution: {
-    /** Percentage in objective activities */
-    objective: number;
-    /** Percentage in flexible activities */
-    flexible: number;
-    /** Percentage in timebox activities */
-    timebox: number;
-    /** Percentage in autopilot state */
-    autopilot: number;
-    /** Percentage in conscious rest */
-    consciousRest: number;
-    /** Percentage in meditation */
-    meditation: number;
-  };
-  /** Final values for each custom variable at day end */
-  finalVariableValues: {
-    /** Variable ID */
-    variableId: CustomVariableId;
-    /** Final value recorded */
-    value: number;
-    /** Net change throughout the day */
-    netChange: number;
-  }[];
+  timeDistribution: TimeDistribution;
   /** Overall momentum quality for the day (0-100) */
   overallMomentumQuality: number;
+}
+
+/**
+ * Day State contains summary information about the day
+ */
+export interface DayState {
+  /** Start date of the day represented as timestamp */
+  startDate: UnixTimestamp;
+  /** End date of the day represented as timestamp */
+  endDate: UnixTimestamp;
+  /** Block assignments for this specific day */
+  //   blocks: TimeBlock[];
+  /** Activities assigned to specific blocks or todo column */
+  activityInstances: Activity[];
+  /** History of the day */
+  dayHistory: History;
+  /** Time distribution for the day */
+  timeDistribution: TimeDistribution;
+  /** Summary of the day */
+  daySummary: DailySummary;
 }
 
 /**
  * User Settings for the application
  */
 export interface UserSettings {
-  /** User's display name */
-  displayName: string;
   /** Preferred theme */
   theme: "light" | "dark" | "system";
-  /** Default/quick access activities */
-  quickAccessActivityIds: ActivityId[];
+  /** UI-specific state for Kanban layout */
+  kanbanState: Record<
+    BlockId,
+    {
+      /** Expanded/collapsed state */
+      isExpanded: boolean;
+      /** Whether to show completed activities */
+      showCompleted: boolean;
+      /** Sort order for activities (default, auto, alphabetical, duration, etc.) */
+      sortOrder: "default" | "auto" | "alphabetical" | "duration";
+    }
+  >;
   /** Default day pattern assignments */
-  defaultDayPatterns: {
-    /** Day pattern this config applies to */
-    pattern: DayPatternConfig;
-    /** Action plans automatically added on these days */
-    actionPlans: {
-      /** Action plan ID */
-      actionPlanId: ActionPlanId;
-      /** Block ID to assign to */
-      blockId: BlockId;
-    }[];
-    /** Individual activities automatically added on these days */
-    activities: {
-      /** Activity template ID */
-      templateId: string;
-      /** Block ID to assign to */
-      blockId: BlockId;
-    }[];
-  }[];
-  /** Time between reminder prompts to update variables (in minutes) */
-  variableReminderInterval: number;
+  //   defaultDayPatterns: {
+  //     /** Day pattern this config applies to */
+  //     pattern: DayPatternConfig;
+  //     /** Action plans automatically added on these days */
+  //     actionPlans: {
+  //       /** Action plan ID */
+  //       actionPlanId: ActionPlanId;
+  //       /** Block ID to assign to */
+  //       blockId: BlockId;
+  //     }[];
+  //     /** Individual activities automatically added on these days */
+  //     activities: {
+  //       /** Activity template ID */
+  //       templateId: string;
+  //       /** Block ID to assign to */
+  //       blockId: BlockId;
+  //     }[];
+  //   }[];
+  /** Time between reminder prompts to update variables (in minutes) (if set) */
+  variableReminderInterval?: number;
   /** Whether to show notifications for timebox limits */
   enableTimeboxNotifications: boolean;
   /** User display settings */
@@ -491,33 +449,38 @@ export interface UserSettings {
     showMomentumChart: boolean;
     /** Default visible variable charts */
     defaultVisibleVariables: CustomVariableId[];
-    /** Chart refresh rate (in seconds) */
-    chartRefreshRate: number;
   };
+}
+
+export interface SharedState {
+  /** Current day state */
+  currentDay: DayState;
+  /** Active activity */
+  activeActivity: Activity;
+  /** Library of activity templates */
+  activityTemplates: Record<ActivityTemplateId, Activity>;
+  /** Custom variable definitions */
+  customVariables: Record<CustomVariableId, CustomVariable>;
+  /** Time block definitions */
+  //   timeBlocks: Record<BlockId, TimeBlock>;
+  /** Action plan definitions */
+  //   actionPlans: Record<ActionPlanId, ActionPlan>;
+  /** Interruption cause definitions */
+  interruptionCauses: Record<InterruptionCauseId, InterruptionCause>;
+  /** Discrete event definitions */
+  discreteEvents: Record<EventTemplateId, DiscreteEvent>;
+  /** User application settings */
+  userSettings: UserSettings;
+  /** Timestamp of last update */
+  lastUpdateTimestamp: UnixTimestamp;
 }
 
 /**
  * Persisted State of the application
  */
-export interface PersistedState {
-  /** Current day state */
-  currentDay: DayState;
-  /** Library of activity templates */
-  activityTemplates: Record<ActivityTemplateId, ActivityTemplate>;
+export interface PersistedState extends SharedState {
   /** Database of past days */
-  dayDatabase: Record<number, DailySummary>;
-  /** Custom variable definitions */
-  customVariables: Record<CustomVariableId, CustomVariable>;
-  /** Time block definitions */
-  timeBlocks: Record<BlockId, TimeBlock>;
-  /** Action plan definitions */
-  actionPlans: Record<ActionPlanId, ActionPlan>;
-  /** Interruption cause definitions */
-  interruptionCauses: Record<InterruptionCauseId, InterruptionCause>;
-  /** User application settings */
-  userSettings: UserSettings;
-  /** Timestamp of last update */
-  lastUpdateTimestamp: number;
+  dayDatabase: DayState[];
 }
 
 /**
@@ -526,15 +489,15 @@ export interface PersistedState {
 export interface QualiaControlAPIType {
   // System lifecycle methods
   getPersistedState: () => Promise<PersistedState>;
-  startDay: (date: number) => Promise<void>;
+  startDay: (date: UnixTimestamp) => Promise<void>;
   endDay: (dayState: DayState) => Promise<void>;
 
   // Activity template management
-  getActivityTemplate: (templateId: ActivityTemplateId) => Promise<ActivityTemplate | undefined>;
-  getActivityTemplates: () => Promise<ActivityTemplate[]>;
-  createActivityTemplate: (template: Omit<ActivityTemplate, "id">) => Promise<ActivityTemplate>;
+  getActivityTemplate: (templateId: ActivityTemplateId) => Promise<Activity | undefined>;
+  getActivityTemplates: () => Promise<Activity[]>;
+  createActivityTemplate: (template: Omit<Activity, "id">) => Promise<Activity>;
   updateActivityTemplate: (
-    templateUpdates: Partial<ActivityTemplate> & { id: ActivityTemplateId }
+    templateUpdates: Partial<Activity> & { id: ActivityTemplateId }
   ) => Promise<void>;
   removeActivityTemplate: (templateId: ActivityTemplateId) => Promise<void>;
 
@@ -550,10 +513,7 @@ export interface QualiaControlAPIType {
     templateId: ActivityTemplateId,
     overrides?: {
       assignedBlockId?: BlockId;
-      dynamicProps?:
-        | { type: "goalOriented"; estimatedMinutes: number }
-        | { type: "flexibleDuration"; minExpectedMinutes: number; maxExpectedMinutes: number }
-        | { type: "timeboxed"; timeboxConfig: TimeboxMode };
+      dynamicProps?: ActivityTypes["dynamicProps"];
     }
   ) => Promise<Activity>;
 
@@ -569,21 +529,21 @@ export interface QualiaControlAPIType {
   ) => Promise<void>;
 
   // Time block management
-  getTimeBlock: (blockId: BlockId) => Promise<TimeBlock | undefined>;
-  getTimeBlocks: () => Promise<TimeBlock[]>;
-  createTimeBlock: (block: Omit<TimeBlock, "id">) => Promise<TimeBlock>;
-  updateTimeBlock: (blockUpdates: Partial<TimeBlock> & { id: BlockId }) => Promise<void>;
-  removeTimeBlock: (blockId: BlockId) => Promise<void>;
+  //   getTimeBlock: (blockId: BlockId) => Promise<TimeBlock | undefined>;
+  //   getTimeBlocks: () => Promise<TimeBlock[]>;
+  //   createTimeBlock: (block: Omit<TimeBlock, "id">) => Promise<TimeBlock>;
+  //   updateTimeBlock: (blockUpdates: Partial<TimeBlock> & { id: BlockId }) => Promise<void>;
+  //   removeTimeBlock: (blockId: BlockId) => Promise<void>;
 
   // Action plan management
-  getActionPlan: (planId: ActionPlanId) => Promise<ActionPlan | undefined>;
-  getActionPlans: () => Promise<ActionPlan[]>;
-  createActionPlan: (plan: Omit<ActionPlan, "id">) => Promise<ActionPlan>;
-  updateActionPlan: (planUpdates: Partial<ActionPlan> & { id: ActionPlanId }) => Promise<void>;
-  removeActionPlan: (planId: ActionPlanId) => Promise<void>;
+  //   getActionPlan: (planId: ActionPlanId) => Promise<ActionPlan | undefined>;
+  //   getActionPlans: () => Promise<ActionPlan[]>;
+  //   createActionPlan: (plan: Omit<ActionPlan, "id">) => Promise<ActionPlan>;
+  //   updateActionPlan: (planUpdates: Partial<ActionPlan> & { id: ActionPlanId }) => Promise<void>;
+  //   removeActionPlan: (planId: ActionPlanId) => Promise<void>;
 
   // Action plan execution
-  executeActionPlan: (planId: ActionPlanId, blockId?: BlockId) => Promise<Activity[]>;
+  //   executeActionPlan: (planId: ActionPlanId, blockId?: BlockId) => Promise<Activity[]>;
 
   // Variable management
   getCustomVariable: (variableId: CustomVariableId) => Promise<CustomVariable | undefined>;
@@ -623,64 +583,16 @@ export interface QualiaControlAPIType {
   getUserSettings: () => Promise<UserSettings>;
   updateUserSettings: (settingsUpdates: Partial<UserSettings>) => Promise<void>;
 
-  // System functions
-  calculateCurrentMomentum: () => Promise<number>;
-  recordMomentumValue: (record: MomentumRecord) => Promise<void>;
-
-  // Data export/import
-  exportData: () => Promise<string>;
-  importData: (data: string) => Promise<void>;
-
   // Utility functions
   getDayActivities: (date: number) => Promise<Activity[]>;
-  getCurrentDayBlocks: () => Promise<TimeBlock[]>;
-  getActiveTimeBlock: () => Promise<TimeBlock | undefined>;
+  //   getCurrentDayBlocks: () => Promise<TimeBlock[]>;
+  //   getActiveTimeBlock: () => Promise<TimeBlock | undefined>;
 }
 
 /**
  * UI State maintained in the application
  */
-export interface UiState {
+export interface UiState extends SharedState {
   /** Whether the system is currently updating */
   updatingSystemState: boolean;
-  /** Current day state */
-  currentDay: DayState;
-  /** Currently active time block */
-  activeTimeBlock?: TimeBlock;
-  /** Currently active activity */
-  activeActivity?: Activity;
-  /** Library of activity templates */
-  activityTemplates: ActivityTemplate[];
-  /** All time blocks */
-  timeBlocks: TimeBlock[];
-  /** All action plans */
-  actionPlans: ActionPlan[];
-  /** All custom variables */
-  customVariables: CustomVariable[];
-  /** All interruption causes */
-  interruptionCauses: InterruptionCause[];
-  /** Current momentum value */
-  currentMomentum: number;
-  /** User settings */
-  userSettings: UserSettings;
-  /** Last update timestamp */
-  lastUpdateTimestamp: number;
-  /** UI-specific state for Kanban layout */
-  kanbanState: {
-    /** Columns expanded/collapsed state */
-    columnExpanded: Record<string, boolean>;
-    /** Whether to show completed activities */
-    showCompleted: boolean;
-    /** Sort order for activities (default, alphabetical, duration, etc.) */
-    sortOrder: "default" | "alphabetical" | "duration" | "recentlyModified";
-  };
-  /** UI state for variable snapshot creation */
-  snapshotCreationState: {
-    /** Whether snapshot creation modal is open */
-    isOpen: boolean;
-    /** Pre-selected activities for relating to the snapshot */
-    preselectedActivityIds: ActivityId[];
-    /** Pre-selected events for relating to the snapshot */
-    preselectedEventIds: EventId[];
-  };
 }
