@@ -84,7 +84,7 @@ type BaseActivity = {
 /**
  * Activity with a clear objective and estimated completion time
  */
-type GoalOrientedActivityProps = {
+export type GoalOrientedActivityProps = {
   type: "goalOriented";
   dynamicProps: {
     /** Estimated minutes to complete the activity (~45 means approximately 45 minutes) */
@@ -456,7 +456,7 @@ export interface SharedState {
   /** Current day state */
   currentDay: DayState;
   /** Active activity */
-  activeActivity: Activity;
+  activeActivity?: Activity;
   /** Library of activity templates */
   activityTemplates: Record<ActivityTemplateId, Activity>;
   /** Custom variable definitions */

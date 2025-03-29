@@ -1,6 +1,6 @@
 // Qualia Control - Daily Summary & History Management Module
 
-import type { DailySummary, DayState, History, SharedState } from "./types";
+import type { DailySummary, DayState, History, SharedState } from "../types";
 
 /**
  * Módulo para la gestión de resúmenes diarios e historial

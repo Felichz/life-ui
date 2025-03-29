@@ -6,7 +6,7 @@ import type {
   SharedState,
   SnapshotId,
   VariableSnapshot,
-} from "./types";
+} from "../types";
 
 /**
  * Módulo para la gestión de variables personalizadas y sus snapshots

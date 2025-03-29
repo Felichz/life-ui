@@ -6,7 +6,7 @@ import type {
   InterruptionCause,
   InterruptionCauseId,
   SharedState,
-} from "./types";
+} from "../types";
 
 /**
  * Módulo para la gestión de eventos discretos y causas de interrupción
