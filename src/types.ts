@@ -32,7 +32,7 @@ export type ActivityStatus = "todo" | "inProgress" | "completed" | "interrupted"
 /**
  * Timebox Modes for structured time management
  */
-type TimeboxMode =
+export type TimeboxMode =
   | { mode: "minimum"; minimumMinutes: number }
   | { mode: "maximum"; maximumMinutes: number }
   | { mode: "range"; minimumMinutes: number; maximumMinutes: number };
