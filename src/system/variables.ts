@@ -26,8 +26,14 @@ export class VariableManagement {
    * Crea una nueva variable personalizada
    */
   public async createCustomVariable(variable: Omit<CustomVariable, "id">): Promise<CustomVariable> {
-    // TO DO: Implementar creación de variable personalizada
-    throw new Error("Not implemented");
+    const newId = `var-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const newVariable: CustomVariable = {
+      ...variable,
+      id: newId,
+    };
+
+    this.state.customVariables[newId] = newVariable;
+    return newVariable;
   }
 
   /**
@@ -36,8 +42,7 @@ export class VariableManagement {
   public async getCustomVariable(
     variableId: CustomVariableId
   ): Promise<CustomVariable | undefined> {
-    // TO DO: Implementar obtención de variable personalizada
-    throw new Error("Not implemented");
+    return this.state.customVariables[variableId];
   }
 
   /**
@@ -46,16 +51,28 @@ export class VariableManagement {
   public async updateCustomVariable(
     variableUpdates: Partial<CustomVariable> & { id: CustomVariableId }
   ): Promise<void> {
-    // TO DO: Implementar actualización de variable personalizada
-    throw new Error("Not implemented");
+    const { id } = variableUpdates;
+    const existingVariable = this.state.customVariables[id];
+
+    if (!existingVariable) {
+      throw new Error(`La variable con id ${id} no existe`);
+    }
+
+    this.state.customVariables[id] = {
+      ...existingVariable,
+      ...variableUpdates,
+    };
   }
 
   /**
    * Elimina una variable personalizada
    */
   public async removeCustomVariable(variableId: CustomVariableId): Promise<void> {
-    // TO DO: Implementar eliminación de variable personalizada
-    throw new Error("Not implemented");
+    if (!this.state.customVariables[variableId]) {
+      throw new Error(`La variable con id ${variableId} no existe`);
+    }
+
+    delete this.state.customVariables[variableId];
   }
 
   /**
@@ -68,16 +85,40 @@ export class VariableManagement {
   public async createVariableSnapshot(
     snapshot: Omit<VariableSnapshot, "id">
   ): Promise<VariableSnapshot> {
-    // TO DO: Implementar creación de snapshot
-    throw new Error("Not implemented");
+    // Validar que las variables existan y que los valores estén dentro del rango
+    for (const varData of snapshot.variables) {
+      const variable = this.state.customVariables[varData.variableId];
+
+      if (!variable) {
+        throw new Error(`La variable con id ${varData.variableId} no existe`);
+      }
+
+      if (varData.currentValue < variable.minValue || varData.currentValue > variable.maxValue) {
+        throw new Error(
+          `El valor ${varData.currentValue} está fuera de rango para la variable ${variable.name} (${variable.minValue}-${variable.maxValue})`
+        );
+      }
+    }
+
+    const newId = `snapshot-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const newSnapshot: VariableSnapshot = {
+      ...snapshot,
+      id: newId,
+    };
+
+    // Añadir el snapshot al historial
+    this.state.currentDay.dayHistory.variableHistory.push(newSnapshot);
+
+    return newSnapshot;
   }
 
   /**
    * Obtiene snapshots de variables en un rango de fechas
    */
   public async getVariableSnapshots(dateFrom: number, dateTo: number): Promise<VariableSnapshot[]> {
-    // TO DO: Implementar obtención de snapshots en un rango de fechas
-    throw new Error("Not implemented");
+    return this.state.currentDay.dayHistory.variableHistory.filter(
+      (snapshot) => snapshot.timestamp >= dateFrom && snapshot.timestamp <= dateTo
+    );
   }
 
   /**
@@ -86,7 +127,8 @@ export class VariableManagement {
   public async getVariableSnapshotById(
     snapshotId: SnapshotId
   ): Promise<VariableSnapshot | undefined> {
-    // TO DO: Implementar obtención de snapshot por ID
-    throw new Error("Not implemented");
+    return this.state.currentDay.dayHistory.variableHistory.find(
+      (snapshot) => snapshot.id === snapshotId
+    );
   }
 }
