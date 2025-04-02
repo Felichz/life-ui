@@ -409,8 +409,6 @@ export interface IPersistenceManager {
   saveState(state: AppState): void;
   loadState(): AppState | null;
   clearState(): void;
-  exportData(): string;
-  importData(jsonData: string): AppState;
 }
 
 /**
