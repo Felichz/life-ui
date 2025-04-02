@@ -1,10 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import QualiaControlApp from "./ui/QualiaControlApp";
+import App from "./ui/App";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <QualiaControlApp />
+    <App />
   </React.StrictMode>
 );
