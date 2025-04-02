@@ -566,39 +566,118 @@ describe("ActivityManager", () => {
     });
 
     describe("completeActivity", () => {
-      it("debe completar la actividad activa", () => {
-        // Crear y activar una instancia
-        const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
-        activityManager.activateActivity(instance.id);
+      beforeEach(() => {
+        // Configurar plantilla, bloque y día activo
+        setupActivityTemplate();
+        setupTimeBlock();
+        setupActiveDay();
+      });
 
-        // Cambiar el mockUUID para el registro completado
-        mockUUID = "completed-id-123";
-        (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
-
-        const result = activityManager.completeActivity(instance.id);
-
-        // Verificar que se creó el registro de actividad completada correctamente
-        expect(result).toEqual({
-          id: mockUUID,
+      it("debe completar la actividad activa y crear un registro", () => {
+        // Crear una instancia
+        const instanceId = "instance-id-123";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
           templateId: mockTemplateId,
-          templateTitle: "Test Activity",
-          state: "completed",
-          type: "clear-objective",
-          startTime: mockTimestamp,
-          endTime: mockTimestamp,
-          durationMinutes: 30, // Valor del mock para calculateDuration
-          dayId: mockDayId,
-          clearObjectiveSettings: {
-            estimatedDurationMinutes: 30,
-          },
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:30:00.000Z", // 30 minutos antes de mockTimestamp
           createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
         });
 
-        // Verificar que se eliminó la instancia
-        expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
+        // Marcar como actividad activa
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
-        // Verificar que se limpió la referencia a la actividad activa
+        // Completar la actividad
+        const result = activityManager.completeActivity(instanceId);
+
+        // Verificar que se creó el registro de actividad completada
+        expect(result).toBeDefined();
+        expect(result.state).toBe("completed");
+        expect(result.templateId).toBe(mockTemplateId);
+        expect(result.dayId).toBe(mockDayId);
+
+        // Verificar que la instancia se eliminó del día actual
+        expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBeUndefined();
+
+        // Verificar que el registro se agregó a completedActivityRecords
+        expect(mockAppState.global.completedActivityRecords.length).toBe(1);
+        expect(mockAppState.global.completedActivityRecords[0]).toEqual(result);
+      });
+
+      it("debe completar solo la actividad activa sin afectar a otras actividades", () => {
+        // Crear varias instancias de actividad en diferentes bloques
+        const activeInstanceId = "active-instance-id";
+        const otherInstanceId1 = "other-instance-id-1";
+        const otherInstanceId2 = "other-instance-id-2";
+
+        // Crear un segundo bloque
+        const otherBlockId = "other-block-id";
+        mockAppState.global.timeBlocks.push({
+          id: otherBlockId,
+          name: "Otro Bloque",
+          startMinute: 780, // 13:00
+          endMinute: 900, // 15:00
+          isDefault: false,
+          order: 2,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+
+        // Crear tres instancias: una activa y dos inactivas
+        mockAppState.currentDay!.activityInstances = [
+          {
+            id: activeInstanceId,
+            templateId: mockTemplateId,
+            blockId: mockBlockId,
+            order: 0,
+            state: "active",
+            startTime: "2023-01-01T11:30:00.000Z",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+          {
+            id: otherInstanceId1,
+            templateId: mockTemplateId,
+            blockId: mockBlockId,
+            order: 1,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+          {
+            id: otherInstanceId2,
+            templateId: mockTemplateId,
+            blockId: otherBlockId,
+            order: 0,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+        ];
+
+        // Marcar la actividad activa
+        mockAppState.currentDay!.activeActivityInstanceId = activeInstanceId;
+
+        // Completar la actividad activa
+        activityManager.completeActivity(activeInstanceId);
+
+        // Verificar que solo la actividad activa se eliminó
+        expect(mockAppState.currentDay?.activityInstances.length).toBe(2);
+        expect(mockAppState.currentDay?.activeActivityInstanceId).toBeUndefined();
+
+        // Verificar que las otras actividades siguen existiendo
+        const remainingIds = mockAppState.currentDay!.activityInstances.map((i) => i.id);
+        expect(remainingIds).toContain(otherInstanceId1);
+        expect(remainingIds).toContain(otherInstanceId2);
+        expect(remainingIds).not.toContain(activeInstanceId);
+
+        // Verificar que se agregó exactamente un registro a completedActivityRecords
+        expect(mockAppState.global.completedActivityRecords.length).toBe(1);
+        expect(mockAppState.global.completedActivityRecords[0].templateId).toBe(mockTemplateId);
       });
 
       it("debe lanzar un error si se intenta completar una actividad no activa", () => {

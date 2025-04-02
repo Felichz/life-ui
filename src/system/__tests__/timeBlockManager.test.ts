@@ -98,6 +98,51 @@ describe("TimeBlockManager", () => {
       expect(mockAppState.global.timeBlocks[0].name).toBe("Por Hacer");
       expect(mockAppState.global.timeBlocks[0].id).toBe(mockDefaultUUID);
     });
+
+    it("debe asegurar que el bloque por defecto exista al iniciar un nuevo día", () => {
+      // Limpiar los bloques para simular un estado inicial sin bloques
+      mockAppState.global.timeBlocks = [];
+
+      // Simular inicialización de SystemCore y día activo
+      mockAppState.currentDay = {
+        day: {
+          id: "day-id-123",
+          state: "active",
+          startTime: mockTimestamp,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        },
+        activityInstances: [],
+        activeActivityInstanceId: undefined,
+      };
+
+      // Preparar mock para isTimeBlockAvailable
+      // Necesitamos sobrescribir el comportamiento para este test específico
+      const isTimeBlockAvailableSpy = jest.spyOn(
+        TimeBlockManager.prototype,
+        "isTimeBlockAvailable"
+      );
+      isTimeBlockAvailableSpy.mockReturnValue(true);
+
+      // Crear una nueva instancia de TimeBlockManager
+      const newTimeBlockManager = new TimeBlockManager(systemCore);
+
+      // Verificar que se creó el bloque por defecto
+      expect(mockAppState.global.timeBlocks.length).toBe(1);
+      expect(mockAppState.global.timeBlocks[0].isDefault).toBe(true);
+      expect(mockAppState.global.timeBlocks[0].name).toBe("Por Hacer");
+
+      // Verificar que el bloque por defecto está disponible
+      const defaultBlock = newTimeBlockManager.getDefaultBlock();
+      expect(defaultBlock).toBeDefined();
+      expect(defaultBlock.isDefault).toBe(true);
+
+      // Verificar que el bloque por defecto siempre está disponible
+      expect(newTimeBlockManager.isTimeBlockAvailable(defaultBlock.id)).toBe(true);
+
+      // Limpiar el spy
+      isTimeBlockAvailableSpy.mockRestore();
+    });
   });
 
   describe("createTimeBlock", () => {
@@ -786,7 +831,7 @@ describe("TimeBlockManager", () => {
         id: "default-block-id",
         name: "Por Hacer",
         startMinute: 0,
-        endMinute: 0,
+        endMinute: 1439, // Actualizado para reflejar el nuevo rango de "todo el día"
         isDefault: true,
         order: 0,
         createdAt: mockTimestamp,

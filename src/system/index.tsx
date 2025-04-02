@@ -137,7 +137,10 @@ export class SystemCore implements ISystemCore {
    * Inicia un nuevo día de actividad
    */
   public startDay(): Day {
-    return this.dayManager.startDay();
+    const newDay = this.dayManager.startDay();
+    // Asegurar que el bloque por defecto "Por Hacer" exista
+    this.timeBlockManager.ensureDefaultBlockExists();
+    return newDay;
   }
 
   /**

@@ -227,6 +227,19 @@ export class TimeBlockManager {
   }
 
   /**
+   * Asegura que el bloque por defecto "Por Hacer" exista
+   * Crea el bloque si no existe
+   */
+  public ensureDefaultBlockExists(): void {
+    const state = this.systemCore.getState();
+    const defaultBlockExists = state.global.timeBlocks.some((block) => block.isDefault);
+
+    if (!defaultBlockExists) {
+      this.createDefaultBlock();
+    }
+  }
+
+  /**
    * Crea el bloque por defecto ("Por Hacer") si no existe
    * @returns Bloque por defecto creado
    */
@@ -243,7 +256,7 @@ export class TimeBlockManager {
       id: UtilityService.generateUUID(),
       name: "Por Hacer",
       startMinute: 0,
-      endMinute: 0,
+      endMinute: 1439, // Cambiar de 0 a 1439 (todo el día) para que isTimeBlockAvailable funcione correctamente
       isDefault: true,
       order: 0, // Siempre primero
       createdAt: now,
@@ -272,19 +285,6 @@ export class TimeBlockManager {
    */
   public convertTimeStringToMinutes(timeString: string): DayMinutes {
     return UtilityService.parseTime(timeString);
-  }
-
-  /**
-   * Asegura que exista el bloque por defecto
-   * Se llama en el constructor
-   */
-  private ensureDefaultBlockExists(): void {
-    const blocks = this.getTimeBlocks();
-    const defaultBlock = blocks.find((block) => block.isDefault);
-
-    if (!defaultBlock) {
-      this.createDefaultBlock();
-    }
   }
 
   /**

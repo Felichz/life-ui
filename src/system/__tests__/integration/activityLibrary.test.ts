@@ -143,7 +143,7 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
 
     // Simular la edición de la actividad
     // (Equivalente a modificar los campos en el formulario y hacer clic en "Guardar cambios")
-    const actividadActualizada = system.updateActivityTemplate(actividadId, {
+    system.updateActivityTemplate(actividadId, {
       title: "Leer documentación avanzada",
       description: "Leer documentación técnica sobre React Hooks",
       flexibleDurationSettings: {
