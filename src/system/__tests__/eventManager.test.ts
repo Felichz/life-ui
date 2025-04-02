@@ -2,6 +2,12 @@ import { SystemCore } from "../index";
 import { EventManager } from "../eventManager";
 import { PersistenceManager } from "../persistenceManager";
 
+// Mock localStorage para las pruebas
+beforeEach(() => {
+  // Limpiar localStorage simulado antes de cada prueba
+  localStorage.clear();
+});
+
 describe("EventManager", () => {
   let systemCore: SystemCore;
   let eventManager: EventManager;
@@ -9,10 +15,9 @@ describe("EventManager", () => {
   beforeEach(() => {
     // Crear instancia limpia del sistema para cada prueba
     systemCore = new SystemCore();
+    // Limpiar explícitamente el estado para evitar persistencia entre pruebas
+    systemCore.clearState();
     eventManager = new EventManager(systemCore);
-
-    // Inicializar el sistema
-    systemCore.initialize();
   });
 
   describe("Gestión de plantillas de eventos", () => {

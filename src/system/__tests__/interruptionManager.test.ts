@@ -8,10 +8,9 @@ describe("InterruptionManager", () => {
   beforeEach(() => {
     // Crear instancia limpia del sistema para cada prueba
     systemCore = new SystemCore();
+    // Limpiar completamente el estado para asegurar aislamiento entre pruebas
+    systemCore.clearState();
     interruptionManager = new InterruptionManager(systemCore);
-
-    // Inicializar el sistema
-    systemCore.initialize();
   });
 
   describe("Gestión de causas de interrupción", () => {
@@ -109,12 +108,18 @@ describe("InterruptionManager", () => {
 
   describe("Estadísticas de interrupciones", () => {
     beforeEach(() => {
+      // Limpiar estado para asegurar aislamiento entre pruebas
+      systemCore.clearState();
+
       // Preparar datos para las pruebas de estadísticas
       const cause1 = interruptionManager.createInterruptionCause("Notificación de email");
       const cause2 = interruptionManager.createInterruptionCause("Llamada telefónica");
 
       // Añadir registros de actividades interrumpidas
       systemCore.updateState((state) => {
+        // Asegurar que el array está vacío antes de añadir los registros de prueba
+        state.global.completedActivityRecords = [];
+
         // Actividad 1 - Interrumpida por causa1
         state.global.completedActivityRecords.push({
           id: "activity-1",

@@ -71,7 +71,7 @@ export class InterruptionManager {
       if (index >= 0) {
         // Crear versión actualizada manteniendo la inmutabilidad
         updatedCause = {
-          ...cause,
+          ...state.global.interruptionCauses[index],
           ...data,
           id, // Asegurar que el ID no se modifique
           updatedAt: timestamp,
