@@ -4,7 +4,6 @@ import type {
   IPersistenceManager,
   StateUpdater,
   GlobalState,
-  UserPreferences,
 } from "../types";
 export { PersistenceManager } from "./persistenceManager";
 

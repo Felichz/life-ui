@@ -20,7 +20,7 @@ export type ActivityState = "in-library" | "instantiated" | "active" | "complete
 export type TimeboxingType = "minimum-time" | "maximum-time" | "both";
 
 // Estados del Día
-export type DayState = "active" | "inactive" | "completed";
+export type DayState = "active" | "inactive";
 
 // ===============================================
 // Entidades Principales
