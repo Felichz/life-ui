@@ -34,16 +34,17 @@ export class AnalyticsManager {
   public getTimelineData(dayId?: UUID): TimelineData {
     const state = this.systemCore.getState();
 
-    // Filtrar actividades por día si se especifica
-    const activities = state.global.completedActivityRecords.filter(
+    // Filtrar actividades completadas por día si se especifica
+    const completedActivities = state.global.completedActivityRecords.filter(
       (record) => !dayId || record.dayId === dayId
     );
 
     // Filtrar eventos por día si se especifica
     const events = state.global.eventInstances.filter((event) => !dayId || event.dayId === dayId);
 
-    return {
-      activities: activities.map((activity) => {
+    // Array para almacenar todas las actividades (completadas y activas)
+    const timelineActivities = [
+      ...completedActivities.map((activity) => {
         let isWithinEstimation: boolean | undefined;
         let estimatedDuration: number | undefined;
 
@@ -97,6 +98,92 @@ export class AnalyticsManager {
           isWithinEstimation,
         };
       }),
+    ];
+
+    // Añadir la actividad activa actual si existe y pertenece al día especificado (o si no se especificó día)
+    if (state.currentDay && state.currentDay.activeActivityInstanceId) {
+      const currentDayId = state.currentDay.day.id;
+      // Solo incluir la actividad activa si no se especificó día o si pertenece al día especificado
+      if (!dayId || dayId === currentDayId) {
+        const activeActivityId = state.currentDay.activeActivityInstanceId;
+        const activeActivity = state.currentDay.activityInstances.find(
+          (a) => a.id === activeActivityId
+        );
+
+        if (activeActivity) {
+          // Buscar la plantilla para obtener más información
+          const template = state.global.activityTemplates.find(
+            (t) => t.id === activeActivity.templateId
+          );
+
+          if (template && activeActivity.startTime) {
+            // Calcular duración hasta el momento actual (en minutos)
+            const startTime = new Date(activeActivity.startTime);
+            const now = new Date();
+            const durationMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
+
+            // Determinar si está dentro de la estimación (si aplica)
+            let isWithinEstimation: boolean | undefined;
+            let estimatedDuration: number | undefined;
+
+            if (activeActivity.clearObjectiveSettings) {
+              estimatedDuration = activeActivity.clearObjectiveSettings.estimatedDurationMinutes;
+              isWithinEstimation = durationMinutes <= estimatedDuration;
+            } else if (activeActivity.flexibleDurationSettings) {
+              const { minimumDurationMinutes, maximumDurationMinutes } =
+                activeActivity.flexibleDurationSettings;
+              isWithinEstimation = true;
+
+              if (
+                minimumDurationMinutes !== undefined &&
+                durationMinutes < minimumDurationMinutes
+              ) {
+                isWithinEstimation = false;
+              }
+              if (
+                maximumDurationMinutes !== undefined &&
+                durationMinutes > maximumDurationMinutes
+              ) {
+                isWithinEstimation = false;
+              }
+            } else if (activeActivity.timeboxingSettings) {
+              const { minimumDurationMinutes, maximumDurationMinutes } =
+                activeActivity.timeboxingSettings;
+              isWithinEstimation = true;
+
+              if (
+                minimumDurationMinutes !== undefined &&
+                durationMinutes < minimumDurationMinutes
+              ) {
+                isWithinEstimation = false;
+              }
+              if (
+                maximumDurationMinutes !== undefined &&
+                durationMinutes > maximumDurationMinutes
+              ) {
+                isWithinEstimation = false;
+              }
+            }
+
+            // Añadir actividad activa al timeline
+            timelineActivities.push({
+              id: activeActivity.id,
+              title: template.title,
+              startTime: activeActivity.startTime,
+              endTime: now.toISOString(), // Hasta el momento actual
+              durationMinutes,
+              type: template.type,
+              state: "completed" as "completed" | "interrupted", // Aunque está activa, usamos "completed" para compatibilidad de tipos
+              estimatedDuration,
+              isWithinEstimation,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      activities: timelineActivities,
       events: events.map((event) => {
         // Calcular la posición del evento en minutos desde el inicio del día
         const timestamp = new Date(event.timestamp);
@@ -109,7 +196,7 @@ export class AnalyticsManager {
           position,
         };
       }),
-      interruptions: activities
+      interruptions: completedActivities
         .filter((activity) => activity.state === "interrupted" && activity.interruptionData)
         .map((activity) => {
           // Calcular la posición de la interrupción en minutos desde el inicio del día

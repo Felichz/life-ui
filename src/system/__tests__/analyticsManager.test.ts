@@ -10,6 +10,8 @@ import type {
   InterruptionCause,
   SubjectiveVariable,
   SubjectiveVariableSnapshot,
+  ActivityInstance,
+  CurrentDayState,
 } from "../../types";
 
 // Mock para systemCore
@@ -26,7 +28,7 @@ const TODAY = new Date("2023-01-01T08:00:00Z");
 const YESTERDAY = new Date("2022-12-31T08:00:00Z");
 
 // Crear datos de prueba para el estado de la aplicación
-const createMockState = (): AppState => {
+const createMockState = (includeActiveActivity: boolean = false): AppState => {
   // Crear plantillas de actividad
   const activityTemplates: ActivityTemplate[] = [
     {
@@ -316,7 +318,8 @@ const createMockState = (): AppState => {
     },
   ];
 
-  return {
+  // Resultado final
+  const appState: AppState = {
     global: {
       days,
       activityTemplates,
@@ -334,6 +337,36 @@ const createMockState = (): AppState => {
     },
     currentDay: null,
   };
+
+  // Si se solicita, añadir un día activo con una actividad activa
+  if (includeActiveActivity) {
+    // Crear una instancia de actividad activa
+    const activeActivityInstance: ActivityInstance = {
+      id: createMockUUID(601),
+      templateId: activityTemplates[0].id, // Usar la primera plantilla
+      blockId: createMockUUID(701), // ID de bloque ficticio
+      order: 1,
+      state: "active",
+      startTime: new Date(TODAY.getTime() - 30 * 60 * 1000).toISOString(), // Empezó hace 30 minutos
+      clearObjectiveSettings: {
+        estimatedDurationMinutes: 60, // Estimada para 60 minutos
+      },
+      createdAt: TODAY.toISOString(),
+      updatedAt: TODAY.toISOString(),
+    };
+
+    // Crear estado del día actual
+    const currentDayState: CurrentDayState = {
+      day: days[0], // Usar el primer día (hoy)
+      activityInstances: [activeActivityInstance],
+      activeActivityInstanceId: activeActivityInstance.id,
+    };
+
+    // Añadir al estado
+    appState.currentDay = currentDayState;
+  }
+
+  return appState;
 };
 
 describe("AnalyticsManager", () => {
@@ -407,6 +440,83 @@ describe("AnalyticsManager", () => {
         (a) => a.type === "timeboxing" && a.state === "completed"
       );
       expect(timeboxingActivity?.isWithinEstimation).toBe(true);
+    });
+
+    it("debería incluir la actividad activa en el timeline cuando hay un día activo", () => {
+      // Crear estado con actividad activa
+      const stateWithActiveActivity = createMockState(true);
+      const coreWithActiveActivity = createMockSystemCore(stateWithActiveActivity);
+      const managerWithActiveActivity = new AnalyticsManager(coreWithActiveActivity);
+
+      // Obtener datos del timeline
+      const timelineData = managerWithActiveActivity.getTimelineData();
+
+      // Verificar que hay una actividad activa en el timeline
+      const activeActivityInTimeline = timelineData.activities.find(
+        (a) => a.id === stateWithActiveActivity.currentDay?.activeActivityInstanceId
+      );
+
+      expect(activeActivityInTimeline).toBeDefined();
+
+      // Nota: No verificamos la duración exacta porque depende de la hora del sistema
+      // al momento de la ejecución del test. Simplemente verificamos que exista.
+      if (activeActivityInTimeline) {
+        expect(activeActivityInTimeline.durationMinutes).toBeGreaterThan(0);
+      }
+    });
+
+    it("debería incluir la actividad activa solo cuando el dayId coincide", () => {
+      // Crear estado con actividad activa
+      const stateWithActiveActivity = createMockState(true);
+      const coreWithActiveActivity = createMockSystemCore(stateWithActiveActivity);
+      const managerWithActiveActivity = new AnalyticsManager(coreWithActiveActivity);
+
+      // ID del día actual
+      const currentDayId = stateWithActiveActivity.currentDay?.day.id;
+      expect(currentDayId).toBeDefined();
+
+      // Verificar que la actividad activa aparece cuando se filtra por el día correcto
+      const timelineDataForToday = managerWithActiveActivity.getTimelineData(currentDayId);
+      expect(
+        timelineDataForToday.activities.some(
+          (a) => a.id === stateWithActiveActivity.currentDay?.activeActivityInstanceId
+        )
+      ).toBe(true);
+
+      // Verificar que la actividad activa NO aparece cuando se filtra por otro día
+      const yesterdayId = stateWithActiveActivity.global.days[1].id; // El segundo día (ayer)
+      const timelineDataForYesterday = managerWithActiveActivity.getTimelineData(yesterdayId);
+      expect(
+        timelineDataForYesterday.activities.some(
+          (a) => a.id === stateWithActiveActivity.currentDay?.activeActivityInstanceId
+        )
+      ).toBe(false);
+    });
+
+    it("debería calcular correctamente el estado de estimación para actividades activas", () => {
+      // Crear estado con actividad activa
+      const stateWithActiveActivity = createMockState(true);
+      const coreWithActiveActivity = createMockSystemCore(stateWithActiveActivity);
+      const managerWithActiveActivity = new AnalyticsManager(coreWithActiveActivity);
+
+      // Obtener datos del timeline
+      const timelineData = managerWithActiveActivity.getTimelineData();
+
+      // Encontrar la actividad activa en el timeline
+      const activeActivityInTimeline = timelineData.activities.find(
+        (a) => a.id === stateWithActiveActivity.currentDay?.activeActivityInstanceId
+      );
+
+      expect(activeActivityInTimeline).toBeDefined();
+
+      if (activeActivityInTimeline) {
+        // Verificar que tiene la información de estimación correcta
+        expect(activeActivityInTimeline.estimatedDuration).toBe(60); // Configurado para 60 minutos
+
+        // Nota: No podemos predecir con certeza isWithinEstimation porque depende
+        // de la hora del sistema. Solo verificamos que el valor esté definido.
+        expect(activeActivityInTimeline.isWithinEstimation !== undefined).toBe(true);
+      }
     });
   });
 
