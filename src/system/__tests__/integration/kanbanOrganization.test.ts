@@ -255,6 +255,57 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
     expect(instanciaEnEstado?.blockId).toBe(tardeBlock.id);
   });
 
+  test("Persistencia de actividades entre días consecutivos", () => {
+    // Crear bloques de tiempo
+    const porHacerBlock = system.getTimeBlocks().find((b) => b.isDefault);
+    const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00
+
+    // Obtener templates
+    const templates = system.getActivityTemplates();
+
+    // Crear una actividad que no se activará ni completará
+    const tareaInformeTemplate = templates.find((t) => t.title === "Redactar informe de trabajo");
+    const tareaInformeInstance = system.createActivityInstance(
+      tareaInformeTemplate!.id,
+      mañanaBlock.id
+    );
+
+    // Guardar el ID para verificar persistencia
+    const tareaInformeId = tareaInformeInstance.id;
+
+    // Crear una actividad que sí se activará y completará para comparar
+    const tareaCorreoTemplate = templates.find((t) => t.title === "Revisar correo electrónico");
+    const tareaCorreoInstance = system.createActivityInstance(
+      tareaCorreoTemplate!.id,
+      porHacerBlock!.id
+    );
+
+    // Activar y completar esta tarea
+    const tareaCorreoActiva = system.activateActivity(tareaCorreoInstance.id);
+    system.completeActivity(tareaCorreoActiva.id);
+
+    // Verificar estado antes de finalizar el día
+    const actividadesAntes = system.getState().currentDay!.activityInstances;
+    expect(actividadesAntes.some((a) => a.id === tareaInformeId)).toBe(true);
+    expect(actividadesAntes.some((a) => a.id === tareaCorreoInstance.id)).toBe(false);
+
+    // Finalizar el día
+    system.endDay();
+
+    // Iniciar un nuevo día
+    system.startDay();
+
+    // Verificar que la tarea pendiente sigue en el kanban
+    const actividadesDespues = system.getState().currentDay!.activityInstances;
+    expect(actividadesDespues.some((a) => a.id === tareaInformeId)).toBe(true);
+
+    // Obtener la instancia y verificar que mantiene sus propiedades
+    const tareaInformeNuevoDia = actividadesDespues.find((a) => a.id === tareaInformeId);
+    expect(tareaInformeNuevoDia).toBeDefined();
+    expect(tareaInformeNuevoDia?.blockId).toBe(mañanaBlock.id);
+    expect(tareaInformeNuevoDia?.templateId).toBe(tareaInformeTemplate!.id);
+  });
+
   test("Punto de decisión PD2: Restricciones de movimiento por temporalidad", () => {
     // Mock para simular diferentes horas del día
     const mockGetMinutes = jest.spyOn(UtilityService, "getCurrentDayMinutes");

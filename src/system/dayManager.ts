@@ -1,6 +1,6 @@
 import { UtilityService } from "./utilityService";
 import type { SystemCore } from "./index";
-import type { Day, UUID } from "../types";
+import type { Day, UUID, ActivityInstance } from "../types";
 
 /**
  * Gestor del ciclo de vida de los días de actividad en Qualia Control
@@ -43,13 +43,27 @@ export class DayManager {
 
     // Actualizar el estado global y el día actual
     this.systemCore.updateState((state) => {
+      // Obtener actividades pendientes si existen en el estado global
+      let pendingActivities: ActivityInstance[] = [];
+
+      // Verificar si hay actividades pendientes en el estado global
+      if (
+        state.global.pendingActivityInstances &&
+        state.global.pendingActivityInstances.length > 0
+      ) {
+        pendingActivities = [...state.global.pendingActivityInstances];
+
+        // Limpiar las actividades pendientes después de recuperarlas
+        state.global.pendingActivityInstances = [];
+      }
+
       // Añadir día a la lista de días en el estado global
       state.global.days.push(newDay);
 
-      // Establecer el día actual
+      // Establecer el día actual con las instancias pendientes
       state.currentDay = {
         day: newDay,
-        activityInstances: [],
+        activityInstances: pendingActivities,
         activeActivityInstanceId: undefined,
       };
 
@@ -82,6 +96,20 @@ export class DayManager {
 
       // Obtener referencia al día actual
       const currentDay = state.currentDay.day;
+
+      // Guardar las actividades pendientes antes de limpiar el día actual
+      // Nos aseguramos de que solo guardamos actividades que no están activas
+      const pendingActivities = state.currentDay.activityInstances.filter(
+        (instance) => instance.state !== "active"
+      );
+
+      // Inicializar el campo si no existe
+      if (!state.global.pendingActivityInstances) {
+        state.global.pendingActivityInstances = [];
+      }
+
+      // Guardar actividades pendientes en el estado global
+      state.global.pendingActivityInstances = pendingActivities;
 
       // Actualizar el estado del día a inactivo y registrar hora de finalización
       const updatedDay: Day = {

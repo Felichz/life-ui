@@ -272,6 +272,9 @@ export interface GlobalState {
   completedActivityRecords: CompletedActivityRecord[];
   eventInstances: EventInstance[];
   subjectiveVariableSnapshots: SubjectiveVariableSnapshot[];
+
+  // Datos transitorios entre días
+  pendingActivityInstances?: ActivityInstance[]; // Actividades pendientes al pasar de un día a otro
 }
 
 /**
