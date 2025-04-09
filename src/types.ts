@@ -420,6 +420,99 @@ export interface IPersistenceManager {
 export interface ISystemCore {
   getState(): AppState;
   updateState(updater: (state: AppState) => AppState): void;
+
+  // Suscripción a cambios de estado
+  onStateChange(callback: (newState: AppState) => void): () => void;
+
+  // Métodos de DayManager
+  startDay(): Day;
+  endDay(): Day;
+  getCurrentDay(): Day | null;
+  isDayActive(): boolean;
+
+  // Métodos de ActivityManager
+  createActivityTemplate(
+    data: Omit<ActivityTemplate, "id" | "createdAt" | "updatedAt">
+  ): ActivityTemplate;
+  updateActivityTemplate(id: UUID, data: Partial<ActivityTemplate>): ActivityTemplate;
+  deleteActivityTemplate(id: UUID): void;
+  getActivityTemplates(): ActivityTemplate[];
+  createActivityInstance(
+    templateId: UUID,
+    blockId: UUID,
+    dynamicSettings?: Pick<
+      ActivityInstance,
+      "clearObjectiveSettings" | "flexibleDurationSettings" | "timeboxingSettings"
+    >
+  ): ActivityInstance;
+  updateActivityInstance(id: UUID, data: Partial<ActivityInstance>): ActivityInstance;
+  moveActivityInstance(id: UUID, targetBlockId: UUID, newOrder?: number): ActivityInstance;
+  deleteActivityInstance(id: UUID): void;
+  activateActivity(id: UUID): ActivityInstance;
+  completeActivity(id: UUID): CompletedActivityRecord;
+  interruptActivity(id: UUID, isAvoidable: boolean, causeId?: UUID): CompletedActivityRecord;
+  getActiveActivity(): ActivityInstance | null;
+
+  // Métodos de TimeBlockManager
+  createTimeBlock(name: string, startMinute: DayMinutes, endMinute: DayMinutes): TimeBlock;
+  updateTimeBlock(id: UUID, data: Partial<TimeBlock>): TimeBlock;
+  deleteTimeBlock(id: UUID): void;
+  getTimeBlocks(): TimeBlock[];
+  getCurrentTimeBlock(): TimeBlock | null;
+  isTimeBlockAvailable(blockId: UUID): boolean;
+
+  // Métodos de SubjectiveVariableManager
+  createSubjectiveVariable(name: string): SubjectiveVariable;
+  updateSubjectiveVariable(id: UUID, data: Partial<SubjectiveVariable>): SubjectiveVariable;
+  deleteSubjectiveVariable(id: UUID): void;
+  createSnapshot(
+    values: { variableId: UUID; currentValue: number }[],
+    relatedActivityIds?: UUID[],
+    relatedEventIds?: UUID[]
+  ): SubjectiveVariableSnapshot | null;
+  getSnapshots(filters?: {
+    dayId?: UUID;
+    variableIds?: UUID[];
+    since?: string;
+    until?: string;
+  }): SubjectiveVariableSnapshot[];
+  getLatestValues(): Record<UUID, number>;
+  canUpdateVariables(): boolean;
+
+  // Métodos de EventManager
+  createEventTemplate(name: string): EventTemplate;
+  updateEventTemplate(id: UUID, data: Partial<EventTemplate>): EventTemplate;
+  deleteEventTemplate(id: UUID): void;
+  createEventInstance(templateId: UUID): EventInstance;
+  getEventInstances(filters?: { dayId?: UUID; since?: string; until?: string }): EventInstance[];
+  getRecentEvents(minutesWindow?: number): EventInstance[];
+
+  // Métodos de InterruptionManager
+  createInterruptionCause(description: string): InterruptionCause;
+  updateInterruptionCause(id: UUID, data: Partial<InterruptionCause>): InterruptionCause;
+  deleteInterruptionCause(id: UUID): void;
+  getInterruptionCauses(): InterruptionCause[];
+  getInterruptionStatistics(): InterruptionStatistics;
+
+  // Métodos de AnalyticsManager
+  getTimelineData(dayId?: UUID): TimelineData;
+  getTimeDistributionData(dayId?: UUID): TimeDistributionData;
+  getSubjectiveVariablesData(dayId?: UUID): SubjectiveVariablesData;
+  getActivityStats(templateId?: UUID): ActivityStatistics;
+  getCompletionRate(): number;
+  getInterruptionRate(): number;
+  getEstimationAccuracy(): number;
+
+  // Métodos de UserPreferencesManager
+  updateUserPreferences(preferences: Partial<UserPreferences>): UserPreferences;
+  getUserPreferences(): UserPreferences;
+  toggleVariableVisibility(variableId: UUID): void;
+  isVariableVisible(variableId: UUID): boolean;
+
+  // Métodos de PersistenceManager
+  exportData(): string;
+  importData(jsonData: string): AppState;
+  clearState(): void;
 }
 
 /**
