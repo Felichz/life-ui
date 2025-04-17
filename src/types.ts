@@ -456,10 +456,11 @@ export interface ISystemCore {
   // Métodos de TimeBlockManager
   createTimeBlock(name: string, startMinute: DayMinutes, endMinute: DayMinutes): TimeBlock;
   updateTimeBlock(id: UUID, data: Partial<TimeBlock>): TimeBlock;
-  deleteTimeBlock(id: UUID): void;
+  deleteTimeBlock(id: UUID, moveActivitiesToTodo?: boolean): void;
   getTimeBlocks(): TimeBlock[];
   getCurrentTimeBlock(): TimeBlock | null;
   isTimeBlockAvailable(blockId: UUID): boolean;
+  isTimeBlockExisting(blockId: UUID): boolean;
 
   // Métodos de SubjectiveVariableManager
   createSubjectiveVariable(name: string): SubjectiveVariable;

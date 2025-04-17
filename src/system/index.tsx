@@ -286,8 +286,8 @@ export class SystemCore implements ISystemCore {
   /**
    * Elimina un bloque de tiempo
    */
-  public deleteTimeBlock(id: UUID): void {
-    this.timeBlockManager.deleteTimeBlock(id);
+  public deleteTimeBlock(id: UUID, moveActivitiesToTodo: boolean = true): void {
+    this.timeBlockManager.deleteTimeBlock(id, moveActivitiesToTodo);
   }
 
   /**
@@ -309,6 +309,14 @@ export class SystemCore implements ISystemCore {
    */
   public isTimeBlockAvailable(blockId: UUID): boolean {
     return this.timeBlockManager.isTimeBlockAvailable(blockId);
+  }
+
+  /**
+   * Verifica si un bloque de tiempo existe, ignorando restricciones horarias
+   * Esta función permite colocar actividades en bloques fuera de su horario
+   */
+  public isTimeBlockExisting(blockId: UUID): boolean {
+    return this.timeBlockManager.isTimeBlockExisting(blockId);
   }
 
   // ===============================================

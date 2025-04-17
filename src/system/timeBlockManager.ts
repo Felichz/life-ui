@@ -136,9 +136,10 @@ export class TimeBlockManager {
   /**
    * Elimina un bloque de tiempo
    * @param id Identificador del bloque a eliminar
+   * @param moveActivitiesToTodo Si es true, mueve las actividades al bloque por defecto; si es false, las elimina
    * @throws Error si se intenta eliminar el bloque por defecto
    */
-  public deleteTimeBlock(id: UUID): void {
+  public deleteTimeBlock(id: UUID, moveActivitiesToTodo: boolean = true): void {
     const block = this.getTimeBlock(id);
     if (!block) {
       throw new Error(`No se encontró el bloque con ID: ${id}`);
@@ -148,6 +149,45 @@ export class TimeBlockManager {
       throw new Error("No se puede eliminar el bloque por defecto");
     }
 
+    // Mover o eliminar actividades asignadas a este bloque
+    const state = this.systemCore.getState();
+    if (state.currentDay) {
+      const activities = state.currentDay.activityInstances.filter((a) => a.blockId === id);
+      if (activities.length > 0) {
+        if (moveActivitiesToTodo) {
+          // Mover actividades al bloque por defecto
+          const defaultBlock = this.getDefaultBlock();
+          this.systemCore.updateState((prevState) => {
+            if (!prevState.currentDay) return prevState;
+            return {
+              ...prevState,
+              currentDay: {
+                ...prevState.currentDay,
+                activityInstances: prevState.currentDay.activityInstances.map((a) =>
+                  a.blockId === id ? { ...a, blockId: defaultBlock.id } : a
+                ),
+              },
+            };
+          });
+        } else {
+          // Eliminar actividades de este bloque
+          this.systemCore.updateState((prevState) => {
+            if (!prevState.currentDay) return prevState;
+            return {
+              ...prevState,
+              currentDay: {
+                ...prevState.currentDay,
+                activityInstances: prevState.currentDay.activityInstances.filter(
+                  (a) => a.blockId !== id
+                ),
+              },
+            };
+          });
+        }
+      }
+    }
+
+    // Finalmente, eliminar el bloque
     this.systemCore.updateState(this.createDeleteTimeBlockUpdater(id));
   }
 
@@ -224,6 +264,17 @@ export class TimeBlockManager {
     // Para bloques regulares, verificar si estamos dentro de su rango horario
     const currentMinutes = UtilityService.getCurrentDayMinutes();
     return currentMinutes >= block.startMinute && currentMinutes < block.endMinute;
+  }
+
+  /**
+   * Verifica si un bloque de tiempo existe, ignorando restricciones horarias
+   * Esta función permite colocar actividades en bloques fuera de su horario
+   * @param blockId Identificador del bloque
+   * @returns true si el bloque existe, false en caso contrario
+   */
+  public isTimeBlockExisting(blockId: UUID): boolean {
+    const block = this.getTimeBlock(blockId);
+    return !!block; // Devuelve true si el bloque existe, independientemente de su horario
   }
 
   /**

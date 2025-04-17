@@ -430,15 +430,108 @@ describe("TimeBlockManager", () => {
       blockId = mockUUID;
     });
 
-    it("debe eliminar un bloque existente", () => {
-      // Verificar que hay 2 bloques inicialmente
-      expect(mockAppState.global.timeBlocks.length).toBe(2);
+    it("debe eliminar un bloque existente y mover actividades a 'Por Hacer' si moveActivitiesToTodo es true", () => {
+      // Agregar actividades al bloque a eliminar
+      mockAppState.currentDay = {
+        day: {
+          id: "day-id-123",
+          state: "active",
+          startTime: mockTimestamp,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        },
+        activityInstances: [
+          {
+            id: "a1",
+            templateId: "t1",
+            blockId: blockId,
+            order: 0,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+          {
+            id: "a2",
+            templateId: "t2",
+            blockId: blockId,
+            order: 1,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+          {
+            id: "a3",
+            templateId: "t3",
+            blockId: mockDefaultUUID,
+            order: 2,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+        ],
+        activeActivityInstanceId: undefined,
+      };
 
-      // Eliminar el bloque
-      timeBlockManager.deleteTimeBlock(blockId);
+      // Eliminar el bloque y mover actividades
+      timeBlockManager.deleteTimeBlock(blockId, true);
 
-      // Verificar que quedó solo el bloque por defecto
-      expect(mockAppState.global.timeBlocks.length).toBe(1);
+      // Las actividades deben estar ahora en el bloque por defecto
+      const moved = mockAppState.currentDay!.activityInstances.filter(
+        (a) => a.blockId === mockDefaultUUID
+      );
+      expect(moved.length).toBe(3); // a1, a2, a3
+      expect(mockAppState.global.timeBlocks.find((b) => b.id === blockId)).toBeUndefined();
+    });
+
+    it("debe eliminar un bloque existente y eliminar actividades si moveActivitiesToTodo es false", () => {
+      // Agregar actividades al bloque a eliminar
+      mockAppState.currentDay = {
+        day: {
+          id: "day-id-123",
+          state: "active",
+          startTime: mockTimestamp,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        },
+        activityInstances: [
+          {
+            id: "a1",
+            templateId: "t1",
+            blockId: blockId,
+            order: 0,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+          {
+            id: "a2",
+            templateId: "t2",
+            blockId: blockId,
+            order: 1,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+          {
+            id: "a3",
+            templateId: "t3",
+            blockId: mockDefaultUUID,
+            order: 2,
+            state: "instantiated",
+            createdAt: mockTimestamp,
+            updatedAt: mockTimestamp,
+          },
+        ],
+        activeActivityInstanceId: undefined,
+      };
+
+      // Eliminar el bloque y eliminar actividades
+      timeBlockManager.deleteTimeBlock(blockId, false);
+
+      // Solo debe quedar la actividad en el bloque por defecto
+      const remaining = mockAppState.currentDay!.activityInstances;
+      expect(remaining.length).toBe(1);
+      expect(remaining[0].id).toBe("a3");
       expect(mockAppState.global.timeBlocks.find((b) => b.id === blockId)).toBeUndefined();
     });
 

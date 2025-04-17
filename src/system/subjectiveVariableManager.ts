@@ -306,6 +306,10 @@ export class SubjectiveVariableManager implements ISubjectiveVariableManager {
    * @returns true si se pueden actualizar las variables, false en caso contrario
    */
   public canUpdateVariables(): boolean {
+    // BYPASS para debug: siempre retorna true
+    return true;
+
+    /* Código original comentado
     const state = this.systemCore.getState();
     const snapshots = state.global.subjectiveVariableSnapshots;
 
@@ -324,6 +328,7 @@ export class SubjectiveVariableManager implements ISubjectiveVariableManager {
 
     // Verificar si han pasado al menos 5 minutos
     return currentTime - latestTimestamp >= this.MIN_UPDATE_INTERVAL_MS;
+    */
   }
 
   /**
