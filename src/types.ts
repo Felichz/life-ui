@@ -23,6 +23,28 @@ export type TimeboxingType = "minimum-time" | "maximum-time" | "both";
 export type DayState = "active" | "inactive";
 
 // ===============================================
+// Tipos Dinámicos
+// ===============================================
+
+/**
+ * Configuraciones dinámicas para instancias de actividades
+ */
+export type DynamicSettings = {
+  clearObjectiveSettings?: {
+    estimatedDurationMinutes: number;
+  };
+  flexibleDurationSettings?: {
+    minimumDurationMinutes: number;
+    maximumDurationMinutes: number;
+  };
+  timeboxingSettings?: {
+    type: TimeboxingType;
+    minimumDurationMinutes?: number;
+    maximumDurationMinutes?: number;
+  };
+};
+
+// ===============================================
 // Entidades Principales
 // ===============================================
 

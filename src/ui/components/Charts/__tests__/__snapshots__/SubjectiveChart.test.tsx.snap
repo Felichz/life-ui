@@ -1,0 +1,46 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`SubjectiveChart Component respeta la estructura de datos proporcionada 1`] = `
+<div>
+  <div
+    class="MuiBox-root css-2z7te8"
+    data-testid="subjective-chart-container"
+  >
+    <div
+      data-testid="responsive-container"
+    >
+      <div
+        data-testid="line-chart"
+      >
+        <div
+          data-testid="cartesian-grid"
+        />
+        <div
+          data-testid="x-axis"
+        />
+        <div
+          data-testid="y-axis"
+        />
+        <div
+          data-testid="tooltip"
+        />
+        <div
+          data-testid="legend"
+        />
+        <div
+          data-hidden="false"
+          data-key="value_var-1"
+          data-name="Energía"
+          data-testid="subjective-chart-line-var-1"
+        />
+        <div
+          data-hidden="false"
+          data-key="value_var-2"
+          data-name="Concentración"
+          data-testid="subjective-chart-line-var-2"
+        />
+      </div>
+    </div>
+  </div>
+</div>
+`;

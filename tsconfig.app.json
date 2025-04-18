@@ -9,8 +9,8 @@
       "@core/*": ["./src/core/*"],
       "@shadcn": ["./src/ui/components/shadcn"],
       "@shadcn/*": ["./src/ui/components/shadcn/*"]
-
     },
+    "types": ["jest", "@testing-library/jest-dom", "node"],
     "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "bundler",
