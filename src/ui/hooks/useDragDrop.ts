@@ -47,11 +47,19 @@ export const useDragDrop = (options: UseDragDropOptions = {}): UseDragDropReturn
     [options.onDragStart]
   );
 
+  // Función auxiliar para verificar si un droppableId es una librería
+  const isLibrary = (droppableId: string): boolean => {
+    return droppableId === "library";
+  };
+
   const handleDragEnd = useCallback(
     (result: DropResult) => {
       setIsDragging(false);
       setDraggedTemplateId(null);
       setDraggedSource(null);
+
+      // Debugging detallado del resultado
+      console.log("Drag end result:", JSON.stringify(result, null, 2));
 
       // Siempre notificar al callback si está definido
       if (options.onDragEnd) {
@@ -60,34 +68,44 @@ export const useDragDrop = (options: UseDragDropOptions = {}): UseDragDropReturn
 
       const { source, destination, draggableId } = result;
 
-      // Para debugging
-      console.log("Drag end result:", result);
-
       // Si no hay destino, se canceló el drag
       if (!destination) {
+        console.log("No destination, drag was cancelled");
         return;
       }
 
       // No hacer nada si el origen y destino son iguales y el índice no cambió
       if (source.droppableId === destination.droppableId && source.index === destination.index) {
+        console.log("Source and destination are the same with the same index, no action needed");
         return;
       }
 
-      // Identificar el tipo de operación
-      // 1. Arrastrar desde biblioteca a columna de Kanban
-      if (source.droppableId === "library" && destination.droppableId.startsWith("block-")) {
-        console.log("Biblioteca a Kanban: ", draggableId, destination.droppableId);
-        const blockId = destination.droppableId.split("-")[1];
+      console.log(
+        `Source droppableId: ${source.droppableId}, Destination droppableId: ${destination.droppableId}`
+      );
+
+      // Caso 1: Arrastrar desde biblioteca a un bloque
+      if (isLibrary(source.droppableId)) {
+        console.log("Caso 1: Library → Block");
+        const blockId = destination.droppableId;
         openConfigModal(draggableId, blockId);
+        return;
       }
-      // 2. Reordenar dentro de una misma columna o entre columnas de Kanban
-      else if (
-        source.droppableId.startsWith("block-") &&
-        destination.droppableId.startsWith("block-")
-      ) {
-        console.log("Reordenar en Kanban: ", draggableId, destination.droppableId);
-        const targetBlockId = destination.droppableId.split("-")[1];
-        moveActivityInstance(draggableId, targetBlockId, destination.index);
+
+      // Caso 2: Reordenar dentro de un bloque o entre bloques
+      if (!isLibrary(source.droppableId) && !isLibrary(destination.droppableId)) {
+        console.log("Caso 2: Block → Block");
+        const targetBlockId = destination.droppableId;
+
+        try {
+          console.log(
+            `Calling moveActivityInstance(${draggableId}, ${targetBlockId}, ${destination.index})`
+          );
+          moveActivityInstance(draggableId, targetBlockId, destination.index);
+          console.log("Move completed successfully");
+        } catch (error) {
+          console.error("Error moving activity instance:", error);
+        }
       }
     },
     [options.onDragEnd, moveActivityInstance]

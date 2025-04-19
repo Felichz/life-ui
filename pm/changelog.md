@@ -737,3 +737,28 @@ Notas para siguientes tickets:
 - Revisar los componentes existentes con comportamientos asíncronos para garantizar que sigan estos patrones.
 - Al crear nuevos contenedores o componentes con efectos, documentar claramente la lógica de dependencias.
 - Para los tests de componentes con `useSystemCore`, considerar crear un mock helper que proporcione referencias estables.
+
+## Ticket ID: BF01
+
+Título: Corrección del sistema Drag & Drop entre bloques
+
+Resumen de cambios:
+
+- Solución de un problema crítico que impedía el arrastre de actividades entre bloques de tiempo en el tablero Kanban.
+- Simplificación del sistema de identificación de bloques eliminando el prefijo "block-" de los droppableId.
+- Modificación del componente `Column.tsx` para usar directamente el ID del bloque como droppableId.
+- Refactorización del hook `useDragDrop.ts` para trabajar directamente con los IDs originales de los bloques:
+  - Eliminación de la función `extractBlockId` que procesaba inconsistentemente los IDs.
+  - Reemplazo de la función `isBlock` por una función más simple `isLibrary`.
+  - Simplificación del código para manejar de forma más robusta los flujos de drag & drop.
+- Integración apropiada con la función `isValidBlockId` del TimeBlockManager para validar bloques destino.
+- Mejora del sistema de logs para facilitar la depuración de futuros problemas con drag & drop.
+- Optimización del rendimiento al eliminar manipulaciones innecesarias de strings en el proceso de arrastre.
+
+Notas para siguientes tickets:
+
+- La interfaz de drag & drop ahora es más robusta y trabaja directamente con los IDs originales sin manipulaciones.
+- Para futuros desarrollos que involucren el sistema DnD, es importante mantener la consistencia en el uso de identificadores.
+- El sistema de logs implementado proporciona información detallada sobre cada paso del proceso de drag & drop.
+- La estructura actual facilita la extensión para nuevos tipos de elementos arrastrables o destinos en el futuro.
+- Se recomienda implementar tests de integración específicos para los escenarios de drag & drop entre bloques para evitar regresiones.

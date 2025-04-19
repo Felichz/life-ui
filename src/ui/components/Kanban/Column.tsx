@@ -51,6 +51,10 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     );
   };
 
+  // Usar directamente el ID del bloque como droppableId
+  const droppableId = block.id;
+  console.log(`Creando columna con droppableId: ${droppableId}`);
+
   return (
     <Paper
       sx={{
@@ -70,7 +74,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
         {renderColumnHeader()}
       </Box>
 
-      <Droppable droppableId={block.id}>
+      <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
           <Stack
             ref={provided.innerRef}
