@@ -738,7 +738,7 @@ Notas para siguientes tickets:
 - Al crear nuevos contenedores o componentes con efectos, documentar claramente la lógica de dependencias.
 - Para los tests de componentes con `useSystemCore`, considerar crear un mock helper que proporcione referencias estables.
 
-## Ticket ID: BF01
+## Ticket ID: Bug fix 1
 
 Título: Corrección del sistema Drag & Drop entre bloques
 
@@ -762,3 +762,26 @@ Notas para siguientes tickets:
 - El sistema de logs implementado proporciona información detallada sobre cada paso del proceso de drag & drop.
 - La estructura actual facilita la extensión para nuevos tipos de elementos arrastrables o destinos en el futuro.
 - Se recomienda implementar tests de integración específicos para los escenarios de drag & drop entre bloques para evitar regresiones.
+
+## Ticket ID: Bug fix 2
+
+Título: Reposicionamiento del Timeline
+
+Resumen de cambios:
+
+- Cambio en la posición del componente Timeline para mostrarlo como una barra horizontal en la parte superior del layout.
+- Modificación de la estructura en DayPage.tsx para mostrar el Timeline arriba del Kanban en lugar de a la derecha.
+- Optimización del componente Timeline.tsx para limitar su altura y mostrar elementos alineados verticalmente por tipo.
+- Refinamiento de TimelineBar.tsx para que todas las barras de actividad aparezcan en la misma línea visual.
+- Actualización de TimelineMarker.tsx para centrar verticalmente los marcadores de eventos e interrupciones.
+- Reducción del espacio vertical entre elementos para una visualización más compacta.
+- Ajuste fino de la escala de tiempo para mostrar marcadores cada 2 horas en lugar de cada 3 horas.
+- Mejora en la estructura para evitar la aparición de elementos rectangulares extraños en el timeline.
+
+Notas para siguientes tickets:
+
+- El nuevo posicionamiento del Timeline mejora la legibilidad al mostrar más horas en pantalla.
+- Ahora todos los elementos del mismo tipo (actividades, eventos, interrupciones) aparecen alineados verticalmente.
+- Para futuros desarrollos, esta estructura facilita la expansión a una vista diaria completa más intuitiva.
+- El Timeline ahora utiliza mejor el espacio horizontal, especialmente importante en dispositivos con pantallas más anchas.
+- Esta implementación refuerza el patrón visual de organización cronológica de actividades (línea de tiempo arriba, organización de tareas abajo).

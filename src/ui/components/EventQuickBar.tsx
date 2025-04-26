@@ -73,6 +73,7 @@ const EventQuickBar: React.FC<EventQuickBarProps> = ({
               onClick={() => onEventClick(template.id)}
               disabled={isLoadingThis}
               sx={{ minWidth: "auto" }}
+              data-testid={`quick-event-${template.id}`}
             >
               {template.name}
             </Button>

@@ -222,7 +222,7 @@ const ActivityLibraryDrawer: React.FC<ActivityLibraryDrawerProps> = ({ open, onC
         </Droppable>
       </Box>
       <Box sx={{ p: 2, borderTop: "1px solid rgba(0, 0, 0, 0.12)" }}>
-        <Button variant="contained" color="primary" fullWidth>
+        <Button variant="contained" color="primary" fullWidth data-testid="new-activity-button">
           Nueva Actividad
         </Button>
       </Box>

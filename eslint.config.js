@@ -49,5 +49,21 @@ export default tseslint.config(
       'prettier/prettier': 'error',
     },
   },
+  {
+    files: ['cypress/**/*.ts'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: ['./tsconfig.cypress.json'],
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint.plugin,
+    },
+    rules: {
+      '@typescript-eslint/no-namespace': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
   prettierConfig,
 );

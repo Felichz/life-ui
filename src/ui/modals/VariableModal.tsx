@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -18,7 +18,6 @@ import {
   CircularProgress,
   Paper,
   IconButton,
-  Grid as MuiGrid,
   Alert,
   Stack,
 } from "@mui/material";
@@ -75,6 +74,8 @@ const VariableModal: React.FC<VariableModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   // Estado para indicar si se pueden actualizar variables (restricción temporal)
   const [canUpdate, setCanUpdate] = useState(true);
+  // Referencia para evitar inicializaciones repetidas
+  const initialized = useRef(false);
 
   // Memorizar actividades completadas recientes para el select
   const recentCompletedActivities = useMemo(() => {
@@ -91,7 +92,7 @@ const VariableModal: React.FC<VariableModalProps> = ({
           new Date(b.endTime).getTime() - new Date(a.endTime).getTime()
       )
       .slice(0, 5); // Limitar a las 5 más recientes
-  }, [state]);
+  }, [state.global?.completedActivityRecords, state.currentDay?.day?.id]);
 
   // Memorizar eventos recientes para el select
   const recentEvents = useMemo(() => {
@@ -108,12 +109,10 @@ const VariableModal: React.FC<VariableModalProps> = ({
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       )
       .slice(0, 5); // Limitar a los 5 más recientes
-  }, [state]);
+  }, [state.global?.eventInstances, state.currentDay?.day?.id]);
 
-  // Inicializar estado al abrir el modal
-  useEffect(() => {
-    if (!open) return;
-
+  // Función para inicializar el modal
+  const initializeModal = useCallback(() => {
     setError(null);
     setIsProcessing(false);
 
@@ -143,10 +142,31 @@ const VariableModal: React.FC<VariableModalProps> = ({
     // Inicializar actividades y eventos relacionados
     setSelectedActivityIds(relatedActivityIds);
     setSelectedEventIds(relatedEventIds);
-  }, [open, getLatestValues, canUpdateVariables, relatedActivityIds, relatedEventIds, state]);
+
+    // Marcar como inicializado
+    initialized.current = true;
+  }, [
+    canUpdateVariables,
+    getLatestValues,
+    relatedActivityIds,
+    relatedEventIds,
+    state.global?.subjectiveVariables,
+  ]);
+
+  // Inicializar estado al abrir el modal
+  useEffect(() => {
+    if (!open) {
+      initialized.current = false;
+      return;
+    }
+
+    if (!initialized.current) {
+      initializeModal();
+    }
+  }, [open, initializeModal]);
 
   // Manejar el cambio de valor de una variable
-  const handleVariableChange = (variableId: UUID, newValue: number) => {
+  const handleVariableChange = useCallback((variableId: UUID, newValue: number) => {
     setValues((prevValues) => {
       // Buscar si ya existe un valor para esta variable
       const existingIndex = prevValues.findIndex((v) => v.variableId === variableId);
@@ -161,10 +181,10 @@ const VariableModal: React.FC<VariableModalProps> = ({
         return [...prevValues, { variableId, currentValue: newValue }];
       }
     });
-  };
+  }, []);
 
   // Crear una nueva variable subjetiva
-  const handleCreateVariable = () => {
+  const handleCreateVariable = useCallback(() => {
     if (!newVariableName.trim()) {
       return;
     }
@@ -189,10 +209,10 @@ const VariableModal: React.FC<VariableModalProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [newVariableName, createSubjectiveVariable]);
 
   // Manejar la confirmación de los cambios
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (!canUpdate) {
       setError("Debes esperar al menos 5 minutos entre actualizaciones de variables");
       return;
@@ -213,15 +233,23 @@ const VariableModal: React.FC<VariableModalProps> = ({
       );
       setIsProcessing(false);
     }
-  };
+  }, [canUpdate, variables.length, values, selectedActivityIds, selectedEventIds, onConfirm]);
 
   // Nuevo método para omitir la actualización de variables
-  const handleSkip = () => {
+  const handleSkip = useCallback(() => {
     onClose();
-  };
+  }, [onClose]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      data-testid="variable-modal"
+      TransitionProps={{ mountOnEnter: true, unmountOnExit: true, timeout: { enter: 0, exit: 0 } }}
+      BackdropProps={{ transitionDuration: 0 }}
+    >
       <DialogTitle>
         Actualizar Variables Subjetivas
         <IconButton
@@ -398,22 +426,23 @@ const VariableModal: React.FC<VariableModalProps> = ({
         )}
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={handleSkip} disabled={isProcessing} sx={{ marginRight: "auto" }}>
+      <DialogActions sx={{ p: 2 }}>
+        <Button
+          onClick={handleSkip}
+          color="secondary"
+          disabled={isProcessing}
+          data-testid="skip-variables-button"
+        >
           Omitir actualización
-        </Button>
-        <Button onClick={onClose} disabled={isProcessing}>
-          Cancelar
         </Button>
         <Button
           onClick={handleConfirm}
           variant="contained"
           color="primary"
-          disabled={isProcessing || !canUpdate || variables.length === 0}
-          startIcon={isProcessing ? <CircularProgress size={20} /> : null}
-          data-testid="confirm-button"
+          disabled={isProcessing || !canUpdate}
+          data-testid="confirm-variables-button"
         >
-          {isProcessing ? "Guardando..." : "Aplicar Cambios"}
+          {isProcessing ? <CircularProgress size={24} color="inherit" /> : "Confirmar Valores"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -9,6 +9,7 @@ import ActivityTimer from "../Common/ActivityTimer";
 
 interface KanbanCardProps {
   activity: ActivityInstance;
+  templateTitle: string;
   index: number;
   onEdit?: (activity: ActivityInstance) => void;
   onActivate?: (activityId: UUID) => void;
@@ -20,6 +21,7 @@ interface KanbanCardProps {
 
 const KanbanCard: React.FC<KanbanCardProps> = ({
   activity,
+  templateTitle,
   index,
   onEdit,
   onActivate,
@@ -28,10 +30,6 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
   isDayActive,
   isTimeBlockAvailable,
 }) => {
-  // Recuperar el nombre del título de la activity desde cache local o store
-  // Implementación futura conectando con SystemCore para obtener el título de la plantilla
-  const activityTitle = "Actividad " + activity.id.substring(0, 4);
-
   // Renderizar duración según configuraciones
   const renderDuration = () => {
     if (activity.clearObjectiveSettings) {
@@ -93,6 +91,7 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
             ...provided.draggableProps.style,
             opacity: snapshot.isDragging ? 0.8 : 1,
           }}
+          data-testid={`kanban-card-${activity.id}`}
         >
           <Card
             variant="outlined"
@@ -107,7 +106,7 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6" component="h3" gutterBottom noWrap>
-                  {activityTitle}
+                  {templateTitle}
                 </Typography>
                 <IconButton size="small" onClick={handleEditClick} aria-label="editar actividad">
                   <EditIcon fontSize="small" />

@@ -190,36 +190,43 @@ const DayPage: React.FC = () => {
                   <EventQuickBarContainer />
                 </Box>
 
-                <Box sx={{ display: "flex", flexDirection: { xs: "column", lg: "row" }, gap: 3 }}>
-                  {/* Kanban */}
-                  <Box sx={{ flexGrow: 1, width: { xs: "100%", lg: "66.66%" } }}>
-                    <Paper sx={{ p: 2, height: "100%" }}>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                        <Typography variant="h5" component="h2">
-                          Actividades del día
-                        </Typography>
-                        <Box>
-                          <Button variant="outlined" onClick={openTimeBlockModal} sx={{ mr: 1 }}>
-                            Gestionar bloques
-                          </Button>
-                          <Button variant="outlined" onClick={openLibraryModal}>
-                            Mostrar biblioteca
-                          </Button>
-                        </Box>
-                      </Box>
-                      <KanbanContainer ref={kanbanRef} />
-                    </Paper>
-                  </Box>
-
-                  {/* Timeline */}
-                  <Box sx={{ width: { xs: "100%", lg: "33.33%" } }}>
-                    <Paper sx={{ p: 2, height: "100%" }}>
-                      <Typography variant="h5" component="h2" mb={2}>
-                        Línea de tiempo
-                      </Typography>
+                {/* Timeline - como barra horizontal que ocupa todo el ancho */}
+                <Box mb={4} width="100%">
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="h5" component="h2" mb={2}>
+                      Línea de tiempo
+                    </Typography>
+                    <Box
+                      sx={{
+                        height: "180px",
+                        overflow: "auto",
+                        position: "relative",
+                        bgcolor: "transparent",
+                      }}
+                    >
                       <TimelineContainer />
-                    </Paper>
-                  </Box>
+                    </Box>
+                  </Paper>
+                </Box>
+
+                {/* Kanban */}
+                <Box>
+                  <Paper sx={{ p: 2 }}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                      <Typography variant="h5" component="h2">
+                        Actividades del día
+                      </Typography>
+                      <Box>
+                        <Button variant="outlined" onClick={openTimeBlockModal} sx={{ mr: 1 }}>
+                          Gestionar bloques
+                        </Button>
+                        <Button variant="outlined" onClick={openLibraryModal}>
+                          Mostrar biblioteca
+                        </Button>
+                      </Box>
+                    </Box>
+                    <KanbanContainer ref={kanbanRef} />
+                  </Paper>
                 </Box>
               </Container>
             </Box>

@@ -144,7 +144,8 @@ const EventLibraryModal: React.FC<EventLibraryModalProps> = ({ open, onClose }) 
         setTemplates((prev) => [...prev, newTemplate]);
       }
       resetForm();
-      onClose(); // Cerrar el modal después de guardar exitosamente
+      // No cerrar el modal automáticamente después de guardar, para permitir crear múltiples eventos
+      // onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error desconocido";
       setError(`Error al guardar: ${errorMessage}`);
@@ -236,7 +237,7 @@ const EventLibraryModal: React.FC<EventLibraryModalProps> = ({ open, onClose }) 
                 <List dense sx={{ maxHeight: 300, overflow: "auto" }}>
                   {filteredTemplates.map((template) => (
                     <React.Fragment key={template.id}>
-                      <ListItem>
+                      <ListItem data-testid={`event-template-${template.id}`}>
                         <ListItemText primary={template.name} />
                         <ListItemSecondaryAction>
                           <Tooltip title="Editar">

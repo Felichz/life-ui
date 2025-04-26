@@ -71,7 +71,6 @@ const ActivityLibraryContainer: React.FC<ActivityLibraryContainerProps> = ({
     if (onCreateInstance) {
       onCreateInstance(templateId, blockId);
     }
-    onClose();
   };
 
   return (

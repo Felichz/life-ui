@@ -18,6 +18,11 @@ const ActivityTimer: React.FC<ActivityTimerProps> = ({
   const startTimeMs = useRef<number>(new Date(startTime).getTime());
   const requestRef = useRef<number | null>(null);
 
+  // Actualizar startTimeMs cuando cambia startTime
+  useEffect(() => {
+    startTimeMs.current = new Date(startTime).getTime();
+  }, [startTime]);
+
   // Función para formatear milisegundos a formato MM:SS
   const formatTime = (ms: number): string => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -34,14 +39,17 @@ const ActivityTimer: React.FC<ActivityTimerProps> = ({
 
   // Efecto para iniciar y limpiar el timer
   useEffect(() => {
+    // Iniciar animación
     requestRef.current = requestAnimationFrame(updateTimer);
 
+    // Limpiar animación al desmontar o cambiar startTime
     return () => {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
+        requestRef.current = null;
       }
     };
-  }, [startTime]);
+  }, [startTime]); // Solo depende de startTime
 
   return (
     <Box display="flex" alignItems="center" gap={0.5} data-testid={testId}>

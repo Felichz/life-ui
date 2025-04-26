@@ -10,11 +10,13 @@ const TimelineContainer: React.FC = () => {
 
   // Obtener datos del timeline para el día actual
   const timelineData = useMemo(() => {
-    if (!state.currentDay) return null;
-    return getTimelineData(state.currentDay.day.id);
-  }, [getTimelineData, state.currentDay]);
+    const currentDayId = state.currentDay?.day.id;
+    return getTimelineData(currentDayId);
+    // Simplificar dependencias: Solo recalcular si cambian los registros completados
+    // o si la función getTimelineData cambia (poco probable pero seguro incluirla)
+  }, [getTimelineData, state.global.completedActivityRecords]);
 
-  // Renderizar skeleton loader si no hay datos disponibles
+  // Renderizar skeleton loader si no hay datos disponibles O no hay día
   if (!timelineData || !state.currentDay) {
     return (
       <Box sx={{ width: "100%" }}>
@@ -24,7 +26,7 @@ const TimelineContainer: React.FC = () => {
   }
 
   return (
-    <Box sx={{ width: "100%", overflowX: "auto" }}>
+    <Box sx={{ width: "100%" }}>
       <Timeline
         activities={timelineData.activities}
         events={timelineData.events}

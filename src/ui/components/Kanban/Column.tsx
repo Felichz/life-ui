@@ -3,10 +3,11 @@ import { Paper, Typography, Box, Stack } from "@mui/material";
 import type { TimeBlock, ActivityInstance, UUID } from "../../../types";
 import KanbanCard from "./Card";
 import { Droppable } from "@hello-pangea/dnd";
+import type { ActivityInstanceWithTitle } from "./Board";
 
 interface KanbanColumnProps {
   block: TimeBlock;
-  activities: ActivityInstance[];
+  activities: ActivityInstanceWithTitle[];
   onEditActivity?: (activity: ActivityInstance) => void;
   onActivateActivity?: (activityId: UUID) => void;
   onCompleteActivity?: (activityId: UUID) => void;
@@ -51,7 +52,6 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     );
   };
 
-  // Usar directamente el ID del bloque como droppableId
   const droppableId = block.id;
   console.log(`Creando columna con droppableId: ${droppableId}`);
 
@@ -80,6 +80,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             ref={provided.innerRef}
             {...provided.droppableProps}
             spacing={1}
+            data-testid={`kanban-column-${block.name.toLowerCase().replace(/ /g, "-")}`}
             sx={{
               flex: 1,
               overflowY: "auto",
@@ -111,6 +112,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                 <KanbanCard
                   key={activity.id}
                   activity={activity}
+                  templateTitle={activity.templateTitle}
                   index={index}
                   onEdit={onEditActivity}
                   onActivate={onActivateActivity}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -60,13 +60,16 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
   // Memorizar bloques de tiempo
   const timeBlocks = useMemo(() => {
     return getTimeBlocks();
-  }, [getTimeBlocks, state.global.timeBlocks]);
+  }, [state.global.timeBlocks]); // Solo depende de los timeBlocks en el estado
 
   // Verificar si un bloque tiene actividades asignadas
-  const hasActivities = (blockId: UUID): boolean => {
-    if (!state.currentDay) return false;
-    return state.currentDay.activityInstances.some((activity) => activity.blockId === blockId);
-  };
+  const hasActivities = useCallback(
+    (blockId: UUID): boolean => {
+      if (!state.currentDay) return false;
+      return state.currentDay.activityInstances.some((activity) => activity.blockId === blockId);
+    },
+    [state.currentDay?.activityInstances]
+  );
 
   // Convertir horas a minutos (HH:MM -> minutos del día)
   const timeToMinutes = (timeString: string): number => {
@@ -84,7 +87,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
   };
 
   // Resetear formulario
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setEditMode(false);
     setCurrentBlockId(null);
     setName("");
@@ -93,10 +96,10 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
     setErrors({});
     setFormValid(false);
     setSuccessMessage("");
-  };
+  }, []);
 
   // Validar formulario
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
     // Validar nombre
@@ -153,43 +156,45 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
 
     setErrors(newErrors);
     setFormValid(Object.keys(newErrors).length === 0);
-  };
+  }, [name, startTime, endTime, editMode, currentBlockId, timeBlocks]);
 
   // Cargar datos para edición
-  const handleEdit = (block: TimeBlock) => {
+  const handleEdit = useCallback((block: TimeBlock) => {
     setCurrentBlockId(block.id);
     setName(block.name);
     setStartTime(minutesToTime(block.startMinute));
     setEndTime(minutesToTime(block.endMinute));
     setEditMode(true);
-    validateForm();
-  };
+  }, []);
 
   // Iniciar proceso de eliminación
-  const handleDelete = (block: TimeBlock) => {
-    if (block.isDefault) {
-      return; // No permitir eliminar bloque "Por Hacer"
-    }
-
-    setBlockToDelete(block);
-
-    // Si tiene actividades, mostrar confirmación
-    if (hasActivities(block.id)) {
-      setShowDeleteConfirm(true);
-      setMoveActivitiesToTodo(true);
-    } else {
-      // Si no tiene actividades, eliminar directamente
-      try {
-        deleteTimeBlock(block.id, true);
-        setSuccessMessage(`Bloque "${block.name}" eliminado correctamente`);
-      } catch (error) {
-        setErrors({ general: (error as Error).message });
+  const handleDelete = useCallback(
+    (block: TimeBlock) => {
+      if (block.isDefault) {
+        return; // No permitir eliminar bloque "Por Hacer"
       }
-    }
-  };
+
+      setBlockToDelete(block);
+
+      // Si tiene actividades, mostrar confirmación
+      if (hasActivities(block.id)) {
+        setShowDeleteConfirm(true);
+        setMoveActivitiesToTodo(true);
+      } else {
+        // Si no tiene actividades, eliminar directamente
+        try {
+          deleteTimeBlock(block.id, true);
+          setSuccessMessage(`Bloque "${block.name}" eliminado correctamente`);
+        } catch (error) {
+          setErrors({ general: (error as Error).message });
+        }
+      }
+    },
+    [hasActivities, deleteTimeBlock]
+  );
 
   // Confirmar eliminación
-  const confirmDelete = () => {
+  const confirmDelete = useCallback(() => {
     if (!blockToDelete) return;
 
     try {
@@ -201,16 +206,16 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
       setShowDeleteConfirm(false);
       setBlockToDelete(null);
     }
-  };
+  }, [blockToDelete, moveActivitiesToTodo, deleteTimeBlock]);
 
   // Cancelar eliminación
-  const cancelDelete = () => {
+  const cancelDelete = useCallback(() => {
     setShowDeleteConfirm(false);
     setBlockToDelete(null);
-  };
+  }, []);
 
   // Guardar bloque (crear o actualizar)
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!formValid) return;
 
     const startMinute = timeToMinutes(startTime);
@@ -235,21 +240,31 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
     } catch (error) {
       setErrors({ general: (error as Error).message });
     }
-  };
+  }, [
+    formValid,
+    startTime,
+    endTime,
+    editMode,
+    currentBlockId,
+    name,
+    updateTimeBlock,
+    createTimeBlock,
+    resetForm,
+  ]);
 
-  // Validar formulario cuando cambian los datos
+  // Ejecutar la validación cuando cambien los datos relevantes
   useEffect(() => {
     if (open) validateForm();
-  }, [name, startTime, endTime, editMode, currentBlockId, timeBlocks, open]);
+  }, [name, startTime, endTime, open, validateForm]);
 
   // Resetear formulario al abrir modal
   useEffect(() => {
     if (open) resetForm();
-  }, [open]);
+  }, [open, resetForm]);
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="md" data-testid="time-block-modal">
         <DialogTitle>Gestión de Bloques de Tiempo</DialogTitle>
         <DialogContent>
           {successMessage && (
@@ -275,6 +290,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                   maxHeight: 400,
                   overflow: "auto",
                 }}
+                data-testid="time-blocks-list-container"
               >
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="h6">Bloques de tiempo existentes</Typography>
@@ -284,6 +300,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                     size="small"
                     onClick={resetForm}
                     disabled={editMode}
+                    data-testid="new-time-block-button"
                   >
                     Nuevo
                   </Button>
@@ -291,7 +308,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
 
                 <Divider sx={{ mb: 2 }} />
 
-                <List>
+                <List role="list" data-testid="time-blocks-list">
                   {timeBlocks.length === 0 ? (
                     <Typography color="text.secondary" align="center">
                       No hay bloques de tiempo definidos
@@ -312,6 +329,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                                   edge="end"
                                   aria-label="editar"
                                   onClick={() => handleEdit(block)}
+                                  data-testid={`edit-block-${block.id}`}
                                 >
                                   <EditIcon />
                                 </IconButton>
@@ -321,6 +339,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                                   edge="end"
                                   aria-label="eliminar"
                                   onClick={() => handleDelete(block)}
+                                  data-testid={`delete-block-${block.id}`}
                                 >
                                   <DeleteIcon />
                                 </IconButton>
@@ -335,6 +354,8 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                           pl: block.isDefault ? 2 : 0,
                           mb: 1,
                         }}
+                        data-testid={`time-block-${block.id}`}
+                        role="listitem"
                       >
                         <ListItemText
                           primary={block.name}
@@ -361,6 +382,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                   maxHeight: 400,
                   overflow: "auto",
                 }}
+                data-testid="time-block-form"
               >
                 <Typography variant="h6" mb={2}>
                   {editMode ? "Editar bloque" : "Nuevo bloque de tiempo"}
@@ -374,6 +396,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                   error={!!errors.name}
                   helperText={errors.name}
                   margin="normal"
+                  data-testid="block-name-input"
                 />
 
                 <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2 }}>
@@ -387,6 +410,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                       error={!!errors.startTime}
                       helperText={errors.startTime}
                       margin="normal"
+                      data-testid="start-time-input"
                     />
                   </Box>
                   <Box sx={{ flex: 1 }}>
@@ -399,17 +423,29 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
                       error={!!errors.endTime || !!errors.overlap}
                       helperText={errors.endTime || errors.overlap}
                       margin="normal"
+                      data-testid="end-time-input"
                     />
                   </Box>
                 </Box>
 
                 <Box display="flex" justifyContent="flex-end" mt={3}>
                   {editMode && (
-                    <Button variant="outlined" color="secondary" onClick={resetForm} sx={{ mr: 1 }}>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      onClick={resetForm}
+                      sx={{ mr: 1 }}
+                      data-testid="cancel-edit-button"
+                    >
                       Cancelar
                     </Button>
                   )}
-                  <Button variant="contained" onClick={handleSave} disabled={!formValid}>
+                  <Button
+                    variant="contained"
+                    onClick={handleSave}
+                    disabled={!formValid}
+                    data-testid="save-block-button"
+                  >
                     {editMode ? "Actualizar" : "Crear"}
                   </Button>
                 </Box>
@@ -418,12 +454,18 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={onClose}>Cerrar</Button>
+          <Button onClick={onClose} data-testid="close-modal-button">
+            Cerrar
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Modal de confirmación para eliminar */}
-      <Dialog open={showDeleteConfirm} onClose={cancelDelete}>
+      <Dialog
+        open={showDeleteConfirm}
+        onClose={cancelDelete}
+        data-testid="delete-confirmation-modal"
+      >
         <DialogTitle>¿Eliminar bloque de tiempo?</DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -444,13 +486,16 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={cancelDelete}>Cancelar</Button>
+          <Button onClick={cancelDelete} data-testid="cancel-delete-button">
+            Cancelar
+          </Button>
           <Button
             onClick={() => {
               setMoveActivitiesToTodo(false);
               confirmDelete();
             }}
             color="error"
+            data-testid="delete-activities-button"
           >
             Eliminar actividades
           </Button>
@@ -460,6 +505,7 @@ const TimeBlockModal: React.FC<TimeBlockModalProps> = ({ open, onClose }) => {
               confirmDelete();
             }}
             variant="contained"
+            data-testid="move-activities-button"
           >
             Mover a "Por Hacer"
           </Button>

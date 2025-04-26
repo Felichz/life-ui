@@ -516,6 +516,7 @@ export class ActivityManager {
           // Crear registro de actividad completada
           const completedRecord: CompletedActivityRecord = {
             id: UtilityService.generateUUID(),
+            activityInstanceId: activeInstance.id,
             templateId: activeInstance.templateId,
             templateTitle:
               this.getActivityTemplate(activeInstance.templateId)?.title || "Desconocida",
@@ -627,6 +628,7 @@ export class ActivityManager {
       // Crear registro de actividad completada
       completedRecord = {
         id: UtilityService.generateUUID(),
+        activityInstanceId: instance.id,
         templateId: instance.templateId,
         templateTitle: template.title,
         state: "completed",
@@ -737,6 +739,7 @@ export class ActivityManager {
       // Crear registro de actividad interrumpida
       interruptedRecord = {
         id: UtilityService.generateUUID(),
+        activityInstanceId: instance.id,
         templateId: instance.templateId,
         templateTitle: template.title,
         state: "interrupted",

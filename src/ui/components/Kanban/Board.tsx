@@ -4,15 +4,21 @@ import KanbanColumn from "./Column";
 import type { TimeBlock, ActivityInstance, UUID } from "../../../types";
 import type { DropResult } from "@hello-pangea/dnd";
 
+// Define the augmented activity type
+export interface ActivityInstanceWithTitle extends ActivityInstance {
+  templateTitle: string;
+}
+
+// Update the interface to use the augmented type
 export interface TimeBlockWithActivities {
   block: TimeBlock;
-  activities: ActivityInstance[];
+  activities: ActivityInstanceWithTitle[]; // Use the augmented type here
 }
 
 interface KanbanBoardProps {
   columns: TimeBlockWithActivities[];
   onDragEnd?: (result: DropResult) => void;
-  onEditActivity?: (activity: ActivityInstance) => void;
+  onEditActivity?: (activity: ActivityInstance) => void; // Keep original type for callbacks if needed
   onActivateActivity?: (activityId: UUID) => void;
   onCompleteActivity?: (activityId: UUID) => void;
   onInterruptActivity?: (activityId: UUID) => void;
@@ -38,6 +44,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         p: 1,
         minHeight: "70vh",
       }}
+      data-testid="kanban-board"
     >
       {columns.length > 0 ? (
         columns.map((column) => (

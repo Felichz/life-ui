@@ -97,13 +97,14 @@ const StartPage = () => {
               borderRadius: 2,
               mb: 6,
             }}
+            data-testid="start-day-button"
           >
             {loading ? <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} /> : null}
             Comenzar día
           </Button>
 
           {hasPreviousDays && lastDay && lastDayStats ? (
-            <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }}>
+            <Paper elevation={2} sx={{ p: 3, borderRadius: 3 }} data-testid="previous-day-summary">
               <Typography variant="h5" gutterBottom>
                 Resumen del día anterior
               </Typography>
@@ -115,7 +116,7 @@ const StartPage = () => {
                       <Typography variant="h6" gutterBottom>
                         Tasa de completación
                       </Typography>
-                      <Typography variant="h4" color="primary">
+                      <Typography variant="h4" color="primary" data-testid="completion-rate-value">
                         {Math.round(lastDayStats.completionRate * 100)}%
                       </Typography>
                     </CardContent>
@@ -128,7 +129,11 @@ const StartPage = () => {
                       <Typography variant="h6" gutterBottom>
                         Actividades completadas
                       </Typography>
-                      <Typography variant="h4" color="primary">
+                      <Typography
+                        variant="h4"
+                        color="primary"
+                        data-testid="completed-activities-count"
+                      >
                         {lastDayStats.activitiesCount}
                       </Typography>
                     </CardContent>
@@ -156,13 +161,22 @@ const StartPage = () => {
               </Box>
 
               <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
-                <Button variant="outlined" color="primary" onClick={() => navigate("/overview")}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={() => navigate("/overview")}
+                  data-testid="view-details-button"
+                >
                   Ver detalles completos
                 </Button>
               </Stack>
             </Paper>
           ) : hasPreviousDays === false ? (
-            <Paper elevation={1} sx={{ p: 3, borderRadius: 3, bgcolor: "background.default" }}>
+            <Paper
+              elevation={1}
+              sx={{ p: 3, borderRadius: 3, bgcolor: "background.default" }}
+              data-testid="welcome-message"
+            >
               <Typography variant="body1">
                 Bienvenido a Qualia Control. Este es tu primer día utilizando el sistema. Presiona
                 "Comenzar día" para iniciar tu primera sesión.

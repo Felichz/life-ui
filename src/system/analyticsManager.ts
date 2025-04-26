@@ -87,7 +87,7 @@ export class AnalyticsManager {
         }
 
         return {
-          id: activity.id,
+          id: activity.activityInstanceId,
           title: activity.templateTitle,
           startTime: activity.startTime,
           endTime: activity.endTime,

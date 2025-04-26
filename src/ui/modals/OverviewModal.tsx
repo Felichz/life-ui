@@ -16,7 +16,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  SelectChangeEvent,
+  type SelectChangeEvent,
   CircularProgress,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -131,7 +131,9 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
     if (error) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-          <Typography color="error">Error al cargar datos: {error.message}</Typography>
+          <Typography color="error" data-testid="timeline-error-message">
+            Error al cargar datos: {error.message}
+          </Typography>
         </Box>
       );
     }
@@ -139,7 +141,7 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
     if (!timelineData || !timelineData.activities || timelineData.activities.length === 0) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-          <Typography color="textSecondary">
+          <Typography color="textSecondary" data-testid="no-timeline-data-message">
             No hay actividades registradas para este día
           </Typography>
         </Box>
@@ -163,7 +165,9 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
     if (error) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-          <Typography color="error">Error al cargar datos: {error.message}</Typography>
+          <Typography color="error" data-testid="subjective-error-message">
+            Error al cargar datos: {error.message}
+          </Typography>
         </Box>
       );
     }
@@ -171,7 +175,7 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
     if (!subjectiveData || !subjectiveData.variables || subjectiveData.variables.length === 0) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-          <Typography color="textSecondary">
+          <Typography color="textSecondary" data-testid="no-subjective-data-message">
             No hay variables subjetivas registradas para este día
           </Typography>
         </Box>
@@ -195,7 +199,9 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
     if (error) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-          <Typography color="error">Error al cargar datos: {error.message}</Typography>
+          <Typography color="error" data-testid="distribution-error-message">
+            Error al cargar datos: {error.message}
+          </Typography>
         </Box>
       );
     }
@@ -207,7 +213,7 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
     ) {
       return (
         <Box sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-          <Typography color="textSecondary">
+          <Typography color="textSecondary" data-testid="no-distribution-data-message">
             No hay datos de distribución de tiempo para este día
           </Typography>
         </Box>
@@ -227,6 +233,7 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
         fullWidth
         fullScreen={isMobile}
         aria-labelledby="overview-dialog-title"
+        data-testid="overview-modal"
       >
         <DialogTitle id="overview-dialog-title">
           Resumen Histórico
@@ -247,8 +254,8 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
               minHeight: "50vh",
             }}
           >
-            <Typography color="textSecondary" variant="h6">
-              No hay días anteriores registrados
+            <Typography color="textSecondary" variant="h6" data-testid="no-days-data-message">
+              No hay días finalizados para mostrar.
             </Typography>
           </Box>
         </DialogContent>
@@ -269,6 +276,7 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
         fullWidth
         fullScreen={isMobile}
         aria-labelledby="overview-dialog-title"
+        data-testid="overview-modal"
       >
         <DialogTitle id="overview-dialog-title">
           Resumen Histórico
@@ -304,6 +312,7 @@ const OverviewModal: React.FC<OverviewModalProps> = ({
       fullWidth
       fullScreen={isMobile}
       aria-labelledby="overview-dialog-title"
+      data-testid="overview-modal"
     >
       <DialogTitle id="overview-dialog-title">
         Resumen Histórico

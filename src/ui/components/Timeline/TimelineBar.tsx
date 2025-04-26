@@ -32,6 +32,27 @@ const TimelineBar: React.FC<TimelineBarProps> = ({ activity, index }) => {
   const endFormatted = formatMinutesToTime(endMinutes);
   const durationFormatted = formatDuration(activity.durationMinutes);
 
+  // Calcular estado de estimación para el atributo data
+  const getEstimationState = () => {
+    if (activity.state === "interrupted") return "interrupted"; // Si se interrumpe, no aplica estimación
+
+    // Lógica basada en isWithinEstimation y tipo de actividad
+    switch (activity.type) {
+      case "clear-objective":
+        return activity.isWithinEstimation ? "within" : "exceeded";
+      case "flexible-duration":
+        return activity.isWithinEstimation ? "within-range" : "outside-range"; // Asumiendo que isWithinEstimation funciona para flexible
+      case "timeboxing":
+        // Para timeboxing, 'isWithinEstimation' podría significar que se cumplió el mínimo.
+        // O podríamos necesitar una lógica más específica si hay diferentes sub-estados.
+        // Por ahora, asumimos que 'isWithinEstimation' True = 'timebox-met'
+        return activity.isWithinEstimation ? "timebox-met" : "timebox-not-met";
+      default:
+        return "unknown";
+    }
+  };
+  const estimationState = getEstimationState();
+
   // Tooltip con información detallada
   const tooltipContent = () => {
     let estimationInfo = "";
@@ -58,19 +79,15 @@ Estado: ${activity.state === "completed" ? "Completado" : "Interrumpido"}`;
   // Información para aria-label
   const ariaLabel = `Actividad ${activity.title}: ${startFormatted} a ${endFormatted}, duración ${durationFormatted}, ${activity.state === "completed" ? "completada" : "interrumpida"}`;
 
-  // Altura de cada barra (40px) con separación de 8px
-  const barHeight = 40;
-  const barTop = index * (barHeight + 8);
-
   return (
     <Tooltip title={tooltipContent()} arrow placement="top">
       <Box
         sx={{
           position: "absolute",
           left: `${startPercent}%`,
-          top: barTop,
+          top: 0, // Siempre en la parte superior del contenedor
           width: `${width}%`,
-          height: barHeight,
+          height: "100%", // Ocupa toda la altura del contenedor padre
           backgroundColor: barColor,
           borderRadius: "4px",
           zIndex: 1,
@@ -80,6 +97,8 @@ Estado: ${activity.state === "completed" ? "Completado" : "Interrumpido"}`;
           },
         }}
         data-testid={`timeline-bar-${activity.id}`}
+        data-state={activity.state}
+        data-estimation-state={estimationState}
         role="listitem"
         aria-label={ariaLabel}
         tabIndex={0}

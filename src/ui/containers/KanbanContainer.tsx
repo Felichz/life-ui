@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle, useEffect } from "react";
+import { useState, forwardRef, useImperativeHandle, useEffect, useMemo } from "react";
 import { Box } from "@mui/material";
 import { useSystemCore } from "../hooks/useSystemCore";
 import KanbanBoard from "../components/Kanban/Board";
@@ -52,6 +52,16 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
   const [activityToInterrupt, setActivityToInterrupt] = useState<UUID | null>(null);
   const [interruptedActivityId, setInterruptedActivityId] = useState<UUID | null>(null);
 
+  // Create a map for templateId -> title for efficient lookup
+  const templateTitleMap = useMemo(() => {
+    const templates = getActivityTemplates();
+    const map: Record<UUID, string> = {};
+    templates.forEach((t) => {
+      map[t.id] = t.title;
+    });
+    return map;
+  }, [getActivityTemplates]); // Recalculate only if templates function changes
+
   // Buscar el ID de la plantilla "Piloto Automático" al cargar
   useEffect(() => {
     // Buscar entre las plantillas del sistema
@@ -100,15 +110,23 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
   // Obtener actividades instanciadas del día actual
   const activities: ActivityInstance[] = state.currentDay?.activityInstances || [];
 
-  // Mapear bloques a columnas con actividades correspondientes
-  const columns: TimeBlockWithActivities[] = timeBlocks
-    .sort((a, b) => a.order - b.order)
-    .map((block) => ({
-      block,
-      activities: activities
-        .filter((act) => act.blockId === block.id)
-        .sort((a, b) => a.order - b.order),
-    }));
+  // Mapear bloques a columnas con actividades correspondientes, AÑADIENDO templateTitle
+  const columns: TimeBlockWithActivities[] = useMemo(() => {
+    return timeBlocks
+      .sort((a, b) => a.order - b.order)
+      .map((block) => ({
+        block,
+        activities: activities
+          .filter((act) => act.blockId === block.id)
+          .sort((a, b) => a.order - b.order)
+          .map((act) => ({
+            // Augment activity with title
+            ...act,
+            templateTitle:
+              templateTitleMap[act.templateId] || `Actividad ${act.id.substring(0, 4)}`, // Add title or fallback
+          })),
+      }));
+  }, [timeBlocks, activities, templateTitleMap]); // Recalculate if blocks, activities, or the title map change
 
   // Manejar la edición de una actividad
   const handleEditActivity = (activity: ActivityInstance) => {
@@ -274,50 +292,52 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
   };
 
   return (
-    <Box sx={{ width: "100%" }}>
-      <KanbanBoard
-        columns={columns}
-        onEditActivity={handleEditActivity}
-        onActivateActivity={handleActivateActivity}
-        onCompleteActivity={handleCompleteActivity}
-        onInterruptActivity={handleInterruptActivity}
-        isDayActive={isDayActive()}
-        isTimeBlockAvailable={isTimeBlockAvailable}
-      />
-      <ActivityInstanceModal
-        open={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setIsEditMode(false);
-          setIsFromActivation(false);
-        }}
-        templateId={modalData.templateId}
-        blockId={modalData.blockId}
-        instanceId={modalData.instanceId}
-        isEditMode={isEditMode}
-        onConfirm={handleConfirmActivityInstance}
-      />
-      <VariableModalContainer
-        open={isVariableModalOpen}
-        onClose={handleCloseVariableModal}
-        relatedActivityIds={
-          interruptedActivityId
-            ? [interruptedActivityId]
-            : completedActivityId
-              ? [completedActivityId]
-              : []
-        }
-        onSuccess={handleVariableSuccess}
-      />
-      <InterruptionModalContainer
-        open={isInterruptionModalOpen}
-        onClose={() => {
-          setIsInterruptionModalOpen(false);
-          setActivityToInterrupt(null);
-        }}
-        activityId={activityToInterrupt || undefined}
-        onInterruptSuccess={handleInterruptSuccess}
-      />
+    <Box sx={{ width: "100%" }} data-testid="kanban-container">
+      <Box sx={{ width: "100%" }} data-testid="kanban-container">
+        <KanbanBoard
+          columns={columns}
+          onEditActivity={handleEditActivity}
+          onActivateActivity={handleActivateActivity}
+          onCompleteActivity={handleCompleteActivity}
+          onInterruptActivity={handleInterruptActivity}
+          isDayActive={isDayActive()}
+          isTimeBlockAvailable={isTimeBlockAvailable}
+        />
+        <ActivityInstanceModal
+          open={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setIsEditMode(false);
+            setIsFromActivation(false);
+          }}
+          templateId={modalData.templateId}
+          blockId={modalData.blockId}
+          instanceId={modalData.instanceId}
+          isEditMode={isEditMode}
+          onConfirm={handleConfirmActivityInstance}
+        />
+        <VariableModalContainer
+          open={isVariableModalOpen}
+          onClose={handleCloseVariableModal}
+          relatedActivityIds={
+            interruptedActivityId
+              ? [interruptedActivityId]
+              : completedActivityId
+                ? [completedActivityId]
+                : []
+          }
+          onSuccess={handleVariableSuccess}
+        />
+        <InterruptionModalContainer
+          open={isInterruptionModalOpen}
+          onClose={() => {
+            setIsInterruptionModalOpen(false);
+            setActivityToInterrupt(null);
+          }}
+          activityId={activityToInterrupt || undefined}
+          onInterruptSuccess={handleInterruptSuccess}
+        />
+      </Box>
     </Box>
   );
 });

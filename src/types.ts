@@ -119,6 +119,7 @@ export interface ActivityInstance {
  */
 export interface CompletedActivityRecord {
   id: UUID;
+  activityInstanceId: UUID;
   templateId: UUID;
   templateTitle: string;
   state: "completed" | "interrupted";

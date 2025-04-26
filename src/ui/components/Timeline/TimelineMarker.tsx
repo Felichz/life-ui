@@ -47,7 +47,7 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
         sx={{
           position: "absolute",
           left: `${positionPercent}%`,
-          top: verticalOffset ? `${verticalOffset}px` : "50%",
+          top: "50%", // Centrado verticalmente
           transform: "translate(-50%, -50%)",
           zIndex: 2,
           cursor: "pointer",

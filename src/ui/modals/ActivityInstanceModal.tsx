@@ -286,6 +286,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
               error={!!errors.estimatedDuration}
               helperText={errors.estimatedDuration}
               margin="normal"
+              data-testid="estimated-duration-input"
             />
           </Box>
         );
@@ -307,6 +308,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
               error={!!errors.minimumDuration || !!errors.durationRange}
               helperText={errors.minimumDuration || errors.durationRange}
               margin="normal"
+              data-testid="min-duration-input"
             />
             <TextField
               fullWidth
@@ -322,6 +324,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
               error={!!errors.maximumDuration || !!errors.durationRange}
               helperText={errors.maximumDuration}
               margin="normal"
+              data-testid="max-duration-input"
             />
           </Box>
         );
@@ -335,6 +338,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
                 value={dynamicSettings.timeboxingSettings?.type || "minimum-time"}
                 onChange={(e) => handleTimeboxingTypeChange(e.target.value as TimeboxingType)}
                 label="Tipo de timeboxing"
+                data-testid="timeboxing-type-select"
               >
                 <MenuItem value="minimum-time">Tiempo mínimo</MenuItem>
                 <MenuItem value="maximum-time">Tiempo máximo</MenuItem>
@@ -349,6 +353,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
                 fullWidth
                 label="Tiempo mínimo"
                 type="number"
+                data-testid="min-duration-input"
                 InputProps={{
                   endAdornment: <InputAdornment position="end">min</InputAdornment>,
                 }}
@@ -368,6 +373,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
                 fullWidth
                 label="Tiempo máximo"
                 type="number"
+                data-testid="max-duration-input"
                 InputProps={{
                   endAdornment: <InputAdornment position="end">min</InputAdornment>,
                 }}
@@ -389,7 +395,13 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      data-testid="activity-instance-modal"
+    >
       <DialogTitle>{isEditMode ? "Editar actividad" : "Configurar actividad"}</DialogTitle>
       <DialogContent>
         {template ? (
@@ -407,7 +419,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} color="inherit">
+        <Button onClick={onClose} color="inherit" data-testid="cancel-button">
           Cancelar
         </Button>
         <Button
@@ -415,6 +427,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
           color="primary"
           variant="contained"
           disabled={!template || !isValid}
+          data-testid="confirm-button"
         >
           {isEditMode ? "Guardar cambios" : "Confirmar"}
         </Button>

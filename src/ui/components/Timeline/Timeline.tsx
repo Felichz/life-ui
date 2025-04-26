@@ -12,20 +12,29 @@ interface TimelineProps {
 }
 
 const Timeline: React.FC<TimelineProps> = ({ activities, events, interruptions }) => {
-  // Altura total necesaria para todas las barras (40px por barra + 8px de espacio)
-  const totalBarHeight = activities.length * (40 + 8);
+  // Configuración de alturas y espaciado
+  const headerHeight = 30; // Altura para los marcadores de hora
+  const barHeight = 30; // Altura para la sección de actividades
+  const markersHeight = 20; // Altura para cada sección de marcadores
+  const dividerHeight = 5; // Espacio para el divisor
+
+  // Calcular altura total, manteniendo un tamaño compacto
+  const totalHeight =
+    headerHeight +
+    dividerHeight +
+    barHeight +
+    (events.length > 0 ? markersHeight : 0) +
+    (interruptions.length > 0 ? markersHeight : 0);
 
   // Verificar si hay elementos para mostrar
   const hasElements = activities.length > 0 || events.length > 0 || interruptions.length > 0;
 
-  // Generar marcadores de hora (cada 3 horas)
+  // Generar marcadores de hora (cada 2 horas)
   const hourMarkers = [];
 
-  for (let hour = 0; hour <= 24; hour += 3) {
+  for (let hour = 0; hour <= 24; hour += 2) {
     const minutes = hour * 60;
     const position = (minutes / 1440) * 100;
-
-    // Asegurar que el valor de minutos esté en el rango válido (0-1439)
     const validMinutes = Math.min(Math.max(0, minutes), 1439);
 
     hourMarkers.push(
@@ -53,6 +62,7 @@ const Timeline: React.FC<TimelineProps> = ({ activities, events, interruptions }
           top: "15px",
           transform: "translateX(-50%)",
           color: "text.secondary",
+          fontSize: "0.7rem",
         }}
         role="presentation"
         aria-hidden="true"
@@ -64,68 +74,71 @@ const Timeline: React.FC<TimelineProps> = ({ activities, events, interruptions }
 
   return (
     <Box
-      sx={{ width: "100%", position: "relative" }}
+      sx={{
+        width: "100%",
+        position: "relative",
+        height: hasElements ? totalHeight : headerHeight + dividerHeight,
+        maxHeight: "150px", // Limitar altura máxima
+      }}
       data-testid="timeline"
       role="region"
       aria-label="Línea de tiempo de actividades"
     >
       {/* Escala de tiempo */}
-      <Box sx={{ height: "40px", width: "100%", position: "relative", mb: 2 }} role="presentation">
+      <Box sx={{ height: headerHeight, width: "100%", position: "relative" }} role="presentation">
         {hourMarkers}
       </Box>
 
-      <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ my: 0.5 }} />
 
       {/* Contenido principal del timeline */}
       {!hasElements ? (
-        <Typography color="text.secondary" align="center" sx={{ py: 4 }} role="status">
+        <Typography color="text.secondary" align="center" sx={{ py: 0.5 }} role="status">
           No hay datos de timeline disponibles
         </Typography>
       ) : (
-        <Box
-          sx={{ position: "relative", height: totalBarHeight + 60 }}
-          role="list"
-          aria-label="Actividades y eventos registrados"
-        >
-          {/* Barras de actividades */}
-          {activities.map((activity, index) => (
-            <TimelineBar key={activity.id} activity={activity} index={index} />
-          ))}
-
-          {/* Marcadores de eventos */}
-          <Box
-            sx={{ position: "relative", height: "30px", mt: totalBarHeight + 10 }}
-            role="list"
-            aria-label="Eventos registrados"
-          >
-            {events.map((event, index) => (
-              <TimelineMarker
-                key={event.id}
-                type="event"
-                position={event.position}
-                data={event}
-                verticalOffset={index % 2 === 0 ? 0 : 15}
+        <>
+          {/* Barras de actividades - todas alineadas en la misma línea vertical */}
+          <Box sx={{ position: "relative", height: barHeight, width: "100%" }}>
+            {activities.map((activity, index) => (
+              <TimelineBar
+                key={activity.id}
+                activity={activity}
+                index={0} // Índice 0 para que todas estén en la misma posición vertical
               />
             ))}
           </Box>
 
-          {/* Marcadores de interrupciones */}
-          <Box
-            sx={{ position: "relative", height: "30px", mt: 1 }}
-            role="list"
-            aria-label="Interrupciones registradas"
-          >
-            {interruptions.map((interruption, index) => (
-              <TimelineMarker
-                key={interruption.id}
-                type="interruption"
-                position={interruption.position}
-                data={interruption}
-                verticalOffset={index % 2 === 0 ? 0 : 15}
-              />
-            ))}
-          </Box>
-        </Box>
+          {/* Marcadores de eventos - todos alineados en la misma línea vertical */}
+          {events.length > 0 && (
+            <Box sx={{ position: "relative", height: markersHeight, width: "100%" }}>
+              {events.map((event, index) => (
+                <TimelineMarker
+                  key={event.id}
+                  type="event"
+                  position={event.position}
+                  data={event}
+                  verticalOffset={0} // Sin desplazamiento vertical
+                />
+              ))}
+            </Box>
+          )}
+
+          {/* Marcadores de interrupciones - todos alineados en la misma línea vertical */}
+          {interruptions.length > 0 && (
+            <Box sx={{ position: "relative", height: markersHeight, width: "100%" }}>
+              {interruptions.map((interruption, index) => (
+                <TimelineMarker
+                  key={interruption.id}
+                  type="interruption"
+                  position={interruption.position}
+                  data={interruption}
+                  verticalOffset={0} // Sin desplazamiento vertical
+                />
+              ))}
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );

@@ -53,6 +53,7 @@ const QuickBar = ({
         overflowX: "auto",
       }}
       aria-label="Barra de acceso rápido a actividades del sistema"
+      data-testid="quick-bar"
     >
       {systemActivities.map((activity) => {
         const isActive = activity.id === activeActivityId;
@@ -73,6 +74,7 @@ const QuickBar = ({
             onClick={() => onSelect(activity.id)}
             aria-pressed={isActive}
             disabled={isActive || isLoading}
+            data-testid={`quick-activity-${activity.id}`}
           />
         );
       })}
