@@ -3,7 +3,7 @@ import type { Config } from "jest";
 const config: Config = {
   preset: "ts-jest",
   testEnvironment: "jsdom",
-  roots: ["<rootDir>/src"],
+  roots: ["<rootDir>/src_new"],
   transform: {
     "^.+\\.(ts|tsx)$": [
       "ts-jest",
@@ -16,9 +16,9 @@ const config: Config = {
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
   setupFilesAfterEnv: ["./jest.setup.ts"],
   moduleNameMapper: {
-    "^@/(.*)$": "<rootDir>/src/$1",
-    "^@core/(.*)$": "<rootDir>/src/core/$1",
-    "^@shadcn/(.*)$": "<rootDir>/src/ui/components/shadcn/$1",
+    "^@/(.*)$": "<rootDir>/src_new/$1",
+    "^@core/(.*)$": "<rootDir>/src_new/core/$1",
+    "^@shadcn/(.*)$": "<rootDir>/src_new/ui/components/shadcn/$1",
   },
 };
 

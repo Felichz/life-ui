@@ -1,0 +1,1 @@
+{"root":["./cypress/e2e/create_activity.cy.ts","./cypress/e2e/event_management.cy.ts","./cypress/e2e/flow-4-activity-activation.cy.ts","./cypress/e2e/kanban_boards.cy.ts","./cypress/e2e/start_day.cy.ts","./cypress/support/component.ts","./cypress/support/e2e.ts","./cypress/support/index.d.ts","./cypress/support/commands/app-actions.ts"],"errors":true,"version":"5.6.3"}
