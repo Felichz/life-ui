@@ -90,7 +90,7 @@ export class AnalyticsManager {
         }
 
         return {
-          id: activity.activityInstanceId,
+          id: activity.activityInstanceId || activity.id,
           title: activity.templateTitle,
           startTime: activity.startTime,
           endTime: activity.endTime,
@@ -119,7 +119,7 @@ export class AnalyticsManager {
             (t) => t.id === activeActivity.templateId
           );
 
-          if (template && activeActivity.startTime) {
+          if (template && activeActivity && activeActivity.startTime) {
             // Calcular duración hasta el momento actual (en minutos)
             const startTime = new Date(activeActivity.startTime);
             const now = new Date();
@@ -200,7 +200,7 @@ export class AnalyticsManager {
         };
       }),
       interruptions: completedActivities
-        .filter((activity) => activity.state === "interrupted" && activity.interruptionData)
+        .filter((activity) => activity.state === "interrupted")
         .map((activity) => {
           // Calcular la posición de la interrupción en minutos desde el inicio del día
           const timestamp = new Date(activity.endTime);
@@ -211,8 +211,8 @@ export class AnalyticsManager {
             activityId: activity.id,
             timestamp: activity.endTime,
             position,
-            isAvoidable: activity.interruptionData?.isAvoidable || false,
-            cause: activity.interruptionData?.causeDescription,
+            isAvoidable: false,
+            cause: undefined,
           };
         }),
     };
@@ -431,24 +431,21 @@ export class AnalyticsManager {
       estimationAccuracy = accuracySum / activitiesWithEstimation.length;
     }
 
-    // Identificar causas frecuentes de interrupción
-    const interruptedActivities = activities.filter(
-      (activity) => activity.state === "interrupted" && activity.interruptionData?.causeDescription
-    );
-
+    // Schema v2+: causas de interrupción eliminadas del modelo.
+    // Se preserva la interfaz pero siempre retorna undefined.
     let frequentInterruptionCauses:
       | { cause: string; count: number; percentage: number }[]
       | undefined;
 
+    const interruptedActivities = activities.filter((activity) => activity.state === "interrupted");
+
     if (interruptedActivities.length > 0) {
-      // Contar ocurrencias de cada causa
+      // Contar ocurrencias (sin causa, agrupamos como "Sin clasificar")
       const causeCounts = new Map<string, number>();
 
-      interruptedActivities.forEach((activity) => {
-        if (activity.interruptionData?.causeDescription) {
-          const cause = activity.interruptionData.causeDescription;
-          causeCounts.set(cause, (causeCounts.get(cause) || 0) + 1);
-        }
+      interruptedActivities.forEach(() => {
+        const cause = "Sin clasificar";
+        causeCounts.set(cause, (causeCounts.get(cause) || 0) + 1);
       });
 
       // Convertir a array y ordenar por frecuencia
@@ -510,28 +507,22 @@ export class AnalyticsManager {
     const state = this.systemCore.getState();
     const activities = state.global.completedActivityRecords;
 
-    // Filtrar actividades interrumpidas
-    const interruptedActivities = activities.filter(
-      (activity) => activity.state === "interrupted" && activity.interruptionData
-    );
+    // Filtrar actividades interrumpidas (schema v2+: sin interruptionData)
+    const interruptedActivities = activities.filter((activity) => activity.state === "interrupted");
 
     const totalInterruptions = interruptedActivities.length;
-    const avoidableInterruptions = interruptedActivities.filter(
-      (activity) => activity.interruptionData?.isAvoidable
-    ).length;
+    // Schema v2+: ya no hay clasificación evitable/no evitable.
+    const avoidableInterruptions = 0;
+    const unavoidableInterruptions = totalInterruptions;
+    const avoidablePercentage = 0;
 
-    const unavoidableInterruptions = totalInterruptions - avoidableInterruptions;
-    const avoidablePercentage =
-      totalInterruptions > 0 ? (avoidableInterruptions / totalInterruptions) * 100 : 0;
-
-    // Analizar causas principales
+    // Causas: schema v2+ no tiene causas configurables.
     const causesMap = new Map<string, { id: UUID; count: number }>();
 
     interruptedActivities.forEach((activity) => {
-      if (activity.interruptionData?.causeId && activity.interruptionData.causeDescription) {
-        const causeId = activity.interruptionData.causeId;
-        const causeDesc = activity.interruptionData.causeDescription;
-
+      const causeId = activity.id;
+      const causeDesc = "Sin clasificar";
+      {
         if (!causesMap.has(causeId)) {
           causesMap.set(causeId, { id: causeId, count: 0 });
         }

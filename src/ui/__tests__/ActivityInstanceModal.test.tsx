@@ -111,7 +111,7 @@ describe("ActivityInstanceModal", () => {
 
     // Verificar que el título y los campos se renderizan correctamente
     await waitFor(() => {
-      expect(screen.getByText("Configurar actividad")).toBeInTheDocument();
+      expect(screen.getByText("Añadir a tu día")).toBeInTheDocument();
     });
 
     // Esperar explícitamente a que el título de la actividad se renderice

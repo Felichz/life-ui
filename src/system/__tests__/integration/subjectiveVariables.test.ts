@@ -278,11 +278,13 @@ describe("Flujo 7: Actualización de variables subjetivas", () => {
     actividadActiva = system.activateActivity(instanciaMeditacion.id);
 
     // Simular que el usuario completa la actividad
-    const actividadCompletada = system.completeActivity(actividadActiva.id);
+    const actividadCompletada = system.completeActivity(actividadActiva.id, {
+      satisfactionScore: 5,
+    });
 
     // Verificar que la actividad se completó
     expect(system.getActiveActivity()).toBeNull();
-    expect(actividadCompletada.state).toBe("completed");
+    expect(actividadCompletada.record.state).toBe("completed");
 
     // Simular que el usuario actualiza variables después de completar la actividad
     const snapshot = system.createSnapshot(
@@ -290,7 +292,7 @@ describe("Flujo 7: Actualización de variables subjetivas", () => {
         { variableId: variableEnergia.id, currentValue: 8 },
         { variableId: variableConcentracion.id, currentValue: 7 },
       ],
-      [actividadCompletada.id],
+      [actividadCompletada.record.id],
       []
     );
 
@@ -300,7 +302,7 @@ describe("Flujo 7: Actualización de variables subjetivas", () => {
 
     // Verificar que está asociado a la actividad completada
     const createdSnapshot = system.getState().global.subjectiveVariableSnapshots[0];
-    expect(createdSnapshot.relatedActivityIds).toContain(actividadCompletada.id);
+    expect(createdSnapshot.relatedActivityIds).toContain(actividadCompletada.record.id);
   });
 
   test("Flujo Alternativo A2: Actualización al registrar evento", () => {
@@ -349,7 +351,9 @@ describe("Flujo 7: Actualización de variables subjetivas", () => {
     );
 
     actividadActiva = system.activateActivity(instanciaMeditacion.id);
-    const actividadCompletada = system.completeActivity(actividadActiva.id);
+    const actividadCompletada = system.completeActivity(actividadActiva.id, {
+      satisfactionScore: 5,
+    });
 
     // Verificar que no hay snapshots (simula que el usuario omitió la actualización)
     expect(system.getState().global.subjectiveVariableSnapshots.length).toBe(0);
@@ -360,7 +364,7 @@ describe("Flujo 7: Actualización de variables subjetivas", () => {
     // Obtener historial de actividades completadas
     const actividadesCompletadas = system.getState().global.completedActivityRecords;
     expect(actividadesCompletadas.length).toBe(1);
-    expect(actividadesCompletadas[0].id).toBe(actividadCompletada.id);
+    expect(actividadesCompletadas[0].id).toBe(actividadCompletada.record.id);
   });
 
   test("Restricción temporal para actualización de variables", () => {

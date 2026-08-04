@@ -6,23 +6,15 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormHelperText,
   Box,
   Typography,
   InputAdornment,
+  Paper,
+  ToggleButton,
+  ToggleButtonGroup,
+  Stack,
 } from "@mui/material";
-import type {
-  ActivityTemplate,
-  ActivityType,
-  ActivityInstance,
-  UUID,
-  TimeboxingType,
-  DynamicSettings,
-} from "../../types";
+import type { ActivityTemplate, UUID, DynamicSettings } from "../../types";
 import { useSystemCore } from "../hooks/useSystemCore";
 
 interface ActivityInstanceModalProps {
@@ -30,14 +22,11 @@ interface ActivityInstanceModalProps {
   onClose: () => void;
   templateId: UUID | null;
   blockId: UUID | null;
-  instanceId?: UUID; // ID de la instancia en caso de edición
-  isEditMode?: boolean; // Modo edición o creación
+  instanceId?: UUID;
+  isEditMode?: boolean;
   onConfirm: (templateId: UUID, blockId: UUID, dynamicSettings: DynamicSettings) => void;
 }
 
-/**
- * Modal para configurar propiedades dinámicas al crear o editar una instancia de actividad
- */
 const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
   open,
   onClose,
@@ -53,133 +42,116 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isValid, setIsValid] = useState<boolean>(false);
 
-  // Memorizar las instancias de actividad actuales para evitar referencias cambiantes
   const currentActivityInstances = useMemo(() => {
     return state?.currentDay?.activityInstances || [];
   }, [state?.currentDay?.activityInstances]);
 
-  // Memorizar los templates para evitar renderizaciones innecesarias
   const activityTemplates = useMemo(() => {
     return getActivityTemplates?.() || [];
   }, [getActivityTemplates]);
 
-  // Inicializar configuraciones dinámicas según el tipo de actividad
-  const initializeDynamicSettings = (template: ActivityTemplate) => {
-    let newSettings: DynamicSettings = {};
-
-    if (template.type === "clear-objective" && template.clearObjectiveSettings) {
-      newSettings = {
+  const initializeDynamicSettings = (tpl: ActivityTemplate) => {
+    let s: DynamicSettings = {};
+    if (tpl.type === "clear-objective" && tpl.clearObjectiveSettings) {
+      s = {
         clearObjectiveSettings: {
-          estimatedDurationMinutes: template.clearObjectiveSettings.estimatedDurationMinutes,
+          estimatedDurationMinutes: tpl.clearObjectiveSettings.estimatedDurationMinutes,
         },
       };
-    } else if (template.type === "flexible-duration" && template.flexibleDurationSettings) {
-      newSettings = {
+    } else if (tpl.type === "flexible-duration" && tpl.flexibleDurationSettings) {
+      s = {
         flexibleDurationSettings: {
-          minimumDurationMinutes: template.flexibleDurationSettings.minimumDurationMinutes,
-          maximumDurationMinutes: template.flexibleDurationSettings.maximumDurationMinutes,
+          minimumDurationMinutes: tpl.flexibleDurationSettings.minimumDurationMinutes,
+          maximumDurationMinutes: tpl.flexibleDurationSettings.maximumDurationMinutes,
         },
       };
-    } else if (template.type === "timeboxing" && template.timeboxingSettings) {
-      newSettings = {
+    } else if (tpl.type === "timeboxing" && tpl.timeboxingSettings) {
+      s = {
         timeboxingSettings: {
-          type: template.timeboxingSettings.type,
-          minimumDurationMinutes: template.timeboxingSettings.minimumDurationMinutes,
-          maximumDurationMinutes: template.timeboxingSettings.maximumDurationMinutes,
+          type: tpl.timeboxingSettings.type,
+          minimumDurationMinutes: tpl.timeboxingSettings.minimumDurationMinutes,
+          maximumDurationMinutes: tpl.timeboxingSettings.maximumDurationMinutes,
         },
       };
     }
-
-    return newSettings;
+    return s;
   };
 
-  // Validar las configuraciones
   const validateSettings = (settings: DynamicSettings) => {
     const newErrors: Record<string, string> = {};
 
     if (settings.clearObjectiveSettings) {
       const { estimatedDurationMinutes } = settings.clearObjectiveSettings;
       if (!estimatedDurationMinutes || estimatedDurationMinutes <= 0) {
-        newErrors.estimatedDuration = "La duración estimada debe ser mayor a 0";
+        newErrors.estimatedDuration = "Indica una duración estimada";
       }
     }
 
     if (settings.flexibleDurationSettings) {
       const { minimumDurationMinutes, maximumDurationMinutes } = settings.flexibleDurationSettings;
       if (!minimumDurationMinutes || minimumDurationMinutes <= 0) {
-        newErrors.minimumDuration = "La duración mínima debe ser mayor a 0";
+        newErrors.minimumDuration = "Indica el mínimo";
       }
       if (!maximumDurationMinutes || maximumDurationMinutes <= 0) {
-        newErrors.maximumDuration = "La duración máxima debe ser mayor a 0";
+        newErrors.maximumDuration = "Indica el máximo";
       }
       if (
         minimumDurationMinutes &&
         maximumDurationMinutes &&
         minimumDurationMinutes > maximumDurationMinutes
       ) {
-        newErrors.durationRange = "La duración mínima no puede ser mayor a la máxima";
+        newErrors.durationRange = "El mínimo no puede ser mayor al máximo";
       }
     }
 
     if (settings.timeboxingSettings) {
       const { type, minimumDurationMinutes, maximumDurationMinutes } = settings.timeboxingSettings;
-
       if (
         (type === "minimum-time" || type === "both") &&
         (!minimumDurationMinutes || minimumDurationMinutes <= 0)
       ) {
-        newErrors.tbMinimumDuration = "El tiempo mínimo debe ser mayor a 0";
+        newErrors.tbMinimumDuration = "Indica el mínimo";
       }
-
       if (
         (type === "maximum-time" || type === "both") &&
         (!maximumDurationMinutes || maximumDurationMinutes <= 0)
       ) {
-        newErrors.tbMaximumDuration = "El tiempo máximo debe ser mayor a 0";
+        newErrors.tbMaximumDuration = "Indica el máximo";
       }
-
       if (
         type === "both" &&
         minimumDurationMinutes &&
         maximumDurationMinutes &&
         minimumDurationMinutes > maximumDurationMinutes
       ) {
-        newErrors.tbDurationRange = "El tiempo mínimo no puede ser mayor al máximo";
+        newErrors.tbDurationRange = "El mínimo no puede ser mayor al máximo";
       }
     }
 
     return { errors: newErrors, isValid: Object.keys(newErrors).length === 0 };
   };
 
-  // Cargar la plantilla y si es edición, también la instancia
   useEffect(() => {
     if (!open || !templateId) return;
 
-    // Obtener la plantilla
     const foundTemplate = activityTemplates.find((t) => t.id === templateId);
     if (!foundTemplate) return;
 
     setTemplate(foundTemplate);
 
-    // Inicializar settings con valores por defecto
     let initialSettings: DynamicSettings;
-
-    // En modo edición, cargar los valores de la instancia
     if (isEditMode && instanceId) {
       const instance = currentActivityInstances.find((a) => a.id === instanceId);
       if (instance) {
-        // Usar los valores de la instancia existente
         initialSettings = {
           clearObjectiveSettings: instance.clearObjectiveSettings,
           flexibleDurationSettings: instance.flexibleDurationSettings,
           timeboxingSettings: instance.timeboxingSettings,
         };
       } else {
-        // Si no se encuentra la instancia, inicializar con valores de plantilla
         initialSettings = initializeDynamicSettings(foundTemplate);
       }
     } else {
-      // Modo creación, inicializar con la plantilla
       initialSettings = initializeDynamicSettings(foundTemplate);
     }
 
@@ -187,9 +159,6 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
     const validation = validateSettings(initialSettings);
     setErrors(validation.errors);
     setIsValid(validation.isValid);
-
-    // Remover state.currentDay para evitar re-renders infinitos
-    // Solo dependemos de la lista memoizada de instancias
   }, [open, templateId, instanceId, isEditMode, activityTemplates, currentActivityInstances]);
 
   const handleConfirm = () => {
@@ -201,9 +170,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
   const handleClearObjectiveChange = (estimatedDurationMinutes: number) => {
     const newSettings = {
       ...dynamicSettings,
-      clearObjectiveSettings: {
-        estimatedDurationMinutes,
-      },
+      clearObjectiveSettings: { estimatedDurationMinutes },
     };
     setDynamicSettings(newSettings);
     const validation = validateSettings(newSettings);
@@ -234,7 +201,7 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
     setIsValid(validation.isValid);
   };
 
-  const handleTimeboxingTypeChange = (type: TimeboxingType) => {
+  const handleTimeboxingTypeChange = (type: "minimum-time" | "maximum-time" | "both") => {
     const newSettings = {
       ...dynamicSettings,
       timeboxingSettings: {
@@ -267,131 +234,134 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
     setIsValid(validation.isValid);
   };
 
+  const renderClearObjectiveField = () => {
+    const value = dynamicSettings.clearObjectiveSettings?.estimatedDurationMinutes || 0;
+    return (
+      <TextField
+        fullWidth
+        label="Duración estimada"
+        type="number"
+        value={value || ""}
+        onChange={(e) => handleClearObjectiveChange(Number(e.target.value))}
+        InputProps={{ endAdornment: <InputAdornment position="end">min</InputAdornment> }}
+        error={!!errors.estimatedDuration}
+        helperText={errors.estimatedDuration || "Compararemos cuánto tardaste realmente"}
+        margin="normal"
+        data-testid="estimated-duration-input"
+      />
+    );
+  };
+
+  const renderFlexibleDurationFields = () => {
+    const min = dynamicSettings.flexibleDurationSettings?.minimumDurationMinutes || 0;
+    const max = dynamicSettings.flexibleDurationSettings?.maximumDurationMinutes || 0;
+    return (
+      <>
+        <TextField
+          fullWidth
+          label="Duración mínima"
+          type="number"
+          value={min || ""}
+          onChange={(e) =>
+            handleFlexibleDurationChange("minimumDurationMinutes", Number(e.target.value))
+          }
+          InputProps={{ endAdornment: <InputAdornment position="end">min</InputAdornment> }}
+          error={!!errors.minimumDuration || !!errors.durationRange}
+          helperText={errors.minimumDuration || errors.durationRange}
+          margin="normal"
+          data-testid="min-duration-input"
+        />
+        <TextField
+          fullWidth
+          label="Duración máxima"
+          type="number"
+          value={max || ""}
+          onChange={(e) =>
+            handleFlexibleDurationChange("maximumDurationMinutes", Number(e.target.value))
+          }
+          InputProps={{ endAdornment: <InputAdornment position="end">min</InputAdornment> }}
+          error={!!errors.maximumDuration || !!errors.durationRange}
+          helperText={errors.maximumDuration}
+          margin="normal"
+          data-testid="max-duration-input"
+        />
+      </>
+    );
+  };
+
+  const renderTimeboxingFields = () => {
+    const tb = dynamicSettings.timeboxingSettings;
+    if (!tb) return null;
+    const tbType = tb.type;
+
+    return (
+      <Stack spacing={2} sx={{ mt: 1 }}>
+        <Box>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            ¿Qué tipo de compromiso quieres hoy?
+          </Typography>
+          <ToggleButtonGroup
+            value={tbType}
+            exclusive
+            onChange={(_, v) => v && handleTimeboxingTypeChange(v)}
+            color="primary"
+            sx={{ flexWrap: "wrap" }}
+            data-testid="timeboxing-question-group"
+          >
+            <ToggleButton value="minimum-time" sx={{ textTransform: "none" }}>
+              Al menos X min
+            </ToggleButton>
+            <ToggleButton value="maximum-time" sx={{ textTransform: "none" }}>
+              No más de X min
+            </ToggleButton>
+            <ToggleButton value="both" sx={{ textTransform: "none" }}>
+              Entre X e Y min
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+
+        {(tbType === "minimum-time" || tbType === "both") && (
+          <TextField
+            fullWidth
+            label={tbType === "both" ? "Mínimo (min)" : "¿Cuántos minutos como mínimo?"}
+            type="number"
+            data-testid="tb-min-duration-input"
+            InputProps={{ endAdornment: <InputAdornment position="end">min</InputAdornment> }}
+            value={tb.minimumDurationMinutes || ""}
+            onChange={(e) =>
+              handleTimeboxingDurationChange("minimumDurationMinutes", Number(e.target.value))
+            }
+            error={!!errors.tbMinimumDuration || !!errors.tbDurationRange}
+            helperText={errors.tbMinimumDuration || errors.tbDurationRange}
+          />
+        )}
+
+        {(tbType === "maximum-time" || tbType === "both") && (
+          <TextField
+            fullWidth
+            label={tbType === "both" ? "Máximo (min)" : "¿Cuántos minutos como máximo?"}
+            type="number"
+            data-testid="tb-max-duration-input"
+            InputProps={{ endAdornment: <InputAdornment position="end">min</InputAdornment> }}
+            value={tb.maximumDurationMinutes || ""}
+            onChange={(e) =>
+              handleTimeboxingDurationChange("maximumDurationMinutes", Number(e.target.value))
+            }
+            error={!!errors.tbMaximumDuration || !!errors.tbDurationRange}
+            helperText={errors.tbMaximumDuration}
+          />
+        )}
+      </Stack>
+    );
+  };
+
   const renderDynamicFields = () => {
     if (!template) return null;
 
-    switch (template.type) {
-      case "clear-objective":
-        return (
-          <Box>
-            <TextField
-              fullWidth
-              label="Duración estimada"
-              type="number"
-              value={dynamicSettings.clearObjectiveSettings?.estimatedDurationMinutes || ""}
-              onChange={(e) => handleClearObjectiveChange(Number(e.target.value))}
-              InputProps={{
-                endAdornment: <InputAdornment position="end">min</InputAdornment>,
-              }}
-              error={!!errors.estimatedDuration}
-              helperText={errors.estimatedDuration}
-              margin="normal"
-              data-testid="estimated-duration-input"
-            />
-          </Box>
-        );
-
-      case "flexible-duration":
-        return (
-          <Box>
-            <TextField
-              fullWidth
-              label="Duración mínima"
-              type="number"
-              value={dynamicSettings.flexibleDurationSettings?.minimumDurationMinutes || ""}
-              onChange={(e) =>
-                handleFlexibleDurationChange("minimumDurationMinutes", Number(e.target.value))
-              }
-              InputProps={{
-                endAdornment: <InputAdornment position="end">min</InputAdornment>,
-              }}
-              error={!!errors.minimumDuration || !!errors.durationRange}
-              helperText={errors.minimumDuration || errors.durationRange}
-              margin="normal"
-              data-testid="min-duration-input"
-            />
-            <TextField
-              fullWidth
-              label="Duración máxima"
-              type="number"
-              value={dynamicSettings.flexibleDurationSettings?.maximumDurationMinutes || ""}
-              onChange={(e) =>
-                handleFlexibleDurationChange("maximumDurationMinutes", Number(e.target.value))
-              }
-              InputProps={{
-                endAdornment: <InputAdornment position="end">min</InputAdornment>,
-              }}
-              error={!!errors.maximumDuration || !!errors.durationRange}
-              helperText={errors.maximumDuration}
-              margin="normal"
-              data-testid="max-duration-input"
-            />
-          </Box>
-        );
-
-      case "timeboxing":
-        return (
-          <Box>
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Tipo de timeboxing</InputLabel>
-              <Select
-                value={dynamicSettings.timeboxingSettings?.type || "minimum-time"}
-                onChange={(e) => handleTimeboxingTypeChange(e.target.value as TimeboxingType)}
-                label="Tipo de timeboxing"
-                data-testid="timeboxing-type-select"
-              >
-                <MenuItem value="minimum-time">Tiempo mínimo</MenuItem>
-                <MenuItem value="maximum-time">Tiempo máximo</MenuItem>
-                <MenuItem value="both">Ambos</MenuItem>
-              </Select>
-              <FormHelperText>Selecciona el tipo de limitación de tiempo</FormHelperText>
-            </FormControl>
-
-            {(dynamicSettings.timeboxingSettings?.type === "minimum-time" ||
-              dynamicSettings.timeboxingSettings?.type === "both") && (
-              <TextField
-                fullWidth
-                label="Tiempo mínimo"
-                type="number"
-                data-testid="min-duration-input"
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">min</InputAdornment>,
-                }}
-                value={dynamicSettings.timeboxingSettings?.minimumDurationMinutes || ""}
-                onChange={(e) =>
-                  handleTimeboxingDurationChange("minimumDurationMinutes", Number(e.target.value))
-                }
-                error={!!errors.tbMinimumDuration || !!errors.tbDurationRange}
-                helperText={errors.tbMinimumDuration || errors.tbDurationRange}
-                margin="normal"
-              />
-            )}
-
-            {(dynamicSettings.timeboxingSettings?.type === "maximum-time" ||
-              dynamicSettings.timeboxingSettings?.type === "both") && (
-              <TextField
-                fullWidth
-                label="Tiempo máximo"
-                type="number"
-                data-testid="max-duration-input"
-                InputProps={{
-                  endAdornment: <InputAdornment position="end">min</InputAdornment>,
-                }}
-                value={dynamicSettings.timeboxingSettings?.maximumDurationMinutes || ""}
-                onChange={(e) =>
-                  handleTimeboxingDurationChange("maximumDurationMinutes", Number(e.target.value))
-                }
-                error={!!errors.tbMaximumDuration || !!errors.tbDurationRange}
-                helperText={errors.tbMaximumDuration}
-                margin="normal"
-              />
-            )}
-          </Box>
-        );
-
-      default:
-        return null;
-    }
+    if (template.type === "clear-objective") return renderClearObjectiveField();
+    if (template.type === "flexible-duration") return renderFlexibleDurationFields();
+    if (template.type === "timeboxing") return renderTimeboxingFields();
+    return null;
   };
 
   return (
@@ -402,16 +372,23 @@ const ActivityInstanceModal: React.FC<ActivityInstanceModalProps> = ({
       maxWidth="sm"
       data-testid="activity-instance-modal"
     >
-      <DialogTitle>{isEditMode ? "Editar actividad" : "Configurar actividad"}</DialogTitle>
+      <DialogTitle>{isEditMode ? "Editar actividad" : "Añadir a tu día"}</DialogTitle>
       <DialogContent>
         {template ? (
           <>
-            <Typography variant="h6" gutterBottom>
-              {template.title}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" paragraph>
-              {template.description}
-            </Typography>
+            <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 2, bgcolor: "#f4f6fb" }}>
+              <Typography variant="overline" color="text.secondary">
+                De tu biblioteca
+              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                {template.title}
+              </Typography>
+              {template.description && (
+                <Typography variant="body2" color="text.secondary">
+                  {template.description}
+                </Typography>
+              )}
+            </Paper>
             {renderDynamicFields()}
           </>
         ) : (

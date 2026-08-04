@@ -31,14 +31,14 @@ describe("UserPreferencesManager", () => {
       currentDay: null,
     };
 
-    // Mock de SystemCore
+    // Mock de SystemCore (schema v2: muchos métodos, mock parcial via cast)
     mockSystemCore = {
       getState: jest.fn().mockReturnValue(mockState),
-      updateState: jest.fn((updater) => {
+      updateState: jest.fn((updater: (state: AppState) => AppState) => {
         mockState = updater(mockState);
         return mockState;
       }),
-    };
+    } as unknown as ISystemCore;
 
     userPreferencesManager = new UserPreferencesManager(mockSystemCore);
   });

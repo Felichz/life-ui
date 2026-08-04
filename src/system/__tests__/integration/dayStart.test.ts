@@ -115,7 +115,7 @@ describe("Flujo 1: Inicio del día", () => {
     const activeMeditacion = system.activateActivity(meditacionInstance.id);
 
     // Completar la actividad para tener un registro
-    system.completeActivity(activeMeditacion.id);
+    system.completeActivity(activeMeditacion.id, { satisfactionScore: 5 });
 
     // Finalizar el día anterior
     system.endDay();

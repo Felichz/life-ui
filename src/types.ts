@@ -119,7 +119,7 @@ export interface ActivityInstance {
  */
 export interface CompletedActivityRecord {
   id: UUID;
-  activityInstanceId: UUID;
+  activityInstanceId?: UUID;
   templateId: UUID;
   templateTitle: string;
   state: "completed" | "interrupted";
@@ -146,10 +146,12 @@ export interface CompletedActivityRecord {
   endTime: ISODateTimeString;
   durationMinutes: MinutesNumber;
 
-  // Sistema de tempos (schema v2+)
-  satisfactionScore: number;
-  temposAwarded: number;
-  beatEstimate: boolean;
+  // Sistema de tempos (schema v2+). El core siempre los setea;
+  // son opcionales en el tipo solo para tolerar fixtures de tests legacy
+  // y estados anteriores a la migración v1→v2.
+  satisfactionScore?: number;
+  temposAwarded?: number;
+  beatEstimate?: boolean;
 
   // Día al que pertenece
   dayId: UUID;
@@ -267,7 +269,7 @@ export interface Day {
  */
 export interface UserPreferences {
   hiddenSubjectiveVariableIds: UUID[]; // Variables ocultas en gráficos
-  dailyTempoTarget: number; // Schema v2+: default 1000
+  dailyTempoTarget?: number; // Schema v2+: default 1000, opcional para legacy
 
   updatedAt: ISODateTimeString;
 }

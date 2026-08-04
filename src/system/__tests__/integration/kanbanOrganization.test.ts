@@ -181,7 +181,7 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
     expect(system.getActiveActivity()?.id).toBe(informeInstance.id);
 
     // Completar la actividad para poder activar otra
-    system.completeActivity(informeInstance.id);
+    system.completeActivity(informeInstance.id, { satisfactionScore: 5 });
 
     // Después de completar la actividad, ya no debería existir en la lista de instancias
     // Por lo que intentar activarla de nuevo no debería encontrarla
@@ -282,7 +282,7 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
 
     // Activar y completar esta tarea
     const tareaCorreoActiva = system.activateActivity(tareaCorreoInstance.id);
-    system.completeActivity(tareaCorreoActiva.id);
+    system.completeActivity(tareaCorreoActiva.id, { satisfactionScore: 5 });
 
     // Verificar estado antes de finalizar el día
     const actividadesAntes = system.getState().currentDay!.activityInstances;

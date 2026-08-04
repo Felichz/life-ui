@@ -102,6 +102,7 @@ describe("ActivityManager", () => {
         timeBlocks: [],
         userPreferences: {
           hiddenSubjectiveVariableIds: [],
+          dailyTempoTarget: 1000,
           updatedAt: "2023-01-01T00:00:00.000Z",
         },
         completedActivityRecords: [],
@@ -591,13 +592,15 @@ describe("ActivityManager", () => {
         mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
         // Completar la actividad
-        const result = activityManager.completeActivity(instanceId);
+        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 8 });
 
         // Verificar que se creó el registro de actividad completada
         expect(result).toBeDefined();
-        expect(result.state).toBe("completed");
-        expect(result.templateId).toBe(mockTemplateId);
-        expect(result.dayId).toBe(mockDayId);
+        expect(result.record.state).toBe("completed");
+        expect(result.record.templateId).toBe(mockTemplateId);
+        expect(result.record.dayId).toBe(mockDayId);
+        expect(result.record.satisfactionScore).toBe(8);
+        expect(result.temposAwarded).toBeGreaterThan(0);
 
         // Verificar que la instancia se eliminó del día actual
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
@@ -663,7 +666,7 @@ describe("ActivityManager", () => {
         mockAppState.currentDay!.activeActivityInstanceId = activeInstanceId;
 
         // Completar la actividad activa
-        activityManager.completeActivity(activeInstanceId);
+        activityManager.completeActivity(activeInstanceId, { satisfactionScore: 7 });
 
         // Verificar que solo la actividad activa se eliminó
         expect(mockAppState.currentDay?.activityInstances.length).toBe(2);
@@ -685,13 +688,13 @@ describe("ActivityManager", () => {
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         expect(() => {
-          activityManager.completeActivity(instance.id);
+          activityManager.completeActivity(instance.id, { satisfactionScore: 8 });
         }).toThrow("Solo se puede completar la actividad activa actual");
       });
     });
 
     describe("interruptActivity", () => {
-      it("debe interrumpir la actividad activa (caso no evitable)", () => {
+      it("debe interrumpir la actividad activa (sin pregunta evitable)", () => {
         // Crear y activar una instancia
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
         activityManager.activateActivity(instance.id);
@@ -700,71 +703,26 @@ describe("ActivityManager", () => {
         mockUUID = "interrupted-id-123";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
-        const result = activityManager.interruptActivity(instance.id, false);
+        const result = activityManager.interruptActivity(instance.id);
 
-        // Verificar que se creó el registro de actividad interrumpida correctamente
-        expect(result).toEqual({
-          id: mockUUID,
-          templateId: mockTemplateId,
-          templateTitle: "Test Activity",
-          state: "interrupted",
-          type: "clear-objective",
-          startTime: mockTimestamp,
-          endTime: mockTimestamp,
-          durationMinutes: 30, // Valor del mock para calculateDuration
-          dayId: mockDayId,
-          interruptionData: {
-            isAvoidable: false,
-          },
-          clearObjectiveSettings: {
-            estimatedDurationMinutes: 30,
-          },
-          createdAt: mockTimestamp,
-        });
+        // Schema v2+: ya no hay interruptionData. Tempos=0 siempre.
+        expect(result.state).toBe("interrupted");
+        expect(result.templateId).toBe(mockTemplateId);
+        expect(result.temposAwarded).toBe(0);
+        expect(result.satisfactionScore).toBe(0);
+        expect(result.beatEstimate).toBe(false);
 
         // Verificar que se eliminó la instancia
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
-
-        // Verificar que se limpió la referencia a la actividad activa
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBeUndefined();
       });
 
-      it("debe interrumpir la actividad activa con causa (caso evitable)", () => {
-        // Crear y activar una instancia
+      it("debe lanzar error si la actividad no está activa", () => {
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
-        activityManager.activateActivity(instance.id);
-
-        // Crear una causa de interrupción
-        const causeId = "cause-id-123";
-        mockAppState.global.interruptionCauses.push({
-          id: causeId,
-          description: "Causa de prueba",
-          createdAt: mockTimestamp,
-          updatedAt: mockTimestamp,
-        });
-
-        // Cambiar el mockUUID para el registro interrumpido
-        mockUUID = "interrupted-id-123";
-        (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
-
-        const result = activityManager.interruptActivity(instance.id, true, causeId);
-
-        // Verificar que la interrupción incluye la causa
-        expect(result.interruptionData).toEqual({
-          isAvoidable: true,
-          causeId: causeId,
-          causeDescription: "Causa de prueba",
-        });
-      });
-
-      it("debe lanzar un error si no se proporciona causeId para interrupciones evitables", () => {
-        // Crear y activar una instancia
-        const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
-        activityManager.activateActivity(instance.id);
 
         expect(() => {
-          activityManager.interruptActivity(instance.id, true);
-        }).toThrow("Se requiere un causeId para interrupciones evitables");
+          activityManager.interruptActivity(instance.id);
+        }).toThrow("Solo se puede interrumpir la actividad activa actual");
       });
     });
 

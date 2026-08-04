@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -12,26 +12,30 @@ import {
   Card,
   CardContent,
   CardActions,
-  Chip,
   IconButton,
   Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  FormHelperText,
   Grid,
   Alert,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Paper,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
-import type { ActivityTemplate, ActivityType, TimeboxingType, UUID } from "../../types";
+import TimerRoundedIcon from "@mui/icons-material/TimerRounded";
+import HorizontalRuleRoundedIcon from "@mui/icons-material/HorizontalRuleRounded";
+import HeightRoundedIcon from "@mui/icons-material/HeightRounded";
+import SyncAltRoundedIcon from "@mui/icons-material/SyncAltRounded";
+import type { ActivityTemplate, UUID, TimeboxingType } from "../../types";
 import { useSystemCore } from "../hooks/useSystemCore";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
+
+type DurationQuestion = "estimate" | "range" | "commitment";
+type TimeboxingQuestion = "minimum-time" | "maximum-time" | "both";
 
 interface ActivityLibraryModalProps {
   open: boolean;
@@ -47,13 +51,9 @@ interface ActivityLibraryModalProps {
   confirmDeleteId: UUID | null;
 }
 
-/**
- * Modal para mostrar y gestionar la biblioteca de actividades
- */
 const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
   open,
   onClose,
-  onOpenCreate,
   onOpenEdit,
   onConfirmDelete,
   onDelete,
@@ -70,61 +70,64 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<ActivityTemplate | null>(null);
 
-  // Formulario
+  // Form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [activityType, setActivityType] = useState<ActivityType>("clear-objective");
+  const [durationQuestion, setDurationQuestion] = useState<DurationQuestion>("estimate");
   const [estimatedDuration, setEstimatedDuration] = useState<number>(30);
   const [minDuration, setMinDuration] = useState<number>(15);
   const [maxDuration, setMaxDuration] = useState<number>(45);
-  const [timeboxingType, setTimeboxingType] = useState<TimeboxingType>("minimum-time");
+  const [timeboxingQuestion, setTimeboxingQuestion] = useState<TimeboxingQuestion>("minimum-time");
+  const [tbMinDuration, setTbMinDuration] = useState<number>(15);
+  const [tbMaxDuration, setTbMaxDuration] = useState<number>(45);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Cargar actividades al abrir
+  const inferredType = useMemo(() => {
+    if (durationQuestion === "estimate") return "clear-objective" as const;
+    if (durationQuestion === "range") return "flexible-duration" as const;
+    return "timeboxing" as const;
+  }, [durationQuestion]);
+
   useEffect(() => {
     let isMounted = true;
-
     if (open) {
       const templates = getActivityTemplates();
-      if (isMounted) {
-        setActivities(templates);
-      }
+      if (isMounted) setActivities(templates);
     }
-
     return () => {
       isMounted = false;
     };
   }, [open]);
 
-  // Cargar datos del template cuando estamos en modo edición
   useEffect(() => {
     if (editingTemplate) {
       setTitle(editingTemplate.title);
       setDescription(editingTemplate.description);
-      setActivityType(editingTemplate.type);
 
       if (editingTemplate.type === "clear-objective" && editingTemplate.clearObjectiveSettings) {
+        setDurationQuestion("estimate");
         setEstimatedDuration(editingTemplate.clearObjectiveSettings.estimatedDurationMinutes);
       } else if (
         editingTemplate.type === "flexible-duration" &&
         editingTemplate.flexibleDurationSettings
       ) {
+        setDurationQuestion("range");
         setMinDuration(editingTemplate.flexibleDurationSettings.minimumDurationMinutes);
         setMaxDuration(editingTemplate.flexibleDurationSettings.maximumDurationMinutes);
       } else if (editingTemplate.type === "timeboxing" && editingTemplate.timeboxingSettings) {
-        setTimeboxingType(editingTemplate.timeboxingSettings.type);
+        setDurationQuestion("commitment");
+        setTimeboxingQuestion(editingTemplate.timeboxingSettings.type);
         if (editingTemplate.timeboxingSettings.minimumDurationMinutes) {
-          setMinDuration(editingTemplate.timeboxingSettings.minimumDurationMinutes);
+          setTbMinDuration(editingTemplate.timeboxingSettings.minimumDurationMinutes);
         }
         if (editingTemplate.timeboxingSettings.maximumDurationMinutes) {
-          setMaxDuration(editingTemplate.timeboxingSettings.maximumDurationMinutes);
+          setTbMaxDuration(editingTemplate.timeboxingSettings.maximumDurationMinutes);
         }
       }
       setIsFormOpen(true);
     }
   }, [editingTemplate]);
 
-  // Actualizar la lista de actividades después de eliminar una actividad
   useEffect(() => {
     if (open && confirmDeleteId === null && showDeleteConfirm === false) {
       const templates = getActivityTemplates();
@@ -132,63 +135,62 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
     }
   }, [open, confirmDeleteId, showDeleteConfirm, getActivityTemplates]);
 
-  // Reset del formulario
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    setActivityType("clear-objective");
+    setDurationQuestion("estimate");
     setEstimatedDuration(30);
     setMinDuration(15);
     setMaxDuration(45);
-    setTimeboxingType("minimum-time");
+    setTimeboxingQuestion("minimum-time");
+    setTbMinDuration(15);
+    setTbMaxDuration(45);
     setErrors({});
   };
 
-  // Manejar la apertura del formulario de creación
   const handleOpenCreateForm = () => {
     resetForm();
     setIsFormOpen(true);
   };
 
-  // Validar el formulario
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!title.trim()) {
-      newErrors.title = "El título es obligatorio";
-    }
+    if (!title.trim()) newErrors.title = "El título es obligatorio";
+    if (!description.trim()) newErrors.description = "La descripción es obligatoria";
 
-    if (!description.trim()) {
-      newErrors.description = "La descripción es obligatoria";
-    }
-
-    if (activityType === "clear-objective") {
+    if (durationQuestion === "estimate") {
       if (!estimatedDuration || estimatedDuration <= 0) {
-        newErrors.estimatedDuration = "La duración estimada debe ser mayor a 0";
+        newErrors.estimatedDuration = "Indica cuánto suele durar";
       }
-    } else if (activityType === "flexible-duration") {
+    } else if (durationQuestion === "range") {
       if (!minDuration || minDuration <= 0) {
-        newErrors.minDuration = "La duración mínima debe ser mayor a 0";
+        newErrors.minDuration = "Indica una duración mínima";
       }
       if (!maxDuration || maxDuration <= 0) {
-        newErrors.maxDuration = "La duración máxima debe ser mayor a 0";
+        newErrors.maxDuration = "Indica una duración máxima";
       }
       if (minDuration && maxDuration && minDuration >= maxDuration) {
-        newErrors.durationRange = "La duración mínima debe ser menor que la máxima";
+        newErrors.durationRange = "El mínimo debe ser menor que el máximo";
       }
-    } else if (activityType === "timeboxing") {
-      if (timeboxingType === "minimum-time" || timeboxingType === "both") {
-        if (!minDuration || minDuration <= 0) {
-          newErrors.tbMinDuration = "La duración mínima debe ser mayor a 0";
+    } else {
+      if (timeboxingQuestion === "minimum-time" || timeboxingQuestion === "both") {
+        if (!tbMinDuration || tbMinDuration <= 0) {
+          newErrors.tbMinDuration = "Indica el compromiso mínimo";
         }
       }
-      if (timeboxingType === "maximum-time" || timeboxingType === "both") {
-        if (!maxDuration || maxDuration <= 0) {
-          newErrors.tbMaxDuration = "La duración máxima debe ser mayor a 0";
+      if (timeboxingQuestion === "maximum-time" || timeboxingQuestion === "both") {
+        if (!tbMaxDuration || tbMaxDuration <= 0) {
+          newErrors.tbMaxDuration = "Indica el compromiso máximo";
         }
       }
-      if (timeboxingType === "both" && minDuration && maxDuration && minDuration >= maxDuration) {
-        newErrors.tbDurationRange = "La duración mínima debe ser menor que la máxima";
+      if (
+        timeboxingQuestion === "both" &&
+        tbMinDuration &&
+        tbMaxDuration &&
+        tbMinDuration >= tbMaxDuration
+      ) {
+        newErrors.tbDurationRange = "El mínimo debe ser menor que el máximo";
       }
     }
 
@@ -196,132 +198,187 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  // Manejar el guardado del formulario
   const handleSaveForm = () => {
     if (!validateForm()) return;
 
     const templateData: Omit<ActivityTemplate, "id" | "createdAt" | "updatedAt"> = {
       title,
       description,
-      type: activityType,
+      type: inferredType,
       isSystemActivity: false,
     };
 
-    // Agregar configuraciones específicas según el tipo
-    if (activityType === "clear-objective") {
-      templateData.clearObjectiveSettings = {
-        estimatedDurationMinutes: estimatedDuration,
-      };
-    } else if (activityType === "flexible-duration") {
+    if (inferredType === "clear-objective") {
+      templateData.clearObjectiveSettings = { estimatedDurationMinutes: estimatedDuration };
+    } else if (inferredType === "flexible-duration") {
       templateData.flexibleDurationSettings = {
         minimumDurationMinutes: minDuration,
         maximumDurationMinutes: maxDuration,
       };
-    } else if (activityType === "timeboxing") {
-      templateData.timeboxingSettings = {
-        type: timeboxingType,
-      };
-
-      if (timeboxingType === "minimum-time" || timeboxingType === "both") {
-        templateData.timeboxingSettings!.minimumDurationMinutes = minDuration;
+    } else {
+      const tbSettings: {
+        type: TimeboxingType;
+        minimumDurationMinutes?: number;
+        maximumDurationMinutes?: number;
+      } = { type: timeboxingQuestion };
+      if (timeboxingQuestion === "minimum-time" || timeboxingQuestion === "both") {
+        tbSettings.minimumDurationMinutes = tbMinDuration;
       }
-      if (timeboxingType === "maximum-time" || timeboxingType === "both") {
-        templateData.timeboxingSettings!.maximumDurationMinutes = maxDuration;
+      if (timeboxingQuestion === "maximum-time" || timeboxingQuestion === "both") {
+        tbSettings.maximumDurationMinutes = tbMaxDuration;
       }
+      templateData.timeboxingSettings = tbSettings;
     }
 
     onSave(templateData);
     setIsFormOpen(false);
     resetForm();
-
-    // Actualizar la lista de actividades después de guardar
     const updatedTemplates = getActivityTemplates();
     setActivities(updatedTemplates);
   };
 
-  // Manejar clic en la tarjeta
   const handleCardClick = (template: ActivityTemplate) => {
     const blocks = getTimeBlocks();
-    // Buscar el bloque "Por Hacer" (default)
     const defaultBlock = blocks.find((block) => block.isDefault);
-    if (defaultBlock) {
-      onOpenInstanceModal(template.id, defaultBlock.id);
-    }
+    if (defaultBlock) onOpenInstanceModal(template.id, defaultBlock.id);
   };
 
-  // Cuando se confirma la eliminación
   const handleConfirmDelete = (template: ActivityTemplate) => {
     setTemplateToDelete(template);
     setShowDeleteConfirm(true);
     onConfirmDelete(template.id);
   };
 
-  // Función para manejar la eliminación y actualizar la lista
   const handleDelete = () => {
     onDelete();
     setShowDeleteConfirm(false);
-
-    // Actualizar la lista de actividades después de eliminar
     const updatedTemplates = getActivityTemplates();
     setActivities(updatedTemplates);
   };
 
-  // Función para cancelar la eliminación
   const handleCancelDelete = () => {
     onCancelDelete();
     setShowDeleteConfirm(false);
   };
 
-  // Filtrar actividades según término de búsqueda
   const filteredActivities = activities.filter(
     (activity) =>
       activity.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       activity.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Renderizar chip según el tipo de actividad
-  const renderActivityTypeChip = (type: string) => {
-    switch (type) {
-      case "clear-objective":
-        return <Chip size="small" label="Objetivo claro" color="primary" variant="outlined" />;
-      case "flexible-duration":
-        return <Chip size="small" label="Duración flexible" color="secondary" variant="outlined" />;
-      case "timeboxing":
-        return <Chip size="small" label="Timeboxing" color="info" variant="outlined" />;
-      default:
-        return null;
+  const renderPreview = () => {
+    if (durationQuestion === "estimate") {
+      return (
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#f4f6fb" }}>
+          <Typography variant="overline" color="text.secondary">
+            Vista previa
+          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title || "Tu actividad"}
+          </Typography>
+          <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <TimerRoundedIcon fontSize="small" color="primary" />
+            <Typography variant="body2">
+              Estimado: <strong>~{estimatedDuration || "?"} min</strong>
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Al finalizar, verás cuánto tardaste realmente vs. lo estimado.
+          </Typography>
+        </Paper>
+      );
     }
+    if (durationQuestion === "range") {
+      return (
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#f4f6fb" }}>
+          <Typography variant="overline" color="text.secondary">
+            Vista previa
+          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title || "Tu actividad"}
+          </Typography>
+          <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <SyncAltRoundedIcon fontSize="small" color="primary" />
+            <Typography variant="body2">
+              Duración habitual:{" "}
+              <strong>
+                {minDuration}-{maxDuration} min
+              </strong>
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Solo se registra para análisis. No hay notificaciones.
+          </Typography>
+        </Paper>
+      );
+    }
+    if (timeboxingQuestion === "minimum-time") {
+      return (
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#f4f6fb" }}>
+          <Typography variant="overline" color="text.secondary">
+            Vista previa
+          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title || "Tu actividad"}
+          </Typography>
+          <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <HorizontalRuleRoundedIcon fontSize="small" color="primary" />
+            <Typography variant="body2">
+              Te avisaré a los <strong>{tbMinDuration} min</strong> como mínimo.
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Útil para vencer la resistencia inicial. Puedes seguir si quieres.
+          </Typography>
+        </Paper>
+      );
+    }
+    if (timeboxingQuestion === "maximum-time") {
+      return (
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#f4f6fb" }}>
+          <Typography variant="overline" color="text.secondary">
+            Vista previa
+          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+            {title || "Tu actividad"}
+          </Typography>
+          <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+            <HeightRoundedIcon fontSize="small" color="primary" />
+            <Typography variant="body2">
+              Te avisaré a los <strong>{tbMaxDuration} min</strong> como máximo.
+            </Typography>
+          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Útil para limitar tareas que tienden a expandirse.
+          </Typography>
+        </Paper>
+      );
+    }
+    return (
+      <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#f4f6fb" }}>
+        <Typography variant="overline" color="text.secondary">
+          Vista previa
+        </Typography>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          {title || "Tu actividad"}
+        </Typography>
+        <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+          <SyncAltRoundedIcon fontSize="small" color="primary" />
+          <Typography variant="body2">
+            Compromiso:{" "}
+            <strong>
+              {tbMinDuration}-{tbMaxDuration} min
+            </strong>
+          </Typography>
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+          Aviso al alcanzar el mínimo, alerta al acercarse al máximo.
+        </Typography>
+      </Paper>
+    );
   };
 
-  // Renderizar duración según el tipo de actividad
-  const renderDuration = (activity: ActivityTemplate) => {
-    if (activity.type === "clear-objective" && activity.clearObjectiveSettings) {
-      return `~${activity.clearObjectiveSettings.estimatedDurationMinutes} min`;
-    } else if (activity.type === "flexible-duration" && activity.flexibleDurationSettings) {
-      return `${activity.flexibleDurationSettings.minimumDurationMinutes}-${activity.flexibleDurationSettings.maximumDurationMinutes} min`;
-    } else if (activity.type === "timeboxing" && activity.timeboxingSettings) {
-      if (
-        activity.timeboxingSettings.type === "minimum-time" &&
-        activity.timeboxingSettings.minimumDurationMinutes
-      ) {
-        return `≥ ${activity.timeboxingSettings.minimumDurationMinutes} min`;
-      } else if (
-        activity.timeboxingSettings.type === "maximum-time" &&
-        activity.timeboxingSettings.maximumDurationMinutes
-      ) {
-        return `≤ ${activity.timeboxingSettings.maximumDurationMinutes} min`;
-      } else if (
-        activity.timeboxingSettings.type === "both" &&
-        activity.timeboxingSettings.minimumDurationMinutes &&
-        activity.timeboxingSettings.maximumDurationMinutes
-      ) {
-        return `${activity.timeboxingSettings.minimumDurationMinutes}-${activity.timeboxingSettings.maximumDurationMinutes} min`;
-      }
-    }
-    return "Duración no definida";
-  };
-
-  // Renderizar formulario para crear/editar plantilla
   const renderForm = () => (
     <Dialog
       open={isFormOpen}
@@ -330,161 +387,182 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
         resetForm();
       }}
       fullWidth
-      maxWidth="sm"
+      maxWidth="md"
       data-testid="activity-form-modal"
     >
       <DialogTitle>{editingTemplate ? "Editar Actividad" : "Nueva Actividad"}</DialogTitle>
       <DialogContent dividers>
-        <Stack spacing={3}>
-          <TextField
-            fullWidth
-            label="Título"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            error={!!errors.title}
-            helperText={errors.title}
-            required
-            autoFocus
-            data-testid="activity-title-input"
-          />
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={7}>
+            <Stack spacing={3}>
+              <TextField
+                fullWidth
+                label="¿Qué actividad es?"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                error={!!errors.title}
+                helperText={errors.title}
+                required
+                autoFocus
+                data-testid="activity-title-input"
+              />
 
-          <TextField
-            fullWidth
-            label="Descripción"
-            multiline
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            error={!!errors.description}
-            helperText={errors.description}
-            required
-            data-testid="activity-description-input"
-          />
+              <TextField
+                fullWidth
+                label="Describe brevemente (opcional)"
+                multiline
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                error={!!errors.description}
+                helperText={errors.description}
+                data-testid="activity-description-input"
+              />
 
-          <FormControl fullWidth error={!!errors.activityType}>
-            <InputLabel id="activity-type-label">Tipo de Actividad</InputLabel>
-            <Select
-              labelId="activity-type-label"
-              value={activityType}
-              label="Tipo de Actividad"
-              onChange={(e) => setActivityType(e.target.value as ActivityType)}
-              data-testid="activity-type-select"
-            >
-              <MenuItem value="clear-objective">Con objetivo claro</MenuItem>
-              <MenuItem value="flexible-duration">Duración flexible</MenuItem>
-              <MenuItem value="timeboxing">Timeboxing</MenuItem>
-            </Select>
-            {errors.activityType && <FormHelperText>{errors.activityType}</FormHelperText>}
-          </FormControl>
-
-          {/* Campos específicos según tipo */}
-          {activityType === "clear-objective" && (
-            <TextField
-              fullWidth
-              type="number"
-              label="Tiempo Estimado (minutos)"
-              value={estimatedDuration}
-              onChange={(e) => setEstimatedDuration(Number(e.target.value))}
-              InputProps={{
-                inputProps: { min: 1 },
-              }}
-              error={!!errors.estimatedDuration}
-              helperText={errors.estimatedDuration}
-              required
-              data-testid="estimated-duration-input"
-            />
-          )}
-
-          {activityType === "flexible-duration" && (
-            <>
-              <Grid container spacing={2}>
-                <Grid xs={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Tiempo Mínimo (min)"
-                    value={minDuration}
-                    onChange={(e) => setMinDuration(Number(e.target.value))}
-                    InputProps={{ inputProps: { min: 1 } }}
-                    error={!!errors.minDuration || !!errors.durationRange}
-                    helperText={errors.minDuration || errors.durationRange}
-                    required
-                    data-testid="min-duration-input"
-                  />
-                </Grid>
-                <Grid xs={6}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Tiempo Máximo (min)"
-                    value={maxDuration}
-                    onChange={(e) => setMaxDuration(Number(e.target.value))}
-                    InputProps={{ inputProps: { min: 1 } }}
-                    error={!!errors.maxDuration || !!errors.durationRange}
-                    helperText={errors.maxDuration}
-                    required
-                    data-testid="max-duration-input"
-                  />
-                </Grid>
-              </Grid>
-            </>
-          )}
-
-          {activityType === "timeboxing" && (
-            <>
-              <FormControl fullWidth error={!!errors.timeboxingType}>
-                <InputLabel id="timeboxing-type-label">Tipo de Timeboxing</InputLabel>
-                <Select
-                  labelId="timeboxing-type-label"
-                  value={timeboxingType}
-                  label="Tipo de Timeboxing"
-                  onChange={(e) => setTimeboxingType(e.target.value as TimeboxingType)}
-                  data-testid="timeboxing-type-select"
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  ¿Cómo quieres registrar su tiempo?
+                </Typography>
+                <ToggleButtonGroup
+                  value={durationQuestion}
+                  exclusive
+                  onChange={(_, v) => v && setDurationQuestion(v)}
+                  color="primary"
+                  sx={{ flexWrap: "wrap" }}
+                  data-testid="duration-question-group"
                 >
-                  <MenuItem value="minimum-time">Tiempo Mínimo</MenuItem>
-                  <MenuItem value="maximum-time">Tiempo Máximo</MenuItem>
-                  <MenuItem value="both">Ambos</MenuItem>
-                </Select>
-                {errors.timeboxingType && <FormHelperText>{errors.timeboxingType}</FormHelperText>}
-              </FormControl>
+                  <ToggleButton value="estimate" sx={{ textTransform: "none" }}>
+                    Tengo un estimado
+                  </ToggleButton>
+                  <ToggleButton value="range" sx={{ textTransform: "none" }}>
+                    Dura un rango variable
+                  </ToggleButton>
+                  <ToggleButton value="commitment" sx={{ textTransform: "none" }}>
+                    Quiero un compromiso con límite
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
 
-              <Grid container spacing={2}>
-                {(timeboxingType === "minimum-time" || timeboxingType === "both") && (
-                  <Grid xs={timeboxingType === "both" ? 6 : 12}>
+              {durationQuestion === "estimate" && (
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="¿Cuánto suele durar? (minutos)"
+                  value={estimatedDuration}
+                  onChange={(e) => setEstimatedDuration(Number(e.target.value))}
+                  InputProps={{ inputProps: { min: 1 } }}
+                  error={!!errors.estimatedDuration}
+                  helperText={errors.estimatedDuration}
+                  required
+                  data-testid="estimated-duration-input"
+                />
+              )}
+
+              {durationQuestion === "range" && (
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
                     <TextField
                       fullWidth
                       type="number"
-                      label="Tiempo Mínimo (min)"
+                      label="Mínimo (min)"
                       value={minDuration}
                       onChange={(e) => setMinDuration(Number(e.target.value))}
                       InputProps={{ inputProps: { min: 1 } }}
-                      error={!!errors.tbMinDuration || !!errors.tbDurationRange}
-                      helperText={errors.tbMinDuration || errors.tbDurationRange}
+                      error={!!errors.minDuration || !!errors.durationRange}
+                      helperText={errors.minDuration || errors.durationRange}
                       required
                       data-testid="min-duration-input"
                     />
                   </Grid>
-                )}
-                {(timeboxingType === "maximum-time" || timeboxingType === "both") && (
-                  <Grid xs={timeboxingType === "both" ? 6 : 12}>
+                  <Grid item xs={6}>
                     <TextField
                       fullWidth
                       type="number"
-                      label="Tiempo Máximo (min)"
+                      label="Máximo (min)"
                       value={maxDuration}
                       onChange={(e) => setMaxDuration(Number(e.target.value))}
                       InputProps={{ inputProps: { min: 1 } }}
-                      error={!!errors.tbMaxDuration || !!errors.tbDurationRange}
-                      helperText={errors.tbMaxDuration}
+                      error={!!errors.maxDuration || !!errors.durationRange}
+                      helperText={errors.maxDuration}
                       required
                       data-testid="max-duration-input"
                     />
                   </Grid>
-                )}
-              </Grid>
-            </>
-          )}
-        </Stack>
+                </Grid>
+              )}
+
+              {durationQuestion === "commitment" && (
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      ¿Qué tipo de compromiso?
+                    </Typography>
+                    <ToggleButtonGroup
+                      value={timeboxingQuestion}
+                      exclusive
+                      onChange={(_, v) => v && setTimeboxingQuestion(v)}
+                      color="primary"
+                      sx={{ flexWrap: "wrap" }}
+                      data-testid="timeboxing-question-group"
+                    >
+                      <ToggleButton value="minimum-time" sx={{ textTransform: "none" }}>
+                        Al menos X minutos
+                      </ToggleButton>
+                      <ToggleButton value="maximum-time" sx={{ textTransform: "none" }}>
+                        No más de X minutos
+                      </ToggleButton>
+                      <ToggleButton value="both" sx={{ textTransform: "none" }}>
+                        Entre X e Y
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </Box>
+
+                  {(timeboxingQuestion === "minimum-time" || timeboxingQuestion === "both") && (
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label={
+                        timeboxingQuestion === "both"
+                          ? "Mínimo (min)"
+                          : "¿Cuántos minutos como mínimo?"
+                      }
+                      value={tbMinDuration}
+                      onChange={(e) => setTbMinDuration(Number(e.target.value))}
+                      InputProps={{ inputProps: { min: 1 } }}
+                      error={!!errors.tbMinDuration || !!errors.tbDurationRange}
+                      helperText={errors.tbMinDuration || errors.tbDurationRange}
+                      required
+                      data-testid="tb-min-duration-input"
+                    />
+                  )}
+
+                  {(timeboxingQuestion === "maximum-time" || timeboxingQuestion === "both") && (
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label={
+                        timeboxingQuestion === "both"
+                          ? "Máximo (min)"
+                          : "¿Cuántos minutos como máximo?"
+                      }
+                      value={tbMaxDuration}
+                      onChange={(e) => setTbMaxDuration(Number(e.target.value))}
+                      InputProps={{ inputProps: { min: 1 } }}
+                      error={!!errors.tbMaxDuration || !!errors.tbDurationRange}
+                      helperText={errors.tbMaxDuration}
+                      required
+                      data-testid="tb-max-duration-input"
+                    />
+                  )}
+                </Stack>
+              )}
+            </Stack>
+          </Grid>
+
+          <Grid item xs={12} md={5}>
+            {renderPreview()}
+          </Grid>
+        </Grid>
       </DialogContent>
       <DialogActions>
         <Button
@@ -508,7 +586,6 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
     </Dialog>
   );
 
-  // Renderizar confirmación de eliminación
   const renderDeleteConfirmation = () => (
     <Box sx={{ p: 2 }}>
       <Alert severity="warning" sx={{ mb: 2 }}>
@@ -525,7 +602,6 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
     </Box>
   );
 
-  // Renderizar bibliotecas de actividades
   const renderLibrary = () => (
     <>
       <Box sx={{ mb: 3 }}>
@@ -551,11 +627,7 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
           <Box
             ref={provided.innerRef}
             {...provided.droppableProps}
-            sx={{
-              display: "flex",
-              flexWrap: "wrap",
-              margin: "-8px",
-            }}
+            sx={{ display: "flex", flexWrap: "wrap", margin: "-8px" }}
           >
             {filteredActivities.map((activity, index) => (
               <Draggable key={activity.id} draggableId={activity.id} index={index}>
@@ -578,10 +650,7 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
                         flexDirection: "column",
                         bgcolor: snapshot.isDragging ? "rgba(0, 0, 0, 0.04)" : "background.paper",
                         transition: "all 0.2s",
-                        "&:hover": {
-                          boxShadow: 2,
-                          cursor: "pointer",
-                        },
+                        "&:hover": { boxShadow: 2, cursor: "pointer" },
                       }}
                       onClick={() => handleCardClick(activity)}
                       data-testid={`activity-template-${activity.id}`}
@@ -600,9 +669,8 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
                             <DragIndicatorIcon color="action" />
                           </div>
                         </Box>
-                        <Box mb={1}>{renderActivityTypeChip(activity.type)}</Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          {renderDuration(activity)}
+                          {renderActivityDurationChip(activity)}
                         </Typography>
                         <Typography
                           variant="body2"
@@ -660,7 +728,6 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
     </>
   );
 
-  // Principal
   return (
     <Dialog
       open={open}
@@ -692,5 +759,24 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
     </Dialog>
   );
 };
+
+function renderActivityDurationChip(activity: ActivityTemplate) {
+  if (activity.type === "clear-objective" && activity.clearObjectiveSettings) {
+    return `~${activity.clearObjectiveSettings.estimatedDurationMinutes} min`;
+  }
+  if (activity.type === "flexible-duration" && activity.flexibleDurationSettings) {
+    return `${activity.flexibleDurationSettings.minimumDurationMinutes}-${activity.flexibleDurationSettings.maximumDurationMinutes} min`;
+  }
+  if (activity.type === "timeboxing" && activity.timeboxingSettings) {
+    const tb = activity.timeboxingSettings;
+    if (tb.type === "minimum-time" && tb.minimumDurationMinutes)
+      return `≥ ${tb.minimumDurationMinutes} min`;
+    if (tb.type === "maximum-time" && tb.maximumDurationMinutes)
+      return `≤ ${tb.maximumDurationMinutes} min`;
+    if (tb.type === "both" && tb.minimumDurationMinutes && tb.maximumDurationMinutes)
+      return `${tb.minimumDurationMinutes}-${tb.maximumDurationMinutes} min`;
+  }
+  return "Duración no definida";
+}
 
 export default ActivityLibraryModal;

@@ -103,11 +103,10 @@ export class InterruptionManager {
       throw new Error(`La causa de interrupción con id ${id} no existe`);
     }
 
-    // Verificar que no existan registros que usen esta causa
-    const state = this.systemCore.getState();
-    const inUse = state.global.completedActivityRecords.some(
-      (record) => record.state === "interrupted" && record.interruptionData?.causeId === id
-    );
+    // Schema v2+: interruptionData eliminado. Causas personalizadas no se usan ya.
+    // Mantenemos el método por compatibilidad pero no hace nada relevante.
+    const _state = this.systemCore.getState();
+    const inUse = false;
 
     if (inUse) {
       throw new Error(
@@ -171,25 +170,18 @@ export class InterruptionManager {
       }
     }
 
-    // Calcular estadísticas
+    // Schema v2+: ya no se distingue evitable/no evitable. Stub por compatibilidad.
     const totalInterruptions = records.length;
-    const avoidableInterruptions = records.filter(
-      (r) => r.interruptionData?.isAvoidable === true
-    ).length;
-    const unavoidableInterruptions = totalInterruptions - avoidableInterruptions;
-    const avoidablePercentage =
-      totalInterruptions > 0 ? (avoidableInterruptions / totalInterruptions) * 100 : 0;
+    const avoidableInterruptions = 0;
+    const unavoidableInterruptions = totalInterruptions;
+    const avoidablePercentage = 0;
 
     // Calcular causas más frecuentes
     const causeCounts: { [causeId: string]: number } = {};
 
     // Contar ocurrencias de cada causa
-    for (const record of records) {
-      if (record.interruptionData?.isAvoidable && record.interruptionData?.causeId) {
-        const causeId = record.interruptionData.causeId;
-        causeCounts[causeId] = (causeCounts[causeId] || 0) + 1;
-      }
-    }
+    // Schema v2+: sin causas. Stub vacío.
+    // Mantenemos la estructura por compatibilidad con la interfaz.
 
     // Convertir conteos a lista de causas ordenada
     const topCauses = Object.entries(causeCounts)
@@ -238,24 +230,15 @@ export class InterruptionManager {
     count: number;
     percentage: number;
   }[] {
+    // Schema v2+: stub. No hay causas configurables. Siempre retorna [].
     const state = this.systemCore.getState();
     const records = state.global.completedActivityRecords.filter(
-      (record) =>
-        record.state === "interrupted" &&
-        record.interruptionData?.isAvoidable === true &&
-        record.interruptionData?.causeId
+      (record) => record.state === "interrupted"
     );
 
     const totalInterruptions = records.length;
     const causeCounts: { [causeId: string]: number } = {};
-
-    // Contar ocurrencias de cada causa
-    for (const record of records) {
-      if (record.interruptionData?.causeId) {
-        const causeId = record.interruptionData.causeId;
-        causeCounts[causeId] = (causeCounts[causeId] || 0) + 1;
-      }
-    }
+    // Vacío por schema v2+: sin classification.
 
     // Convertir conteos a lista de causas ordenada
     const topCauses = Object.entries(causeCounts)

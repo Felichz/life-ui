@@ -42,7 +42,6 @@ const InterruptionModal: React.FC<InterruptionModalProps> = ({
   onClose,
   activityTitle,
   causes,
-  isCreatingCause,
   onConfirm,
   onCreateCause,
 }) => {
@@ -166,8 +165,11 @@ const InterruptionModal: React.FC<InterruptionModalProps> = ({
             </Typography>
           )}
 
-          <Typography variant="body1" gutterBottom mt={2}>
-            ¿Fue por una causa que podrías evitar en el futuro?
+          <Typography variant="body2" color="text.secondary" gutterBottom mt={2}>
+            Sin juzgarte — solo para aprender.
+          </Typography>
+          <Typography variant="body1" gutterBottom>
+            ¿Hubo algo que podrías haber hecho diferente para evitarlo?
           </Typography>
 
           <RadioGroup
@@ -179,13 +181,13 @@ const InterruptionModal: React.FC<InterruptionModalProps> = ({
             <FormControlLabel
               value="true"
               control={<Radio />}
-              label="Sí, podría evitarse"
+              label="Sí, creo que sí"
               data-testid="avoidable-yes"
             />
             <FormControlLabel
               value="false"
               control={<Radio />}
-              label="No, era inevitable"
+              label="No, fue inevitable"
               data-testid="avoidable-no"
             />
           </RadioGroup>

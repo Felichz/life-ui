@@ -61,13 +61,13 @@ describe("SubjectiveVariableManager", () => {
       },
     };
 
-    // Crear un mock para SystemCore
+    // Crear un mock para SystemCore (schema v2: cast para evitar mockear 50+ métodos)
     systemCore = {
       getState: jest.fn().mockImplementation(() => mockState),
       updateState: jest.fn().mockImplementation((updater) => {
         mockState = updater(mockState);
       }),
-    };
+    } as unknown as ISystemCore;
 
     // Instanciar SubjectiveVariableManager con el SystemCore mockeado
     subjectiveVariableManager = new SubjectiveVariableManager(systemCore);

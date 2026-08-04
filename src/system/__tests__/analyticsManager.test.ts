@@ -14,11 +14,14 @@ import type {
   CurrentDayState,
 } from "../../types";
 
-// Mock para systemCore
-const createMockSystemCore = (mockState: AppState): ISystemCore => ({
-  getState: jest.fn().mockReturnValue(mockState),
-  updateState: jest.fn(),
-});
+// Mock para systemCore (schema v2: muchos métodos, usamos as unknown as para flexibilidad de tests)
+const createMockSystemCore = (mockState: AppState): ISystemCore => {
+  const mock = {
+    getState: jest.fn().mockReturnValue(mockState),
+    updateState: jest.fn(),
+  };
+  return mock as unknown as ISystemCore;
+};
 
 // Funciones auxiliares para crear UUIDs de prueba
 const createMockUUID = (id: number): UUID => `mock-uuid-${id}`;
@@ -155,11 +158,6 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       startTime: new Date(TODAY.getTime() + 2 * 60 * 60 * 1000).toISOString(),
       endTime: new Date(TODAY.getTime() + 2.25 * 60 * 60 * 1000).toISOString(),
       durationMinutes: 15,
-      interruptionData: {
-        isAvoidable: true,
-        causeId: interruptionCauses[0].id,
-        causeDescription: interruptionCauses[0].description,
-      },
       dayId: days[0].id,
       createdAt: TODAY.toISOString(),
     },
@@ -210,11 +208,6 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       startTime: new Date(YESTERDAY.getTime() + 2 * 60 * 60 * 1000).toISOString(),
       endTime: new Date(YESTERDAY.getTime() + 2.1 * 60 * 60 * 1000).toISOString(),
       durationMinutes: 6,
-      interruptionData: {
-        isAvoidable: false,
-        causeId: interruptionCauses[1].id,
-        causeDescription: interruptionCauses[1].description,
-      },
       dayId: days[1].id,
       createdAt: YESTERDAY.toISOString(),
     },

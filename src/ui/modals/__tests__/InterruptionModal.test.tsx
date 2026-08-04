@@ -42,10 +42,10 @@ describe("InterruptionModal", () => {
 
     expect(screen.getByText("Interrumpir actividad")).toBeInTheDocument();
     expect(
-      screen.getByText("¿Fue por una causa que podrías evitar en el futuro?")
+      screen.getByText("¿Hubo algo que podrías haber hecho diferente para evitarlo?")
     ).toBeInTheDocument();
-    expect(screen.getByText("Sí, podría evitarse")).toBeInTheDocument();
-    expect(screen.getByText("No, era inevitable")).toBeInTheDocument();
+    expect(screen.getByText("Sí, creo que sí")).toBeInTheDocument();
+    expect(screen.getByText("No, fue inevitable")).toBeInTheDocument();
     expect(screen.getByText("Confirmar")).toBeInTheDocument();
     expect(screen.getByText("Cancelar")).toBeInTheDocument();
   });
