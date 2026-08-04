@@ -3,6 +3,7 @@ import { Box, Alert, Snackbar } from "@mui/material";
 import QuickBar from "../components/QuickBar";
 import ActivityInstanceModal from "../modals/ActivityInstanceModal";
 import { useSystemCore } from "../hooks/useSystemCore";
+import { useCompletionFlow } from "../context/CompletionFlowContext";
 import type { ActivityTemplate, UUID, DynamicSettings } from "../../types";
 
 const QuickBarContainer = () => {
@@ -16,6 +17,8 @@ const QuickBarContainer = () => {
     getCurrentTimeBlock,
     getTimeBlocks,
   } = useSystemCore();
+
+  const completionFlow = useCompletionFlow();
 
   // Estados para gestionar la UI
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,22 +89,33 @@ const QuickBarContainer = () => {
     }
   };
 
-  // Activación directa sin configuración
+  // Activación directa sin configuración (con auto-continuación si hay activa)
   const handleDirectActivation = (activityId: UUID) => {
     setIsLoading(true);
     setLoadingActivityId(activityId);
     setError(null);
 
     try {
-      // Si hay actividad activa, NO auto-completar: el core ahora exige completion explícito.
-      // La UI debe mostrar el CompletionModal antes de permitir el cambio.
-      if (activeActivity) {
-        setError("Hay una actividad activa. Ciérrala primero desde el kanban antes de cambiar.");
-        setIsLoading(false);
-        setLoadingActivityId(null);
+      const active = activeActivity;
+      if (active && active.id !== activityId) {
+        completionFlow.requestCloseActive(
+          active.id,
+          () => {
+            try {
+              activateActivity(activityId);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Error desconocido";
+              setError(`Error al activar: ${msg}`);
+            } finally {
+              setIsLoading(false);
+              setLoadingActivityId(null);
+            }
+          },
+          () => {},
+          () => {}
+        );
         return;
       }
-
       activateActivity(activityId);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Error desconocido";
@@ -112,7 +126,7 @@ const QuickBarContainer = () => {
     }
   };
 
-  // Manejar confirmación del modal con configuración dinámica
+  // Manejar confirmación del modal con configuración dinámica (con auto-continuación)
   const handleModalConfirm = (
     templateId: UUID,
     blockId: UUID,
@@ -123,17 +137,32 @@ const QuickBarContainer = () => {
     setError(null);
 
     try {
-      // Si hay actividad activa, NO auto-completar.
-      if (activeActivity) {
-        setError("Hay una actividad activa. Ciérrala primero desde el kanban antes de crear otra.");
-        setIsLoading(false);
-        setLoadingActivityId(null);
+      const active = activeActivity;
+      if (active) {
+        completionFlow.requestCloseActive(
+          active.id,
+          () => {
+            try {
+              const instance = createActivityInstance(templateId, blockId, dynamicSettings);
+              activateActivity(instance.id);
+              setIsModalOpen(false);
+              setSelectedTemplateId(null);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Error desconocido";
+              setError(`Error al crear/activar: ${msg}`);
+            } finally {
+              setIsLoading(false);
+              setLoadingActivityId(null);
+            }
+          },
+          () => {},
+          () => {}
+        );
         return;
       }
 
       const instance = createActivityInstance(templateId, blockId, dynamicSettings);
       activateActivity(instance.id);
-
       setIsModalOpen(false);
       setSelectedTemplateId(null);
     } catch (err: unknown) {

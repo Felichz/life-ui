@@ -1,20 +1,12 @@
-import { useState, forwardRef, useImperativeHandle, useEffect, useMemo } from "react";
-import { Box, Snackbar, Alert } from "@mui/material";
+import { useState, forwardRef, useImperativeHandle, useEffect, useMemo, useRef } from "react";
+import { Box } from "@mui/material";
 import { useSystemCore } from "../hooks/useSystemCore";
+import { useCompletionFlow } from "../context/CompletionFlowContext";
 import KanbanBoard from "../components/Kanban/Board";
 import type { TimeBlockWithActivities } from "../components/Kanban/Board";
-import type {
-  TimeBlock,
-  ActivityInstance,
-  UUID,
-  ActivityTemplate,
-  CompletionRequest,
-} from "../../types";
+import type { TimeBlock, ActivityInstance, UUID, ActivityTemplate } from "../../types";
 import type { DropResult } from "@hello-pangea/dnd";
 import ActivityInstanceModal from "../modals/ActivityInstanceModal";
-import CompletionModal from "../modals/CompletionModal";
-import VariableModalContainer from "../containers/VariableModalContainer";
-import InterruptionModalContainer from "../containers/InterruptionModalContainer";
 import { useDragDrop } from "../hooks/useDragDrop";
 
 // Definición de la interfaz para la ref
@@ -29,13 +21,13 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
     createActivityInstance,
     updateActivityInstance,
     activateActivity,
-    requestCompletion,
-    completeActivity,
-    interruptActivity,
     isDayActive,
     isTimeBlockAvailable,
     getActivityTemplates,
   } = useSystemCore();
+
+  // Flujo de cierre coordinado (CompletionModal vive en DayPage)
+  const completionFlow = useCompletionFlow();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState<{
@@ -50,25 +42,15 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
   // Flag para saber si el modal viene de activación (para activar después)
   const [isFromActivation, setIsFromActivation] = useState(false);
 
-  // Estado para el CompletionModal (Fase 5+6)
-  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
-  const [completionRequest, setCompletionRequest] = useState<CompletionRequest | null>(null);
-  const [completionActivityId, setCompletionActivityId] = useState<UUID | null>(null);
-  const [lastReward, setLastReward] = useState<{
-    activityTitle: string;
-    tempos: number;
+  const [pendingActivation, setPendingActivation] = useState<{
+    activityId: UUID;
+    templateId: UUID;
+    blockId: UUID;
+    dynamicSettings?: Record<string, unknown>;
   } | null>(null);
 
-  // Estado para el modal de variables
-  const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
-  const [completedActivityId, setCompletedActivityId] = useState<UUID | null>(null);
   // ID de la plantilla "Piloto Automático" (se cargará en useEffect)
   const [pilotoAutoId, setPilotoAutoId] = useState<UUID | null>(null);
-
-  // Estado para el modal de interrupción
-  const [isInterruptionModalOpen, setIsInterruptionModalOpen] = useState(false);
-  const [activityToInterrupt, setActivityToInterrupt] = useState<UUID | null>(null);
-  const [interruptedActivityId, setInterruptedActivityId] = useState<UUID | null>(null);
 
   // Create a map for templateId -> title for efficient lookup
   const templateTitleMap = useMemo(() => {
@@ -195,99 +177,90 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
       setIsFromActivation(true); // Marcar que viene de activación
       setIsModalOpen(true);
     } else {
-      // Activar directamente
-      try {
-        activateActivity(activityId);
-      } catch (error) {
-        console.error("Error al activar actividad:", error);
-      }
+      // Activar con auto-continuación si hay activa
+      handleActivateWithContinuation(
+        activityInstance.id,
+        activityInstance.templateId,
+        activityInstance.blockId
+      );
     }
   };
 
-  // Nuevo: Manejar completar una actividad
-  const handleCompleteActivity = (activityId: UUID) => {
+  // Activar con auto-continuación: si hay activa, primero pedir completion
+  const handleActivateWithContinuation = (
+    activityId: UUID,
+    templateId: UUID,
+    blockId: UUID,
+    dynamicSettings?: Record<string, unknown>
+  ) => {
     if (!isDayActive()) return;
 
     try {
-      const request = requestCompletion(activityId);
-      setCompletionActivityId(activityId);
-      setCompletionRequest(request);
-      setIsCompletionModalOpen(true);
-    } catch (error) {
-      console.error("Error al solicitar completion:", error);
-    }
-  };
-
-  // Confirmación del CompletionModal
-  const handleCompletionConfirm = (assessment: { satisfactionScore: number }) => {
-    if (!completionActivityId || !completionRequest) return;
-
-    try {
-      const result = completeActivity(completionActivityId, assessment);
-      setLastReward({
-        activityTitle: completionRequest.activityTitle,
-        tempos: result.temposAwarded,
-      });
-      setIsCompletionModalOpen(false);
-      setCompletionRequest(null);
-      setCompletionActivityId(null);
-
-      // Mantener flujo legacy de variables por ahora (Phase 10 eliminará esto)
-      setCompletedActivityId(result.record.id);
-      setIsVariableModalOpen(true);
-    } catch (error) {
-      console.error("Error al completar actividad:", error);
-    }
-  };
-
-  // Interrupción desde el CompletionModal
-  const handleCompletionInterrupt = () => {
-    if (!completionActivityId) return;
-
-    try {
-      interruptActivity(completionActivityId);
-      setIsCompletionModalOpen(false);
-      setCompletionRequest(null);
-      setCompletionActivityId(null);
-      setLastReward({
-        activityTitle: completionRequest?.activityTitle || "Actividad",
-        tempos: 0,
-      });
-    } catch (error) {
-      console.error("Error al interrumpir:", error);
-    }
-  };
-
-  // Manejar el cierre del modal de variables (sin snapshot)
-  const handleCloseVariableModal = () => {
-    setIsVariableModalOpen(false);
-    setCompletedActivityId(null);
-    setInterruptedActivityId(null);
-
-    // Activar piloto automático después de cerrar
-    if (pilotoAutoId) {
-      try {
-        activateActivity(pilotoAutoId);
-      } catch (error) {
-        console.error("Error al activar piloto automático:", error);
+      const active = getActiveActivity();
+      if (active && active.id !== activityId) {
+        setPendingActivation({ activityId, templateId, blockId, dynamicSettings });
+        completionFlow.requestCloseActive(
+          active.id,
+          () => {
+            const pending = pendingActivationRef.current;
+            setPendingActivation(null);
+            if (pending) {
+              try {
+                if (pending.dynamicSettings) {
+                  const inst = createActivityInstance(
+                    pending.templateId,
+                    pending.blockId,
+                    pending.dynamicSettings as never
+                  );
+                  activateActivity(inst.id);
+                } else {
+                  activateActivity(pending.activityId);
+                }
+              } catch (e) {
+                console.error("Error al activar pendiente:", e);
+              }
+            }
+          },
+          // El reward/record es manejado por DayPage (modal compartido)
+          () => {},
+          () => {}
+        );
+        return;
       }
+
+      activateActivity(activityId);
+    } catch (error) {
+      console.error("Error al activar actividad:", error);
     }
   };
 
-  // Manejar el éxito al crear un snapshot
-  const handleVariableSuccess = () => {
-    setIsVariableModalOpen(false);
-    setCompletedActivityId(null);
-    setInterruptedActivityId(null);
+  // Ref para que el callback de continuation vea el valor más reciente
+  const pendingActivationRef = useRef(pendingActivation);
+  useEffect(() => {
+    pendingActivationRef.current = pendingActivation;
+  }, [pendingActivation]);
 
-    // Activar piloto automático después de guardar snapshot
-    if (pilotoAutoId) {
-      try {
-        activateActivity(pilotoAutoId);
-      } catch (error) {
-        console.error("Error al activar piloto automático:", error);
-      }
-    }
+  // Manejar completar una actividad (botón "Completar" en la card)
+  // DayPage renderiza el CompletionModal único y maneja el reward
+  const handleCompleteActivity = (activityId: UUID) => {
+    if (!isDayActive()) return;
+    completionFlow.requestCloseActive(
+      activityId,
+      () => {},
+      () => {},
+      () => {}
+    );
+  };
+
+  // Manejar la interrupción: usa el CompletionModal compartido (botón "No la terminé")
+  const handleInterruptActivity = (activityId: UUID) => {
+    if (!isDayActive()) return;
+    completionFlow.requestCloseActive(
+      activityId,
+      () => {},
+      () => {},
+      () => {}
+    );
   };
 
   // Crear o actualizar instancia de actividad desde el modal
@@ -319,22 +292,8 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
     setIsFromActivation(false);
   };
 
-  // Manejar la interrupción de una actividad
-  const handleInterruptActivity = (activityId: UUID) => {
-    if (!isDayActive()) return;
-
-    setActivityToInterrupt(activityId);
-    setIsInterruptionModalOpen(true);
-  };
-
-  // Manejar el éxito de la interrupción
-  const handleInterruptSuccess = (interruptedId: UUID) => {
-    // Guardar el ID de la actividad interrumpida para relacionarla con el snapshot
-    setInterruptedActivityId(interruptedId);
-
-    // Abrir el modal de variables subjetivas
-    setIsVariableModalOpen(true);
-  };
+  // Manejar la interrupción: usa el CompletionModal compartido (botón "No la terminé")
+  // (handleInterruptActivity ya está definido arriba, en línea ~252)
 
   return (
     <Box sx={{ width: "100%" }} data-testid="kanban-container">
@@ -360,55 +319,6 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
           instanceId={modalData.instanceId}
           isEditMode={isEditMode}
           onConfirm={handleConfirmActivityInstance}
-        />
-        <CompletionModal
-          open={isCompletionModalOpen}
-          request={completionRequest}
-          onConfirm={handleCompletionConfirm}
-          onInterrupt={handleCompletionInterrupt}
-          onClose={() => {
-            setIsCompletionModalOpen(false);
-            setCompletionRequest(null);
-            setCompletionActivityId(null);
-          }}
-        />
-        <Snackbar
-          open={!!lastReward}
-          autoHideDuration={4000}
-          onClose={() => setLastReward(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-          data-testid="reward-snackbar"
-        >
-          <Alert
-            onClose={() => setLastReward(null)}
-            severity={lastReward && lastReward.tempos > 0 ? "success" : "info"}
-            sx={{ width: "100%" }}
-          >
-            {lastReward && lastReward.tempos > 0
-              ? `+${lastReward.tempos} tempos · ${lastReward.activityTitle}`
-              : `Sin tempos esta vez · ${lastReward?.activityTitle}`}
-          </Alert>
-        </Snackbar>
-        <VariableModalContainer
-          open={isVariableModalOpen}
-          onClose={handleCloseVariableModal}
-          relatedActivityIds={
-            interruptedActivityId
-              ? [interruptedActivityId]
-              : completedActivityId
-                ? [completedActivityId]
-                : []
-          }
-          onSuccess={handleVariableSuccess}
-        />
-        <InterruptionModalContainer
-          open={isInterruptionModalOpen}
-          onClose={() => {
-            setIsInterruptionModalOpen(false);
-            setActivityToInterrupt(null);
-          }}
-          activityId={activityToInterrupt || undefined}
-          onInterruptSuccess={handleInterruptSuccess}
         />
       </Box>
     </Box>

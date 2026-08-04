@@ -597,7 +597,9 @@ export class AnalyticsManager {
     return {
       totalTempos,
       target,
-      targetProgress: Math.min(1, totalTempos / target),
+      targetProgress: totalTempos / target,
+      progressBarValue: Math.min(100, (totalTempos / target) * 100),
+      displayPercent: Math.round((totalTempos / target) * 100),
       completedActivities,
       averageSatisfaction,
       lastReward: last
@@ -640,7 +642,7 @@ export class AnalyticsManager {
       return {
         date: day.createdAt,
         totalTempos,
-        targetProgress: Math.min(1, totalTempos / target),
+        targetProgress: totalTempos / target,
         averageSatisfaction: avg,
       };
     });

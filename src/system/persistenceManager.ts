@@ -149,59 +149,65 @@ export class PersistenceManager implements IPersistenceManager {
   }
 
   /**
-   * Migración de v1 a v2:
-   * - Agrega dailyTempoTarget: 1000 si falta
-   * - Marca completedActivityRecords antiguos con temposAwarded=0
-   * - Preserva subjectiveVariables/interruptionCauses en localStorage pero no los expone en AppState
-   *   (la limpieza real se hará en fase 10 cuando eliminemos los managers)
+   * Migración de v1 a v2.
+   * Robusta ante estados parciales: si falta global, userPreferences o
+   * completedActivityRecords, reconstruye defaults sin perder lo que sí exista.
    */
   private migrateV1ToV2(
     state: AppState & { schemaVersion?: number },
     warnings: string[]
   ): AppState & { schemaVersion?: number } {
-    const userPreferences = state.global?.userPreferences;
-    if (!userPreferences || typeof userPreferences !== "object") {
-      warnings.push("userPreferences ausente en estado migrado");
-      return state;
-    }
+    const fromVersion = typeof state.schemaVersion === "number" ? state.schemaVersion : 1;
+
+    // Reconstruir userPreferences si falta
+    const existingPrefs = state.global?.userPreferences;
+    const userPreferences = {
+      hiddenSubjectiveVariableIds: existingPrefs?.hiddenSubjectiveVariableIds ?? [],
+      dailyTempoTarget:
+        typeof existingPrefs?.dailyTempoTarget === "number" ? existingPrefs.dailyTempoTarget : 1000,
+      updatedAt: existingPrefs?.updatedAt ?? new Date().toISOString(),
+    };
+    warnings.push("userPreferences reconstruido con defaults");
+
+    // Sanear completedActivityRecords: marcar los viejos con tempos=0 si faltan
+    const records = Array.isArray(state.global?.completedActivityRecords)
+      ? state.global.completedActivityRecords
+      : [];
+    const completedActivityRecords = records.map((record) => {
+      const r = record as typeof record & {
+        satisfactionScore?: number;
+        temposAwarded?: number;
+        beatEstimate?: boolean;
+      };
+      if (
+        typeof r.satisfactionScore !== "number" ||
+        typeof r.temposAwarded !== "number" ||
+        typeof r.beatEstimate !== "boolean"
+      ) {
+        return {
+          ...r,
+          satisfactionScore: 0,
+          temposAwarded: 0,
+          beatEstimate: false,
+        };
+      }
+      return r;
+    });
+
+    // Reconstruir global manteniendo lo que exista
+    const migratedGlobal = {
+      ...(state.global || {}),
+      userPreferences,
+      completedActivityRecords,
+    };
 
     const migrated = {
       ...state,
-      global: {
-        ...state.global,
-        userPreferences: {
-          ...userPreferences,
-          dailyTempoTarget:
-            typeof (userPreferences as { dailyTempoTarget?: number }).dailyTempoTarget === "number"
-              ? (userPreferences as { dailyTempoTarget: number }).dailyTempoTarget
-              : 1000,
-        },
-        // Sanear completedActivityRecords: marcar los viejos con tempos=0 si faltan
-        completedActivityRecords: (state.global.completedActivityRecords || []).map((record) => {
-          const r = record as typeof record & {
-            satisfactionScore?: number;
-            temposAwarded?: number;
-            beatEstimate?: boolean;
-          };
-          if (
-            typeof r.satisfactionScore !== "number" ||
-            typeof r.temposAwarded !== "number" ||
-            typeof r.beatEstimate !== "boolean"
-          ) {
-            return {
-              ...r,
-              satisfactionScore: 0,
-              temposAwarded: 0,
-              beatEstimate: false,
-            };
-          }
-          return r;
-        }),
-      },
-      schemaVersion: 2,
-    };
+      global: migratedGlobal,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+    } as AppState & { schemaVersion?: number };
 
-    warnings.push(`Migrado de v${(state as { schemaVersion?: number }).schemaVersion ?? 1} a v2`);
+    warnings.push(`Migrado de v${fromVersion} a v${CURRENT_SCHEMA_VERSION}`);
     return migrated;
   }
 }

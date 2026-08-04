@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
-import type { CompletionRequest, CompletionResult } from "../../types";
+import type { CompletionRequest } from "../../types";
 
 const SCORE_LABELS: Record<number, string> = {
   0: "No completé. Está bien, lo importante es que lo declaré.",
@@ -33,7 +33,7 @@ const SCORE_LABELS: Record<number, string> = {
 interface CompletionModalProps {
   open: boolean;
   request: CompletionRequest | null;
-  onConfirm: (assessment: { satisfactionScore: number }) => CompletionResult;
+  onConfirm: (assessment: { satisfactionScore: number }) => void;
   onInterrupt: () => void;
   onClose: () => void;
 }

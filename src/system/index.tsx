@@ -258,7 +258,7 @@ export class SystemCore implements ISystemCore {
    */
   public completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number }
+    assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
   ): CompletionResult {
     return this.activityManager.completeActivity(activityId, assessment);
   }

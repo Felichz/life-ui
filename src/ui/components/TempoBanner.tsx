@@ -15,7 +15,8 @@ const TempoBanner: React.FC = () => {
 
   if (!summary) return null;
 
-  const percent = Math.round(summary.targetProgress * 100);
+  const percent = summary.displayPercent;
+  const barValue = summary.progressBarValue;
   const isOverTarget = summary.totalTempos >= summary.target;
 
   return (
@@ -87,7 +88,7 @@ const TempoBanner: React.FC = () => {
 
           <LinearProgress
             variant="determinate"
-            value={Math.min(100, percent)}
+            value={barValue}
             sx={{
               mt: 1.5,
               height: 6,

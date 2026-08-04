@@ -83,6 +83,7 @@ export const useSystemCore = () => {
     moveActivityInstance: core.moveActivityInstance.bind(core),
     deleteActivityInstance: core.deleteActivityInstance.bind(core),
     activateActivity: core.activateActivity.bind(core),
+    requestCompletion: core.requestCompletion.bind(core),
     completeActivity: core.completeActivity.bind(core),
     interruptActivity: core.interruptActivity.bind(core),
     getActiveActivity: core.getActiveActivity.bind(core),
@@ -128,12 +129,15 @@ export const useSystemCore = () => {
     getCompletionRate: core.getCompletionRate.bind(core),
     getInterruptionRate: core.getInterruptionRate.bind(core),
     getEstimationAccuracy: core.getEstimationAccuracy.bind(core),
+    getTempoSummary: core.getTempoSummary.bind(core),
+    getTempoTrends: core.getTempoTrends.bind(core),
 
     // Métodos de UserPreferencesManager
     updateUserPreferences: core.updateUserPreferences.bind(core),
     getUserPreferences: core.getUserPreferences.bind(core),
     toggleVariableVisibility: core.toggleVariableVisibility.bind(core),
     isVariableVisible: core.isVariableVisible.bind(core),
+    updateDailyTempoTarget: core.updateDailyTempoTarget.bind(core),
 
     // Métodos de PersistenceManager
     exportData: core.exportData.bind(core),

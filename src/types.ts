@@ -432,9 +432,19 @@ export interface InterruptionStatistics {
 export interface TempoSummary {
   totalTempos: number;
   target: number;
-  targetProgress: number; // 0..1
+  /**
+   * Ratio real sin cap (puede ser > 1 si superaste el target).
+   * Ej: 1847 / 1000 = 1.847
+   */
+  targetProgress: number;
+  /**
+   * Valor para la barra de progreso (siempre 0..100).
+   * Para mostrar >100% se usa `displayPercent` que tampoco se capa.
+   */
+  progressBarValue: number;
+  displayPercent: number;
   completedActivities: number;
-  averageSatisfaction: number; // 0-10
+  averageSatisfaction: number;
   lastReward?: {
     recordId: UUID;
     activityTitle: string;
@@ -453,13 +463,16 @@ export interface TempoTrendPoint {
 }
 
 /**
- * Solicitud de cierre de actividad: lo que la UI necesita para mostrar el modal
+ * Solicitud de cierre de actividad: lo que la UI necesita para mostrar el modal.
+ * El timestamp se congela al pedir el cierre; completeActivity lo usa para que
+ * la duración no cambie mientras el usuario decide.
  */
 export interface CompletionRequest {
   activityTitle: string;
   durationMinutes: number;
-  estimatedMinutes?: number; // Solo si clear-objective
-  canApplyBonus: boolean; // true solo si clear-objective con estimado
+  estimatedMinutes?: number;
+  canApplyBonus: boolean;
+  requestedAt: ISODateTimeString;
 }
 
 /**
@@ -522,7 +535,10 @@ export interface ISystemCore {
   deleteActivityInstance(id: UUID): void;
   activateActivity(id: UUID): ActivityInstance;
   requestCompletion(activityId: UUID): CompletionRequest;
-  completeActivity(activityId: UUID, assessment: { satisfactionScore: number }): CompletionResult;
+  completeActivity(
+    activityId: UUID,
+    assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
+  ): CompletionResult;
   interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 

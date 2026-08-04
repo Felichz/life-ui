@@ -7,6 +7,7 @@ import type {
   CompletedActivityRecord,
   CompletionRequest,
   CompletionResult,
+  ISODateTimeString,
 } from "../types";
 
 /**
@@ -574,9 +575,9 @@ export class ActivityManager {
       throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
     }
 
-    const timestamp = UtilityService.getCurrentISODateTime();
+    const requestedAt = UtilityService.getCurrentISODateTime();
     const durationMinutes = instance.startTime
-      ? this.calculateDuration(instance.startTime, timestamp)
+      ? this.calculateDuration(instance.startTime, requestedAt)
       : 0;
 
     const estimatedMinutes =
@@ -595,6 +596,7 @@ export class ActivityManager {
       durationMinutes,
       estimatedMinutes,
       canApplyBonus,
+      requestedAt,
     };
   }
 
@@ -610,9 +612,12 @@ export class ActivityManager {
    */
   public completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number }
+    assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
   ): CompletionResult {
-    const timestamp = UtilityService.getCurrentISODateTime();
+    // Si la UI nos pasa endTime (timestamp congelado al pedir completion),
+    // lo usamos. Si no, caemos al "ahora". Esto evita que la duración cambie
+    // entre la preview del modal y el guardado final.
+    const timestamp = assessment.endTime || UtilityService.getCurrentISODateTime();
     const { satisfactionScore } = assessment;
 
     if (

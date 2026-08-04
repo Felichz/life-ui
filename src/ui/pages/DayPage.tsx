@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Box,
   Button,
@@ -15,6 +15,7 @@ import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
 import ViewKanbanRoundedIcon from "@mui/icons-material/ViewKanbanRounded";
 import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
 import { useSystemCore } from "../hooks/useSystemCore";
+import { useCompletionFlow } from "../context/CompletionFlowContext";
 import KanbanContainer from "../containers/KanbanContainer";
 import QuickBarContainer from "../containers/QuickBarContainer";
 import EventQuickBarContainer from "../containers/EventQuickBarContainer";
@@ -25,11 +26,12 @@ import EventLibraryModalContainer from "../containers/EventLibraryModalContainer
 import VariableModalContainer from "../containers/VariableModalContainer";
 import OverviewModalContainer from "../containers/OverviewModalContainer";
 import ActivityInstanceModal from "../modals/ActivityInstanceModal";
+import CompletionModal from "../modals/CompletionModal";
 import TempoBanner from "../components/TempoBanner";
 import { useModal } from "../hooks/useModal";
 import { DragDropContext } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
-import type { UUID, DynamicSettings } from "../../types";
+import type { UUID, DynamicSettings, CompletionRequest } from "../../types";
 import ConfirmEndDayModal from "../modals/ConfirmEndDayModal";
 import { useInRouterContext, useNavigate } from "react-router-dom";
 import TopBar from "../components/Common/TopBar";
@@ -41,9 +43,14 @@ const DayPage: React.FC = () => {
     isDayActive,
     createActivityInstance,
     getActiveActivity,
+    requestCompletion,
+    completeActivity,
+    interruptActivity,
     canUpdateVariables,
     endDay,
   } = useSystemCore();
+
+  const completionFlow = useCompletionFlow();
   const {
     isOpen: isInstanceModalOpen,
     open: openInstanceModal,
@@ -93,6 +100,34 @@ const DayPage: React.FC = () => {
           ?.title
       : undefined;
 
+  // CompletionModal único compartido: estado local para su request/snackbar
+  const [completionRequest, setCompletionRequest] = useState<CompletionRequest | null>(null);
+  const [lastReward, setLastReward] = useState<{ activityTitle: string; tempos: number } | null>(
+    null
+  );
+
+  // Reaccionar al flow context: cuando alguien pide cerrar una activa,
+  // obtener el request y abrir el modal
+  React.useEffect(() => {
+    if (completionFlow.pendingCloseId && !completionRequest) {
+      try {
+        const req = requestCompletion(completionFlow.pendingCloseId);
+        setCompletionRequest(req);
+      } catch (e) {
+        console.error("Error al obtener completion request:", e);
+        completionFlow.cancel();
+      }
+    }
+  }, [completionFlow.pendingCloseId, completionRequest, requestCompletion, completionFlow]);
+
+  // Helper para obtener título desde el state actual
+  const getActiveTitleFromState = (id: UUID): string => {
+    const inst = state.currentDay?.activityInstances.find((a) => a.id === id);
+    if (!inst) return "Actividad";
+    const tpl = state.global.activityTemplates.find((t) => t.id === inst.templateId);
+    return tpl?.title || "Actividad";
+  };
+
   if (!isDayActive()) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8, textAlign: "center" }}>
@@ -127,13 +162,34 @@ const DayPage: React.FC = () => {
   };
   const handleEndDayConfirm = () => {
     try {
-      // Schema v2+: si hay actividad activa, NO auto-completar al cerrar el día.
-      // El usuario debe cerrar primero vía CompletionModal desde el Kanban.
+      // Schema v2+: si hay activa, abrir CompletionModal primero; endDay va después.
       if (activeActivity) {
-        setError(
-          "Hay una actividad activa. Ciérrala primero desde el kanban antes de finalizar el día."
-        );
         closeEndDayModal();
+        completionFlow.requestCloseActive(
+          activeActivity.id,
+          () => {
+            endDay();
+            navigate("/overview");
+          },
+          (closedId, score) => {
+            try {
+              completeActivity(closedId, { satisfactionScore: score });
+              endDay();
+              navigate("/overview");
+            } catch (e) {
+              console.error("Error al completar antes de endDay:", e);
+            }
+          },
+          (closedId) => {
+            try {
+              interruptActivity(closedId);
+              endDay();
+              navigate("/overview");
+            } catch (e) {
+              console.error("Error al interrumpir antes de endDay:", e);
+            }
+          }
+        );
         return;
       }
       endDay();
@@ -359,6 +415,67 @@ const DayPage: React.FC = () => {
           />
         </Box>
       </DragDropContext>
+
+      {/* CompletionModal único compartido */}
+      <CompletionModal
+        open={!!completionFlow.pendingCloseId && !!completionRequest}
+        request={completionRequest}
+        onConfirm={(assessment) => {
+          const id = completionFlow.pendingCloseId;
+          setCompletionRequest(null);
+          if (id) {
+            // Pasar endTime congelado para que la duración no cambie
+            // mientras el usuario decidía
+            const result = completeActivity(id, {
+              satisfactionScore: assessment.satisfactionScore,
+              endTime: completionFlow.requestedAt || undefined,
+            });
+            setLastReward({
+              activityTitle: getActiveTitleFromState(id),
+              tempos: result.temposAwarded,
+            });
+            completionFlow.resolve(assessment.satisfactionScore);
+          }
+        }}
+        onInterrupt={() => {
+          const id = completionFlow.pendingCloseId;
+          setCompletionRequest(null);
+          if (id) {
+            try {
+              interruptActivity(id);
+              setLastReward({
+                activityTitle: getActiveTitleFromState(id),
+                tempos: 0,
+              });
+            } catch (e) {
+              console.error("Error al interrumpir:", e);
+            }
+            completionFlow.reject();
+          }
+        }}
+        onClose={() => {
+          setCompletionRequest(null);
+          completionFlow.cancel();
+        }}
+      />
+
+      <Snackbar
+        open={!!lastReward}
+        autoHideDuration={4000}
+        onClose={() => setLastReward(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setLastReward(null)}
+          severity={lastReward && lastReward.tempos > 0 ? "success" : "info"}
+          sx={{ width: "100%" }}
+        >
+          {lastReward && lastReward.tempos > 0
+            ? `+${lastReward.tempos} tempos · ${lastReward.activityTitle}`
+            : `Sin tempos esta vez · ${lastReward?.activityTitle ?? ""}`}
+        </Alert>
+      </Snackbar>
+
       <Snackbar
         open={!!error}
         autoHideDuration={6000}
