@@ -26,9 +26,9 @@ const EventQuickBar: React.FC<EventQuickBarProps> = ({
           display: "flex",
           alignItems: "center",
           bgcolor: "background.paper",
-          borderRadius: 2,
+          borderRadius: 3,
           p: 1.5,
-          boxShadow: 1,
+          border: "1px dashed rgba(99,115,145,0.22)",
           width: "100%",
         }}
       >
@@ -47,16 +47,19 @@ const EventQuickBar: React.FC<EventQuickBarProps> = ({
         alignItems: "center",
         gap: 1,
         bgcolor: "background.paper",
-        borderRadius: 2,
+        borderRadius: 3,
         p: 1.5,
-        boxShadow: 1,
+        border: "1px solid rgba(99,115,145,0.12)",
         width: "100%",
         overflowX: "auto",
       }}
       aria-label="Registro rápido de eventos"
     >
-      <Typography variant="body2" sx={{ mr: 1 }}>
-        Registrar evento:
+      <Typography
+        variant="body2"
+        sx={{ mr: 1, color: "text.secondary", fontWeight: 700, whiteSpace: "nowrap" }}
+      >
+        Registrar ahora
       </Typography>
 
       {eventTemplates.map((template) => {

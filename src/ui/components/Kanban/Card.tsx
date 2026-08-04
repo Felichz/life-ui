@@ -96,16 +96,26 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
           <Card
             variant="outlined"
             sx={{
-              bgcolor: snapshot.isDragging ? "rgba(0, 0, 0, 0.04)" : "background.paper",
-              transition: "all 0.2s",
+              bgcolor: snapshot.isDragging ? "#eef2ff" : "background.paper",
+              transition: "transform 0.2s, box-shadow 0.2s",
+              border: activity.state === "active" ? "1px solid rgba(49,86,216,0.4)" : undefined,
+              boxShadow:
+                activity.state === "active" ? "0 8px 20px rgba(49,86,216,0.12)" : undefined,
               "&:hover": {
-                boxShadow: 1,
+                transform: "translateY(-1px)",
+                boxShadow: "0 8px 20px rgba(31,48,86,0.1)",
               },
             }}
           >
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Typography variant="h6" component="h3" gutterBottom noWrap>
+                <Typography
+                  variant="h6"
+                  component="h3"
+                  gutterBottom
+                  sx={{ fontSize: "0.98rem" }}
+                  noWrap
+                >
                   {templateTitle}
                 </Typography>
                 <IconButton size="small" onClick={handleEditClick} aria-label="editar actividad">
@@ -123,7 +133,13 @@ const KanbanCard: React.FC<KanbanCardProps> = ({
               <Box display="flex" justifyContent="space-between" alignItems="center" mt={1}>
                 <Chip
                   size="small"
-                  label={activity.state}
+                  label={
+                    activity.state === "active"
+                      ? "En curso"
+                      : activity.state === "instantiated"
+                        ? "Preparada"
+                        : activity.state
+                  }
                   color={activity.state === "active" ? "primary" : "default"}
                   variant="outlined"
                 />

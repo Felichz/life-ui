@@ -1,102 +1,63 @@
 import { createTheme } from "@mui/material/styles";
 import type { TypographyVariantsOptions } from "@mui/material/styles";
 
-// Definición de la paleta de colores
-const palette = {
-  primary: {
-    main: "#3f51b5", // Azul indigo
-    light: "#757de8",
-    dark: "#002984",
-    contrastText: "#fff",
-  },
-  secondary: {
-    main: "#f50057", // Rosa
-    light: "#ff5983",
-    dark: "#bb002f",
-    contrastText: "#fff",
-  },
-  background: {
-    default: "#f5f5f5",
-    paper: "#fff",
-  },
-  text: {
-    primary: "rgba(0, 0, 0, 0.87)",
-    secondary: "rgba(0, 0, 0, 0.6)",
-    disabled: "rgba(0, 0, 0, 0.38)",
-  },
-};
-
-// Definición de breakpoints
-const breakpoints = {
-  values: {
-    xs: 0,
-    sm: 600,
-    md: 960,
-    lg: 1280,
-    xl: 1920,
-  },
-};
-
-// Configuración de tipografía
-const typography: TypographyVariantsOptions = {
-  fontFamily: ["Roboto", "Arial", "sans-serif"].join(","),
-  h1: {
-    fontSize: "2.5rem",
-    fontWeight: 500,
-  },
-  h2: {
-    fontSize: "2rem",
-    fontWeight: 500,
-  },
-  h3: {
-    fontSize: "1.75rem",
-    fontWeight: 500,
-  },
-  h4: {
-    fontSize: "1.5rem",
-    fontWeight: 500,
-  },
-  h5: {
-    fontSize: "1.25rem",
-    fontWeight: 500,
-  },
-  h6: {
-    fontSize: "1rem",
-    fontWeight: 500,
-  },
-  button: {
-    textTransform: "none" as const,
-  },
-};
-
-// Creación del tema
 const theme = createTheme({
-  palette,
-  breakpoints,
-  typography,
+  palette: {
+    primary: { main: "#3156d8", light: "#6f8cff", dark: "#19338f", contrastText: "#fff" },
+    secondary: { main: "#e97857", light: "#ffab8e", dark: "#b94d32", contrastText: "#fff" },
+    success: { main: "#218b69" },
+    warning: { main: "#c78628" },
+    info: { main: "#4778a8" },
+    background: { default: "#f5f7fb", paper: "#ffffff" },
+    text: { primary: "#1b2538", secondary: "#647089", disabled: "#9aa5b8" },
+  },
+  breakpoints: { values: { xs: 0, sm: 600, md: 960, lg: 1280, xl: 1920 } },
+  typography: {
+    fontFamily: ["Inter", "Roboto", "Arial", "sans-serif"].join(","),
+    h1: { fontSize: "2.7rem", fontWeight: 750, letterSpacing: "-0.045em" },
+    h2: { fontSize: "2rem", fontWeight: 750, letterSpacing: "-0.03em" },
+    h3: { fontSize: "1.5rem", fontWeight: 750, letterSpacing: "-0.02em" },
+    h4: { fontSize: "1.25rem", fontWeight: 700 },
+    h5: { fontSize: "1.05rem", fontWeight: 700 },
+    h6: { fontSize: "1rem", fontWeight: 700 },
+    button: { textTransform: "none" as const },
+  } as TypographyVariantsOptions,
+  shape: { borderRadius: 12 },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: { backgroundColor: "#f5f7fb", color: "#1b2538" },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 10,
+          fontWeight: 700,
+          boxShadow: "none",
+          minHeight: 40,
+          "&:hover": { boxShadow: "none" },
         },
       },
     },
+    MuiIconButton: { styleOverrides: { root: { borderRadius: 10 } } },
     MuiPaper: {
       styleOverrides: {
-        rounded: {
-          borderRadius: 12,
-        },
+        root: { backgroundImage: "none" },
+        rounded: { borderRadius: 18 },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.1)",
+          borderRadius: 16,
+          boxShadow: "0 8px 24px rgba(31, 48, 86, 0.06)",
+          border: "1px solid rgba(99, 115, 145, 0.12)",
         },
       },
     },
+    MuiTextField: { defaultProps: { size: "small" } },
+    MuiChip: { styleOverrides: { root: { fontWeight: 700 } } },
   },
 });
 

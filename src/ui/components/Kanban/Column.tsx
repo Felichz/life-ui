@@ -1,5 +1,6 @@
 import React from "react";
-import { Paper, Typography, Box, Stack } from "@mui/material";
+import { Paper, Typography, Box, Stack, Chip } from "@mui/material";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import type { TimeBlock, ActivityInstance, UUID } from "../../../types";
 import KanbanCard from "./Card";
 import { Droppable } from "@hello-pangea/dnd";
@@ -53,16 +54,13 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
   };
 
   const droppableId = block.id;
-  console.log(`Creando columna con droppableId: ${droppableId}`);
-
   return (
     <Paper
       sx={{
-        width: 280,
+        width: "100%",
         height: "100%",
-        mx: 1,
         mb: 1,
-        backgroundColor: "background.paper",
+        backgroundColor: "#fbfcfe",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
@@ -70,8 +68,37 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
       elevation={0}
       variant="outlined"
     >
-      <Box p={2} bgcolor="background.default" borderRadius="4px 4px 0 0">
-        {renderColumnHeader()}
+      <Box
+        p={2}
+        sx={{
+          bgcolor: block.isDefault ? "#eef2ff" : "#f1f6f5",
+          borderBottom: "1px solid rgba(99,115,145,0.12)",
+          borderRadius: "16px 16px 0 0",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 1,
+          }}
+        >
+          <Box>{renderColumnHeader()}</Box>
+          <Chip
+            size="small"
+            label={activities.length}
+            sx={{ bgcolor: "rgba(255,255,255,0.8)", minWidth: 28 }}
+          />
+        </Box>
+        {!block.isDefault && (
+          <Box
+            sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 1, color: "text.secondary" }}
+          >
+            <ScheduleRoundedIcon sx={{ fontSize: 14 }} />
+            <Typography variant="caption">Planificado</Typography>
+          </Box>
+        )}
       </Box>
 
       <Droppable droppableId={droppableId}>
@@ -84,9 +111,9 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
             sx={{
               flex: 1,
               overflowY: "auto",
-              p: 1,
-              minHeight: 100,
-              backgroundColor: snapshot.isDraggingOver ? "action.hover" : "background.paper",
+              p: 1.25,
+              minHeight: 140,
+              backgroundColor: snapshot.isDraggingOver ? "rgba(49,86,216,0.07)" : "#fbfcfe",
               transition: "background-color 0.2s ease",
             }}
             role="list"

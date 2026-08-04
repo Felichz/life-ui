@@ -1,6 +1,7 @@
-import { AppBar, Toolbar, Typography, Button, Box, IconButton, Tooltip } from "@mui/material";
-import { Link as RouterLink, useLocation } from "react-router-dom";
+import { AppBar, Toolbar, Typography, Button, Box, IconButton, Tooltip, Chip } from "@mui/material";
+import { Link as RouterLink, useInRouterContext, useLocation } from "react-router-dom";
 import BedtimeIcon from "@mui/icons-material/Bedtime";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import type { ReactNode } from "react";
 
 interface TopBarProps {
@@ -9,64 +10,108 @@ interface TopBarProps {
   actionButtons?: ReactNode;
 }
 
-/**
- * TopBar - Barra de navegación superior
- * Contiene el título de la aplicación, enlaces de navegación, botones de acción
- * y el botón para finalizar el día cuando está activo
- */
 const TopBar = ({ isDayActive = false, onEndDayClick, actionButtons }: TopBarProps) => {
-  // Obtener la ruta actual para resaltar el botón activo
-  const location = useLocation();
-  const isPath = (path: string) => location.pathname === path;
+  const inRouter = useInRouterContext();
+  // TopBar can also be rendered as an isolated component in previews/tests.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const location = inRouter ? useLocation() : null;
+  const isPath = (path: string) => location?.pathname === path;
 
   return (
-    <AppBar position="static" color="primary" elevation={0}>
-      <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          Qualia Control
-        </Typography>
-        <Box sx={{ display: { xs: "none", sm: "block" } }}>
-          {/* Enlace a la vista principal */}
-          <Button
-            component={RouterLink}
-            to="/"
-            color="inherit"
+    <AppBar
+      position="sticky"
+      color="transparent"
+      elevation={0}
+      sx={{
+        bgcolor: "rgba(255,255,255,0.88)",
+        borderBottom: "1px solid rgba(99, 115, 145, 0.14)",
+        backdropFilter: "blur(14px)",
+        zIndex: (theme) => theme.zIndex.appBar,
+      }}
+    >
+      <Toolbar sx={{ minHeight: { xs: 64, md: 72 }, gap: 1.5, px: { xs: 2, md: 4 } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.2, mr: { md: 3 } }}>
+          <Box
             sx={{
-              mx: 1,
-              fontWeight: isPath("/") ? "bold" : "normal",
-              borderBottom: isPath("/") ? "2px solid white" : "none",
+              width: 34,
+              height: 34,
+              display: "grid",
+              placeItems: "center",
+              borderRadius: 2.5,
+              bgcolor: "primary.main",
+              color: "primary.contrastText",
             }}
           >
-            Día
-          </Button>
-          {/* Enlace a la vista de resumen */}
+            <AutoAwesomeIcon sx={{ fontSize: 19 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ lineHeight: 1.05, letterSpacing: "-0.03em" }}>
+              Qualia Control
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: { xs: "none", sm: "block" } }}
+            >
+              Tu interfaz para el día real
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Button
-            component={RouterLink}
+            component={inRouter ? RouterLink : "a"}
+            to="/"
+            href="/"
+            color={isPath("/") ? "primary" : "inherit"}
+            startIcon={
+              <Box component="span" sx={{ fontSize: 16 }}>
+                ◷
+              </Box>
+            }
+            sx={{ color: isPath("/") ? "primary.main" : "text.secondary", px: 1.5 }}
+          >
+            Hoy
+          </Button>
+          <Button
+            component={inRouter ? RouterLink : "a"}
             to="/overview"
-            color="inherit"
-            sx={{
-              mx: 1,
-              fontWeight: isPath("/overview") ? "bold" : "normal",
-              borderBottom: isPath("/overview") ? "2px solid white" : "none",
-            }}
+            href="/overview"
+            color={isPath("/overview") ? "primary" : "inherit"}
+            startIcon={
+              <Box component="span" sx={{ fontSize: 16 }}>
+                ▥
+              </Box>
+            }
+            sx={{ color: isPath("/overview") ? "primary.main" : "text.secondary", px: 1.5 }}
           >
             Resumen
           </Button>
         </Box>
 
-        {/* Botones de acción adicionales */}
+        <Box sx={{ flexGrow: 1 }} />
+        {isDayActive && (
+          <Chip
+            size="small"
+            label="Día en curso"
+            sx={{
+              display: { xs: "none", sm: "inline-flex" },
+              color: "success.dark",
+              bgcolor: "rgba(33,139,105,0.1)",
+              border: "1px solid rgba(33,139,105,0.18)",
+            }}
+          />
+        )}
         {actionButtons}
-
-        {/* Botón para finalizar el día (visible sólo cuando hay un día activo) */}
         {isDayActive && (
           <Tooltip title="Finalizar día">
             <IconButton
-              color="inherit"
+              color="primary"
               onClick={onEndDayClick}
-              sx={{ ml: 1 }}
               aria-label="finalizar día"
+              sx={{ ml: 0.5, bgcolor: "rgba(49,86,216,0.08)" }}
             >
-              <BedtimeIcon />
+              <BedtimeIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}

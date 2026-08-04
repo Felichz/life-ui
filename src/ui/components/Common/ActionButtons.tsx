@@ -1,5 +1,5 @@
 import React from "react";
-import { IconButton, Tooltip } from "@mui/material";
+import { Box, Button, IconButton, Tooltip, useMediaQuery, useTheme } from "@mui/material";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import EventNoteIcon from "@mui/icons-material/EventNote";
@@ -15,9 +15,6 @@ interface ActionButtonsProps {
   onActivityLibraryClick: () => void;
 }
 
-/**
- * Componente que muestra los botones de acción principales para las funcionalidades del sistema
- */
 const ActionButtons: React.FC<ActionButtonsProps> = ({
   canUpdateVariables,
   onVariableClick,
@@ -26,72 +23,88 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   onEventLibraryClick,
   onActivityLibraryClick,
 }) => {
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+  const actions = [
+    {
+      label: "Variables",
+      icon: <ShowChartIcon />,
+      onClick: onVariableClick,
+      disabled: !canUpdateVariables,
+      title: canUpdateVariables
+        ? "actualizar variables subjetivas"
+        : "actualizar variables subjetivas",
+    },
+    {
+      label: "Bloques",
+      icon: <AccessTimeIcon />,
+      onClick: onTimeBlockClick,
+      title: "gestionar bloques de tiempo",
+    },
+    {
+      label: "Eventos",
+      icon: <EventNoteIcon />,
+      onClick: onEventLibraryClick,
+      title: "gestionar biblioteca de eventos",
+    },
+    {
+      label: "Biblioteca",
+      icon: <MenuBookIcon />,
+      onClick: onActivityLibraryClick,
+      title: "abrir biblioteca de actividades",
+    },
+  ];
+
   return (
-    <>
-      <Tooltip
-        title={
-          canUpdateVariables
-            ? "Actualizar variables subjetivas"
-            : "Debes esperar 5 minutos entre actualizaciones"
-        }
-      >
-        <span>
-          <IconButton
-            color="inherit"
-            onClick={onVariableClick}
-            aria-label="actualizar variables subjetivas"
-            sx={{ mr: 1 }}
-            disabled={!canUpdateVariables}
-          >
-            <ShowChartIcon />
-          </IconButton>
-        </span>
-      </Tooltip>
-
-      <Tooltip title="Ver resumen histórico">
-        <IconButton
-          color="inherit"
-          onClick={onOverviewClick}
-          aria-label="ver resumen histórico"
-          sx={{ mr: 1 }}
-        >
-          <AssessmentIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Gestionar bloques de tiempo">
-        <IconButton
-          color="inherit"
-          onClick={onTimeBlockClick}
-          aria-label="gestionar bloques de tiempo"
-          sx={{ mr: 1 }}
-        >
-          <AccessTimeIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Gestionar biblioteca de eventos">
-        <IconButton
-          color="inherit"
-          onClick={onEventLibraryClick}
-          aria-label="gestionar biblioteca de eventos"
-          sx={{ mr: 1 }}
-        >
-          <EventNoteIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip title="Biblioteca de actividades">
-        <IconButton
-          color="inherit"
-          onClick={onActivityLibraryClick}
-          aria-label="abrir biblioteca de actividades"
-          sx={{ mr: 1 }}
-        >
-          <MenuBookIcon />
-        </IconButton>
-      </Tooltip>
-    </>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+      {isDesktop ? (
+        <Box sx={{ display: "flex", gap: 0.5 }}>
+          {actions.map((action) => (
+            <Tooltip key={action.label} title={action.title}>
+              <span>
+                <Button
+                  size="small"
+                  color="inherit"
+                  startIcon={action.icon}
+                  onClick={action.onClick}
+                  disabled={action.disabled}
+                  aria-label={action.title}
+                  sx={{ color: "text.secondary", px: 1.1, minWidth: "auto" }}
+                >
+                  {action.label}
+                </Button>
+              </span>
+            </Tooltip>
+          ))}
+        </Box>
+      ) : (
+        <Box sx={{ display: "flex", gap: 0.25 }}>
+          {actions.map((action) => (
+            <Tooltip key={action.label} title={action.title}>
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={action.onClick}
+                disabled={action.disabled}
+                aria-label={action.title}
+              >
+                {action.icon}
+              </IconButton>
+            </Tooltip>
+          ))}
+          <Tooltip title="Ver resumen histórico">
+            <IconButton
+              size="small"
+              color="primary"
+              onClick={onOverviewClick}
+              aria-label="ver resumen histórico"
+            >
+              <AssessmentIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
+    </Box>
   );
 };
 

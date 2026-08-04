@@ -41,14 +41,19 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       sx={{
         display: "flex",
         overflowX: "auto",
-        p: 1,
-        minHeight: "70vh",
+        gap: 1.5,
+        p: 0.5,
+        minHeight: "52vh",
+        alignItems: "stretch",
       }}
       data-testid="kanban-board"
     >
       {columns.length > 0 ? (
         columns.map((column) => (
-          <Box key={column.block.id} sx={{ minWidth: 280, mx: 1 }}>
+          <Box
+            key={column.block.id}
+            sx={{ minWidth: { xs: 280, md: 310 }, flex: { md: "1 0 0" }, maxWidth: { md: 360 } }}
+          >
             <KanbanColumn
               block={column.block}
               activities={column.activities}
