@@ -92,4 +92,16 @@ export class UserPreferencesManager {
     const preferences = this.getUserPreferences();
     return !preferences.hiddenSubjectiveVariableIds.includes(variableId);
   }
+
+  /**
+   * Schema v2+: actualiza el target diario de tempos
+   * @param target Nuevo target (entero positivo)
+   * @returns Preferencias actualizadas
+   */
+  public updateDailyTempoTarget(target: number): UserPreferences {
+    if (typeof target !== "number" || target <= 0 || !Number.isInteger(target)) {
+      throw new Error("dailyTempoTarget debe ser un entero positivo");
+    }
+    return this.updateUserPreferences({ dailyTempoTarget: target });
+  }
 }

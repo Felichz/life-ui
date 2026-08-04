@@ -1,5 +1,6 @@
 import type {
   UUID,
+  ISODateTimeString,
   ISystemCore,
   TimelineData,
   TimeDistributionData,
@@ -8,6 +9,8 @@ import type {
   CompletedActivityRecord,
   InterruptionStatistics,
   DayMinutes,
+  TempoSummary,
+  TempoTrendPoint,
 } from "../types";
 
 /**
@@ -578,5 +581,77 @@ export class AnalyticsManager {
       default:
         return "Otros";
     }
+  }
+
+  /**
+   * Resumen de tempos de un día específico
+   */
+  public getTempoSummary(dayId: UUID): TempoSummary {
+    const state = this.systemCore.getState();
+    const target = state.global.userPreferences.dailyTempoTarget || 1000;
+
+    const dayRecords = state.global.completedActivityRecords.filter(
+      (r) => r.dayId === dayId && r.state === "completed"
+    );
+
+    const totalTempos = dayRecords.reduce((sum, r) => sum + (r.temposAwarded || 0), 0);
+    const completedActivities = dayRecords.length;
+    const averageSatisfaction =
+      completedActivities > 0
+        ? dayRecords.reduce((sum, r) => sum + (r.satisfactionScore || 0), 0) / completedActivities
+        : 0;
+
+    const last = dayRecords[dayRecords.length - 1];
+
+    return {
+      totalTempos,
+      target,
+      targetProgress: Math.min(1, totalTempos / target),
+      completedActivities,
+      averageSatisfaction,
+      lastReward: last
+        ? {
+            recordId: last.id,
+            activityTitle: last.templateTitle,
+            tempos: last.temposAwarded || 0,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * Tendencias de tempos en un rango temporal
+   */
+  public getTempoTrends(range: {
+    from: ISODateTimeString;
+    to: ISODateTimeString;
+  }): TempoTrendPoint[] {
+    const state = this.systemCore.getState();
+    const target = state.global.userPreferences.dailyTempoTarget || 1000;
+    const fromMs = new Date(range.from).getTime();
+    const toMs = new Date(range.to).getTime();
+
+    const daysInRange = state.global.days.filter((d) => {
+      const created = new Date(d.createdAt).getTime();
+      return created >= fromMs && created <= toMs;
+    });
+
+    return daysInRange.map((day) => {
+      const records = state.global.completedActivityRecords.filter(
+        (r) => r.dayId === day.id && r.state === "completed"
+      );
+      const totalTempos = records.reduce((sum, r) => sum + (r.temposAwarded || 0), 0);
+      const avg =
+        records.length > 0
+          ? records.reduce((sum, r) => sum + (r.satisfactionScore || 0), 0) / records.length
+          : 0;
+
+      return {
+        date: day.createdAt,
+        totalTempos,
+        targetProgress: Math.min(1, totalTempos / target),
+        averageSatisfaction: avg,
+      };
+    });
   }
 }

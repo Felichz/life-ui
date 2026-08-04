@@ -12,7 +12,6 @@ const QuickBarContainer = () => {
     getActiveActivity,
     isDayActive,
     activateActivity,
-    completeActivity,
     createActivityInstance,
     getCurrentTimeBlock,
     getTimeBlocks,
@@ -94,12 +93,15 @@ const QuickBarContainer = () => {
     setError(null);
 
     try {
-      // Si hay actividad activa, completarla antes
+      // Si hay actividad activa, NO auto-completar: el core ahora exige completion explícito.
+      // La UI debe mostrar el CompletionModal antes de permitir el cambio.
       if (activeActivity) {
-        completeActivity(activeActivity.id);
+        setError("Hay una actividad activa. Ciérrala primero desde el kanban antes de cambiar.");
+        setIsLoading(false);
+        setLoadingActivityId(null);
+        return;
       }
 
-      // Activar la nueva
       activateActivity(activityId);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Error desconocido";
@@ -121,18 +123,17 @@ const QuickBarContainer = () => {
     setError(null);
 
     try {
-      // Crear instancia con configuración dinámica
-      const instance = createActivityInstance(templateId, blockId, dynamicSettings);
-
-      // Si hay actividad activa, completarla
+      // Si hay actividad activa, NO auto-completar.
       if (activeActivity) {
-        completeActivity(activeActivity.id);
+        setError("Hay una actividad activa. Ciérrala primero desde el kanban antes de crear otra.");
+        setIsLoading(false);
+        setLoadingActivityId(null);
+        return;
       }
 
-      // Activar la nueva instancia
+      const instance = createActivityInstance(templateId, blockId, dynamicSettings);
       activateActivity(instance.id);
 
-      // Cerrar modal
       setIsModalOpen(false);
       setSelectedTemplateId(null);
     } catch (err: unknown) {

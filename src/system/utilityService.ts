@@ -118,4 +118,55 @@ export class UtilityService {
 
     return copy as T;
   }
+
+  /**
+   * Determina si una actividad cumple la condición de "beat estimate".
+   * El bonus SOLO aplica si el tipo es clear-objective y hay un estimado puntual.
+   *
+   * @param activityType Tipo de actividad
+   * @param actualMinutes Duración real en minutos
+   * @param estimatedMinutes Duración estimada (solo presente para clear-objective)
+   * @returns true si cumple la condición para aplicar bonus
+   */
+  public static shouldApplyBonus(
+    activityType: "clear-objective" | "flexible-duration" | "timeboxing",
+    actualMinutes: number,
+    estimatedMinutes: number | undefined
+  ): boolean {
+    if (activityType !== "clear-objective") return false;
+    if (typeof estimatedMinutes !== "number" || estimatedMinutes <= 0) return false;
+    if (actualMinutes <= 0) return false;
+    return actualMinutes <= estimatedMinutes * 0.8;
+  }
+
+  /**
+   * Calcula la recompensa de tempos por una actividad completada.
+   *
+   * Reglas:
+   * - score === 0 → 0 tempos (coherencia)
+   * - durationMinutes <= 0 → 0 tempos (no se premia tiempo nulo)
+   * - score inválido (< 0 o > 10) → 0 tempos
+   * - base = ceil(durationMinutes × score / 10) (siempre a favor del usuario)
+   * - bonus = +5 si shouldApplyBonus(...) y score > 0
+   *
+   * @param durationMinutes Duración real invertida
+   * @param satisfactionScore Auto-evaluación 0-10
+   * @param canApplyBonus Si la actividad es elegible para bonus
+   * @returns Total de tempos otorgados (>= 0)
+   */
+  public static calculateTemposAwarded(
+    durationMinutes: number,
+    satisfactionScore: number,
+    canApplyBonus: boolean
+  ): number {
+    if (typeof durationMinutes !== "number" || durationMinutes <= 0) return 0;
+    if (typeof satisfactionScore !== "number") return 0;
+    if (satisfactionScore < 0 || satisfactionScore > 10) return 0;
+    if (satisfactionScore === 0) return 0;
+
+    const baseTempos = Math.ceil((durationMinutes * satisfactionScore) / 10);
+    const bonusTempos = canApplyBonus ? 5 : 0;
+
+    return baseTempos + bonusTempos;
+  }
 }

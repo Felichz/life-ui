@@ -21,6 +21,11 @@ import type {
   InterruptionStatistics,
   UserPreferences,
   UUID,
+  CompletionRequest,
+  CompletionResult,
+  TempoSummary,
+  TempoTrendPoint,
+  ISODateTimeString,
 } from "../types";
 import { PersistenceManager } from "./persistenceManager";
 import { DayManager } from "./dayManager";
@@ -241,21 +246,28 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Completa una actividad
+   * Solicita el cierre de una actividad: la UI usa esto para abrir el CompletionModal.
    */
-  public completeActivity(id: UUID): CompletedActivityRecord {
-    return this.activityManager.completeActivity(id);
+  public requestCompletion(activityId: UUID): CompletionRequest {
+    return this.activityManager.requestCompletion(activityId);
   }
 
   /**
-   * Interrumpe una actividad
+   * Completa una actividad con auto-evaluación del usuario.
+   * Calcula tempos en el core (la UI nunca recalcula la fórmula).
    */
-  public interruptActivity(
-    id: UUID,
-    isAvoidable: boolean,
-    causeId?: UUID
-  ): CompletedActivityRecord {
-    return this.activityManager.interruptActivity(id, isAvoidable, causeId);
+  public completeActivity(
+    activityId: UUID,
+    assessment: { satisfactionScore: number }
+  ): CompletionResult {
+    return this.activityManager.completeActivity(activityId, assessment);
+  }
+
+  /**
+   * Interrumpe una actividad. Schema v2+: sin pregunta evitable/causa.
+   */
+  public interruptActivity(activityId: UUID): CompletedActivityRecord {
+    return this.activityManager.interruptActivity(activityId);
   }
 
   /**
@@ -521,6 +533,23 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
+   * Schema v2+: resumen de tempos de un día
+   */
+  public getTempoSummary(dayId: UUID): TempoSummary {
+    return this.analyticsManager.getTempoSummary(dayId);
+  }
+
+  /**
+   * Schema v2+: tendencias de tempos en un rango
+   */
+  public getTempoTrends(range: {
+    from: ISODateTimeString;
+    to: ISODateTimeString;
+  }): TempoTrendPoint[] {
+    return this.analyticsManager.getTempoTrends(range);
+  }
+
+  /**
    * Obtiene la precisión de estimación de tiempos
    */
   public getEstimationAccuracy(): number {
@@ -557,6 +586,13 @@ export class SystemCore implements ISystemCore {
    */
   public isVariableVisible(variableId: UUID): boolean {
     return this.userPreferencesManager.isVariableVisible(variableId);
+  }
+
+  /**
+   * Schema v2+: actualiza el target diario de tempos
+   */
+  public updateDailyTempoTarget(target: number): UserPreferences {
+    return this.userPreferencesManager.updateDailyTempoTarget(target);
   }
 
   // ===============================================
@@ -616,6 +652,7 @@ export class SystemCore implements ISystemCore {
       timeBlocks: [],
       userPreferences: {
         hiddenSubjectiveVariableIds: [],
+        dailyTempoTarget: 1000,
         updatedAt: timestamp,
       },
       completedActivityRecords: [],

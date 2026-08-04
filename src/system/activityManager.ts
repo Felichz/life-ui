@@ -5,9 +5,8 @@ import type {
   ActivityInstance,
   UUID,
   CompletedActivityRecord,
-  ActivityType,
-  ActivityState,
-  TimeboxingType,
+  CompletionRequest,
+  CompletionResult,
 } from "../types";
 
 /**
@@ -486,10 +485,14 @@ export class ActivityManager {
   // ===============================================
 
   /**
-   * Activa una instancia de actividad
+   * Activa una instancia de actividad.
+   *
+   * NO auto-completa la actividad anterior. Si hay una activa, lanza error —
+   * la UI debe cerrar la anterior vía `requestCompletion` + `completeActivity` antes.
+   *
    * @param id ID de la instancia
    * @returns La instancia activada
-   * @throws Error si la instancia no existe o no hay día activo
+   * @throws Error si ya hay una actividad activa, si la instancia no existe, o si no hay día activo
    */
   public activateActivity(id: UUID): ActivityInstance {
     const timestamp = UtilityService.getCurrentISODateTime();
@@ -500,63 +503,23 @@ export class ActivityManager {
         throw new Error("No hay un día activo");
       }
 
-      let updatedInstances = [...state.currentDay.activityInstances];
-      let completedRecords = [...state.global.completedActivityRecords];
-
-      // Finalizar actividad activa previa si existe
       if (state.currentDay.activeActivityInstanceId) {
-        const activeInstanceId = state.currentDay.activeActivityInstanceId;
-        const activeInstanceIndex = updatedInstances.findIndex(
-          (instance) => instance.id === activeInstanceId
+        throw new Error(
+          "Hay una actividad activa. Ciérrala primero mediante completeActivity o interruptActivity."
         );
-
-        if (activeInstanceIndex !== -1) {
-          const activeInstance = updatedInstances[activeInstanceIndex];
-
-          // Crear registro de actividad completada
-          const completedRecord: CompletedActivityRecord = {
-            id: UtilityService.generateUUID(),
-            activityInstanceId: activeInstance.id,
-            templateId: activeInstance.templateId,
-            templateTitle:
-              this.getActivityTemplate(activeInstance.templateId)?.title || "Desconocida",
-            state: "completed",
-            type: this.getActivityTemplate(activeInstance.templateId)?.type || "clear-objective",
-            startTime: activeInstance.startTime || timestamp,
-            endTime: timestamp,
-            durationMinutes: activeInstance.startTime
-              ? this.calculateDuration(activeInstance.startTime, timestamp)
-              : 0,
-            dayId: state.currentDay.day.id,
-            createdAt: timestamp,
-          };
-
-          // Añadir configuraciones específicas según el tipo
-          if (activeInstance.clearObjectiveSettings) {
-            completedRecord.clearObjectiveSettings = activeInstance.clearObjectiveSettings;
-          } else if (activeInstance.flexibleDurationSettings) {
-            completedRecord.flexibleDurationSettings = activeInstance.flexibleDurationSettings;
-          } else if (activeInstance.timeboxingSettings) {
-            completedRecord.timeboxingSettings = activeInstance.timeboxingSettings;
-          }
-
-          // Agregar el registro a la lista de actividades completadas
-          completedRecords = [...completedRecords, completedRecord];
-
-          // Eliminar la instancia activa
-          updatedInstances = updatedInstances.filter((_, index) => index !== activeInstanceIndex);
-        }
       }
 
       // Buscar la instancia a activar
-      const instanceIndex = updatedInstances.findIndex((instance) => instance.id === id);
+      const instanceIndex = state.currentDay.activityInstances.findIndex(
+        (instance) => instance.id === id
+      );
 
       if (instanceIndex === -1) {
         throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
       }
 
       // Actualizar la instancia
-      const instance = updatedInstances[instanceIndex];
+      const instance = state.currentDay.activityInstances[instanceIndex];
       activatedInstance = {
         ...instance,
         state: "active",
@@ -565,15 +528,11 @@ export class ActivityManager {
       };
 
       // Crear nuevo array con la instancia activada
-      const finalInstances = [...updatedInstances];
+      const finalInstances = [...state.currentDay.activityInstances];
       finalInstances[instanceIndex] = activatedInstance;
 
       return {
         ...state,
-        global: {
-          ...state.global,
-          completedActivityRecords: completedRecords,
-        },
         currentDay: {
           ...state.currentDay,
           activityInstances: finalInstances,
@@ -590,43 +549,130 @@ export class ActivityManager {
   }
 
   /**
-   * Completa la actividad activa actual
-   * @param id ID de la instancia a completar
-   * @returns Registro de la actividad completada
-   * @throws Error si la instancia no existe, no está activa o no hay día activo
+   * Solicitud de cierre: la UI usa esto para obtener la info que necesita
+   * mostrar en el CompletionModal. NO completa la actividad; solo lee el estado.
+   *
+   * @param activityId ID de la instancia activa que se quiere cerrar
+   * @returns Datos para mostrar el CompletionModal
    */
-  public completeActivity(id: UUID): CompletedActivityRecord {
+  public requestCompletion(activityId: UUID): CompletionRequest {
+    const state = this.systemCore.getState();
+
+    if (!state.currentDay) {
+      throw new Error("No hay un día activo");
+    }
+    if (state.currentDay.activeActivityInstanceId !== activityId) {
+      throw new Error("Solo se puede cerrar la actividad activa actual");
+    }
+
+    const instance = state.currentDay.activityInstances.find((i) => i.id === activityId);
+    if (!instance) {
+      throw new Error(`Instancia con ID ${activityId} no encontrada`);
+    }
+    const template = this.getActivityTemplate(instance.templateId);
+    if (!template) {
+      throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
+    }
+
     const timestamp = UtilityService.getCurrentISODateTime();
-    let completedRecord: CompletedActivityRecord | null = null;
+    const durationMinutes = instance.startTime
+      ? this.calculateDuration(instance.startTime, timestamp)
+      : 0;
+
+    const estimatedMinutes =
+      template.type === "clear-objective" && template.clearObjectiveSettings
+        ? template.clearObjectiveSettings.estimatedDurationMinutes
+        : undefined;
+
+    const canApplyBonus = UtilityService.shouldApplyBonus(
+      template.type,
+      durationMinutes,
+      estimatedMinutes
+    );
+
+    return {
+      activityTitle: template.title,
+      durationMinutes,
+      estimatedMinutes,
+      canApplyBonus,
+    };
+  }
+
+  /**
+   * Completa la actividad activa actual con auto-evaluación honesta del usuario.
+   *
+   * El core calcula los tempos. La UI nunca recalcula la fórmula.
+   * score === 0 → 0 tempos. Bonus solo si clear-objective + beat estimate.
+   *
+   * @param activityId ID de la instancia a completar
+   * @param assessment Auto-evaluación 0-10
+   * @returns Resultado con record creado, tempos y total del día
+   */
+  public completeActivity(
+    activityId: UUID,
+    assessment: { satisfactionScore: number }
+  ): CompletionResult {
+    const timestamp = UtilityService.getCurrentISODateTime();
+    const { satisfactionScore } = assessment;
+
+    if (
+      typeof satisfactionScore !== "number" ||
+      satisfactionScore < 0 ||
+      satisfactionScore > 10 ||
+      !Number.isInteger(satisfactionScore)
+    ) {
+      throw new Error("satisfactionScore debe ser un entero entre 0 y 10");
+    }
+
+    let resultRecord: CompletedActivityRecord | null = null;
+    let beatEstimate = false;
+    let temposAwarded = 0;
+    let dailyTotal = 0;
+    let target = 1000;
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
         throw new Error("No hay un día activo");
       }
-
-      // Verificar que sea la actividad activa
-      if (state.currentDay.activeActivityInstanceId !== id) {
+      if (state.currentDay.activeActivityInstanceId !== activityId) {
         throw new Error("Solo se puede completar la actividad activa actual");
       }
 
-      // Buscar la instancia
       const instanceIndex = state.currentDay.activityInstances.findIndex(
-        (instance) => instance.id === id
+        (i) => i.id === activityId
       );
-
       if (instanceIndex === -1) {
-        throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
+        throw new Error(`Instancia con ID ${activityId} no encontrada`);
       }
 
       const instance = state.currentDay.activityInstances[instanceIndex];
       const template = this.getActivityTemplate(instance.templateId);
-
       if (!template) {
         throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
       }
 
-      // Crear registro de actividad completada
-      completedRecord = {
+      const durationMinutes = instance.startTime
+        ? this.calculateDuration(instance.startTime, timestamp)
+        : 0;
+
+      const estimatedMinutes =
+        template.type === "clear-objective" && instance.clearObjectiveSettings
+          ? instance.clearObjectiveSettings.estimatedDurationMinutes
+          : undefined;
+
+      beatEstimate = UtilityService.shouldApplyBonus(
+        template.type,
+        durationMinutes,
+        estimatedMinutes
+      );
+
+      temposAwarded = UtilityService.calculateTemposAwarded(
+        durationMinutes,
+        satisfactionScore,
+        beatEstimate
+      );
+
+      const completedRecord: CompletedActivityRecord = {
         id: UtilityService.generateUUID(),
         activityInstanceId: instance.id,
         templateId: instance.templateId,
@@ -635,14 +681,14 @@ export class ActivityManager {
         type: template.type,
         startTime: instance.startTime || timestamp,
         endTime: timestamp,
-        durationMinutes: instance.startTime
-          ? this.calculateDuration(instance.startTime, timestamp)
-          : 0,
+        durationMinutes,
         dayId: state.currentDay.day.id,
+        satisfactionScore,
+        temposAwarded,
+        beatEstimate,
         createdAt: timestamp,
       };
 
-      // Añadir configuraciones específicas según el tipo
       if (instance.clearObjectiveSettings) {
         completedRecord.clearObjectiveSettings = instance.clearObjectiveSettings;
       } else if (instance.flexibleDurationSettings) {
@@ -651,9 +697,14 @@ export class ActivityManager {
         completedRecord.timeboxingSettings = instance.timeboxingSettings;
       }
 
-      // Eliminar la instancia de la lista
+      resultRecord = completedRecord;
+      target = state.global.userPreferences.dailyTempoTarget || 1000;
+      dailyTotal =
+        state.global.completedActivityRecords.reduce((sum, r) => sum + (r.temposAwarded || 0), 0) +
+        temposAwarded;
+
       const updatedInstances = state.currentDay.activityInstances.filter(
-        (_, index) => index !== instanceIndex
+        (_, idx) => idx !== instanceIndex
       );
 
       return {
@@ -670,26 +721,29 @@ export class ActivityManager {
       };
     });
 
-    if (!completedRecord) {
-      throw new Error(`Error al completar la actividad ${id}`);
+    if (!resultRecord) {
+      throw new Error(`Error al completar la actividad ${activityId}`);
     }
 
-    return completedRecord;
+    return {
+      record: resultRecord,
+      temposAwarded,
+      beatEstimate,
+      dailyTempoTotal: dailyTotal,
+      targetProgress: Math.min(1, dailyTotal / target),
+    };
   }
 
   /**
-   * Interrumpe la actividad activa actual
-   * @param id ID de la instancia a interrumpir
-   * @param isAvoidable Indica si la interrupción era evitable
-   * @param causeId ID de la causa de interrupción (solo para interrupciones evitables)
+   * Interrumpe la actividad activa actual.
+   *
+   * Schema v2+: ya no pregunta evitable/causa. Solo registra la interrupción
+   * sin tempos. Sin penalización. Sin juicio moral.
+   *
+   * @param activityId ID de la instancia a interrumpir
    * @returns Registro de la actividad interrumpida
-   * @throws Error si la instancia no existe, no está activa o no hay día activo
    */
-  public interruptActivity(
-    id: UUID,
-    isAvoidable: boolean,
-    causeId?: UUID
-  ): CompletedActivityRecord {
+  public interruptActivity(activityId: UUID): CompletedActivityRecord {
     const timestamp = UtilityService.getCurrentISODateTime();
     let interruptedRecord: CompletedActivityRecord | null = null;
 
@@ -697,47 +751,28 @@ export class ActivityManager {
       if (!state.currentDay) {
         throw new Error("No hay un día activo");
       }
-
-      // Verificar que sea la actividad activa
-      if (state.currentDay.activeActivityInstanceId !== id) {
+      if (state.currentDay.activeActivityInstanceId !== activityId) {
         throw new Error("Solo se puede interrumpir la actividad activa actual");
       }
 
-      // Buscar la instancia
       const instanceIndex = state.currentDay.activityInstances.findIndex(
-        (instance) => instance.id === id
+        (i) => i.id === activityId
       );
-
       if (instanceIndex === -1) {
-        throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
+        throw new Error(`Instancia con ID ${activityId} no encontrada`);
       }
 
       const instance = state.currentDay.activityInstances[instanceIndex];
       const template = this.getActivityTemplate(instance.templateId);
-
       if (!template) {
         throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
       }
 
-      // Si es interrupción evitable, verificar que se proporcione un causeId
-      if (isAvoidable && !causeId) {
-        throw new Error("Se requiere un causeId para interrupciones evitables");
-      }
+      const durationMinutes = instance.startTime
+        ? this.calculateDuration(instance.startTime, timestamp)
+        : 0;
 
-      // Buscar causa de interrupción si aplica
-      let causeDescription: string | undefined;
-      if (isAvoidable && causeId) {
-        const cause = state.global.interruptionCauses.find((cause) => cause.id === causeId);
-
-        if (!cause) {
-          throw new Error(`Causa de interrupción con ID ${causeId} no encontrada`);
-        }
-
-        causeDescription = cause.description;
-      }
-
-      // Crear registro de actividad interrumpida
-      interruptedRecord = {
+      const record: CompletedActivityRecord = {
         id: UtilityService.generateUUID(),
         activityInstanceId: instance.id,
         templateId: instance.templateId,
@@ -746,37 +781,33 @@ export class ActivityManager {
         type: template.type,
         startTime: instance.startTime || timestamp,
         endTime: timestamp,
-        durationMinutes: instance.startTime
-          ? this.calculateDuration(instance.startTime, timestamp)
-          : 0,
+        durationMinutes,
         dayId: state.currentDay.day.id,
-        interruptionData: {
-          isAvoidable,
-          causeId,
-          causeDescription,
-        },
+        satisfactionScore: 0,
+        temposAwarded: 0,
+        beatEstimate: false,
         createdAt: timestamp,
       };
 
-      // Añadir configuraciones específicas según el tipo
       if (instance.clearObjectiveSettings) {
-        interruptedRecord.clearObjectiveSettings = instance.clearObjectiveSettings;
+        record.clearObjectiveSettings = instance.clearObjectiveSettings;
       } else if (instance.flexibleDurationSettings) {
-        interruptedRecord.flexibleDurationSettings = instance.flexibleDurationSettings;
+        record.flexibleDurationSettings = instance.flexibleDurationSettings;
       } else if (instance.timeboxingSettings) {
-        interruptedRecord.timeboxingSettings = instance.timeboxingSettings;
+        record.timeboxingSettings = instance.timeboxingSettings;
       }
 
-      // Eliminar la instancia de la lista
+      interruptedRecord = record;
+
       const updatedInstances = state.currentDay.activityInstances.filter(
-        (_, index) => index !== instanceIndex
+        (_, idx) => idx !== instanceIndex
       );
 
       return {
         ...state,
         global: {
           ...state.global,
-          completedActivityRecords: [...state.global.completedActivityRecords, interruptedRecord],
+          completedActivityRecords: [...state.global.completedActivityRecords, record],
         },
         currentDay: {
           ...state.currentDay,
@@ -787,7 +818,7 @@ export class ActivityManager {
     });
 
     if (!interruptedRecord) {
-      throw new Error(`Error al interrumpir la actividad ${id}`);
+      throw new Error(`Error al interrumpir la actividad ${activityId}`);
     }
 
     return interruptedRecord;

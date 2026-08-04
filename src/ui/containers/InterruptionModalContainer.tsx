@@ -53,23 +53,22 @@ const InterruptionModalContainer: React.FC<InterruptionModalContainerProps> = ({
   }, [activityInstance, getActivityTemplates]);
 
   // Manejo de la confirmación
-  const handleConfirm = async (isAvoidable: boolean, causeId?: UUID) => {
+  const handleConfirm = async (_isAvoidable: boolean, _causeId?: UUID) => {
     if (!activityId) return;
 
     try {
-      // Interrumpir la actividad
-      const interruptedActivity = interruptActivity(activityId, isAvoidable, causeId);
+      // Schema v2+: interruptActivity ya no toma isAvoidable ni causeId.
+      // Mantenemos los parámetros legacy por compatibilidad con InterruptionModal UI
+      // pero el core los ignora. Phase 10 eliminará el modal completo.
+      const interruptedActivity = interruptActivity(activityId);
 
-      // Cerrar el modal primero
       onClose();
 
-      // Notificar éxito para que el componente padre pueda abrir el modal de variables
       if (onInterruptSuccess) {
         onInterruptSuccess(interruptedActivity.id);
       }
     } catch (error) {
       console.error("Error al interrumpir actividad:", error);
-      // No cerramos el modal en caso de error para que el usuario pueda reintentar
     }
   };
 

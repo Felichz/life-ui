@@ -25,6 +25,7 @@ import EventLibraryModalContainer from "../containers/EventLibraryModalContainer
 import VariableModalContainer from "../containers/VariableModalContainer";
 import OverviewModalContainer from "../containers/OverviewModalContainer";
 import ActivityInstanceModal from "../modals/ActivityInstanceModal";
+import TempoBanner from "../components/TempoBanner";
 import { useModal } from "../hooks/useModal";
 import { DragDropContext } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
@@ -41,7 +42,6 @@ const DayPage: React.FC = () => {
     createActivityInstance,
     getActiveActivity,
     canUpdateVariables,
-    completeActivity,
     endDay,
   } = useSystemCore();
   const {
@@ -127,7 +127,15 @@ const DayPage: React.FC = () => {
   };
   const handleEndDayConfirm = () => {
     try {
-      if (activeActivity) completeActivity(activeActivity.id);
+      // Schema v2+: si hay actividad activa, NO auto-completar al cerrar el día.
+      // El usuario debe cerrar primero vía CompletionModal desde el Kanban.
+      if (activeActivity) {
+        setError(
+          "Hay una actividad activa. Ciérrala primero desde el kanban antes de finalizar el día."
+        );
+        closeEndDayModal();
+        return;
+      }
       endDay();
       closeEndDayModal();
       navigate("/overview");
@@ -158,6 +166,7 @@ const DayPage: React.FC = () => {
       <DragDropContext onDragEnd={handleDragEnd}>
         <Box sx={{ minHeight: "calc(100vh - 72px)" }} data-testid="day-page">
           <Container maxWidth="xl" sx={{ py: { xs: 3, md: 5 } }}>
+            <TempoBanner />
             <Box
               sx={{
                 display: "flex",

@@ -146,12 +146,10 @@ export interface CompletedActivityRecord {
   endTime: ISODateTimeString;
   durationMinutes: MinutesNumber;
 
-  // Datos de interrupción, si aplica
-  interruptionData?: {
-    isAvoidable: boolean;
-    causeId?: UUID;
-    causeDescription?: string;
-  };
+  // Sistema de tempos (schema v2+)
+  satisfactionScore: number;
+  temposAwarded: number;
+  beatEstimate: boolean;
 
   // Día al que pertenece
   dayId: UUID;
@@ -269,6 +267,7 @@ export interface Day {
  */
 export interface UserPreferences {
   hiddenSubjectiveVariableIds: UUID[]; // Variables ocultas en gráficos
+  dailyTempoTarget: number; // Schema v2+: default 1000
 
   updatedAt: ISODateTimeString;
 }
@@ -424,6 +423,54 @@ export interface InterruptionStatistics {
   }[];
 }
 
+/**
+ * Resumen de tempos de un día
+ * Calculado derivado, no persistido
+ */
+export interface TempoSummary {
+  totalTempos: number;
+  target: number;
+  targetProgress: number; // 0..1
+  completedActivities: number;
+  averageSatisfaction: number; // 0-10
+  lastReward?: {
+    recordId: UUID;
+    activityTitle: string;
+    tempos: number;
+  };
+}
+
+/**
+ * Punto de tendencia de tempos en el tiempo
+ */
+export interface TempoTrendPoint {
+  date: ISODateTimeString;
+  totalTempos: number;
+  targetProgress: number;
+  averageSatisfaction: number;
+}
+
+/**
+ * Solicitud de cierre de actividad: lo que la UI necesita para mostrar el modal
+ */
+export interface CompletionRequest {
+  activityTitle: string;
+  durationMinutes: number;
+  estimatedMinutes?: number; // Solo si clear-objective
+  canApplyBonus: boolean; // true solo si clear-objective con estimado
+}
+
+/**
+ * Resultado de cerrar una actividad: lo que el core retorna a la UI
+ */
+export interface CompletionResult {
+  record: CompletedActivityRecord;
+  temposAwarded: number;
+  beatEstimate: boolean;
+  dailyTempoTotal: number;
+  targetProgress: number; // 0..1
+}
+
 // ===============================================
 // Interfaces para Módulos del Sistema
 // ===============================================
@@ -472,8 +519,9 @@ export interface ISystemCore {
   moveActivityInstance(id: UUID, targetBlockId: UUID, newOrder?: number): ActivityInstance;
   deleteActivityInstance(id: UUID): void;
   activateActivity(id: UUID): ActivityInstance;
-  completeActivity(id: UUID): CompletedActivityRecord;
-  interruptActivity(id: UUID, isAvoidable: boolean, causeId?: UUID): CompletedActivityRecord;
+  requestCompletion(activityId: UUID): CompletionRequest;
+  completeActivity(activityId: UUID, assessment: { satisfactionScore: number }): CompletionResult;
+  interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 
   // Métodos de TimeBlockManager
@@ -526,12 +574,15 @@ export interface ISystemCore {
   getCompletionRate(): number;
   getInterruptionRate(): number;
   getEstimationAccuracy(): number;
+  getTempoSummary(dayId: UUID): TempoSummary;
+  getTempoTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): TempoTrendPoint[];
 
   // Métodos de UserPreferencesManager
   updateUserPreferences(preferences: Partial<UserPreferences>): UserPreferences;
   getUserPreferences(): UserPreferences;
   toggleVariableVisibility(variableId: UUID): void;
   isVariableVisible(variableId: UUID): boolean;
+  updateDailyTempoTarget(target: number): UserPreferences;
 
   // Métodos de PersistenceManager
   exportData(): string;

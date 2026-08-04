@@ -1,11 +1,18 @@
 import { useState, forwardRef, useImperativeHandle, useEffect, useMemo } from "react";
-import { Box } from "@mui/material";
+import { Box, Snackbar, Alert } from "@mui/material";
 import { useSystemCore } from "../hooks/useSystemCore";
 import KanbanBoard from "../components/Kanban/Board";
 import type { TimeBlockWithActivities } from "../components/Kanban/Board";
-import type { TimeBlock, ActivityInstance, UUID, ActivityTemplate } from "../../types";
+import type {
+  TimeBlock,
+  ActivityInstance,
+  UUID,
+  ActivityTemplate,
+  CompletionRequest,
+} from "../../types";
 import type { DropResult } from "@hello-pangea/dnd";
 import ActivityInstanceModal from "../modals/ActivityInstanceModal";
+import CompletionModal from "../modals/CompletionModal";
 import VariableModalContainer from "../containers/VariableModalContainer";
 import InterruptionModalContainer from "../containers/InterruptionModalContainer";
 import { useDragDrop } from "../hooks/useDragDrop";
@@ -22,7 +29,9 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
     createActivityInstance,
     updateActivityInstance,
     activateActivity,
+    requestCompletion,
     completeActivity,
+    interruptActivity,
     isDayActive,
     isTimeBlockAvailable,
     getActivityTemplates,
@@ -40,6 +49,15 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
   const [isEditMode, setIsEditMode] = useState(false);
   // Flag para saber si el modal viene de activación (para activar después)
   const [isFromActivation, setIsFromActivation] = useState(false);
+
+  // Estado para el CompletionModal (Fase 5+6)
+  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [completionRequest, setCompletionRequest] = useState<CompletionRequest | null>(null);
+  const [completionActivityId, setCompletionActivityId] = useState<UUID | null>(null);
+  const [lastReward, setLastReward] = useState<{
+    activityTitle: string;
+    tempos: number;
+  } | null>(null);
 
   // Estado para el modal de variables
   const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
@@ -191,25 +209,52 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
     if (!isDayActive()) return;
 
     try {
-      // Completar la actividad y guardar el registro
-      const completedActivity = completeActivity(activityId);
+      const request = requestCompletion(activityId);
+      setCompletionActivityId(activityId);
+      setCompletionRequest(request);
+      setIsCompletionModalOpen(true);
+    } catch (error) {
+      console.error("Error al solicitar completion:", error);
+    }
+  };
 
-      // Guardar el ID de la actividad completada para relacionarla con el snapshot
-      setCompletedActivityId(completedActivity.id);
+  // Confirmación del CompletionModal
+  const handleCompletionConfirm = (assessment: { satisfactionScore: number }) => {
+    if (!completionActivityId || !completionRequest) return;
 
-      // Abrir el modal de variables subjetivas
+    try {
+      const result = completeActivity(completionActivityId, assessment);
+      setLastReward({
+        activityTitle: completionRequest.activityTitle,
+        tempos: result.temposAwarded,
+      });
+      setIsCompletionModalOpen(false);
+      setCompletionRequest(null);
+      setCompletionActivityId(null);
+
+      // Mantener flujo legacy de variables por ahora (Phase 10 eliminará esto)
+      setCompletedActivityId(result.record.id);
       setIsVariableModalOpen(true);
     } catch (error) {
       console.error("Error al completar actividad:", error);
+    }
+  };
 
-      // Si hay error, intentar activar el piloto automático de todas formas
-      if (pilotoAutoId) {
-        try {
-          activateActivity(pilotoAutoId);
-        } catch (e) {
-          console.error("Error al activar piloto automático:", e);
-        }
-      }
+  // Interrupción desde el CompletionModal
+  const handleCompletionInterrupt = () => {
+    if (!completionActivityId) return;
+
+    try {
+      interruptActivity(completionActivityId);
+      setIsCompletionModalOpen(false);
+      setCompletionRequest(null);
+      setCompletionActivityId(null);
+      setLastReward({
+        activityTitle: completionRequest?.activityTitle || "Actividad",
+        tempos: 0,
+      });
+    } catch (error) {
+      console.error("Error al interrumpir:", error);
     }
   };
 
@@ -316,6 +361,34 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
           isEditMode={isEditMode}
           onConfirm={handleConfirmActivityInstance}
         />
+        <CompletionModal
+          open={isCompletionModalOpen}
+          request={completionRequest}
+          onConfirm={handleCompletionConfirm}
+          onInterrupt={handleCompletionInterrupt}
+          onClose={() => {
+            setIsCompletionModalOpen(false);
+            setCompletionRequest(null);
+            setCompletionActivityId(null);
+          }}
+        />
+        <Snackbar
+          open={!!lastReward}
+          autoHideDuration={4000}
+          onClose={() => setLastReward(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          data-testid="reward-snackbar"
+        >
+          <Alert
+            onClose={() => setLastReward(null)}
+            severity={lastReward && lastReward.tempos > 0 ? "success" : "info"}
+            sx={{ width: "100%" }}
+          >
+            {lastReward && lastReward.tempos > 0
+              ? `+${lastReward.tempos} tempos · ${lastReward.activityTitle}`
+              : `Sin tempos esta vez · ${lastReward?.activityTitle}`}
+          </Alert>
+        </Snackbar>
         <VariableModalContainer
           open={isVariableModalOpen}
           onClose={handleCloseVariableModal}
