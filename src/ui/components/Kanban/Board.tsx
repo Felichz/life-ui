@@ -6,7 +6,7 @@ import type { DropResult } from "@hello-pangea/dnd";
 
 // Define the augmented activity type
 export interface ActivityInstanceWithTitle extends ActivityInstance {
-  templateTitle: string;
+  templateTitle?: string;
 }
 
 // Update the interface to use the augmented type

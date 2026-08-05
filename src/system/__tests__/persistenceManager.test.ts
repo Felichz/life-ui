@@ -6,29 +6,34 @@ import { PersistenceManager, STORAGE_KEY } from "../persistenceManager";
 import type { AppState } from "../../types";
 
 // Mock directo de localStorage
-let mockLocalStorage: Record<string, string> = {};
+// Usamos un objeto estable y mutamos sus keys en lugar de reasignar la referencia.
+// Esto evita problemas de closures que no ven la reasignación.
+const mockLocalStorage: Record<string, string> = {};
+const clearMockStorage = () => {
+  for (const k of Object.keys(mockLocalStorage)) {
+    delete mockLocalStorage[k];
+  }
+};
 
 beforeAll(() => {
-  // Crear mock de localStorage
   Object.defineProperty(window, "localStorage", {
     value: {
-      getItem: jest.fn((key: string) => mockLocalStorage[key] || null),
+      getItem: jest.fn((key: string) => mockLocalStorage[key] ?? null),
       setItem: jest.fn((key: string, value: string) => {
         mockLocalStorage[key] = value;
       }),
       removeItem: jest.fn((key: string) => {
         delete mockLocalStorage[key];
       }),
-      clear: jest.fn(() => {
-        mockLocalStorage = {};
-      }),
+      clear: jest.fn(() => clearMockStorage()),
     },
     writable: true,
   });
 });
 
 // Silenciamos console.error durante las pruebas
-jest.spyOn(console, "error").mockImplementation();
+const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation();
 
 describe("PersistenceManager", () => {
   let persistenceManager: PersistenceManager;
@@ -57,7 +62,7 @@ describe("PersistenceManager", () => {
     // Limpiar mocks y localStorage antes de cada prueba
     jest.clearAllMocks();
     window.localStorage.clear();
-    mockLocalStorage = {};
+    clearMockStorage();
     persistenceManager = new PersistenceManager();
   });
 
@@ -76,14 +81,14 @@ describe("PersistenceManager", () => {
     it("debe guardar el estado correctamente en localStorage", () => {
       persistenceManager.saveState(mockValidState);
 
+      // Schema v2+: saveState añade schemaVersion=2 al payload
+      const expectedPayload = JSON.stringify({ ...mockValidState, schemaVersion: 2 });
+
       // Verificar que setItem fue llamado con los parámetros correctos
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        STORAGE_KEY,
-        JSON.stringify(mockValidState)
-      );
+      expect(localStorage.setItem).toHaveBeenCalledWith(STORAGE_KEY, expectedPayload);
 
       // Verificar que el valor se guardó en mockLocalStorage
-      expect(mockLocalStorage[STORAGE_KEY]).toBe(JSON.stringify(mockValidState));
+      expect(mockLocalStorage[STORAGE_KEY]).toBe(expectedPayload);
     });
 
     it("debe manejar errores durante el guardado", () => {
@@ -109,8 +114,8 @@ describe("PersistenceManager", () => {
     });
 
     it("debe cargar y deserializar correctamente el estado", () => {
-      // Guardar datos en localStorage
-      const serializedState = JSON.stringify(mockValidState);
+      // Schema v2+: el estado persistido lleva schemaVersion
+      const serializedState = JSON.stringify({ ...mockValidState, schemaVersion: 2 });
       mockLocalStorage[STORAGE_KEY] = serializedState;
 
       // Verificar que nuestro mock funciona
@@ -194,6 +199,228 @@ describe("PersistenceManager", () => {
       }).not.toThrow();
 
       expect(console.error).toHaveBeenCalled();
+    });
+  });
+
+  // Schema v2: migración resiliente
+  describe("migrateV1ToV2 (schema upgrade)", () => {
+    // Restaurar TODOS los métodos de localStorage. Los tests previos
+    // ("debe manejar errores durante el guardado" y "debe manejar errores durante la carga")
+    // sobreescriben setItem/getItem con mocks que solo lanzan una vez.
+    beforeEach(() => {
+      localStorage.setItem = jest.fn((key: string, value: string) => {
+        mockLocalStorage[key] = value;
+      });
+      localStorage.getItem = jest.fn((key: string) => mockLocalStorage[key] ?? null);
+      localStorage.removeItem = jest.fn((key: string) => {
+        delete mockLocalStorage[key];
+      });
+      localStorage.clear = jest.fn(() => clearMockStorage());
+    });
+
+    it("estado sin schemaVersion (v1) se migra a v2 con dailyTempoTarget default 1000", () => {
+      // Guardar un estado v1 (sin schemaVersion)
+      const v1State = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          subjectiveVariables: [],
+          interruptionCauses: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: [],
+            // NO dailyTempoTarget (es v1)
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariableSnapshots: [],
+        },
+        currentDay: null,
+        // NO schemaVersion
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v1State);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
+    });
+
+    it("preserva dailyTempoTarget si ya existe (no sobrescribe)", () => {
+      const v1StateWithTarget = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          subjectiveVariables: [],
+          interruptionCauses: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: [],
+            dailyTempoTarget: 500, // usuario lo había configurado
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariableSnapshots: [],
+        },
+        currentDay: null,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v1StateWithTarget);
+
+      const result = persistenceManager.loadState();
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(500);
+    });
+
+    it("marca completedActivityRecords antiguos con tempos=0", () => {
+      const v1StateWithRecords = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          subjectiveVariables: [],
+          interruptionCauses: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: [],
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [
+            {
+              id: "r1",
+              templateId: "t1",
+              templateTitle: "Old",
+              state: "completed",
+              type: "clear-objective",
+              startTime: "2023-01-01T00:00:00.000Z",
+              endTime: "2023-01-01T00:30:00.000Z",
+              durationMinutes: 30,
+              dayId: "d1",
+              createdAt: "2023-01-01T00:00:00.000Z",
+              // NO satisfactionScore, NO temposAwarded, NO beatEstimate (es v1)
+            },
+          ],
+          eventInstances: [],
+          subjectiveVariableSnapshots: [],
+        },
+        currentDay: null,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v1StateWithRecords);
+
+      const result = persistenceManager.loadState();
+      expect(result!.global.completedActivityRecords.length).toBe(1);
+      expect(result!.global.completedActivityRecords[0].satisfactionScore).toBe(0);
+      expect(result!.global.completedActivityRecords[0].temposAwarded).toBe(0);
+      expect(result!.global.completedActivityRecords[0].beatEstimate).toBe(false);
+    });
+
+    it("RECONSTRUYE userPreferences si falta global completo (estado corrupto parcial)", () => {
+      const corruptState = {
+        // Falta global.currentDay
+        global: {
+          days: [],
+          activityTemplates: [],
+          // ...faltan varios campos
+        },
+        currentDay: null,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(corruptState);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+      // Debe haber reconstruido userPreferences con dailyTempoTarget=1000
+      expect(result!.global.userPreferences).toBeDefined();
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
+    });
+
+    it("RECONSTRUYE userPreferences si el objeto global existe pero userPreferences falta", () => {
+      const stateWithoutPrefs = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          subjectiveVariables: [],
+          interruptionCauses: [],
+          timeBlocks: [],
+          // NO userPreferences
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariableSnapshots: [],
+        },
+        currentDay: null,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(stateWithoutPrefs);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+      expect(result!.global.userPreferences).toBeDefined();
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
+      expect(result!.global.userPreferences.hiddenSubjectiveVariableIds).toEqual([]);
+    });
+
+    it("RECONSTRUYE completedActivityRecords si falta el array", () => {
+      const stateWithoutRecords = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          subjectiveVariables: [],
+          interruptionCauses: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: [],
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          // NO completedActivityRecords
+          eventInstances: [],
+          subjectiveVariableSnapshots: [],
+        },
+        currentDay: null,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(stateWithoutRecords);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+      expect(Array.isArray(result!.global.completedActivityRecords)).toBe(true);
+      expect(result!.global.completedActivityRecords.length).toBe(0);
+    });
+
+    it("estado v2 (schemaVersion=2) no se re-migra", () => {
+      const v2State = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          subjectiveVariables: [],
+          interruptionCauses: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: [],
+            dailyTempoTarget: 750, // valor custom del usuario
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariableSnapshots: [],
+        },
+        currentDay: null,
+        schemaVersion: 2,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v2State);
+
+      const result = persistenceManager.loadState();
+      // Si fuera v1, se sobrescribiría a 1000. v2 respeta el 750.
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(750);
+    });
+
+    it("saveState incluye schemaVersion=2 al persistir", () => {
+      persistenceManager.saveState(mockValidState);
+
+      const stored = mockLocalStorage[STORAGE_KEY];
+      expect(stored).toBeDefined();
+      const parsed = JSON.parse(stored);
+      expect(parsed.schemaVersion).toBe(2);
     });
   });
 });

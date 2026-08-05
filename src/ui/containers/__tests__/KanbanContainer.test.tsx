@@ -1,52 +1,35 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { renderHook } from "@testing-library/react-hooks";
-import type { ActivityInstance, UUID } from "../../../types";
+import type { UUID } from "../../../types";
 
-// Mock completo de useSystemCore con factory para garantizar que todos los métodos estén definidos
-jest.mock("../../hooks/useSystemCore", () => {
-  const mockActivateActivity = jest.fn();
-  const mockUpdateActivityInstance = jest.fn();
-  const mockIsDayActive = jest.fn().mockReturnValue(true);
-  const mockIsTimeBlockAvailable = jest.fn().mockReturnValue(true);
-  const mockCreateActivityInstance = jest.fn();
-  const mockGetActivityTemplates = jest.fn().mockReturnValue([]);
-  const mockGetInterruptionCauses = jest.fn().mockReturnValue([]);
-  const mockCompleteActivity = jest.fn().mockReturnValue({
-    id: "completed-activity-id",
-    templateTitle: "Completed Activity",
-  });
+// Mock del contexto de completion flow
+const mockRequestCloseActive = jest.fn();
+const mockPendingCloseId = null;
+const mockRequestedAt = null;
 
-  const mockActivities = [
-    {
-      id: "activity-123",
-      templateId: "template-123",
-      blockId: "block-123",
-      order: 0,
-      state: "instantiated",
-      timeboxingSettings: {
-        type: "minimum-time",
-        minimumDurationMinutes: 30,
-      },
-      createdAt: "2023-01-01T00:00:00Z",
-      updatedAt: "2023-01-01T00:00:00Z",
-    },
-    {
-      id: "activity-456",
-      templateId: "template-456",
-      blockId: "block-123",
-      order: 1,
-      state: "instantiated",
-      timeboxingSettings: {
-        type: "minimum-time",
-        // Sin minimumDurationMinutes para forzar configuración
-      },
-      createdAt: "2023-01-01T00:00:00Z",
-      updatedAt: "2023-01-01T00:00:00Z",
-    },
-  ];
+jest.mock("../../context/CompletionFlowContext", () => ({
+  useCompletionFlow: () => ({
+    pendingCloseId: mockPendingCloseId,
+    requestedAt: mockRequestedAt,
+    pendingContinuation: null,
+    requestCloseActive: mockRequestCloseActive,
+    resolve: jest.fn(),
+    reject: jest.fn(),
+    cancel: jest.fn(),
+  }),
+}));
 
-  const mockSystemCore = {
+// Mock de useSystemCore con factory
+const mockActivateActivity = jest.fn();
+const mockUpdateActivityInstance = jest.fn();
+const mockIsDayActive = jest.fn().mockReturnValue(true);
+const mockIsTimeBlockAvailable = jest.fn().mockReturnValue(true);
+const mockCreateActivityInstance = jest.fn();
+const mockGetActivityTemplates = jest.fn().mockReturnValue([]);
+const mockGetActiveActivity = jest.fn().mockReturnValue(null);
+
+jest.mock("../../hooks/useSystemCore", () => ({
+  useSystemCore: () => ({
     state: {
       global: {
         timeBlocks: [
@@ -61,9 +44,36 @@ jest.mock("../../hooks/useSystemCore", () => {
             updatedAt: "2023-01-01T00:00:00Z",
           },
         ],
+        activityTemplates: [],
       },
       currentDay: {
-        activityInstances: mockActivities,
+        activityInstances: [
+          {
+            id: "activity-123",
+            templateId: "template-123",
+            blockId: "block-123",
+            order: 0,
+            state: "instantiated",
+            timeboxingSettings: {
+              type: "minimum-time",
+              minimumDurationMinutes: 30,
+            },
+            createdAt: "2023-01-01T00:00:00Z",
+            updatedAt: "2023-01-01T00:00:00Z",
+          },
+          {
+            id: "activity-456",
+            templateId: "template-456",
+            blockId: "block-123",
+            order: 1,
+            state: "instantiated",
+            timeboxingSettings: {
+              type: "minimum-time",
+            },
+            createdAt: "2023-01-01T00:00:00Z",
+            updatedAt: "2023-01-01T00:00:00Z",
+          },
+        ],
         day: { id: "day-123" },
       },
     },
@@ -73,17 +83,10 @@ jest.mock("../../hooks/useSystemCore", () => {
     isTimeBlockAvailable: mockIsTimeBlockAvailable,
     createActivityInstance: mockCreateActivityInstance,
     getActivityTemplates: mockGetActivityTemplates,
-    getInterruptionCauses: mockGetInterruptionCauses,
-    completeActivity: mockCompleteActivity,
-  };
+    getActiveActivity: mockGetActiveActivity,
+  }),
+}));
 
-  return {
-    __esModule: true,
-    useSystemCore: jest.fn().mockReturnValue(mockSystemCore),
-  };
-});
-
-// Importar el componente después de definir todos los mocks
 import KanbanContainer from "../KanbanContainer";
 
 jest.mock("../../hooks/useDragDrop", () => ({
@@ -93,10 +96,8 @@ jest.mock("../../hooks/useDragDrop", () => ({
   }),
 }));
 
-// Definir interfaces para los props del componente mockeado
 interface BoardProps {
   onActivateActivity: (id: UUID) => void;
-  mockIdToActivate?: string;
   [key: string]: unknown;
 }
 
@@ -107,17 +108,11 @@ interface ModalProps {
   [key: string]: unknown;
 }
 
-interface InterruptionCause {
-  id: string;
-  name: string;
-}
-
-// Mock estático de Board
 const BoardMock = jest.fn((props: BoardProps) => (
   <div data-testid="mocked-board">
     <button
       data-testid="activate-button"
-      onClick={() => props.onActivateActivity(props.mockIdToActivate || "activity-123")}
+      onClick={() => props.onActivateActivity("activity-123")}
     >
       Activar desde Test
     </button>
@@ -147,64 +142,7 @@ jest.mock("../../modals/ActivityInstanceModal", () => ({
     ) : null,
 }));
 
-// Mock para VariableModalContainer
-jest.mock("../../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: (props: {
-    open: boolean;
-    onClose: () => void;
-    relatedActivityIds?: string[];
-    relatedEventIds?: string[];
-    onConfirm?: () => void;
-  }) =>
-    props.open ? (
-      <div data-testid="variable-modal">
-        <button data-testid="variable-close" onClick={props.onClose}>
-          Cerrar Variables
-        </button>
-        {props.onConfirm && (
-          <button data-testid="variable-confirm" onClick={props.onConfirm}>
-            Confirmar Variables
-          </button>
-        )}
-      </div>
-    ) : null,
-}));
-
-// Mock para InterruptionModalContainer
-jest.mock("../../containers/InterruptionModalContainer", () => ({
-  __esModule: true,
-  default: (props: {
-    open: boolean;
-    onClose: () => void;
-    activityTitle?: string;
-    causes?: InterruptionCause[];
-    isCreatingCause?: boolean;
-    onConfirm?: (causeId: string, notes: string) => void;
-    onCreateCause?: (name: string) => void;
-    [key: string]: unknown;
-  }) =>
-    props.open ? (
-      <div data-testid="interruption-modal">
-        <button data-testid="interruption-close" onClick={props.onClose}>
-          Cerrar Interrupción
-        </button>
-        {props.onConfirm && (
-          <button
-            data-testid="interruption-confirm"
-            onClick={() => props.onConfirm?.("test-cause-id", "test-notes")}
-          >
-            Confirmar Interrupción
-          </button>
-        )}
-      </div>
-    ) : null,
-}));
-
 describe("KanbanContainer", () => {
-  // Accedemos a los mocks directamente desde el módulo
-  const mockUseSystemCore = jest.requireMock("../../hooks/useSystemCore").useSystemCore;
-
   beforeEach(() => {
     jest.clearAllMocks();
     BoardMock.mockClear();
@@ -213,56 +151,21 @@ describe("KanbanContainer", () => {
   test("debería activar directamente una actividad cuando no necesita configuración", async () => {
     render(<KanbanContainer />);
 
-    // Simular clic en el botón de activar
     const activateButton = screen.getByTestId("activate-button");
     await act(async () => {
       fireEvent.click(activateButton);
     });
 
-    // Obtenemos el mock del hook
-    const mockSystemCore = mockUseSystemCore();
-
-    // Verificar que se llama a activateActivity con el ID correcto
-    expect(mockSystemCore.activateActivity).toHaveBeenCalledWith("activity-123");
-    // Verificar que el modal no se abre
+    expect(mockActivateActivity).toHaveBeenCalledWith("activity-123");
     expect(screen.queryByTestId("activity-modal")).not.toBeInTheDocument();
   });
 
   test("debería abrir el modal de configuración cuando la actividad necesita configuración", async () => {
-    // Simular una actividad que necesita configuración (sin minimumDurationMinutes)
-    const activityNeedsConfig = {
-      id: "activity-456",
-      templateId: "template-456",
-      blockId: "block-123",
-      order: 1,
-      state: "instantiated",
-      timeboxingSettings: {
-        type: "minimum-time",
-        // Sin minimumDurationMinutes para forzar configuración
-      },
-      createdAt: "2023-01-01T00:00:00Z",
-      updatedAt: "2023-01-01T00:00:00Z",
-    };
-
-    // Modificamos el valor de retorno del mock para este test específico
-    mockUseSystemCore.mockReturnValueOnce({
-      ...mockUseSystemCore(),
-      state: {
-        ...mockUseSystemCore().state,
-        currentDay: {
-          ...mockUseSystemCore().state.currentDay,
-          activityInstances: [activityNeedsConfig],
-        },
-      },
-    });
-
     render(<KanbanContainer />);
 
-    // Asegurarnos de que el mock fue llamado y obtener las props pasadas
     expect(BoardMock).toHaveBeenCalled();
     const onActivateActivity = BoardMock.mock.calls[0][0].onActivateActivity;
 
-    // Renderizar un componente adicional con un botón para activar la actividad
     render(
       <div>
         <button
@@ -276,26 +179,47 @@ describe("KanbanContainer", () => {
       </div>
     );
 
-    // Activar directamente la actividad que necesita configuración
     const triggerButton = screen.getByTestId("trigger-456");
     await act(async () => {
       fireEvent.click(triggerButton);
     });
 
-    // Verificar que se abre el modal de configuración
     expect(screen.getByTestId("activity-modal")).toBeInTheDocument();
 
-    // Simular confirmación del modal
     const confirmButton = screen.getByTestId("confirm-button");
     await act(async () => {
       fireEvent.click(confirmButton);
     });
 
-    // Obtenemos el mock del hook para verificaciones
-    const mockSystemCore = mockUseSystemCore();
+    expect(mockUpdateActivityInstance).toHaveBeenCalled();
+    expect(mockActivateActivity).toHaveBeenCalled();
+  });
 
-    // Verificar que se actualiza y activa la actividad
-    expect(mockSystemCore.updateActivityInstance).toHaveBeenCalled();
-    expect(mockSystemCore.activateActivity).toHaveBeenCalled();
+  test("debería delegar el cierre de actividad al completionFlow al completar", () => {
+    render(<KanbanContainer />);
+
+    const onCompleteActivity = BoardMock.mock.calls[0][0].onCompleteActivity as (id: string) => void;
+    onCompleteActivity("activity-123");
+
+    expect(mockRequestCloseActive).toHaveBeenCalledWith(
+      "activity-123",
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    );
+  });
+
+  test("debería delegar el cierre de actividad al completionFlow al interrumpir", () => {
+    render(<KanbanContainer />);
+
+    const onInterruptActivity = BoardMock.mock.calls[0][0].onInterruptActivity as (id: string) => void;
+    onInterruptActivity("activity-123");
+
+    expect(mockRequestCloseActive).toHaveBeenCalledWith(
+      "activity-123",
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function)
+    );
   });
 });

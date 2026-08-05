@@ -24,6 +24,7 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
     isDayActive,
     isTimeBlockAvailable,
     getActivityTemplates,
+    getActiveActivity,
   } = useSystemCore();
 
   // Flujo de cierre coordinado (CompletionModal vive en DayPage)

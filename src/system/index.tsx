@@ -658,6 +658,7 @@ export class SystemCore implements ISystemCore {
       completedActivityRecords: [],
       eventInstances: [],
       subjectiveVariableSnapshots: [],
+      schemaVersion: 2,
     };
 
     return {

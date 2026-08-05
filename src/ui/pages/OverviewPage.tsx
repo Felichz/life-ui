@@ -5,6 +5,8 @@ import DonutLargeRoundedIcon from "@mui/icons-material/DonutLargeRounded";
 import TopBar from "../components/Common/TopBar";
 import TimelineContainer from "../containers/TimelineContainer";
 import ChartsContainer from "../containers/ChartsContainer";
+import DayMetricsContainer from "../containers/DayMetricsContainer";
+import TrendsView from "../containers/TrendsView";
 import { useSystemCore } from "../hooks/useSystemCore";
 
 const OverviewPage = () => {
@@ -35,6 +37,10 @@ const OverviewPage = () => {
               decide qué probar después.
             </Typography>
           </Box>
+
+          <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, mb: 2.5, borderRadius: 4 }}>
+            <DayMetricsContainer />
+          </Paper>
 
           <Box
             sx={{
@@ -69,6 +75,10 @@ const OverviewPage = () => {
               </Typography>
             </Paper>
           </Box>
+
+          <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, mt: 2.5, borderRadius: 4 }}>
+            <TrendsView />
+          </Paper>
 
           <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, mt: 2.5, borderRadius: 4 }}>
             <ChartsContainer />

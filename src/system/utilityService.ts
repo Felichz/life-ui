@@ -162,6 +162,7 @@ export class UtilityService {
     if (typeof durationMinutes !== "number" || durationMinutes <= 0) return 0;
     if (typeof satisfactionScore !== "number") return 0;
     if (satisfactionScore < 0 || satisfactionScore > 10) return 0;
+    if (!Number.isInteger(satisfactionScore)) return 0;
     if (satisfactionScore === 0) return 0;
 
     const baseTempos = Math.ceil((durationMinutes * satisfactionScore) / 10);

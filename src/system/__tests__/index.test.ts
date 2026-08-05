@@ -55,11 +55,13 @@ describe("SystemCore", () => {
           timeBlocks: [],
           userPreferences: {
             hiddenSubjectiveVariableIds: [],
+            dailyTempoTarget: 1000,
             updatedAt: mockTimestamp,
           },
           completedActivityRecords: [],
           eventInstances: [],
           subjectiveVariableSnapshots: [],
+          schemaVersion: 2,
         },
         currentDay: null,
       });
@@ -84,11 +86,13 @@ describe("SystemCore", () => {
           timeBlocks: [],
           userPreferences: {
             hiddenSubjectiveVariableIds: [],
+            dailyTempoTarget: 1000,
             updatedAt: "2023-01-01T10:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
           subjectiveVariableSnapshots: [],
+          schemaVersion: 2,
         },
         currentDay: {
           day: {
@@ -276,7 +280,8 @@ describe("SystemCore", () => {
       expect(updateBlockSpy).toHaveBeenCalledWith(mockUUID, { name: "Updated Block" });
 
       systemCore.deleteTimeBlock(mockUUID);
-      expect(deleteBlockSpy).toHaveBeenCalledWith(mockUUID);
+      // deleteTimeBlock tiene un segundo argumento opcional (moveActivitiesToTodo=true por defecto)
+      expect(deleteBlockSpy).toHaveBeenCalledWith(mockUUID, true);
 
       systemCore.getTimeBlocks();
       expect(getBlocksSpy).toHaveBeenCalled();
@@ -446,11 +451,13 @@ describe("SystemCore", () => {
           timeBlocks: [],
           userPreferences: {
             hiddenSubjectiveVariableIds: [],
+            dailyTempoTarget: 1000,
             updatedAt: "2023-01-01T08:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
           subjectiveVariableSnapshots: [],
+          schemaVersion: 2,
         },
         currentDay: null,
       };

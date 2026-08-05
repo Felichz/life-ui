@@ -299,6 +299,9 @@ export interface GlobalState {
 
   // Datos transitorios entre días
   pendingActivityInstances?: ActivityInstance[]; // Actividades pendientes al pasar de un día a otro
+
+  // Versión del esquema persistido (para migraciones). Default 2.
+  schemaVersion?: number;
 }
 
 /**

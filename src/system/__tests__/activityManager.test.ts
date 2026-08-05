@@ -118,9 +118,17 @@ describe("ActivityManager", () => {
 
     (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
     (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
-    // Mock para calculateDuration - simulamos el método privado
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    jest.spyOn(ActivityManager.prototype as any, "calculateDuration").mockReturnValue(30);
+
+    // Usar implementaciones reales para las funciones de cálculo de tempos
+    // (auto-mock las habría dejado como undefined)
+    const actualUtilityService = jest.requireActual("../utilityService")
+      .UtilityService as typeof UtilityService;
+    (UtilityService.shouldApplyBonus as jest.Mock).mockImplementation(
+      actualUtilityService.shouldApplyBonus
+    );
+    (UtilityService.calculateTemposAwarded as jest.Mock).mockImplementation(
+      actualUtilityService.calculateTemposAwarded
+    );
 
     systemCore = new SystemCore() as jest.Mocked<SystemCore>;
     systemCore.getState = jest.fn().mockReturnValue(mockAppState);
@@ -533,7 +541,7 @@ describe("ActivityManager", () => {
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBe(instance.id);
       });
 
-      it("debe finalizar la actividad activa previa automáticamente", () => {
+      it("lanza error si ya hay una actividad activa (la UI debe cerrarla antes)", () => {
         // Crear dos instancias
         const instance1 = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
@@ -545,24 +553,15 @@ describe("ActivityManager", () => {
         // Activar la primera instancia
         activityManager.activateActivity(instance1.id);
 
-        // Cambiar el mockUUID para el registro completado
-        mockUUID = "completed-id-123";
-        (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
+        // Intentar activar la segunda instancia con la primera aún activa: debe lanzar error
+        // (la UI debe cerrar la primera vía completeActivity/interruptActivity antes)
+        expect(() => {
+          activityManager.activateActivity(instance2.id);
+        }).toThrow(/Hay una actividad activa/);
 
-        // Activar la segunda instancia
-        activityManager.activateActivity(instance2.id);
-
-        // Verificar que se creó el registro de la actividad finalizada
-        expect(mockAppState.global.completedActivityRecords.length).toBe(1);
-        expect(mockAppState.global.completedActivityRecords[0].templateId).toBe(mockTemplateId);
-        expect(mockAppState.global.completedActivityRecords[0].state).toBe("completed");
-
-        // Verificar que la actividad anterior ya no está en la lista de instancias
-        const remainingInstanceIds = mockAppState.currentDay?.activityInstances.map((i) => i.id);
-        expect(remainingInstanceIds).not.toContain(instance1.id);
-
-        // Verificar que la nueva actividad está activa
-        expect(mockAppState.currentDay?.activeActivityInstanceId).toBe(instance2.id);
+        // Verificar que la primera sigue activa (no se cerró automáticamente)
+        expect(mockAppState.currentDay?.activeActivityInstanceId).toBe(instance1.id);
+        expect(mockAppState.currentDay?.activityInstances.length).toBe(2);
       });
     });
 
@@ -586,6 +585,7 @@ describe("ActivityManager", () => {
           startTime: "2023-01-01T11:30:00.000Z", // 30 minutos antes de mockTimestamp
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
         });
 
         // Marcar como actividad activa
@@ -608,7 +608,7 @@ describe("ActivityManager", () => {
 
         // Verificar que el registro se agregó a completedActivityRecords
         expect(mockAppState.global.completedActivityRecords.length).toBe(1);
-        expect(mockAppState.global.completedActivityRecords[0]).toEqual(result);
+        expect(mockAppState.global.completedActivityRecords[0]).toEqual(result.record);
       });
 
       it("debe completar solo la actividad activa sin afectar a otras actividades", () => {
@@ -690,6 +690,257 @@ describe("ActivityManager", () => {
         expect(() => {
           activityManager.completeActivity(instance.id, { satisfactionScore: 8 });
         }).toThrow("Solo se puede completar la actividad activa actual");
+      });
+
+      it("debe calcular tempos correctamente: clear-objective sin bonus", () => {
+        // 30 min estimado, 30 min real → no bonus, base = 10 * 30 / 10 = 30
+        const instanceId = "instance-no-bonus";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:30:00.000Z",
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
+
+        expect(result.beatEstimate).toBe(false);
+        expect(result.temposAwarded).toBe(30);
+        expect(result.record.beatEstimate).toBe(false);
+        expect(result.record.temposAwarded).toBe(30);
+      });
+
+      it("debe calcular bonus correctamente: clear-objective con beat", () => {
+        // 30 min estimado, 20 min real (66%) → bonus, score 10 = 20 + 5 = 25
+        const instanceId = "instance-bonus";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:40:00.000Z", // 20 min antes de mockTimestamp
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
+
+        expect(result.beatEstimate).toBe(true);
+        expect(result.temposAwarded).toBe(25); // 20 base + 5 bonus
+        expect(result.record.beatEstimate).toBe(true);
+      });
+
+      it("debe NO dar bonus para timeboxing aunque batiera el estimado", () => {
+        // Cambiar plantilla a timeboxing
+        mockAppState.global.activityTemplates[0].type = "timeboxing";
+        mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
+        mockAppState.global.activityTemplates[0].timeboxingSettings = {
+          type: "minimum-time",
+          minimumDurationMinutes: 15,
+        };
+
+        const instanceId = "instance-timeboxing";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:45:00.000Z", // 15 min antes
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
+
+        // timeboxing NUNCA da bonus
+        expect(result.beatEstimate).toBe(false);
+        expect(result.temposAwarded).toBe(15); // solo base, sin +5
+      });
+
+      it("score 0 → 0 tempos totales, aunque haya bonus", () => {
+        // 30 min estimado, 20 min real (66%) → bonus disponible, pero score 0
+        const instanceId = "instance-zero";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:40:00.000Z",
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 0 });
+
+        expect(result.temposAwarded).toBe(0);
+      });
+
+      it("usa endTime congelado: la duración no cambia entre request y confirm", () => {
+        // Bloqueante 6 de Codex: endTime debe preservarse desde requestCompletion.
+        // Setup: actividad activa con startTime hace 20 min.
+        const instanceId = "instance-frozen";
+        const startTime = "2023-01-01T11:40:00.000Z"; // 20 min antes de mockTimestamp (12:00)
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime,
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        // requestCompletion congela requestedAt = mockTimestamp (= 20 min)
+        const request = activityManager.requestCompletion(instanceId);
+        expect(request.durationMinutes).toBe(20);
+
+        // El usuario permanece 5 minutos en el modal (cambiamos Date.now virtualmente)
+        // Después completeActivity con endTime congelado: debe usar el endTime del request
+        const result = activityManager.completeActivity(instanceId, {
+          satisfactionScore: 10,
+          endTime: request.requestedAt, // congelado
+        });
+
+        // La duración debe ser la del request (20), no la del "ahora" (25)
+        expect(result.record.durationMinutes).toBe(20);
+        expect(result.record.endTime).toBe(mockTimestamp); // respeta endTime pasado
+      });
+
+      it("lanza error con score inválido (< 0)", () => {
+        const instanceId = "instance-invalid";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:30:00.000Z",
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        expect(() => {
+          activityManager.completeActivity(instanceId, { satisfactionScore: -1 });
+        }).toThrow("satisfactionScore debe ser un entero entre 0 y 10");
+      });
+
+      it("lanza error con score fraccionario (no entero)", () => {
+        const instanceId = "instance-fractional";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:30:00.000Z",
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        expect(() => {
+          activityManager.completeActivity(instanceId, { satisfactionScore: 7.5 });
+        }).toThrow("satisfactionScore debe ser un entero entre 0 y 10");
+      });
+    });
+
+    describe("requestCompletion", () => {
+      beforeEach(() => {
+        setupActivityTemplate();
+        setupTimeBlock();
+        setupActiveDay();
+      });
+
+      it("devuelve datos correctos para clear-objective", () => {
+        const instanceId = "req-1";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:30:00.000Z", // 30 min antes
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const req = activityManager.requestCompletion(instanceId);
+
+        expect(req.activityTitle).toBe("Test Activity");
+        expect(req.durationMinutes).toBe(30);
+        expect(req.estimatedMinutes).toBe(30);
+        // 30 min real, 30 estimado → 100% → no bonus
+        expect(req.canApplyBonus).toBe(false);
+        expect(req.requestedAt).toBeDefined();
+      });
+
+      it("marca canApplyBonus=true cuando se bate el estimado", () => {
+        const instanceId = "req-2";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:45:00.000Z", // 15 min antes, 50% del estimado
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const req = activityManager.requestCompletion(instanceId);
+
+        expect(req.durationMinutes).toBe(15);
+        expect(req.canApplyBonus).toBe(true);
+      });
+
+      it("canApplyBonus=false para timeboxing aunque bata el estimado", () => {
+        mockAppState.global.activityTemplates[0].type = "timeboxing";
+        mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
+        mockAppState.global.activityTemplates[0].timeboxingSettings = {
+          type: "minimum-time",
+          minimumDurationMinutes: 15,
+        };
+
+        const instanceId = "req-3";
+        mockAppState.currentDay!.activityInstances.push({
+          id: instanceId,
+          templateId: mockTemplateId,
+          blockId: mockBlockId,
+          order: 0,
+          state: "active",
+          startTime: "2023-01-01T11:45:00.000Z",
+          createdAt: mockTimestamp,
+          updatedAt: mockTimestamp,
+        });
+        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
+
+        const req = activityManager.requestCompletion(instanceId);
+
+        expect(req.canApplyBonus).toBe(false);
+      });
+
+      it("lanza error si no hay actividad activa", () => {
+        expect(() => activityManager.requestCompletion("non-existent")).toThrow();
       });
     });
 

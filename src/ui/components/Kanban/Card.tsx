@@ -9,7 +9,7 @@ import ActivityTimer from "../Common/ActivityTimer";
 
 interface KanbanCardProps {
   activity: ActivityInstance;
-  templateTitle: string;
+  templateTitle?: string;
   index: number;
   onEdit?: (activity: ActivityInstance) => void;
   onActivate?: (activityId: UUID) => void;

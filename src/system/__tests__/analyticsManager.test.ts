@@ -650,15 +650,11 @@ describe("AnalyticsManager", () => {
     it("debería identificar causas frecuentes de interrupción", () => {
       const stats = analyticsManager.getActivityStats();
 
+      // Schema v2+: no hay causas configurables. Todas las interrupciones
+      // se agrupan como "Sin clasificar".
       expect(stats.frequentInterruptionCauses).toBeDefined();
-      expect(stats.frequentInterruptionCauses?.length).toBe(2);
-
-      // Verificar que las causas están ordenadas por frecuencia
-      if (stats.frequentInterruptionCauses && stats.frequentInterruptionCauses.length >= 2) {
-        expect(stats.frequentInterruptionCauses[0].count).toBeGreaterThanOrEqual(
-          stats.frequentInterruptionCauses[1].count
-        );
-      }
+      expect(stats.frequentInterruptionCauses?.length).toBe(1);
+      expect(stats.frequentInterruptionCauses?.[0].cause).toBe("Sin clasificar");
     });
   });
 
@@ -693,25 +689,18 @@ describe("AnalyticsManager", () => {
     it("debería calcular estadísticas de interrupciones", () => {
       const stats = analyticsManager.getInterruptionStats();
 
+      // Schema v2+: ya no se clasifica evitable/innevitable.
       expect(stats.totalInterruptions).toBe(2);
-      expect(stats.avoidableInterruptions).toBe(1);
-      expect(stats.unavoidableInterruptions).toBe(1);
-      expect(stats.avoidablePercentage).toBe(50);
+      expect(stats.avoidableInterruptions).toBe(0);
+      expect(stats.unavoidableInterruptions).toBe(2);
+      expect(stats.avoidablePercentage).toBe(0);
     });
 
-    it("debería identificar las causas principales de interrupción", () => {
+    it("debería devolver lista vacía de causas (sin clasificación)", () => {
       const stats = analyticsManager.getInterruptionStats();
 
-      expect(stats.topCauses).toHaveLength(2);
-      expect(stats.topCauses[0].count).toBe(1);
-      expect(stats.topCauses[1].count).toBe(1);
-
-      // Verificar que las descripciones coinciden con las causas originales
-      const causeIds = stats.topCauses.map((c) => c.id);
-      const originalCauses = mockState.global.interruptionCauses.filter((c) =>
-        causeIds.includes(c.id)
-      );
-      expect(originalCauses).toHaveLength(2);
+      // Schema v2+: no hay causas configurables, topCauses queda vacío.
+      expect(stats.topCauses).toHaveLength(0);
     });
   });
 
@@ -768,6 +757,250 @@ describe("AnalyticsManager", () => {
       expect(stats.completedInstances).toBe(0);
       expect(stats.interruptedInstances).toBe(0);
       expect(stats.completionRate).toBe(0);
+    });
+  });
+
+  // Schema v2+: tests específicos para tempos
+  describe("getTempoSummary", () => {
+    const tempoDayId = "tempo-day";
+    const otherDayId = "other-day";
+
+    const baseMock = () => {
+      const records: CompletedActivityRecord[] = [
+        {
+          id: "t1",
+          activityInstanceId: "i1",
+          templateId: "tmpl-1",
+          templateTitle: "Leer",
+          state: "completed",
+          type: "clear-objective",
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+          startTime: TODAY.toISOString(),
+          endTime: TODAY.toISOString(),
+          durationMinutes: 30,
+          dayId: tempoDayId,
+          satisfactionScore: 10,
+          temposAwarded: 30,
+          beatEstimate: false,
+          createdAt: TODAY.toISOString(),
+        },
+        {
+          id: "t2",
+          activityInstanceId: "i2",
+          templateId: "tmpl-2",
+          templateTitle: "Ejercicio",
+          state: "completed",
+          type: "clear-objective",
+          clearObjectiveSettings: { estimatedDurationMinutes: 60 },
+          startTime: TODAY.toISOString(),
+          endTime: TODAY.toISOString(),
+          durationMinutes: 60,
+          dayId: tempoDayId,
+          satisfactionScore: 9,
+          temposAwarded: 54,
+          beatEstimate: false,
+          createdAt: TODAY.toISOString(),
+        },
+        // Interrumpida: NO cuenta para tempos (pero cuenta como interrupción)
+        {
+          id: "t3",
+          activityInstanceId: "i3",
+          templateId: "tmpl-3",
+          templateTitle: "Pausa",
+          state: "interrupted",
+          type: "flexible-duration",
+          flexibleDurationSettings: { minimumDurationMinutes: 5, maximumDurationMinutes: 30 },
+          startTime: TODAY.toISOString(),
+          endTime: TODAY.toISOString(),
+          durationMinutes: 10,
+          dayId: tempoDayId,
+          satisfactionScore: 0,
+          temposAwarded: 0,
+          beatEstimate: false,
+          createdAt: TODAY.toISOString(),
+        },
+        // Otro día: no debe contar
+        {
+          id: "t4",
+          activityInstanceId: "i4",
+          templateId: "tmpl-1",
+          templateTitle: "Otro día",
+          state: "completed",
+          type: "clear-objective",
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+          startTime: YESTERDAY.toISOString(),
+          endTime: YESTERDAY.toISOString(),
+          durationMinutes: 30,
+          dayId: otherDayId,
+          satisfactionScore: 10,
+          temposAwarded: 30,
+          beatEstimate: false,
+          createdAt: YESTERDAY.toISOString(),
+        },
+      ];
+      const baseState = createMockState(true);
+      baseState.global.completedActivityRecords = records;
+      baseState.global.userPreferences.dailyTempoTarget = 100; // target bajo para probar overTarget
+      return baseState;
+    };
+
+    it("calcula totalTempos sumando solo records del día y completed", () => {
+      const state = baseMock();
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const summary = manager.getTempoSummary(tempoDayId);
+
+      // Solo t1 (30) + t2 (54) = 84. t3 es interrupted (no cuenta), t4 es otro día
+      expect(summary.totalTempos).toBe(84);
+    });
+
+    it("calcula targetProgress como ratio sin cap", () => {
+      const state = baseMock();
+      state.global.userPreferences.dailyTempoTarget = 50;
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const summary = manager.getTempoSummary(tempoDayId);
+
+      // 84 / 50 = 1.68
+      expect(summary.targetProgress).toBeCloseTo(1.68, 2);
+      // progressBarValue capeado a 100
+      expect(summary.progressBarValue).toBe(100);
+      // displayPercent: 168%
+      expect(summary.displayPercent).toBe(168);
+    });
+
+    it("completedActivities cuenta solo completed", () => {
+      const state = baseMock();
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const summary = manager.getTempoSummary(tempoDayId);
+
+      expect(summary.completedActivities).toBe(2); // t1 y t2
+    });
+
+    it("averageSatisfaction es el promedio del día", () => {
+      const state = baseMock();
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const summary = manager.getTempoSummary(tempoDayId);
+
+      // Solo completed: (10 + 9) / 2 = 9.5
+      expect(summary.averageSatisfaction).toBe(9.5);
+    });
+
+    it("lastReward es el último completed", () => {
+      const state = baseMock();
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const summary = manager.getTempoSummary(tempoDayId);
+
+      // El último en la lista es t2 (Ejercicio, 54 tempos)
+      expect(summary.lastReward?.activityTitle).toBe("Ejercicio");
+      expect(summary.lastReward?.tempos).toBe(54);
+    });
+
+    it("devuelve ceros y undefined cuando no hay records", () => {
+      const state = createMockState(true);
+      state.global.completedActivityRecords = [];
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const summary = manager.getTempoSummary(tempoDayId);
+
+      expect(summary.totalTempos).toBe(0);
+      expect(summary.targetProgress).toBe(0);
+      expect(summary.progressBarValue).toBe(0);
+      expect(summary.displayPercent).toBe(0);
+      expect(summary.completedActivities).toBe(0);
+      expect(summary.averageSatisfaction).toBe(0);
+      expect(summary.lastReward).toBeUndefined();
+    });
+  });
+
+  describe("getTempoTrends", () => {
+    it("devuelve un punto por día con totalTempos, targetProgress y avg", () => {
+      const state = createMockState(true);
+      state.global.days = [
+        {
+          id: "d1",
+          state: "inactive",
+          startTime: YESTERDAY.toISOString(),
+          endTime: YESTERDAY.toISOString(),
+          createdAt: YESTERDAY.toISOString(),
+          updatedAt: YESTERDAY.toISOString(),
+        },
+        {
+          id: "d2",
+          state: "inactive",
+          startTime: TODAY.toISOString(),
+          endTime: TODAY.toISOString(),
+          createdAt: TODAY.toISOString(),
+          updatedAt: TODAY.toISOString(),
+        },
+      ];
+      state.global.completedActivityRecords = [
+        {
+          id: "tr1",
+          activityInstanceId: "i1",
+          templateId: "t1",
+          templateTitle: "A",
+          state: "completed",
+          type: "clear-objective",
+          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
+          startTime: YESTERDAY.toISOString(),
+          endTime: YESTERDAY.toISOString(),
+          durationMinutes: 30,
+          dayId: "d1",
+          satisfactionScore: 8,
+          temposAwarded: 24,
+          beatEstimate: false,
+          createdAt: YESTERDAY.toISOString(),
+        },
+        {
+          id: "tr2",
+          activityInstanceId: "i2",
+          templateId: "t2",
+          templateTitle: "B",
+          state: "completed",
+          type: "clear-objective",
+          clearObjectiveSettings: { estimatedDurationMinutes: 60 },
+          startTime: TODAY.toISOString(),
+          endTime: TODAY.toISOString(),
+          durationMinutes: 60,
+          dayId: "d2",
+          satisfactionScore: 10,
+          temposAwarded: 60,
+          beatEstimate: false,
+          createdAt: TODAY.toISOString(),
+        },
+      ];
+      state.global.userPreferences.dailyTempoTarget = 100;
+
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const trends = manager.getTempoTrends({
+        from: YESTERDAY.toISOString(),
+        to: TODAY.toISOString(),
+      });
+
+      expect(trends.length).toBe(2);
+      expect(trends[0].totalTempos).toBe(24);
+      expect(trends[0].targetProgress).toBeCloseTo(0.24, 2);
+      expect(trends[0].averageSatisfaction).toBe(8);
+      expect(trends[1].totalTempos).toBe(60);
+      expect(trends[1].averageSatisfaction).toBe(10);
+    });
+
+    it("filtra días fuera del rango", () => {
+      const state = createMockState(true);
+      state.global.days = [
+        {
+          id: "d1",
+          state: "inactive",
+          startTime: new Date("2020-01-01").toISOString(),
+          endTime: new Date("2020-01-01").toISOString(),
+          createdAt: new Date("2020-01-01").toISOString(),
+          updatedAt: new Date("2020-01-01").toISOString(),
+        },
+      ];
+      const manager = new AnalyticsManager(createMockSystemCore(state));
+      const trends = manager.getTempoTrends({
+        from: YESTERDAY.toISOString(),
+        to: TODAY.toISOString(),
+      });
+      expect(trends.length).toBe(0);
     });
   });
 });

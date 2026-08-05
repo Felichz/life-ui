@@ -501,58 +501,31 @@ export class AnalyticsManager {
 
   /**
    * Obtiene estadísticas de interrupciones
+   *
+   * Schema v2+: las interrupciones ya no se clasifican (evitable/innevitable)
+   * ni se agrupan por causa. Se preserva la interfaz para no romper consumidores,
+   * pero `topCauses` siempre viene vacío y los contadores de clasificación son 0.
+   *
    * @returns Estadísticas detalladas sobre interrupciones
    */
   public getInterruptionStats(): InterruptionStatistics {
     const state = this.systemCore.getState();
     const activities = state.global.completedActivityRecords;
 
-    // Filtrar actividades interrumpidas (schema v2+: sin interruptionData)
     const interruptedActivities = activities.filter((activity) => activity.state === "interrupted");
 
     const totalInterruptions = interruptedActivities.length;
-    // Schema v2+: ya no hay clasificación evitable/no evitable.
+    // Sin clasificación evitable/innevitable en schema v2+
     const avoidableInterruptions = 0;
     const unavoidableInterruptions = totalInterruptions;
     const avoidablePercentage = 0;
-
-    // Causas: schema v2+ no tiene causas configurables.
-    const causesMap = new Map<string, { id: UUID; count: number }>();
-
-    interruptedActivities.forEach((activity) => {
-      const causeId = activity.id;
-      const causeDesc = "Sin clasificar";
-      {
-        if (!causesMap.has(causeId)) {
-          causesMap.set(causeId, { id: causeId, count: 0 });
-        }
-
-        const causeData = causesMap.get(causeId);
-        if (causeData) {
-          causeData.count += 1;
-        }
-      }
-    });
-
-    // Convertir a array y ordenar por frecuencia
-    const topCauses = Array.from(causesMap.entries())
-      .map(([id, data]) => {
-        const cause = state.global.interruptionCauses.find((c) => c.id === id);
-        return {
-          id,
-          description: cause?.description || "Desconocida",
-          count: data.count,
-          percentage: (data.count / totalInterruptions) * 100,
-        };
-      })
-      .sort((a, b) => b.count - a.count);
 
     return {
       totalInterruptions,
       avoidableInterruptions,
       unavoidableInterruptions,
       avoidablePercentage: Number(avoidablePercentage.toFixed(2)),
-      topCauses,
+      topCauses: [],
     };
   }
 
