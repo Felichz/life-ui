@@ -11,6 +11,7 @@ import {
   Paper,
   Stack,
   Divider,
+  Alert,
 } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
@@ -33,17 +34,26 @@ const SCORE_LABELS: Record<number, string> = {
 interface CompletionModalProps {
   open: boolean;
   request: CompletionRequest | null;
+  /**
+   * Mensaje de error si el cierre anterior falló. Si está presente, el modal
+   * permanece abierto para que el usuario pueda reintentar o cancelar.
+   */
+  error?: string | null;
   onConfirm: (assessment: { satisfactionScore: number }) => void;
   onInterrupt: () => void;
   onClose: () => void;
+  /** Limpia el error del flow (al reintentar o al cambiar el score). */
+  onRetry?: () => void;
 }
 
 const CompletionModal: React.FC<CompletionModalProps> = ({
   open,
   request,
+  error,
   onConfirm,
   onInterrupt,
   onClose,
+  onRetry,
 }) => {
   const [score, setScore] = useState<number>(5);
 
@@ -79,6 +89,22 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
 
       <DialogContent dividers>
         <Stack spacing={3}>
+          {error && (
+            <Alert
+              severity="error"
+              data-testid="completion-error"
+              onClose={onRetry}
+              action={
+                onRetry && (
+                  <Button color="inherit" size="small" onClick={onRetry} data-testid="completion-retry">
+                    Reintentar
+                  </Button>
+                )
+              }
+            >
+              No pudimos guardar el cierre: {error}. Vuelve a intentarlo o cancela.
+            </Alert>
+          )}
           <Box>
             <Typography variant="body2" color="text.secondary">
               Tiempo real
@@ -108,7 +134,12 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
             <Box sx={{ px: 2 }}>
               <Slider
                 value={score}
-                onChange={(_, v) => setScore(v as number)}
+                onChange={(_, v) => {
+                  setScore(v as number);
+                  // Al ajustar el score, limpiamos el error para que
+                  // el usuario sepa que el nuevo intento aún no se hizo.
+                  if (error && onRetry) onRetry();
+                }}
                 min={0}
                 max={10}
                 step={1}

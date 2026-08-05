@@ -12,10 +12,12 @@ import type { UUID } from "../../types";
  * Reglas:
  * 1. Una sola ejecución de `onConfirm`/`onInterrupt` por resolución.
  * 2. `continuation` se ejecuta **solo si el callback de cierre tuvo éxito**.
- *    Si el callback lanza, la continuación NO corre (evita activar otra
- *    actividad o cerrar el día con un registro corrupto).
- * 3. `cancel` descarta el cierre pendiente sin tocar nada.
- * 4. El `requestedAt` (timestamp congelado) NO vive en este contexto:
+ * 3. Si el callback lanza, el estado del flujo se PRESERVA y `closeError`
+ *    se setea con el mensaje. El modal no se cierra: el usuario ve el
+ *    error y puede reintentar o cancelar. No debe parecer que la acción
+ *    funcionó si no se registró la recompensa.
+ * 4. `cancel` descarta el cierre pendiente y limpia cualquier error.
+ * 5. El `requestedAt` (timestamp congelado) NO vive en este contexto:
  *    viene de `activityManager.requestCompletion()` vía `CompletionRequest`.
  */
 
@@ -25,16 +27,17 @@ type InterruptHandler = (activityId: UUID) => void;
 interface CompletionFlowContextValue {
   pendingCloseId: UUID | null;
   pendingContinuation: (() => void) | null;
+  /** Error del último cierre (si el callback de cierre lanzó). Null si OK. */
+  closeError: string | null;
 
-  /** Pedir el cierre de la actividad activa. Solo `(id, continuation)`. */
   requestCloseActive: (activityId: UUID, continuation: () => void) => void;
-
-  /** Registra los handlers que se ejecutarán al resolver/rechazar. */
   registerCloseHandlers: (onConfirm: ConfirmHandler, onInterrupt: InterruptHandler) => void;
 
   resolve: (score: number) => void;
   reject: () => void;
   cancel: () => void;
+  /** Limpia el error sin tocar el state del flow (útil cuando el usuario reintenta). */
+  clearCloseError: () => void;
 }
 
 interface InternalState {
@@ -46,14 +49,15 @@ const CompletionFlowContext = createContext<CompletionFlowContextValue | undefin
 
 export const CompletionFlowProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<InternalState | null>(null);
+  const [closeError, setCloseError] = useState<string | null>(null);
 
-  // Handlers registrados por DayPage (o quien tenga acceso al sistema).
   const handlersRef = useRef<{ onConfirm: ConfirmHandler; onInterrupt: InterruptHandler }>({
     onConfirm: () => {},
     onInterrupt: () => {},
   });
 
   const requestCloseActive = useCallback((activityId: UUID, continuation: () => void) => {
+    setCloseError(null);
     setState({ activityId, continuation });
   }, []);
 
@@ -67,16 +71,19 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
   const resolve = useCallback(
     (score: number) => {
       const s = state;
-      setState(null);
       if (!s) return;
       try {
         handlersRef.current.onConfirm(s.activityId, score);
       } catch (e) {
-        // El cierre falló: no se ejecuta la continuación.
+        // Fallo: el modal NO se cierra. El usuario ve el error y puede
+        // reintentar o cancelar. La continuation NO corre.
+        const message = e instanceof Error ? e.message : "Error desconocido al cerrar";
+        setCloseError(message);
         console.error("CompletionFlow: onConfirm lanzó, se omite continuation.", e);
         return;
       }
-      // Solo en éxito se ejecuta la continuación.
+      setCloseError(null);
+      setState(null);
       s.continuation();
     },
     [state]
@@ -84,19 +91,27 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
 
   const reject = useCallback(() => {
     const s = state;
-    setState(null);
     if (!s) return;
     try {
       handlersRef.current.onInterrupt(s.activityId);
     } catch (e) {
+      const message = e instanceof Error ? e.message : "Error desconocido al interrumpir";
+      setCloseError(message);
       console.error("CompletionFlow: onInterrupt lanzó, se omite continuation.", e);
       return;
     }
+    setCloseError(null);
+    setState(null);
     s.continuation();
   }, [state]);
 
   const cancel = useCallback(() => {
     setState(null);
+    setCloseError(null);
+  }, []);
+
+  const clearCloseError = useCallback(() => {
+    setCloseError(null);
   }, []);
 
   return (
@@ -106,9 +121,11 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
         registerCloseHandlers,
         pendingCloseId: state?.activityId ?? null,
         pendingContinuation: state?.continuation ?? null,
+        closeError,
         resolve,
         reject,
         cancel,
+        clearCloseError,
       }}
     >
       {children}
@@ -122,11 +139,13 @@ export const useCompletionFlow = () => {
     return {
       pendingCloseId: null,
       pendingContinuation: null,
+      closeError: null,
       requestCloseActive: () => {},
       registerCloseHandlers: () => {},
       resolve: () => {},
       reject: () => {},
       cancel: () => {},
+      clearCloseError: () => {},
     };
   }
   return ctx;

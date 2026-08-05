@@ -135,6 +135,9 @@ const DayPage: React.FC = () => {
   // El `endTime` congelado viene SIEMPRE de completionRequest.requestedAt
   // (leído vía ref para no quedar desactualizado), que es el mismo
   // timestamp que se mostró en el modal.
+  // El `activityTitle` del snackbar también sale del `completionRequest`
+  // (lo trajo `requestCompletion()`), evitando el título stale de un
+  // closure que se registró antes de que la actividad apareciera.
   React.useEffect(() => {
     completionFlow.registerCloseHandlers(
       (closedId, score) => {
@@ -143,14 +146,18 @@ const DayPage: React.FC = () => {
           endTime: completionRequestRef.current?.requestedAt,
         });
         setLastReward({
-          activityTitle: getActiveTitleFromState(closedId),
+          activityTitle:
+            completionRequestRef.current?.activityTitle ??
+            getActiveTitleFromState(closedId),
           tempos: result.temposAwarded,
         });
       },
       (closedId) => {
         interruptActivity(closedId);
         setLastReward({
-          activityTitle: getActiveTitleFromState(closedId),
+          activityTitle:
+            completionRequestRef.current?.activityTitle ??
+            getActiveTitleFromState(closedId),
           tempos: 0,
         });
       }
@@ -443,24 +450,29 @@ const DayPage: React.FC = () => {
       </DragDropContext>
 
       {/* CompletionModal único compartido.
-          Aquí NO llamamos completeActivity/interruptActivity: el contexto es la
-          única autoridad. Solo le decimos "el usuario eligió score=N" (resolve)
-          o "el usuario eligió interrumpir" (reject). El endTime congelado se
-          pasó en el momento de registrar el onConfirm (completionRequest.requestedAt). */}
+          El contexto es la única autoridad: solo le decimos "el usuario eligió
+          score=N" (resolve) o "el usuario eligió interrumpir" (reject).
+          El contexto decide si cerrar el modal (éxito) o dejarlo abierto con
+          error visible (fallo). El `completionRequest` local se limpia junto
+          con el cancel explícito del usuario. */}
       <CompletionModal
         open={!!completionFlow.pendingCloseId && !!completionRequest}
         request={completionRequest}
+        error={completionFlow.closeError}
         onConfirm={(assessment) => {
-          setCompletionRequest(null);
           completionFlow.resolve(assessment.satisfactionScore);
+          // Si tuvo éxito, el contexto limpió pendingCloseId → modal se cierra.
+          // Si falló, el contexto preservó state → modal sigue abierto.
         }}
         onInterrupt={() => {
-          setCompletionRequest(null);
           completionFlow.reject();
         }}
         onClose={() => {
           setCompletionRequest(null);
           completionFlow.cancel();
+        }}
+        onRetry={() => {
+          completionFlow.clearCloseError();
         }}
       />
 

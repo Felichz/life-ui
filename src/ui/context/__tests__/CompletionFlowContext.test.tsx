@@ -12,6 +12,7 @@ import {
 interface FlowShape {
   pendingCloseId: string | null;
   pendingContinuation: (() => void) | null;
+  closeError: string | null;
   requestCloseActive: (id: string, continuation: () => void) => void;
   registerCloseHandlers: (
     onConfirm: (id: string, score: number) => void,
@@ -20,6 +21,7 @@ interface FlowShape {
   resolve: (score: number) => void;
   reject: () => void;
   cancel: () => void;
+  clearCloseError: () => void;
 }
 
 interface HarnessProps {
@@ -41,6 +43,7 @@ const Harness: React.FC<HarnessProps> = ({ onConfirm, onInterrupt }) => {
   return (
     <div>
       <span data-testid="pendingCloseId">{flow.pendingCloseId || "none"}</span>
+      <span data-testid="closeError">{flow.closeError || "none"}</span>
       <button data-testid="resolve" onClick={() => flow.resolve(8)}>
         resolve
       </button>
@@ -206,6 +209,154 @@ describe("CompletionFlowContext", () => {
       expect(onInterrupt).not.toHaveBeenCalled();
       expect(onCont).not.toHaveBeenCalled();
       expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
+    });
+  });
+
+  describe("errores en el cierre: feedback visible + state preservado", () => {
+    it("si onConfirm lanza: setea closeError y PRESERVA el state (modal sigue abierto)", () => {
+      const onConfirm = jest.fn(() => {
+        throw new Error("disco lleno");
+      });
+      const onCont = jest.fn();
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("none");
+
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onCont).not.toHaveBeenCalled();
+      // State preservado: el modal sigue "abierto" (pendingCloseId intacto)
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-1");
+      // closeError visible
+      expect(screen.getByTestId("closeError")).toHaveTextContent("disco lleno");
+      errSpy.mockRestore();
+    });
+
+    it("si onInterrupt lanza: setea closeError y PRESERVA el state", () => {
+      const onInterrupt = jest.fn(() => {
+        throw new Error("no se pudo interrumpir");
+      });
+      const onCont = jest.fn();
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onInterrupt });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
+      });
+
+      act(() => {
+        screen.getByTestId("reject").click();
+      });
+      expect(onInterrupt).toHaveBeenCalledTimes(1);
+      expect(onCont).not.toHaveBeenCalled();
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-1");
+      expect(screen.getByTestId("closeError")).toHaveTextContent("no se pudo interrumpir");
+      errSpy.mockRestore();
+    });
+
+    it("clearCloseError limpia el error sin tocar el state", () => {
+      const onConfirm = jest.fn(() => {
+        throw new Error("boom");
+      });
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", () => {});
+      });
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("boom");
+
+      act(() => {
+        getFlow().clearCloseError();
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("none");
+      // State preservado
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-1");
+      errSpy.mockRestore();
+    });
+
+    it("retry: tras un fallo, el usuario puede volver a llamar resolve y esta vez tiene éxito", () => {
+      let attempts = 0;
+      const onConfirm = jest.fn(() => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("transient");
+      });
+      const onCont = jest.fn();
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
+      });
+
+      // Primer intento: falla
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(onCont).not.toHaveBeenCalled();
+      expect(screen.getByTestId("closeError")).toHaveTextContent("transient");
+
+      // Limpiamos error y reintentamos: ahora tiene éxito
+      act(() => {
+        getFlow().clearCloseError();
+      });
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(2);
+      expect(onCont).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
+      errSpy.mockRestore();
+    });
+
+    it("cancel limpia el closeError junto con el state", () => {
+      const onConfirm = jest.fn(() => {
+        throw new Error("boom");
+      });
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", () => {});
+      });
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("boom");
+
+      act(() => {
+        screen.getByTestId("cancel").click();
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("none");
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
+      errSpy.mockRestore();
+    });
+
+    it("requestCloseActive limpia el closeError previo al abrir uno nuevo", () => {
+      const onConfirm = jest.fn(() => {
+        throw new Error("primer fallo");
+      });
+      const onCont = jest.fn();
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
+      });
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("primer fallo");
+
+      act(() => {
+        getFlow().requestCloseActive("act-2", onCont);
+      });
+      expect(screen.getByTestId("closeError")).toHaveTextContent("none");
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-2");
+      errSpy.mockRestore();
     });
   });
 });
