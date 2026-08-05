@@ -33,8 +33,14 @@ interface CompletionFlowContextValue {
   requestCloseActive: (activityId: UUID, continuation: () => void) => void;
   registerCloseHandlers: (onConfirm: ConfirmHandler, onInterrupt: InterruptHandler) => void;
 
-  resolve: (score: number) => void;
-  reject: () => void;
+  /**
+   * Resuelve el cierre con el score dado. Devuelve `true` si el handler
+   * ejecutó sin lanzar; `false` si falló (en cuyo caso el state se
+   * preserva y `closeError` queda seteado). El caller puede usar el
+   * boolean para limpiar su propio state local solo en éxito.
+   */
+  resolve: (score: number) => boolean;
+  reject: () => boolean;
   cancel: () => void;
   /** Limpia el error sin tocar el state del flow (útil cuando el usuario reintenta). */
   clearCloseError: () => void;
@@ -69,9 +75,9 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
   );
 
   const resolve = useCallback(
-    (score: number) => {
+    (score: number): boolean => {
       const s = state;
-      if (!s) return;
+      if (!s) return false;
       try {
         handlersRef.current.onConfirm(s.activityId, score);
       } catch (e) {
@@ -80,29 +86,31 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
         const message = e instanceof Error ? e.message : "Error desconocido al cerrar";
         setCloseError(message);
         console.error("CompletionFlow: onConfirm lanzó, se omite continuation.", e);
-        return;
+        return false;
       }
       setCloseError(null);
       setState(null);
       s.continuation();
+      return true;
     },
     [state]
   );
 
-  const reject = useCallback(() => {
+  const reject = useCallback((): boolean => {
     const s = state;
-    if (!s) return;
+    if (!s) return false;
     try {
       handlersRef.current.onInterrupt(s.activityId);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Error desconocido al interrumpir";
       setCloseError(message);
       console.error("CompletionFlow: onInterrupt lanzó, se omite continuation.", e);
-      return;
+      return false;
     }
     setCloseError(null);
     setState(null);
     s.continuation();
+    return true;
   }, [state]);
 
   const cancel = useCallback(() => {
@@ -142,8 +150,8 @@ export const useCompletionFlow = () => {
       closeError: null,
       requestCloseActive: () => {},
       registerCloseHandlers: () => {},
-      resolve: () => {},
-      reject: () => {},
+      resolve: () => false,
+      reject: () => false,
       cancel: () => {},
       clearCloseError: () => {},
     };

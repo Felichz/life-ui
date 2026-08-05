@@ -453,19 +453,25 @@ const DayPage: React.FC = () => {
           El contexto es la única autoridad: solo le decimos "el usuario eligió
           score=N" (resolve) o "el usuario eligió interrumpir" (reject).
           El contexto decide si cerrar el modal (éxito) o dejarlo abierto con
-          error visible (fallo). El `completionRequest` local se limpia junto
-          con el cancel explícito del usuario. */}
+          error visible (fallo). El `completionRequest` local se limpia SOLO
+          en éxito: si falla, debe preservarse para que el modal siga mostrando
+          el título/duración correctos al reintentar. */}
       <CompletionModal
         open={!!completionFlow.pendingCloseId && !!completionRequest}
         request={completionRequest}
         error={completionFlow.closeError}
         onConfirm={(assessment) => {
-          completionFlow.resolve(assessment.satisfactionScore);
-          // Si tuvo éxito, el contexto limpió pendingCloseId → modal se cierra.
-          // Si falló, el contexto preservó state → modal sigue abierto.
+          const ok = completionFlow.resolve(assessment.satisfactionScore);
+          if (ok) {
+            setCompletionRequest(null);
+          }
+          // Si falló, el contexto preservó state y seteó closeError.
         }}
         onInterrupt={() => {
-          completionFlow.reject();
+          const ok = completionFlow.reject();
+          if (ok) {
+            setCompletionRequest(null);
+          }
         }}
         onClose={() => {
           setCompletionRequest(null);

@@ -18,8 +18,8 @@ interface FlowShape {
     onConfirm: (id: string, score: number) => void,
     onInterrupt: (id: string) => void
   ) => void;
-  resolve: (score: number) => void;
-  reject: () => void;
+  resolve: (score: number) => boolean;
+  reject: () => boolean;
   cancel: () => void;
   clearCloseError: () => void;
 }
@@ -112,22 +112,24 @@ describe("CompletionFlowContext", () => {
   });
 
   describe("resolve: una sola autoridad + continuation solo en éxito", () => {
-    it("invoca onConfirm UNA vez con (id, score) y luego continuation en éxito", () => {
+    it("invoca onConfirm UNA vez con (id, score) y luego continuation en éxito (retorna true)", () => {
       const onConfirm = jest.fn();
       const onCont = jest.fn();
       renderWith({ onConfirm });
       act(() => {
         getFlow().requestCloseActive("act-1", onCont);
       });
+      let result: boolean | undefined;
       act(() => {
-        screen.getByTestId("resolve").click();
+        result = getFlow().resolve(8);
       });
+      expect(result).toBe(true);
       expect(onConfirm).toHaveBeenCalledTimes(1);
       expect(onConfirm).toHaveBeenCalledWith("act-1", 8);
       expect(onCont).toHaveBeenCalledTimes(1);
     });
 
-    it("NO ejecuta continuation si onConfirm lanza", () => {
+    it("NO ejecuta continuation si onConfirm lanza (retorna false, state preservado)", () => {
       const onConfirm = jest.fn(() => {
         throw new Error("boom");
       });
@@ -137,9 +139,11 @@ describe("CompletionFlowContext", () => {
       act(() => {
         getFlow().requestCloseActive("act-1", onCont);
       });
+      let result: boolean | undefined;
       act(() => {
-        screen.getByTestId("resolve").click();
+        result = getFlow().resolve(8);
       });
+      expect(result).toBe(false);
       expect(onConfirm).toHaveBeenCalledTimes(1);
       expect(onCont).not.toHaveBeenCalled();
       expect(errSpy).toHaveBeenCalled();
@@ -159,22 +163,24 @@ describe("CompletionFlowContext", () => {
   });
 
   describe("reject: una sola autoridad + continuation solo en éxito", () => {
-    it("invoca onInterrupt UNA vez y luego continuation en éxito", () => {
+    it("invoca onInterrupt UNA vez y luego continuation en éxito (retorna true)", () => {
       const onInterrupt = jest.fn();
       const onCont = jest.fn();
       renderWith({ onInterrupt });
       act(() => {
         getFlow().requestCloseActive("act-1", onCont);
       });
+      let result: boolean | undefined;
       act(() => {
-        screen.getByTestId("reject").click();
+        result = getFlow().reject();
       });
+      expect(result).toBe(true);
       expect(onInterrupt).toHaveBeenCalledTimes(1);
       expect(onInterrupt).toHaveBeenCalledWith("act-1");
       expect(onCont).toHaveBeenCalledTimes(1);
     });
 
-    it("NO ejecuta continuation si onInterrupt lanza", () => {
+    it("NO ejecuta continuation si onInterrupt lanza (retorna false, state preservado)", () => {
       const onInterrupt = jest.fn(() => {
         throw new Error("boom");
       });
@@ -184,9 +190,11 @@ describe("CompletionFlowContext", () => {
       act(() => {
         getFlow().requestCloseActive("act-1", onCont);
       });
+      let result: boolean | undefined;
       act(() => {
-        screen.getByTestId("reject").click();
+        result = getFlow().reject();
       });
+      expect(result).toBe(false);
       expect(onInterrupt).toHaveBeenCalledTimes(1);
       expect(onCont).not.toHaveBeenCalled();
       errSpy.mockRestore();
