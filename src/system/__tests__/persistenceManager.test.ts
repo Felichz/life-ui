@@ -2,7 +2,11 @@
  * @jest-environment jsdom
  */
 
-import { PersistenceManager, STORAGE_KEY } from "../persistenceManager";
+import {
+  PersistenceManager,
+  STORAGE_KEY,
+  CURRENT_SCHEMA_VERSION,
+} from "../persistenceManager";
 import type { AppState } from "../../types";
 
 // Mock directo de localStorage
@@ -424,7 +428,7 @@ describe("PersistenceManager", () => {
       expect(result).not.toBeNull();
 
       // El shape persistido principal ya no tiene los campos legacy
-      const global = result!.global as Record<string, unknown>;
+      const global = result!.global as unknown as Record<string, unknown>;
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
@@ -467,7 +471,7 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      const global = result!.global as Record<string, unknown>;
+      const global = result!.global as unknown as Record<string, unknown>;
       expect(global.legacyArchive).toBeUndefined();
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
@@ -522,7 +526,7 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      const global = result!.global as Record<string, unknown>;
+      const global = result!.global as unknown as Record<string, unknown>;
 
       // dailyTempoTarget creado por v1→v2
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
@@ -534,6 +538,146 @@ describe("PersistenceManager", () => {
       expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
         .toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
+    });
+  });
+
+  // Pipeline central: serialize/deserialize (lo que export/import y localStorage usan)
+  describe("serialize / deserialize", () => {
+    it("serialize incluye schemaVersion=3 y produce JSON parseable", () => {
+      const json = persistenceManager.serialize(mockValidState);
+      const parsed = JSON.parse(json);
+
+      expect(parsed.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      expect(parsed.global).toEqual(mockValidState.global);
+    });
+
+    it("serialize elimina campos legacy aunque estén en el estado", () => {
+      const stateWithLegacy = {
+        ...mockValidState,
+        global: {
+          ...mockValidState.global,
+          subjectiveVariables: [{ id: "v1" }],
+          interruptionCauses: [{ id: "c1" }],
+          subjectiveVariableSnapshots: [{ id: "s1" }],
+          userPreferences: {
+            ...mockValidState.global.userPreferences,
+            hiddenSubjectiveVariableIds: ["v1"],
+          },
+        },
+      } as typeof mockValidState;
+
+      const json = persistenceManager.serialize(stateWithLegacy);
+      const parsed = JSON.parse(json);
+
+      expect(parsed.global.subjectiveVariables).toBeUndefined();
+      expect(parsed.global.interruptionCauses).toBeUndefined();
+      expect(parsed.global.subjectiveVariableSnapshots).toBeUndefined();
+      expect(parsed.global.userPreferences.hiddenSubjectiveVariableIds).toBeUndefined();
+    });
+
+    it("deserialize de v3 retorna el estado tal cual sin migración", () => {
+      const json = JSON.stringify({ ...mockValidState, schemaVersion: 3 });
+      const result = persistenceManager.deserialize(json);
+
+      expect(result.global).toEqual(mockValidState.global);
+      // Sin warnings porque no hay migración
+    });
+
+    it("deserialize de v2 con campos legacy los archiva y limpia", () => {
+      const v2State = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["v1"],
+            dailyTempoTarget: 800,
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariables: [{ id: "v1", name: "Energía" }],
+          interruptionCauses: [{ id: "c1", description: "Notif" }],
+          subjectiveVariableSnapshots: [{ id: "s1" }],
+          schemaVersion: 2,
+        },
+        currentDay: null,
+        schemaVersion: 2,
+      };
+
+      const result = persistenceManager.deserialize(JSON.stringify(v2State));
+      const global = result.global as unknown as Record<string, unknown>;
+
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.interruptionCauses).toBeUndefined();
+      expect(global.subjectiveVariableSnapshots).toBeUndefined();
+      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
+        .toBeUndefined();
+      expect(global.legacyArchive).toBeDefined();
+      // dailyTempoTarget preservado por la migración
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(800);
+    });
+
+    it("deserialize de v1 sin schemaVersion ejecuta v1→v2→v3", () => {
+      const v1State = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["v1"],
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariables: [{ id: "v1" }],
+          interruptionCauses: [{ id: "c1" }],
+          subjectiveVariableSnapshots: [{ id: "s1" }],
+        },
+        currentDay: null,
+      };
+
+      const result = persistenceManager.deserialize(JSON.stringify(v1State));
+      const global = result.global as unknown as Record<string, unknown>;
+
+      // dailyTempoTarget creado por v1→v2
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
+      // Legacy archivado por v2→v3
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.legacyArchive).toBeDefined();
+    });
+
+    it("deserialize lanza Error con JSON inválido", () => {
+      expect(() => persistenceManager.deserialize("invalid json")).toThrow();
+    });
+
+    it("deserialize lanza Error con estructura inválida", () => {
+      expect(() => persistenceManager.deserialize(JSON.stringify({}))).toThrow();
+    });
+
+    it("roundtrip serialize → deserialize preserva el estado", () => {
+      const original = {
+        ...mockValidState,
+        global: {
+          ...mockValidState.global,
+          days: [
+            {
+              id: "d1",
+              state: "active" as const,
+              createdAt: "2023-01-01T00:00:00.000Z",
+              updatedAt: "2023-01-01T00:00:00.000Z",
+            },
+          ],
+        },
+      };
+
+      const json = persistenceManager.serialize(original);
+      const result = persistenceManager.deserialize(json);
+
+      expect(result.global.days).toEqual(original.global.days);
+      expect(result.global.userPreferences).toEqual(original.global.userPreferences);
     });
   });
 });

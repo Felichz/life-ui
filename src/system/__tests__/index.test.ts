@@ -3,8 +3,32 @@ import { PersistenceManager } from "../persistenceManager";
 import { UtilityService } from "../utilityService";
 import type { AppState, Day, TimeBlock } from "../../types";
 
-// Mocks para los módulos
-jest.mock("../persistenceManager");
+// Mock del PersistenceManager: devuelve SIEMPRE la misma instancia (singleton)
+// para que múltiples `new SystemCore()` en un mismo test compartan el mismo
+// mock configurado. Los tests que necesiten el pipeline real (exportData/importData
+// con migración v2→v3) reasignan el mockImplementation del método correspondiente.
+const sharedPersistence: Record<string, jest.Mock> = {};
+jest.mock("../persistenceManager", () => {
+  const actual = jest.requireActual("../persistenceManager");
+  const MockedClass = jest.fn().mockImplementation(() => {
+    if (Object.keys(sharedPersistence).length === 0) {
+      sharedPersistence.saveState = jest.fn();
+      sharedPersistence.loadState = jest.fn().mockReturnValue(null);
+      sharedPersistence.clearState = jest.fn();
+      sharedPersistence.serialize = jest.fn((state: AppState) =>
+        JSON.stringify({ ...state, schemaVersion: 3 })
+      );
+      sharedPersistence.deserialize = jest.fn((json: string) =>
+        JSON.parse(json) as AppState
+      );
+    }
+    return sharedPersistence;
+  });
+  return {
+    ...actual,
+    PersistenceManager: MockedClass,
+  };
+});
 jest.mock("../dayManager");
 jest.mock("../activityManager");
 jest.mock("../timeBlockManager");
@@ -18,6 +42,7 @@ describe("SystemCore", () => {
   let mockAppState: AppState;
   let mockUUID: string;
   let mockTimestamp: string;
+  let mockPersistence: Record<string, jest.Mock>;
 
   beforeEach(() => {
     // Configurar mocks
@@ -27,11 +52,25 @@ describe("SystemCore", () => {
     (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
     (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
 
-    // Configurar PersistenceManager mock
-    (PersistenceManager.prototype.loadState as jest.Mock).mockReturnValue(null);
-    (PersistenceManager.prototype.saveState as jest.Mock).mockImplementation(() => {});
+    // Resetear el constructor mockeado y limpiar la instancia compartida
+    (PersistenceManager as unknown as jest.Mock).mockClear();
+    Object.keys(sharedPersistence).forEach((k) => delete sharedPersistence[k]);
 
     systemCore = new SystemCore();
+
+    // mockPersistence es ahora la instancia compartida singleton
+    mockPersistence = sharedPersistence;
+
+    // Configurar el mock por defecto
+    mockPersistence.loadState.mockReturnValue(null);
+    mockPersistence.saveState.mockImplementation(() => {});
+    mockPersistence.clearState.mockImplementation(() => {});
+    mockPersistence.serialize.mockImplementation((state: AppState) =>
+      JSON.stringify({ ...state, schemaVersion: 3 })
+    );
+    mockPersistence.deserialize.mockImplementation((json: string) =>
+      JSON.parse(json) as AppState
+    );
 
     // Obtener el estado inicial
     mockAppState = systemCore.getState();
@@ -55,7 +94,7 @@ describe("SystemCore", () => {
           },
           completedActivityRecords: [],
           eventInstances: [],
-          schemaVersion: 2,
+          schemaVersion: 3,
         },
         currentDay: null,
       });
@@ -97,8 +136,8 @@ describe("SystemCore", () => {
         },
       };
 
-      // Configurar mock para devolver un estado guardado
-      (PersistenceManager.prototype.loadState as jest.Mock).mockReturnValue(savedState);
+      // Configurar mock para devolver el estado guardado (compartido vía singleton)
+      (mockPersistence.loadState as jest.Mock).mockReturnValue(savedState);
 
       // Crear nueva instancia con el mock configurado
       const systemCoreWithSavedState = new SystemCore();
@@ -143,7 +182,7 @@ describe("SystemCore", () => {
       expect(mockObserver).toHaveBeenCalledWith(updatedState);
 
       // Verificar que se guardó el estado
-      expect(PersistenceManager.prototype.saveState).toHaveBeenCalledWith(updatedState);
+      expect(mockPersistence.saveState).toHaveBeenCalledWith(updatedState);
 
       // Probar desuscripción
       unsubscribe();
@@ -346,11 +385,13 @@ describe("SystemCore", () => {
       const exportedJson = systemCore.exportData();
       const exportedState = JSON.parse(exportedJson);
 
-      // Verificar que el estado exportado coincide con el estado actual
-      expect(exportedState).toEqual(systemCore.getState());
+      // El estado exportado contiene el global completo + schemaVersion top-level
+      // (añadido por el pipeline central)
+      expect(exportedState.global).toEqual(systemCore.getState().global);
+      expect(exportedState.schemaVersion).toBe(3);
     });
 
-    it("debe importar correctamente el estado desde JSON", () => {
+    it("debe importar correctamente el estado desde JSON (v3)", () => {
       const importedState: AppState = {
         global: {
           days: [
@@ -372,7 +413,7 @@ describe("SystemCore", () => {
           },
           completedActivityRecords: [],
           eventInstances: [],
-          schemaVersion: 2,
+          schemaVersion: 3,
         },
         currentDay: null,
       };
@@ -384,14 +425,142 @@ describe("SystemCore", () => {
       expect(systemCore.getState()).toEqual(importedState);
 
       // Verificar que se guardó el estado importado
-      expect(PersistenceManager.prototype.saveState).toHaveBeenCalledWith(importedState);
+      expect(mockPersistence.saveState).toHaveBeenCalledWith(importedState);
+    });
+
+    it("importData ejecuta el pipeline central: importar v2 con legacy archiva y limpia", () => {
+      // Usamos la implementación real de deserialize (incluye migración)
+      const RealPersistenceManager = jest.requireActual("../persistenceManager")
+        .PersistenceManager as new () => {
+        deserialize: (json: string) => AppState;
+      };
+      const realInstance = new RealPersistenceManager();
+      mockPersistence.deserialize.mockImplementation((json: string) =>
+        realInstance.deserialize(json)
+      );
+
+      // JSON v2 con campos legacy - simula un usuario que importa un backup antiguo
+      const v2WithLegacy = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["v1"],
+            dailyTempoTarget: 1500,
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariables: [{ id: "v1", name: "Energía" }],
+          interruptionCauses: [{ id: "c1" }],
+          subjectiveVariableSnapshots: [{ id: "s1" }],
+          schemaVersion: 2,
+        },
+        currentDay: null,
+        schemaVersion: 2,
+      };
+
+      systemCore.importData(JSON.stringify(v2WithLegacy));
+
+      const state = systemCore.getState();
+      const global = state.global as unknown as Record<string, unknown>;
+
+      // El runtime ya no contiene los legacy fields
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.interruptionCauses).toBeUndefined();
+      expect(global.subjectiveVariableSnapshots).toBeUndefined();
+      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
+        .toBeUndefined();
+      // Pero el archivo está disponible
+      expect(global.legacyArchive).toBeDefined();
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1500);
+    });
+
+    it("importData de v1 sin schemaVersion ejecuta v1→v2→v3 en cadena", () => {
+      // Usamos la implementación real de deserialize
+      const RealPersistenceManager = jest.requireActual("../persistenceManager")
+        .PersistenceManager as new () => {
+        deserialize: (json: string) => AppState;
+      };
+      const realInstance = new RealPersistenceManager();
+      mockPersistence.deserialize.mockImplementation((json: string) =>
+        realInstance.deserialize(json)
+      );
+
+      const v1State = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["v1"],
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariables: [{ id: "v1" }],
+          interruptionCauses: [{ id: "c1" }],
+          subjectiveVariableSnapshots: [{ id: "s1" }],
+        },
+        currentDay: null,
+      };
+
+      systemCore.importData(JSON.stringify(v1State));
+
+      const state = systemCore.getState();
+      const global = state.global as unknown as Record<string, unknown>;
+
+      // dailyTempoTarget creado por v1→v2
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
+      // Legacy archivado por v2→v3
+      expect(global.legacyArchive).toBeDefined();
+    });
+
+    it("exportData pasa por el pipeline central (incluye schemaVersion, no filtra)", () => {
+      // Mockeamos serialize para verificar que se llama
+      mockPersistence.serialize.mockReturnValue("mock-json");
+
+      const result = systemCore.exportData();
+      expect(result).toBe("mock-json");
+      expect(mockPersistence.serialize).toHaveBeenCalled();
+    });
+
+    it("exportData real: incluye schemaVersion=3 y no incluye legacy fields", () => {
+      // Usamos la implementación real de serialize (incluye strip legacy)
+      const RealPersistenceManager = jest.requireActual("../persistenceManager")
+        .PersistenceManager as new () => {
+        serialize: (state: AppState) => string;
+      };
+      const realInstance = new RealPersistenceManager();
+      mockPersistence.serialize.mockImplementation((state: AppState) =>
+        realInstance.serialize(state)
+      );
+
+      // Inyectar un estado con legacy para verificar el strip
+      systemCore.updateState((state) => {
+        const global = state.global as unknown as Record<string, unknown>;
+        global.subjectiveVariables = [{ id: "v1" }];
+        global.interruptionCauses = [{ id: "c1" }];
+        return {
+          ...state,
+          global: global as unknown as typeof state.global,
+        };
+      });
+
+      const json = systemCore.exportData();
+      const parsed = JSON.parse(json);
+
+      expect(parsed.schemaVersion).toBe(3);
+      expect(parsed.global.subjectiveVariables).toBeUndefined();
+      expect(parsed.global.interruptionCauses).toBeUndefined();
     });
 
     it("debe manejar errores al importar JSON inválido", () => {
       // Intentar importar JSON inválido
-      expect(() => systemCore.importData("invalid json")).toThrow(
-        "Error al importar datos: formato JSON inválido"
-      );
+      expect(() => systemCore.importData("invalid json")).toThrow();
     });
 
     it("debe limpiar correctamente el estado", () => {
@@ -422,7 +591,7 @@ describe("SystemCore", () => {
 
       // Verificar que se limpió correctamente
       expect(systemCore.getState().global.days).toEqual([]);
-      expect(PersistenceManager.prototype.clearState).toHaveBeenCalled();
+      expect(mockPersistence.clearState).toHaveBeenCalled();
     });
   });
 });

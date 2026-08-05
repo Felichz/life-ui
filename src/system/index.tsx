@@ -456,23 +456,24 @@ export class SystemCore implements ISystemCore {
   // ===============================================
 
   /**
-   * Exporta todos los datos del sistema como JSON
+   * Exporta todos los datos del sistema como JSON.
+   * Pasa por el pipeline central de persistencia (sanitiza legacy fields +
+   * schemaVersion actual), idéntico al formato que va a localStorage.
    */
   public exportData(): string {
-    return JSON.stringify(this.state);
+    return this.persistenceManager.serialize(this.state);
   }
 
   /**
-   * Importa datos del sistema desde JSON
+   * Importa datos del sistema desde JSON.
+   * Pasa por el pipeline central (parse + validate + migrate + sanitize).
+   * Si el JSON es v1/v2 con campos legacy, los archiva en `legacyArchive`
+   * y elimina del shape principal.
    */
   public importData(jsonData: string): AppState {
-    try {
-      const parsedData = JSON.parse(jsonData) as AppState;
-      this.updateState(() => parsedData);
-      return this.state;
-    } catch (error) {
-      throw new Error("Error al importar datos: formato JSON inválido");
-    }
+    const migrated = this.persistenceManager.deserialize(jsonData);
+    this.updateState(() => migrated);
+    return this.state;
   }
 
   /**
@@ -510,7 +511,7 @@ export class SystemCore implements ISystemCore {
       },
       completedActivityRecords: [],
       eventInstances: [],
-      schemaVersion: 2,
+      schemaVersion: 3,
     };
 
     return {

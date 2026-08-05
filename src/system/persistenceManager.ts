@@ -31,27 +31,78 @@ export interface MigrationResult {
 }
 
 /**
- * Implementación del gestor de persistencia basado en localStorage
- * Responsable de guardar, cargar y limpiar el estado de la aplicación
+ * Implementación del gestor de persistencia basado en localStorage.
  *
- * A partir del schema v2, soporta versionado y migración automática desde
- * estados anteriores (sin perder datos históricos).
+ * Centraliza el pipeline de serialización/deserialización para que
+ * localStorage, export e import produzcan y consuman exactamente el mismo
+ * formato con las mismas garantías:
  *
- * A partir del schema v3, los campos legacy (variables subjetivas, causas de
- * interrupción, snapshots) se eliminan del shape persistido y se archivan
- * por separado en `legacyArchive` para auditoría o exportación.
+ *   parse → validate → migrate v1→v2→v3 → sanitize → persist
+ *
+ * A partir del schema v3:
+ * - los campos legacy (variables subjetivas, causas de interrupción, snapshots,
+ *   hiddenSubjectiveVariableIds) se eliminan del shape persistido;
+ * - se archivan en `legacyArchive` para auditoría o exportación.
  */
 export class PersistenceManager implements IPersistenceManager {
   /**
+   * Construye el JSON final a persistir: aplica `stripLegacyFields` y
+   * `schemaVersion: CURRENT_SCHEMA_VERSION`. Lo usan `saveState` y `serialize`.
+   */
+  private buildSerializedState(state: AppState): string {
+    const sanitized = this.stripLegacyFields(state);
+    const stateWithVersion = { ...sanitized, schemaVersion: CURRENT_SCHEMA_VERSION };
+    return JSON.stringify(stateWithVersion);
+  }
+
+  /**
+   * Serializa un AppState a JSON con la versión actual y los legacy fields
+   * saneados. Idéntico al formato que va a localStorage.
+   */
+  public serialize(state: AppState): string {
+    return this.buildSerializedState(state);
+  }
+
+  /**
+   * Parsea + valida + migra un JSON a AppState. Si es de una versión
+   * anterior, ejecuta la cadena de migraciones (v1→v2→v3) y archiva los
+   * campos legacy en `legacyArchive` antes de retornarlo.
+   * Lanza Error si el JSON es inválido o no parseable.
+   */
+  public deserialize(json: string): AppState {
+    let parsedState: unknown;
+    try {
+      parsedState = JSON.parse(json);
+    } catch (parseError) {
+      throw new Error(
+        `Error al parsear JSON del estado: ${
+          parseError instanceof Error ? parseError.message : String(parseError)
+        }`
+      );
+    }
+
+    if (!this.isValidAppState(parsedState)) {
+      throw new Error("Estructura de estado inválida");
+    }
+
+    const migration = this.migrateIfNeeded(
+      parsedState as AppState & { schemaVersion?: number }
+    );
+
+    if (migration.warnings.length > 0) {
+      console.warn("Migración de estado:", migration.warnings);
+    }
+
+    return migration.state;
+  }
+
+  /**
    * Guarda el estado de la aplicación en localStorage.
-   * Defensa en profundidad: elimina los campos legacy conocidos antes de
-   * serializar para que no se re-introduzcan aunque alguien los cuele en estado.
+   * Pasa por el mismo pipeline que `serialize`.
    */
   public saveState(state: AppState): void {
     try {
-      const sanitized = this.stripLegacyFields(state);
-      const stateWithVersion = { ...sanitized, schemaVersion: CURRENT_SCHEMA_VERSION };
-      const serializedState = JSON.stringify(stateWithVersion);
+      const serializedState = this.buildSerializedState(state);
       localStorage.setItem(STORAGE_KEY, serializedState);
     } catch (error) {
       console.error("Error al guardar el estado en localStorage:", error);
@@ -60,8 +111,8 @@ export class PersistenceManager implements IPersistenceManager {
 
   /**
    * Carga el estado de la aplicación desde localStorage.
-   * Si el estado es de una versión anterior, ejecuta la migración.
-   * @returns Estado de la aplicación o null si no existe o no es válido
+   * Pasa por el mismo pipeline que `deserialize`.
+   * @returns Estado de la aplicación o null si no existe o no se pudo cargar
    */
   public loadState(): AppState | null {
     try {
@@ -71,26 +122,15 @@ export class PersistenceManager implements IPersistenceManager {
         return null;
       }
 
-      let parsedState: unknown;
       try {
-        parsedState = JSON.parse(serializedState);
-      } catch (parseError) {
-        console.error("Error al parsear el estado desde localStorage:", parseError);
+        return this.deserialize(serializedState);
+      } catch (deserializeError) {
+        console.error(
+          "Error al deserializar el estado desde localStorage:",
+          deserializeError
+        );
         return null;
       }
-
-      if (!this.isValidAppState(parsedState)) {
-        console.error("Estructura de estado inválida en localStorage");
-        return null;
-      }
-
-      const migration = this.migrateIfNeeded(parsedState as AppState & { schemaVersion?: number });
-
-      if (migration.warnings.length > 0) {
-        console.warn("Migración de estado:", migration.warnings);
-      }
-
-      return migration.state;
     } catch (error) {
       console.error("Error al cargar el estado desde localStorage:", error);
       return null;
@@ -226,7 +266,7 @@ export class PersistenceManager implements IPersistenceManager {
       ...state,
       global: migratedGlobal,
       schemaVersion: 2,
-    } as AppState & { schemaVersion?: number };
+    } as unknown as AppState & { schemaVersion?: number };
 
     warnings.push(`Migrado de v${fromVersion} a v2`);
     return migrated;
@@ -268,12 +308,14 @@ export class PersistenceManager implements IPersistenceManager {
         archivedAt: new Date().toISOString(),
         fromSchemaVersion: 2,
       };
-      warnings.push(`Legacy archivado: ${JSON.stringify({
-        vars: legacyArchive.subjectiveVariables.length,
-        causes: legacyArchive.interruptionCauses.length,
-        snapshots: legacyArchive.subjectiveVariableSnapshots.length,
-        hiddenIds: legacyArchive.hiddenSubjectiveVariableIds.length,
-      })}`);
+      warnings.push(
+        `Legacy archivado: ${JSON.stringify({
+          vars: legacyArchive.subjectiveVariables.length,
+          causes: legacyArchive.interruptionCauses.length,
+          snapshots: legacyArchive.subjectiveVariableSnapshots.length,
+          hiddenIds: legacyArchive.hiddenSubjectiveVariableIds.length,
+        })}`
+      );
 
       // Adjuntar el archivo al estado para que pueda ser exportado si se desea.
       migratedGlobal = {
