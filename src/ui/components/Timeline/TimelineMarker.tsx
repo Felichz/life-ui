@@ -30,8 +30,8 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
       const event = data as TimelineData["events"][0];
       return `${event.name} (${timeStr})`;
     } else {
-      const interruption = data as TimelineData["interruptions"][0];
-      return `Interrupción${interruption.cause ? `: ${interruption.cause}` : ""} (${timeStr})`;
+      // Schema v2+: las interrupciones no tienen causa registrada
+      return `Interrupción (${timeStr})`;
     }
   };
 
@@ -39,7 +39,7 @@ const TimelineMarker: React.FC<TimelineMarkerProps> = ({
   const ariaLabel =
     type === "event"
       ? `Evento ${(data as TimelineData["events"][0]).name} a las ${timeStr}`
-      : `Interrupción${(data as TimelineData["interruptions"][0]).cause ? ` por ${(data as TimelineData["interruptions"][0]).cause}` : ""} a las ${timeStr}`;
+      : `Interrupción a las ${timeStr}`;
 
   return (
     <Tooltip title={getTooltipContent()} arrow placement="top">

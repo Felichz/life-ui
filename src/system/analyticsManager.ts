@@ -204,13 +204,12 @@ export class AnalyticsManager {
           const timestamp = new Date(activity.endTime);
           const position: DayMinutes = timestamp.getHours() * 60 + timestamp.getMinutes();
 
+          // Schema v2+: sin clasificación evitable/innevitable ni causa.
           return {
             id: activity.id,
             activityId: activity.id,
             timestamp: activity.endTime,
             position,
-            isAvoidable: false,
-            cause: undefined,
           };
         }),
     };

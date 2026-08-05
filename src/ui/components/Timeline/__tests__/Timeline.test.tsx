@@ -61,8 +61,6 @@ const mockInterruptions: TimelineData["interruptions"] = [
     activityId: "act-3",
     timestamp: "2023-05-01T14:30:00.000Z",
     position: 870, // 14:30
-    isAvoidable: true,
-    cause: "Distracción por notificaciones",
   },
 ];
 

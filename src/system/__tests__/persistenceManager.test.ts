@@ -77,8 +77,8 @@ describe("PersistenceManager", () => {
     it("debe guardar el estado correctamente en localStorage", () => {
       persistenceManager.saveState(mockValidState);
 
-      // Schema v2+: saveState añade schemaVersion=2 al payload
-      const expectedPayload = JSON.stringify({ ...mockValidState, schemaVersion: 2 });
+      // Schema v3: saveState añade schemaVersion=3 al payload
+      const expectedPayload = JSON.stringify({ ...mockValidState, schemaVersion: 3 });
 
       // Verificar que setItem fue llamado con los parámetros correctos
       expect(localStorage.setItem).toHaveBeenCalledWith(STORAGE_KEY, expectedPayload);
@@ -386,13 +386,154 @@ describe("PersistenceManager", () => {
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(750);
     });
 
-    it("saveState incluye schemaVersion=2 al persistir", () => {
+    it("saveState incluye schemaVersion=3 al persistir", () => {
       persistenceManager.saveState(mockValidState);
 
       const stored = mockLocalStorage[STORAGE_KEY];
       expect(stored).toBeDefined();
       const parsed = JSON.parse(stored);
-      expect(parsed.schemaVersion).toBe(2);
+      expect(parsed.schemaVersion).toBe(3);
+    });
+
+    // Schema v3: archivado y eliminación de campos legacy
+    it("estado v2 con campos legacy se migra a v3 archivando los campos en legacyArchive", () => {
+      const v2StateWithLegacy = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["var-1"],
+            dailyTempoTarget: 1000,
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariables: [{ id: "var-1", name: "Energía" }],
+          interruptionCauses: [{ id: "cause-1", description: "Notificación" }],
+          subjectiveVariableSnapshots: [{ id: "snap-1" }],
+          schemaVersion: 2,
+        },
+        currentDay: null,
+        schemaVersion: 2,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v2StateWithLegacy);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+
+      // El shape persistido principal ya no tiene los campos legacy
+      const global = result!.global as Record<string, unknown>;
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.interruptionCauses).toBeUndefined();
+      expect(global.subjectiveVariableSnapshots).toBeUndefined();
+      const prefs = global.userPreferences as Record<string, unknown>;
+      expect(prefs.hiddenSubjectiveVariableIds).toBeUndefined();
+
+      // El archivo está disponible para auditoría
+      expect(global.legacyArchive).toBeDefined();
+      const archive = global.legacyArchive as {
+        subjectiveVariables: unknown[];
+        interruptionCauses: unknown[];
+        subjectiveVariableSnapshots: unknown[];
+        hiddenSubjectiveVariableIds: unknown[];
+      };
+      expect(archive.subjectiveVariables).toHaveLength(1);
+      expect(archive.interruptionCauses).toHaveLength(1);
+      expect(archive.subjectiveVariableSnapshots).toHaveLength(1);
+      expect(archive.hiddenSubjectiveVariableIds).toEqual(["var-1"]);
+    });
+
+    it("estado v2 sin campos legacy migra a v3 sin legacyArchive", () => {
+      const v2CleanState = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            dailyTempoTarget: 1000,
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          schemaVersion: 2,
+        },
+        currentDay: null,
+        schemaVersion: 2,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v2CleanState);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+      const global = result!.global as Record<string, unknown>;
+      expect(global.legacyArchive).toBeUndefined();
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.interruptionCauses).toBeUndefined();
+    });
+
+    it("saveState defensivo: elimina campos legacy si se cuelan en el estado", () => {
+      // Forzamos un estado con campos legacy inyectados
+      const stateWithLegacyInjected = {
+        global: {
+          ...mockValidState.global,
+          subjectiveVariables: [{ id: "var-x" }],
+          interruptionCauses: [{ id: "cause-x" }],
+          subjectiveVariableSnapshots: [{ id: "snap-x" }],
+          userPreferences: {
+            ...mockValidState.global.userPreferences,
+            hiddenSubjectiveVariableIds: ["var-x"],
+          },
+        },
+        currentDay: null,
+      } as typeof mockValidState;
+
+      persistenceManager.saveState(stateWithLegacyInjected);
+
+      const stored = JSON.parse(mockLocalStorage[STORAGE_KEY]);
+      expect(stored.global.subjectiveVariables).toBeUndefined();
+      expect(stored.global.interruptionCauses).toBeUndefined();
+      expect(stored.global.subjectiveVariableSnapshots).toBeUndefined();
+      expect(stored.global.userPreferences.hiddenSubjectiveVariableIds).toBeUndefined();
+    });
+
+    it("estado v1 pasa por v2 y v3 en cadena (un solo loadState)", () => {
+      const v1State = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["var-1"],
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          subjectiveVariables: [{ id: "var-1", name: "Energía" }],
+          interruptionCauses: [{ id: "cause-1", description: "Notificación" }],
+          subjectiveVariableSnapshots: [{ id: "snap-1" }],
+        },
+        currentDay: null,
+        // NO schemaVersion => v1
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v1State);
+
+      const result = persistenceManager.loadState();
+      expect(result).not.toBeNull();
+      const global = result!.global as Record<string, unknown>;
+
+      // dailyTempoTarget creado por v1→v2
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
+
+      // Campos legacy archivados por v2→v3
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.interruptionCauses).toBeUndefined();
+      expect(global.subjectiveVariableSnapshots).toBeUndefined();
+      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
+        .toBeUndefined();
+      expect(global.legacyArchive).toBeDefined();
     });
   });
 });

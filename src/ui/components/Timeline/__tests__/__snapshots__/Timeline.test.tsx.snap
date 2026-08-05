@@ -3,12 +3,12 @@
 exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = `
 <div
   aria-label="Línea de tiempo de actividades"
-  class="MuiBox-root css-1kxonj9"
+  class="MuiBox-root css-fgmf1d"
   data-testid="timeline"
   role="region"
 >
   <div
-    class="MuiBox-root css-tns62m"
+    class="MuiBox-root css-ivqzsn"
     role="presentation"
   >
     <div
@@ -17,21 +17,32 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-hokm2s-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-17clsek-MuiTypography-root"
       role="presentation"
     >
       00:00
     </span>
     <div
-      class="MuiBox-root css-dkxajx"
+      class="MuiBox-root css-qx0q7g"
       role="presentation"
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-1l4rl47-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-1d32ocd-MuiTypography-root"
       role="presentation"
     >
-      03:00
+      02:00
+    </span>
+    <div
+      class="MuiBox-root css-cle73f"
+      role="presentation"
+    />
+    <span
+      aria-hidden="true"
+      class="MuiTypography-root MuiTypography-caption css-uzy3cn-MuiTypography-root"
+      role="presentation"
+    >
+      04:00
     </span>
     <div
       class="MuiBox-root css-sh4e0z"
@@ -39,21 +50,32 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-p9wgde-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-k2symb-MuiTypography-root"
       role="presentation"
     >
       06:00
     </span>
     <div
-      class="MuiBox-root css-umfmpu"
+      class="MuiBox-root css-19c5y6c"
       role="presentation"
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-1082jn8-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-1ymfo4k-MuiTypography-root"
       role="presentation"
     >
-      09:00
+      08:00
+    </span>
+    <div
+      class="MuiBox-root css-1p0hday"
+      role="presentation"
+    />
+    <span
+      aria-hidden="true"
+      class="MuiTypography-root MuiTypography-caption css-1tc6qcd-MuiTypography-root"
+      role="presentation"
+    >
+      10:00
     </span>
     <div
       class="MuiBox-root css-8xkugh"
@@ -61,21 +83,32 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-skkabk-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-2x43ku-MuiTypography-root"
       role="presentation"
     >
       12:00
     </span>
     <div
-      class="MuiBox-root css-787qb4"
+      class="MuiBox-root css-1p797s1"
       role="presentation"
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-15mwlmf-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-ejapux-MuiTypography-root"
       role="presentation"
     >
-      15:00
+      14:00
+    </span>
+    <div
+      class="MuiBox-root css-1g6r3sy"
+      role="presentation"
+    />
+    <span
+      aria-hidden="true"
+      class="MuiTypography-root MuiTypography-caption css-ubxr66-MuiTypography-root"
+      role="presentation"
+    >
+      16:00
     </span>
     <div
       class="MuiBox-root css-vj26og"
@@ -83,21 +116,32 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-13si60d-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-rqac3m-MuiTypography-root"
       role="presentation"
     >
       18:00
     </span>
     <div
-      class="MuiBox-root css-1oxr8hv"
+      class="MuiBox-root css-8rrr6l"
       role="presentation"
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-1olvnmp-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-irr6tu-MuiTypography-root"
       role="presentation"
     >
-      21:00
+      20:00
+    </span>
+    <div
+      class="MuiBox-root css-o2pdap"
+      role="presentation"
+    />
+    <span
+      aria-hidden="true"
+      class="MuiTypography-root MuiTypography-caption css-svhll7-MuiTypography-root"
+      role="presentation"
+    >
+      22:00
     </span>
     <div
       class="MuiBox-root css-fib20g"
@@ -105,24 +149,24 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
     />
     <span
       aria-hidden="true"
-      class="MuiTypography-root MuiTypography-caption css-tmisbu-MuiTypography-root"
+      class="MuiTypography-root MuiTypography-caption css-1x7l53p-MuiTypography-root"
       role="presentation"
     >
       24:00
     </span>
   </div>
   <hr
-    class="MuiDivider-root MuiDivider-fullWidth css-1nih0dr-MuiDivider-root"
+    class="MuiDivider-root MuiDivider-fullWidth css-19xj4k4-MuiDivider-root"
   />
   <div
-    aria-label="Actividades y eventos registrados"
-    class="MuiBox-root css-hnij88"
-    role="list"
+    class="MuiBox-root css-11ozacg"
   >
     <div
       aria-label="Actividad Actividad 1: 06:00 a 07:30, duración 1h 30m, completada"
-      class="MuiBox-root css-8rl3ex"
+      class="MuiBox-root css-16cs7q1"
+      data-estimation-state="exceeded"
       data-mui-internal-clone-element="true"
+      data-state="completed"
       data-testid="timeline-bar-act-1"
       role="listitem"
       tabindex="0"
@@ -137,16 +181,20 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
     </div>
     <div
       aria-label="Actividad Actividad 2: 08:00 a 09:00, duración 1h, completada"
-      class="MuiBox-root css-16vk8nw"
+      class="MuiBox-root css-zbdvfc"
+      data-estimation-state="within-range"
       data-mui-internal-clone-element="true"
+      data-state="completed"
       data-testid="timeline-bar-act-2"
       role="listitem"
       tabindex="0"
     />
     <div
       aria-label="Actividad Actividad 3: 11:00 a 11:30, duración 30m, interrumpida"
-      class="MuiBox-root css-12uc9h"
+      class="MuiBox-root css-1u3zubw"
+      data-estimation-state="interrupted"
       data-mui-internal-clone-element="true"
+      data-state="interrupted"
       data-testid="timeline-bar-act-3"
       role="listitem"
       tabindex="0"
@@ -159,81 +207,77 @@ exports[`Timeline Component snapshot selectivo de la estructura principal 1`] = 
         role="presentation"
       />
     </div>
+  </div>
+  <div
+    class="MuiBox-root css-mc1c4x"
+  >
     <div
-      aria-label="Eventos registrados"
-      class="MuiBox-root css-1iv6dpf"
-      role="list"
+      aria-label="Evento Evento 1 a las 13:00"
+      class="MuiBox-root css-1kw9anv"
+      data-mui-internal-clone-element="true"
+      data-testid="timeline-event-evt-1"
+      role="listitem"
+      tabindex="0"
     >
-      <div
-        aria-label="Evento Evento 1 a las 13:00"
-        class="MuiBox-root css-1kw9anv"
-        data-mui-internal-clone-element="true"
-        data-testid="timeline-event-evt-1"
-        role="listitem"
-        tabindex="0"
+      <svg
+        aria-hidden="true"
+        class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1ghvv9k-MuiSvgIcon-root"
+        data-testid="FiberManualRecordIcon"
+        focusable="false"
+        viewBox="0 0 24 24"
       >
-        <svg
-          aria-hidden="true"
-          class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1ghvv9k-MuiSvgIcon-root"
-          data-testid="FiberManualRecordIcon"
-          focusable="false"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="8"
-          />
-        </svg>
-      </div>
-      <div
-        aria-label="Evento Evento 2 a las 15:30"
-        class="MuiBox-root css-1mrojnw"
-        data-mui-internal-clone-element="true"
-        data-testid="timeline-event-evt-2"
-        role="listitem"
-        tabindex="0"
-      >
-        <svg
-          aria-hidden="true"
-          class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1ghvv9k-MuiSvgIcon-root"
-          data-testid="FiberManualRecordIcon"
-          focusable="false"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="8"
-          />
-        </svg>
-      </div>
+        <circle
+          cx="12"
+          cy="12"
+          r="8"
+        />
+      </svg>
     </div>
     <div
-      aria-label="Interrupciones registradas"
-      class="MuiBox-root css-lddf9f"
-      role="list"
+      aria-label="Evento Evento 2 a las 15:30"
+      class="MuiBox-root css-1hys3kp"
+      data-mui-internal-clone-element="true"
+      data-testid="timeline-event-evt-2"
+      role="listitem"
+      tabindex="0"
     >
-      <div
-        aria-label="Interrupción por Distracción por notificaciones a las 14:30"
-        class="MuiBox-root css-ivq956"
-        data-mui-internal-clone-element="true"
-        data-testid="timeline-interruption-int-1"
-        role="listitem"
-        tabindex="0"
+      <svg
+        aria-hidden="true"
+        class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1ghvv9k-MuiSvgIcon-root"
+        data-testid="FiberManualRecordIcon"
+        focusable="false"
+        viewBox="0 0 24 24"
       >
-        <svg
-          aria-hidden="true"
-          class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1tb6nb3-MuiSvgIcon-root"
-          data-testid="WarningIcon"
-          focusable="false"
-          viewBox="0 0 24 24"
-        >
-          <path
-            d="M1 21h22L12 2zm12-3h-2v-2h2zm0-4h-2v-4h2z"
-          />
-        </svg>
-      </div>
+        <circle
+          cx="12"
+          cy="12"
+          r="8"
+        />
+      </svg>
+    </div>
+  </div>
+  <div
+    class="MuiBox-root css-mc1c4x"
+  >
+    <div
+      aria-label="Interrupción a las 14:30"
+      class="MuiBox-root css-ivq956"
+      data-mui-internal-clone-element="true"
+      data-testid="timeline-interruption-int-1"
+      role="listitem"
+      tabindex="0"
+    >
+      <svg
+        aria-hidden="true"
+        class="MuiSvgIcon-root MuiSvgIcon-fontSizeMedium css-1tb6nb3-MuiSvgIcon-root"
+        data-testid="WarningIcon"
+        focusable="false"
+        viewBox="0 0 24 24"
+      >
+        <path
+          d="M1 21h22L12 2zm12-3h-2v-2h2zm0-4h-2v-4h2z"
+        />
+      </svg>
     </div>
   </div>
 </div>

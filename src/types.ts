@@ -230,6 +230,21 @@ export interface UserPreferences {
 // ===============================================
 
 /**
+ * Archivo de datos legacy eliminados en la migración v2→v3.
+ * Contiene las variables subjetivas, causas de interrupción, snapshots y
+ * `hiddenSubjectiveVariableIds` que existían en estados previos. Se conserva
+ * sólo para auditoría o exportación explícita; el runtime ya no lo usa.
+ */
+export interface LegacyArchive {
+  subjectiveVariables: unknown[];
+  interruptionCauses: unknown[];
+  subjectiveVariableSnapshots: unknown[];
+  hiddenSubjectiveVariableIds: unknown[];
+  archivedAt: ISODateTimeString;
+  fromSchemaVersion: number;
+}
+
+/**
  * Estado Global (persiste entre días)
  * Contiene datos históricos y configuraciones persistentes
  */
@@ -248,18 +263,15 @@ export interface GlobalState {
   // Datos transitorios entre días
   pendingActivityInstances?: ActivityInstance[]; // Actividades pendientes al pasar de un día a otro
 
-  // Versión del esquema persistido (para migraciones). Default 2.
+  // Versión del esquema persistido (para migraciones). Default 3.
   schemaVersion?: number;
 
   /**
-   * Campos legacy de schema v1 (subjective variables + interruption causes).
-   * Solo presentes en estados pre-existentes en localStorage; el runtime ya
-   * no los crea ni los usa. Se aceptan en carga por compatibilidad pero
-   * pueden ignorarse o limpiarse en futuras migraciones.
+   * Schema v3+: archivo de datos legacy (variables subjetivas + causas + snapshots
+   * + hiddenSubjectiveVariableIds) que fueron eliminados del shape principal.
+   * Solo presente si la migración v2→v3 archivó algo. No es leído por el runtime.
    */
-  subjectiveVariables?: unknown[];
-  interruptionCauses?: unknown[];
-  subjectiveVariableSnapshots?: unknown[];
+  legacyArchive?: LegacyArchive;
 }
 
 /**
@@ -306,13 +318,16 @@ export interface TimelineData {
     timestamp: ISODateTimeString;
     position: DayMinutes;
   }[];
+  /**
+   * Schema v2+: cada actividad interrumpida aparece como marca en el timeline.
+   * No hay clasificación evitable/innevitable ni causa: el sistema no pregunta,
+   * solo registra el momento.
+   */
   interruptions: {
     id: UUID;
     activityId: UUID;
     timestamp: ISODateTimeString;
     position: DayMinutes;
-    isAvoidable: boolean;
-    cause?: string;
   }[];
 }
 
