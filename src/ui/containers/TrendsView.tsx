@@ -62,6 +62,14 @@ const TrendsView: React.FC = () => {
 
   const hasData = chartData.length > 0;
 
+  // Eje derecho (porcentaje del objetivo) dinámico: si el usuario llega
+  // a 184%, la línea se ve completa, no cortada. Mínimo de 100 para que
+  // el 100% siempre sea visible como referencia.
+  const rightDomainMax = (() => {
+    const maxPct = chartData.reduce((m, p) => Math.max(m, p.targetProgress), 0);
+    return Math.max(100, Math.ceil(maxPct / 50) * 50);
+  })();
+
   return (
     <Box sx={{ width: "100%" }} data-testid="trends-view">
       <Stack
@@ -102,7 +110,7 @@ const TrendsView: React.FC = () => {
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  domain={[0, 100]}
+                  domain={[0, rightDomainMax]}
                   tick={{ fontSize: 12 }}
                 />
                 <Tooltip />

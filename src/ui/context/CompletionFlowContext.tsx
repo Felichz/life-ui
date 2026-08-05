@@ -1,30 +1,36 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, ReactNode } from "react";
 import type { UUID } from "../../types";
 
 /**
  * Coordinator para el ritual de cierre de actividad activa.
  *
- * Cualquier componente (Kanban, QuickBar, "Finalizar día") puede llamar
- * `requestCloseActive(activeId, continuation, onConfirm, onInterrupt)`.
- * El provider expone `pendingCloseId` + `requestedAt`; el CompletionModal vive
- * en DayPage y al cerrarse llama a `resolve(score)` o `reject()`.
+ * El contexto es la **única autoridad** que ejecuta la acción de cierre.
+ * Los callbacks de cierre (`onConfirm`/`onInterrupt`) los registra el
+ * componente que conoce el sistema (típicamente DayPage) y se aplican
+ * a CUALQUIER cierre pendiente, sin importar quién lo haya pedido.
+ *
+ * Reglas:
+ * 1. Una sola ejecución de `onConfirm`/`onInterrupt` por resolución.
+ * 2. `continuation` se ejecuta **solo si el callback de cierre tuvo éxito**.
+ *    Si el callback lanza, la continuación NO corre (evita activar otra
+ *    actividad o cerrar el día con un registro corrupto).
+ * 3. `cancel` descarta el cierre pendiente sin tocar nada.
+ * 4. El `requestedAt` (timestamp congelado) NO vive en este contexto:
+ *    viene de `activityManager.requestCompletion()` vía `CompletionRequest`.
  */
 
+type ConfirmHandler = (activityId: UUID, score: number) => void;
+type InterruptHandler = (activityId: UUID) => void;
+
 interface CompletionFlowContextValue {
-  // Activa cuyo cierre está pendiente (null si ninguna)
   pendingCloseId: UUID | null;
-  // Timestamp congelado al pedir el cierre (para que la duración no cambie
-  // entre la preview del modal y el guardado final)
-  requestedAt: string | null;
-  // El "continuation" callback (lo que se hace tras cerrar la activa)
   pendingContinuation: (() => void) | null;
 
-  requestCloseActive: (
-    activityId: UUID,
-    continuation: () => void,
-    onConfirm: (activityId: UUID, score: number) => void,
-    onInterrupt: (activityId: UUID) => void
-  ) => void;
+  /** Pedir el cierre de la actividad activa. Solo `(id, continuation)`. */
+  requestCloseActive: (activityId: UUID, continuation: () => void) => void;
+
+  /** Registra los handlers que se ejecutarán al resolver/rechazar. */
+  registerCloseHandlers: (onConfirm: ConfirmHandler, onInterrupt: InterruptHandler) => void;
 
   resolve: (score: number) => void;
   reject: () => void;
@@ -33,10 +39,7 @@ interface CompletionFlowContextValue {
 
 interface InternalState {
   activityId: UUID;
-  onConfirm: (activityId: UUID, score: number) => void;
-  onInterrupt: (activityId: UUID) => void;
   continuation: () => void;
-  requestedAt: string;
 }
 
 const CompletionFlowContext = createContext<CompletionFlowContextValue | undefined>(undefined);
@@ -44,15 +47,19 @@ const CompletionFlowContext = createContext<CompletionFlowContextValue | undefin
 export const CompletionFlowProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<InternalState | null>(null);
 
-  const requestCloseActive = useCallback(
-    (
-      activityId: UUID,
-      continuation: () => void,
-      onConfirm: (activityId: UUID, score: number) => void,
-      onInterrupt: (activityId: UUID) => void
-    ) => {
-      const now = new Date().toISOString();
-      setState({ activityId, onConfirm, onInterrupt, continuation, requestedAt: now });
+  // Handlers registrados por DayPage (o quien tenga acceso al sistema).
+  const handlersRef = useRef<{ onConfirm: ConfirmHandler; onInterrupt: InterruptHandler }>({
+    onConfirm: () => {},
+    onInterrupt: () => {},
+  });
+
+  const requestCloseActive = useCallback((activityId: UUID, continuation: () => void) => {
+    setState({ activityId, continuation });
+  }, []);
+
+  const registerCloseHandlers = useCallback(
+    (onConfirm: ConfirmHandler, onInterrupt: InterruptHandler) => {
+      handlersRef.current = { onConfirm, onInterrupt };
     },
     []
   );
@@ -61,10 +68,16 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
     (score: number) => {
       const s = state;
       setState(null);
-      if (s) {
-        s.onConfirm(s.activityId, score);
-        s.continuation();
+      if (!s) return;
+      try {
+        handlersRef.current.onConfirm(s.activityId, score);
+      } catch (e) {
+        // El cierre falló: no se ejecuta la continuación.
+        console.error("CompletionFlow: onConfirm lanzó, se omite continuation.", e);
+        return;
       }
+      // Solo en éxito se ejecuta la continuación.
+      s.continuation();
     },
     [state]
   );
@@ -72,10 +85,14 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
   const reject = useCallback(() => {
     const s = state;
     setState(null);
-    if (s) {
-      s.onInterrupt(s.activityId);
-      s.continuation();
+    if (!s) return;
+    try {
+      handlersRef.current.onInterrupt(s.activityId);
+    } catch (e) {
+      console.error("CompletionFlow: onInterrupt lanzó, se omite continuation.", e);
+      return;
     }
+    s.continuation();
   }, [state]);
 
   const cancel = useCallback(() => {
@@ -86,8 +103,8 @@ export const CompletionFlowProvider = ({ children }: { children: ReactNode }) =>
     <CompletionFlowContext.Provider
       value={{
         requestCloseActive,
+        registerCloseHandlers,
         pendingCloseId: state?.activityId ?? null,
-        requestedAt: state?.requestedAt ?? null,
         pendingContinuation: state?.continuation ?? null,
         resolve,
         reject,
@@ -104,9 +121,9 @@ export const useCompletionFlow = () => {
   if (!ctx) {
     return {
       pendingCloseId: null,
-      requestedAt: null,
       pendingContinuation: null,
       requestCloseActive: () => {},
+      registerCloseHandlers: () => {},
       resolve: () => {},
       reject: () => {},
       cancel: () => {},

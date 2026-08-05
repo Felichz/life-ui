@@ -735,7 +735,8 @@ export class ActivityManager {
       temposAwarded,
       beatEstimate,
       dailyTempoTotal: dailyTotal,
-      targetProgress: Math.min(1, dailyTotal / target),
+      // Ratio real sin cap, consistente con TempoSummary.targetProgress.
+      targetProgress: dailyTotal / target,
     };
   }
 

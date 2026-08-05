@@ -2,25 +2,18 @@
  * @jest-environment jsdom
  */
 
-import React, { useEffect } from "react";
+import React from "react";
 import { act, render, screen } from "@testing-library/react";
 import {
   CompletionFlowProvider,
   useCompletionFlow,
 } from "../CompletionFlowContext";
 
-interface HarnessProps {
-  onCont?: () => void;
-  onConfirm?: (id: string, score: number) => void;
-  onInterrupt?: (id: string) => void;
-}
-
 interface FlowShape {
   pendingCloseId: string | null;
-  requestedAt: string | null;
-  requestCloseActive: (
-    id: string,
-    continuation: () => void,
+  pendingContinuation: (() => void) | null;
+  requestCloseActive: (id: string, continuation: () => void) => void;
+  registerCloseHandlers: (
     onConfirm: (id: string, score: number) => void,
     onInterrupt: (id: string) => void
   ) => void;
@@ -29,13 +22,25 @@ interface FlowShape {
   cancel: () => void;
 }
 
-const Harness: React.FC<HarnessProps> = ({ onCont, onConfirm, onInterrupt }) => {
+interface HarnessProps {
+  onConfirm?: (id: string, score: number) => void;
+  onInterrupt?: (id: string) => void;
+}
+
+const Harness: React.FC<HarnessProps> = ({ onConfirm, onInterrupt }) => {
   const flow = useCompletionFlow();
+  React.useEffect(() => {
+    if (onConfirm || onInterrupt) {
+      flow.registerCloseHandlers(
+        onConfirm ?? (() => {}),
+        onInterrupt ?? (() => {})
+      );
+    }
+  }, [flow, onConfirm, onInterrupt]);
   (window as unknown as { __harness?: { flow: FlowShape } }).__harness = { flow };
   return (
     <div>
       <span data-testid="pendingCloseId">{flow.pendingCloseId || "none"}</span>
-      <span data-testid="requestedAt">{flow.requestedAt || "none"}</span>
       <button data-testid="resolve" onClick={() => flow.resolve(8)}>
         resolve
       </button>
@@ -49,17 +54,15 @@ const Harness: React.FC<HarnessProps> = ({ onCont, onConfirm, onInterrupt }) => 
   );
 };
 
-const renderWith = (props: HarnessProps) =>
+const renderWith = (props: HarnessProps = {}) =>
   render(
     <CompletionFlowProvider>
       <Harness {...props} />
     </CompletionFlowProvider>
   );
 
-const trigger = (id: string) => {
-  const harness = (window as unknown as { __harness: { flow: { requestCloseActive: (...args: unknown[]) => void } } }).__harness;
-  harness.flow.requestCloseActive(id, () => {}, () => {}, () => {});
-};
+const getFlow = () =>
+  (window as unknown as { __harness: { flow: FlowShape } }).__harness.flow;
 
 describe("CompletionFlowContext", () => {
   beforeEach(() => {
@@ -67,183 +70,142 @@ describe("CompletionFlowContext", () => {
   });
 
   describe("estado inicial", () => {
-    it("empieza sin cierre pendiente", () => {
-      renderWith({});
+    it("empieza sin cierre pendiente y sin continuation", () => {
+      renderWith();
       expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
-      expect(screen.getByTestId("requestedAt")).toHaveTextContent("none");
+      expect(getFlow().pendingContinuation).toBeNull();
     });
 
     it("fallback no-op si se usa fuera del provider", () => {
       render(<Harness />);
       expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
     });
+
+    it("NO expone requestedAt propio: el timestamp viene del manager", () => {
+      renderWith();
+      const flow = getFlow();
+      // La nueva API: el contexto delega la fuente del timestamp.
+      expect((flow as unknown as { requestedAt?: unknown }).requestedAt).toBeUndefined();
+    });
   });
 
   describe("requestCloseActive", () => {
-    it("establece pendingCloseId y requestedAt", () => {
-      renderWith({});
+    it("establece pendingCloseId", () => {
+      renderWith();
       act(() => {
-        trigger("act-1");
+        getFlow().requestCloseActive("act-1", () => {});
       });
       expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-1");
-      expect(screen.getByTestId("requestedAt")).not.toHaveTextContent("none");
     });
 
-    it("la continuation se ejecuta al resolver", () => {
-      let contCalled = false;
-      let _interruptedId = "";
-      let _receivedScore = -1;
-
-      renderWith({
-        onCont: () => {
-          contCalled = true;
-        },
-      });
+    it("el último request gana si hay uno pendiente", () => {
+      renderWith();
       act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive(
-          "act-1",
-          () => {
-            contCalled = true;
-          },
-          (id: string, score: number) => {
-            _interruptedId = id;
-            _receivedScore = score;
-          },
-          (id: string) => {
-            _interruptedId = id;
-          }
-        );
+        getFlow().requestCloseActive("act-1", () => {});
+        getFlow().requestCloseActive("act-2", () => {});
       });
-      void _interruptedId;
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-2");
+    });
+  });
+
+  describe("resolve: una sola autoridad + continuation solo en éxito", () => {
+    it("invoca onConfirm UNA vez con (id, score) y luego continuation en éxito", () => {
+      const onConfirm = jest.fn();
+      const onCont = jest.fn();
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
+      });
       act(() => {
         screen.getByTestId("resolve").click();
       });
-      expect(contCalled).toBe(true);
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm).toHaveBeenCalledWith("act-1", 8);
+      expect(onCont).toHaveBeenCalledTimes(1);
     });
 
-    it("la continuation se ejecuta al rechazar", () => {
-      let contCalled = false;
-      let interruptedId = "";
-
-      renderWith({
-        onCont: () => {
-          contCalled = true;
-        },
+    it("NO ejecuta continuation si onConfirm lanza", () => {
+      const onConfirm = jest.fn(() => {
+        throw new Error("boom");
+      });
+      const onCont = jest.fn();
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onConfirm });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
       });
       act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive(
-          "act-1",
-          () => {
-            contCalled = true;
-          },
-          () => {},
-          (id: string) => {
-            interruptedId = id;
-          }
-        );
+        screen.getByTestId("resolve").click();
+      });
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onCont).not.toHaveBeenCalled();
+      expect(errSpy).toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it("limpia pendingCloseId tras resolver", () => {
+      renderWith();
+      act(() => {
+        getFlow().requestCloseActive("act-1", () => {});
+      });
+      act(() => {
+        screen.getByTestId("resolve").click();
+      });
+      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
+    });
+  });
+
+  describe("reject: una sola autoridad + continuation solo en éxito", () => {
+    it("invoca onInterrupt UNA vez y luego continuation en éxito", () => {
+      const onInterrupt = jest.fn();
+      const onCont = jest.fn();
+      renderWith({ onInterrupt });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
       });
       act(() => {
         screen.getByTestId("reject").click();
       });
-      expect(contCalled).toBe(true);
-      expect(interruptedId).toBe("act-1");
+      expect(onInterrupt).toHaveBeenCalledTimes(1);
+      expect(onInterrupt).toHaveBeenCalledWith("act-1");
+      expect(onCont).toHaveBeenCalledTimes(1);
     });
 
-    it("cancel limpia el estado sin ejecutar continuation", () => {
-      let contCalled = false;
-      renderWith({
-        onCont: () => {
-          contCalled = true;
-        },
+    it("NO ejecuta continuation si onInterrupt lanza", () => {
+      const onInterrupt = jest.fn(() => {
+        throw new Error("boom");
+      });
+      const onCont = jest.fn();
+      const errSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      renderWith({ onInterrupt });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
       });
       act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive(
-          "act-1",
-          () => {
-            contCalled = true;
-          },
-          () => {},
-          () => {}
-        );
+        screen.getByTestId("reject").click();
+      });
+      expect(onInterrupt).toHaveBeenCalledTimes(1);
+      expect(onCont).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+  });
+
+  describe("cancel", () => {
+    it("limpia el estado sin ejecutar continuation ni callbacks", () => {
+      const onConfirm = jest.fn();
+      const onInterrupt = jest.fn();
+      const onCont = jest.fn();
+      renderWith({ onConfirm, onInterrupt });
+      act(() => {
+        getFlow().requestCloseActive("act-1", onCont);
       });
       act(() => {
         screen.getByTestId("cancel").click();
       });
-      expect(contCalled).toBe(false);
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(onInterrupt).not.toHaveBeenCalled();
+      expect(onCont).not.toHaveBeenCalled();
       expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
-    });
-  });
-
-  describe("resolve / reject cleanup", () => {
-    it("resolve limpia pendingCloseId", () => {
-      renderWith({});
-      act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive("act-1", () => {}, () => {}, () => {});
-      });
-      act(() => {
-        screen.getByTestId("resolve").click();
-      });
-      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("none");
-    });
-
-    it("resolve invoca onConfirm con score", () => {
-      let receivedScore = -1;
-      let receivedId = "";
-      renderWith({});
-      act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive(
-          "act-1",
-          () => {},
-          (id: string, score: number) => {
-            receivedId = id;
-            receivedScore = score;
-          },
-          () => {}
-        );
-      });
-      act(() => {
-        screen.getByTestId("resolve").click();
-      });
-      expect(receivedId).toBe("act-1");
-      expect(receivedScore).toBe(8);
-    });
-
-    it("reject invoca onInterrupt", () => {
-      let receivedId = "";
-      renderWith({});
-      act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive(
-          "act-1",
-          () => {},
-          () => {},
-          (id: string) => {
-            receivedId = id;
-          }
-        );
-      });
-      act(() => {
-        screen.getByTestId("reject").click();
-      });
-      expect(receivedId).toBe("act-1");
-    });
-  });
-
-  describe("múltiples cierres", () => {
-    it("rechaza nuevos cierres cuando ya hay uno pendiente", () => {
-      renderWith({});
-      act(() => {
-        const flow = (window as unknown as { __harness: { flow: any } }).__harness.flow;
-        flow.requestCloseActive("act-1", () => {}, () => {}, () => {});
-        flow.requestCloseActive("act-2", () => {}, () => {}, () => {});
-      });
-      // El último gana
-      expect(screen.getByTestId("pendingCloseId")).toHaveTextContent("act-2");
     });
   });
 });

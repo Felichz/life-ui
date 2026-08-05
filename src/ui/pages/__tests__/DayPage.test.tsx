@@ -89,11 +89,55 @@ jest.mock("@hello-pangea/dnd", () => ({
 
 describe("DayPage", () => {
   // Configuración del mock para useSystemCore
+  // `state.global` es requerido por TempoBanner, DayMetrics, etc.
   const mockUseSystemCore = () => ({
     isDayActive: jest.fn(() => true),
     createActivityInstance: jest.fn(),
     getActiveActivity: jest.fn(() => null),
     canUpdateVariables: jest.fn(() => true),
+    requestCompletion: jest.fn(() => ({
+      activityTitle: "Test",
+      durationMinutes: 30,
+      estimatedMinutes: 30,
+      canApplyBonus: false,
+      requestedAt: "2023-01-01T12:00:00.000Z",
+    })),
+    completeActivity: jest.fn(() => ({
+      record: { id: "rec", satisfactionScore: 8, temposAwarded: 24 },
+      temposAwarded: 24,
+      beatEstimate: false,
+      dailyTempoTotal: 24,
+      targetProgress: 0.024,
+    })),
+    interruptActivity: jest.fn(() => ({ id: "rec", temposAwarded: 0 })),
+    endDay: jest.fn(),
+    getCurrentDay: jest.fn(() => null),
+    getTempoSummary: jest.fn(() => ({
+      totalTempos: 0,
+      target: 1000,
+      targetProgress: 0,
+      progressBarValue: 0,
+      displayPercent: 0,
+      completedActivities: 0,
+      averageSatisfaction: 0,
+      lastReward: undefined,
+    })),
+    state: {
+      global: {
+        days: [],
+        activityTemplates: [],
+        eventTemplates: [],
+        subjectiveVariables: [],
+        interruptionCauses: [],
+        timeBlocks: [],
+        userPreferences: { hiddenSubjectiveVariableIds: [], dailyTempoTarget: 1000, updatedAt: "" },
+        completedActivityRecords: [],
+        eventInstances: [],
+        subjectiveVariableSnapshots: [],
+        schemaVersion: 2,
+      },
+      currentDay: null,
+    },
   });
 
   beforeEach(() => {

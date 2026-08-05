@@ -86,36 +86,78 @@ jest.mock("../modals/ActivityInstanceModal", () => ({
 }));
 
 describe("DayPage", () => {
+  // Helper para construir el mock base de useSystemCore.
+  // `state.global` es requerido por TempoBanner, etc.
+  const buildMock = (overrides: Record<string, unknown> = {}) => ({
+    isDayActive: jest.fn().mockReturnValue(true),
+    getTimeBlocks: jest.fn().mockReturnValue([]),
+    moveActivityInstance: jest.fn(),
+    createActivityInstance: jest.fn(),
+    getActiveActivity: jest.fn().mockReturnValue(null),
+    canUpdateVariables: jest.fn().mockReturnValue(true),
+    requestCompletion: jest.fn(() => ({
+      activityTitle: "T",
+      durationMinutes: 30,
+      estimatedMinutes: 30,
+      canApplyBonus: false,
+      requestedAt: "2023-01-01T12:00:00.000Z",
+    })),
+    completeActivity: jest.fn(),
+    interruptActivity: jest.fn(),
+    endDay: jest.fn(),
+    getCurrentDay: jest.fn(() => null),
+    getTempoSummary: jest.fn(() => ({
+      totalTempos: 0,
+      target: 1000,
+      targetProgress: 0,
+      progressBarValue: 0,
+      displayPercent: 0,
+      completedActivities: 0,
+      averageSatisfaction: 0,
+      lastReward: undefined,
+    })),
+    state: {
+      global: {
+        days: [],
+        activityTemplates: [],
+        eventTemplates: [],
+        subjectiveVariables: [],
+        interruptionCauses: [],
+        timeBlocks: [],
+        userPreferences: {
+          hiddenSubjectiveVariableIds: [],
+          dailyTempoTarget: 1000,
+          updatedAt: "",
+        },
+        completedActivityRecords: [],
+        eventInstances: [],
+        subjectiveVariableSnapshots: [],
+        schemaVersion: 2,
+      },
+      currentDay: {
+        day: { id: "d", state: "active", createdAt: "", updatedAt: "" },
+        activityInstances: [],
+      },
+    },
+    ...overrides,
+  });
+
   beforeEach(() => {
-    // Mock básico para useSystemCore
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(true),
-      getTimeBlocks: jest.fn().mockReturnValue([]),
-      moveActivityInstance: jest.fn(),
-      createActivityInstance: jest.fn(),
-      getActiveActivity: jest.fn().mockReturnValue(null),
-      canUpdateVariables: jest.fn().mockReturnValue(true),
-    });
+    (useSystemCore as jest.Mock).mockReturnValue(buildMock());
   });
 
   test("renderiza la página cuando hay un día activo", () => {
     render(<DayPage />);
 
-    // Verificar que se renderiza el contenedor principal
     expect(screen.getByTestId("day-page")).toBeInTheDocument();
-
-    // Verificar que los componentes principales se muestran
     expect(screen.getByText("Kanban Container")).toBeInTheDocument();
     expect(screen.getByText("Actividades del día")).toBeInTheDocument();
-    expect(screen.getByText("Línea de tiempo")).toBeInTheDocument();
   });
 
   test("muestra mensaje cuando no hay día activo", () => {
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(false),
-      getActiveActivity: jest.fn().mockReturnValue(null),
-      canUpdateVariables: jest.fn().mockReturnValue(true),
-    });
+    (useSystemCore as jest.Mock).mockReturnValue(
+      buildMock({ isDayActive: jest.fn().mockReturnValue(false) })
+    );
 
     render(<DayPage />);
 
@@ -134,7 +176,7 @@ describe("DayPage", () => {
     expect(screen.getByTestId("activity-library-modal")).toHaveAttribute("data-open", "false");
 
     // Hacer clic en el botón para mostrar biblioteca
-    fireEvent.click(screen.getByText("Mostrar biblioteca"));
+    fireEvent.click(screen.getByText("Abrir biblioteca"));
 
     // Ahora el modal debería estar abierto
     expect(screen.getByTestId("activity-library-modal")).toHaveAttribute("data-open", "true");

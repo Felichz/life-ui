@@ -105,21 +105,64 @@ describe("DayPage", () => {
   const mockCanUpdateVariables = jest.fn().mockReturnValue(true);
   const mockCreateActivityInstance = jest.fn();
 
-  beforeEach(() => {
-    // Configuración por defecto del mock
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(true),
-      getActiveActivity: mockGetActiveActivity,
-      canUpdateVariables: mockCanUpdateVariables,
-      createActivityInstance: mockCreateActivityInstance,
-      getUserPreferences: jest.fn().mockReturnValue({ hiddenSubjectiveVariableIds: [] }),
-      toggleVariableVisibility: jest.fn(),
-      state: {
-        global: {
-          days: [],
+  // Helper para construir un mock base. `state.global` y demás campos
+  // son requeridos por TempoBanner, DayMetricsContainer, etc.
+  const buildMock = (overrides: Record<string, unknown> = {}) => ({
+    isDayActive: jest.fn().mockReturnValue(true),
+    getActiveActivity: mockGetActiveActivity,
+    canUpdateVariables: mockCanUpdateVariables,
+    createActivityInstance: mockCreateActivityInstance,
+    getUserPreferences: jest.fn().mockReturnValue({ hiddenSubjectiveVariableIds: [] }),
+    toggleVariableVisibility: jest.fn(),
+    requestCompletion: jest.fn(() => ({
+      activityTitle: "T",
+      durationMinutes: 30,
+      estimatedMinutes: 30,
+      canApplyBonus: false,
+      requestedAt: "2023-01-01T12:00:00.000Z",
+    })),
+    completeActivity: jest.fn(),
+    interruptActivity: jest.fn(),
+    endDay: jest.fn(),
+    getCurrentDay: jest.fn(() => null),
+    getTempoSummary: jest.fn(() => ({
+      totalTempos: 0,
+      target: 1000,
+      targetProgress: 0,
+      progressBarValue: 0,
+      displayPercent: 0,
+      completedActivities: 0,
+      averageSatisfaction: 0,
+      lastReward: undefined,
+    })),
+    state: {
+      global: {
+        days: [],
+        activityTemplates: [],
+        eventTemplates: [],
+        subjectiveVariables: [],
+        interruptionCauses: [],
+        timeBlocks: [],
+        userPreferences: {
+          hiddenSubjectiveVariableIds: [],
+          dailyTempoTarget: 1000,
+          updatedAt: "",
         },
+        completedActivityRecords: [],
+        eventInstances: [],
+        subjectiveVariableSnapshots: [],
+        schemaVersion: 2,
       },
-    });
+      currentDay: {
+        day: { id: "d", state: "active", createdAt: "", updatedAt: "" },
+        activityInstances: [],
+      },
+    },
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    (useSystemCore as jest.Mock).mockReturnValue(buildMock());
   });
 
   afterEach(() => {
@@ -141,19 +184,9 @@ describe("DayPage", () => {
   });
 
   test("Muestra mensaje cuando no hay día activo", () => {
-    // Cambiar el mock para simular que no hay día activo
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(false),
-      getActiveActivity: mockGetActiveActivity,
-      canUpdateVariables: mockCanUpdateVariables,
-      getUserPreferences: jest.fn().mockReturnValue({ hiddenSubjectiveVariableIds: [] }),
-      toggleVariableVisibility: jest.fn(),
-      state: {
-        global: {
-          days: [],
-        },
-      },
-    });
+    (useSystemCore as jest.Mock).mockReturnValue(
+      buildMock({ isDayActive: jest.fn().mockReturnValue(false) })
+    );
 
     render(
       <MemoryRouter>

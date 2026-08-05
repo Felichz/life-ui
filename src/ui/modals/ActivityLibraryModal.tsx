@@ -393,7 +393,7 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
       <DialogTitle>{editingTemplate ? "Editar Actividad" : "Nueva Actividad"}</DialogTitle>
       <DialogContent dividers>
         <Grid container spacing={3}>
-          <Grid item xs={12} md={7}>
+          <Grid size={{ xs: 12, md: 7 }}>
             <Stack spacing={3}>
               <TextField
                 fullWidth
@@ -460,7 +460,7 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
 
               {durationQuestion === "range" && (
                 <Grid container spacing={2}>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 6 }}>
                     <TextField
                       fullWidth
                       type="number"
@@ -474,7 +474,7 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
                       data-testid="min-duration-input"
                     />
                   </Grid>
-                  <Grid item xs={6}>
+                  <Grid size={{ xs: 6 }}>
                     <TextField
                       fullWidth
                       type="number"
@@ -559,7 +559,7 @@ const ActivityLibraryModal: React.FC<ActivityLibraryModalProps> = ({
             </Stack>
           </Grid>
 
-          <Grid item xs={12} md={5}>
+          <Grid size={{ xs: 12, md: 5 }}>
             {renderPreview()}
           </Grid>
         </Grid>

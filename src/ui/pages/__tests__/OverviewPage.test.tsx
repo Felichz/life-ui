@@ -34,6 +34,38 @@ describe("OverviewPage", () => {
   // Configuración del mock para useSystemCore
   const mockUseSystemCore = {
     isDayActive: jest.fn(() => false),
+    getCurrentDay: jest.fn(() => null),
+    getTempoSummary: jest.fn(() => ({
+      totalTempos: 0,
+      target: 1000,
+      targetProgress: 0,
+      progressBarValue: 0,
+      displayPercent: 0,
+      completedActivities: 0,
+      averageSatisfaction: 0,
+      lastReward: undefined,
+    })),
+    getTempoTrends: jest.fn(() => []),
+    state: {
+      global: {
+        days: [],
+        activityTemplates: [],
+        eventTemplates: [],
+        subjectiveVariables: [],
+        interruptionCauses: [],
+        timeBlocks: [],
+        userPreferences: {
+          hiddenSubjectiveVariableIds: [],
+          dailyTempoTarget: 1000,
+          updatedAt: "",
+        },
+        completedActivityRecords: [],
+        eventInstances: [],
+        subjectiveVariableSnapshots: [],
+        schemaVersion: 2,
+      },
+      currentDay: null,
+    },
   };
 
   beforeEach(() => {

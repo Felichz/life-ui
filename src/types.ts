@@ -486,7 +486,11 @@ export interface CompletionResult {
   temposAwarded: number;
   beatEstimate: boolean;
   dailyTempoTotal: number;
-  targetProgress: number; // 0..1
+  /**
+   * Ratio real sin cap (puede ser > 1 si superaste el target).
+   * Consistente con `TempoSummary.targetProgress` y `TempoTrendPoint.targetProgress`.
+   */
+  targetProgress: number;
 }
 
 // ===============================================

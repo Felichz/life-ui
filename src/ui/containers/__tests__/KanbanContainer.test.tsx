@@ -5,14 +5,13 @@ import type { UUID } from "../../../types";
 // Mock del contexto de completion flow
 const mockRequestCloseActive = jest.fn();
 const mockPendingCloseId = null;
-const mockRequestedAt = null;
 
 jest.mock("../../context/CompletionFlowContext", () => ({
   useCompletionFlow: () => ({
     pendingCloseId: mockPendingCloseId,
-    requestedAt: mockRequestedAt,
     pendingContinuation: null,
     requestCloseActive: mockRequestCloseActive,
+    registerCloseHandlers: jest.fn(),
     resolve: jest.fn(),
     reject: jest.fn(),
     cancel: jest.fn(),
@@ -201,12 +200,10 @@ describe("KanbanContainer", () => {
     const onCompleteActivity = BoardMock.mock.calls[0][0].onCompleteActivity as (id: string) => void;
     onCompleteActivity("activity-123");
 
-    expect(mockRequestCloseActive).toHaveBeenCalledWith(
-      "activity-123",
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Function)
-    );
+    // API nueva: solo (id, continuation). El contexto ejecuta los handlers
+    // registrados por DayPage (registrados en una useEffect, fuera del scope
+    // de este test) y luego corre la continuation en éxito.
+    expect(mockRequestCloseActive).toHaveBeenCalledWith("activity-123", expect.any(Function));
   });
 
   test("debería delegar el cierre de actividad al completionFlow al interrumpir", () => {
@@ -215,11 +212,6 @@ describe("KanbanContainer", () => {
     const onInterruptActivity = BoardMock.mock.calls[0][0].onInterruptActivity as (id: string) => void;
     onInterruptActivity("activity-123");
 
-    expect(mockRequestCloseActive).toHaveBeenCalledWith(
-      "activity-123",
-      expect.any(Function),
-      expect.any(Function),
-      expect.any(Function)
-    );
+    expect(mockRequestCloseActive).toHaveBeenCalledWith("activity-123", expect.any(Function));
   });
 });

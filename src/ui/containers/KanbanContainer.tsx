@@ -200,32 +200,26 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
       const active = getActiveActivity();
       if (active && active.id !== activityId) {
         setPendingActivation({ activityId, templateId, blockId, dynamicSettings });
-        completionFlow.requestCloseActive(
-          active.id,
-          () => {
-            const pending = pendingActivationRef.current;
-            setPendingActivation(null);
-            if (pending) {
-              try {
-                if (pending.dynamicSettings) {
-                  const inst = createActivityInstance(
-                    pending.templateId,
-                    pending.blockId,
-                    pending.dynamicSettings as never
-                  );
-                  activateActivity(inst.id);
-                } else {
-                  activateActivity(pending.activityId);
-                }
-              } catch (e) {
-                console.error("Error al activar pendiente:", e);
+        completionFlow.requestCloseActive(active.id, () => {
+          const pending = pendingActivationRef.current;
+          setPendingActivation(null);
+          if (pending) {
+            try {
+              if (pending.dynamicSettings) {
+                const inst = createActivityInstance(
+                  pending.templateId,
+                  pending.blockId,
+                  pending.dynamicSettings as never
+                );
+                activateActivity(inst.id);
+              } else {
+                activateActivity(pending.activityId);
               }
+            } catch (e) {
+              console.error("Error al activar pendiente:", e);
             }
-          },
-          // El reward/record es manejado por DayPage (modal compartido)
-          () => {},
-          () => {}
-        );
+          }
+        });
         return;
       }
 
@@ -242,26 +236,17 @@ const KanbanContainer = forwardRef<KanbanContainerHandle>((props, ref) => {
   }, [pendingActivation]);
 
   // Manejar completar una actividad (botón "Completar" en la card)
-  // DayPage renderiza el CompletionModal único y maneja el reward
+  // DayPage renderiza el CompletionModal único y maneja el reward.
+  // El contexto ejecuta los handlers registrados (registrados en DayPage).
   const handleCompleteActivity = (activityId: UUID) => {
     if (!isDayActive()) return;
-    completionFlow.requestCloseActive(
-      activityId,
-      () => {},
-      () => {},
-      () => {}
-    );
+    completionFlow.requestCloseActive(activityId, () => {});
   };
 
   // Manejar la interrupción: usa el CompletionModal compartido (botón "No la terminé")
   const handleInterruptActivity = (activityId: UUID) => {
     if (!isDayActive()) return;
-    completionFlow.requestCloseActive(
-      activityId,
-      () => {},
-      () => {},
-      () => {}
-    );
+    completionFlow.requestCloseActive(activityId, () => {});
   };
 
   // Crear o actualizar instancia de actividad desde el modal

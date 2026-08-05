@@ -98,22 +98,17 @@ const QuickBarContainer = () => {
     try {
       const active = activeActivity;
       if (active && active.id !== activityId) {
-        completionFlow.requestCloseActive(
-          active.id,
-          () => {
-            try {
-              activateActivity(activityId);
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : "Error desconocido";
-              setError(`Error al activar: ${msg}`);
-            } finally {
-              setIsLoading(false);
-              setLoadingActivityId(null);
-            }
-          },
-          () => {},
-          () => {}
-        );
+        completionFlow.requestCloseActive(active.id, () => {
+          try {
+            activateActivity(activityId);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "Error desconocido";
+            setError(`Error al activar: ${msg}`);
+          } finally {
+            setIsLoading(false);
+            setLoadingActivityId(null);
+          }
+        });
         return;
       }
       activateActivity(activityId);
@@ -139,25 +134,20 @@ const QuickBarContainer = () => {
     try {
       const active = activeActivity;
       if (active) {
-        completionFlow.requestCloseActive(
-          active.id,
-          () => {
-            try {
-              const instance = createActivityInstance(templateId, blockId, dynamicSettings);
-              activateActivity(instance.id);
-              setIsModalOpen(false);
-              setSelectedTemplateId(null);
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : "Error desconocido";
-              setError(`Error al crear/activar: ${msg}`);
-            } finally {
-              setIsLoading(false);
-              setLoadingActivityId(null);
-            }
-          },
-          () => {},
-          () => {}
-        );
+        completionFlow.requestCloseActive(active.id, () => {
+          try {
+            const instance = createActivityInstance(templateId, blockId, dynamicSettings);
+            activateActivity(instance.id);
+            setIsModalOpen(false);
+            setSelectedTemplateId(null);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : "Error desconocido";
+            setError(`Error al crear/activar: ${msg}`);
+          } finally {
+            setIsLoading(false);
+            setLoadingActivityId(null);
+          }
+        });
         return;
       }
 

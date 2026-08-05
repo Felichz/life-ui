@@ -114,14 +114,67 @@ jest.mock("../components/Common/ActionButtons", () => ({
   default: () => <div>Action Buttons</div>,
 }));
 
+// Helper para construir el mock base de useSystemCore.
+// `state.global` y demás campos son requeridos por TempoBanner, etc.
+const buildSystemCoreMock = (overrides: Record<string, unknown> = {}) => ({
+  isDayActive: jest.fn().mockReturnValue(true),
+  getActiveActivity: jest.fn().mockReturnValue(null),
+  completeActivity: jest.fn(),
+  interruptActivity: jest.fn(),
+  requestCompletion: jest.fn(() => ({
+    activityTitle: "T",
+    durationMinutes: 30,
+    estimatedMinutes: 30,
+    canApplyBonus: false,
+    requestedAt: "2023-01-01T12:00:00.000Z",
+  })),
+  endDay: jest.fn(),
+  canUpdateVariables: jest.fn().mockReturnValue(true),
+  getTimeBlocks: jest.fn().mockReturnValue([]),
+  createActivityInstance: jest.fn(),
+  getCurrentDay: jest.fn(() => null),
+  getTempoSummary: jest.fn(() => ({
+    totalTempos: 0,
+    target: 1000,
+    targetProgress: 0,
+    progressBarValue: 0,
+    displayPercent: 0,
+    completedActivities: 0,
+    averageSatisfaction: 0,
+    lastReward: undefined,
+  })),
+  state: {
+    global: {
+      days: [],
+      activityTemplates: [],
+      eventTemplates: [],
+      subjectiveVariables: [],
+      interruptionCauses: [],
+      timeBlocks: [],
+      userPreferences: {
+        hiddenSubjectiveVariableIds: [],
+        dailyTempoTarget: 1000,
+        updatedAt: "",
+      },
+      completedActivityRecords: [],
+      eventInstances: [],
+      subjectiveVariableSnapshots: [],
+      schemaVersion: 2,
+    },
+    currentDay: {
+      day: { id: "d", state: "active", createdAt: "", updatedAt: "" },
+      activityInstances: [],
+    },
+  },
+  ...overrides,
+});
+
 describe("DayPage - Finalizar día", () => {
-  // Setup inicial para cada test
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  test("al hacer clic en finalizar día y confirmar, debe completar actividad y navegar a overview", async () => {
-    // Setup de los mocks para useSystemCore
+  test("al hacer clic en finalizar día y confirmar con activa: delega al flow (no llama completeActivity directo)", async () => {
     const mockCompleteActivity = jest.fn();
     const mockEndDay = jest.fn();
     const mockActiveActivity = {
@@ -130,15 +183,13 @@ describe("DayPage - Finalizar día", () => {
       state: "active",
     };
 
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(true),
-      getActiveActivity: jest.fn().mockReturnValue(mockActiveActivity),
-      completeActivity: mockCompleteActivity,
-      endDay: mockEndDay,
-      canUpdateVariables: jest.fn().mockReturnValue(true),
-      getTimeBlocks: jest.fn().mockReturnValue([]),
-      createActivityInstance: jest.fn(),
-    });
+    (useSystemCore as jest.Mock).mockReturnValue(
+      buildSystemCoreMock({
+        getActiveActivity: jest.fn().mockReturnValue(mockActiveActivity),
+        completeActivity: mockCompleteActivity,
+        endDay: mockEndDay,
+      })
+    );
 
     render(
       <MemoryRouter>
@@ -146,42 +197,25 @@ describe("DayPage - Finalizar día", () => {
       </MemoryRouter>
     );
 
-    // Buscar y hacer clic en el botón de finalizar día
-    const finishDayButton = screen.getByLabelText(/finalizar día/i);
-    fireEvent.click(finishDayButton);
+    fireEvent.click(screen.getByLabelText(/finalizar día/i));
+    fireEvent.click(screen.getByTestId("confirm-end-day-button"));
 
-    // Comprobar que se abre el modal de confirmación
-    const confirmDialog = screen.getByRole("dialog");
-    expect(confirmDialog).toBeInTheDocument();
-
-    // Confirmar finalización
-    const confirmButton = screen.getByTestId("confirm-end-day-button");
-    fireEvent.click(confirmButton);
-
-    // Verificar que se completa la actividad activa
-    expect(mockCompleteActivity).toHaveBeenCalledWith(mockActiveActivity.id);
-
-    // Verificar que se finaliza el día
-    expect(mockEndDay).toHaveBeenCalled();
-
-    // Verificar que se navega a la página de overview
-    expect(mockNavigate).toHaveBeenCalledWith("/overview");
+    // El contexto es la única autoridad: completeActivity NO se llama
+    // directamente desde DayPage. Se llamaría al resolver el modal.
+    // Aquí verificamos que NO se llamó directamente (sigue siendo 0 calls).
+    expect(mockCompleteActivity).not.toHaveBeenCalled();
   });
 
   test("si no hay actividad activa, solo debe finalizar el día sin completar actividad", async () => {
-    // Setup de los mocks para useSystemCore
     const mockCompleteActivity = jest.fn();
     const mockEndDay = jest.fn();
 
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(true),
-      getActiveActivity: jest.fn().mockReturnValue(null),
-      completeActivity: mockCompleteActivity,
-      endDay: mockEndDay,
-      canUpdateVariables: jest.fn().mockReturnValue(true),
-      getTimeBlocks: jest.fn().mockReturnValue([]),
-      createActivityInstance: jest.fn(),
-    });
+    (useSystemCore as jest.Mock).mockReturnValue(
+      buildSystemCoreMock({
+        completeActivity: mockCompleteActivity,
+        endDay: mockEndDay,
+      })
+    );
 
     render(
       <MemoryRouter>
@@ -189,40 +223,26 @@ describe("DayPage - Finalizar día", () => {
       </MemoryRouter>
     );
 
-    // Buscar y hacer clic en el botón de finalizar día
-    const finishDayButton = screen.getByLabelText(/finalizar día/i);
-    fireEvent.click(finishDayButton);
+    fireEvent.click(screen.getByLabelText(/finalizar día/i));
+    fireEvent.click(screen.getByTestId("confirm-end-day-button"));
 
-    // Confirmar finalización
-    const confirmButton = screen.getByTestId("confirm-end-day-button");
-    fireEvent.click(confirmButton);
-
-    // Verificar que NO se intenta completar ninguna actividad
     expect(mockCompleteActivity).not.toHaveBeenCalled();
-
-    // Verificar que se finaliza el día
     expect(mockEndDay).toHaveBeenCalled();
-
-    // Verificar que se navega a la página de overview
     expect(mockNavigate).toHaveBeenCalledWith("/overview");
   });
 
   test("si ocurre un error al finalizar el día, debe mostrar un mensaje de error", async () => {
-    // Setup de los mocks para useSystemCore
     const mockCompleteActivity = jest.fn();
     const mockEndDay = jest.fn().mockImplementation(() => {
       throw new Error("Error al finalizar el día");
     });
 
-    (useSystemCore as jest.Mock).mockReturnValue({
-      isDayActive: jest.fn().mockReturnValue(true),
-      getActiveActivity: jest.fn().mockReturnValue(null),
-      completeActivity: mockCompleteActivity,
-      endDay: mockEndDay,
-      canUpdateVariables: jest.fn().mockReturnValue(true),
-      getTimeBlocks: jest.fn().mockReturnValue([]),
-      createActivityInstance: jest.fn(),
-    });
+    (useSystemCore as jest.Mock).mockReturnValue(
+      buildSystemCoreMock({
+        completeActivity: mockCompleteActivity,
+        endDay: mockEndDay,
+      })
+    );
 
     render(
       <MemoryRouter>
@@ -230,18 +250,10 @@ describe("DayPage - Finalizar día", () => {
       </MemoryRouter>
     );
 
-    // Buscar y hacer clic en el botón de finalizar día
-    const finishDayButton = screen.getByLabelText(/finalizar día/i);
-    fireEvent.click(finishDayButton);
+    fireEvent.click(screen.getByLabelText(/finalizar día/i));
+    fireEvent.click(screen.getByTestId("confirm-end-day-button"));
 
-    // Confirmar finalización
-    const confirmButton = screen.getByTestId("confirm-end-day-button");
-    fireEvent.click(confirmButton);
-
-    // Verificar que se muestra un mensaje de error
     expect(screen.getByText(/Error al finalizar el día/i)).toBeInTheDocument();
-
-    // Verificar que NO se navega a overview en caso de error
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

@@ -107,7 +107,8 @@ const DayPage: React.FC = () => {
   );
 
   // Reaccionar al flow context: cuando alguien pide cerrar una activa,
-  // obtener el request y abrir el modal
+  // obtener el request (única fuente del timestamp congelado) y abrir el modal.
+  // El `requestedAt` aquí es la MISMA referencia que se persistirá al cerrar.
   React.useEffect(() => {
     if (completionFlow.pendingCloseId && !completionRequest) {
       try {
@@ -119,6 +120,43 @@ const DayPage: React.FC = () => {
       }
     }
   }, [completionFlow.pendingCloseId, completionRequest, requestCompletion, completionFlow]);
+
+  // Refs para que los handlers de cierre vean SIEMPRE el valor actual de
+  // `completionRequest` (necesario para que endTime congelado no se quede
+  // con el del primer request).
+  const completionRequestRef = useRef<CompletionRequest | null>(null);
+  useEffect(() => {
+    completionRequestRef.current = completionRequest;
+  }, [completionRequest]);
+
+  // Registrar los handlers de cierre UNA vez. Estos son los ÚNICOS puntos donde
+  // se llama a completeActivity/interruptActivity para un cierre disparado por
+  // el flow. El contexto (autoridad) los invoca en resolve/reject.
+  // El `endTime` congelado viene SIEMPRE de completionRequest.requestedAt
+  // (leído vía ref para no quedar desactualizado), que es el mismo
+  // timestamp que se mostró en el modal.
+  React.useEffect(() => {
+    completionFlow.registerCloseHandlers(
+      (closedId, score) => {
+        const result = completeActivity(closedId, {
+          satisfactionScore: score,
+          endTime: completionRequestRef.current?.requestedAt,
+        });
+        setLastReward({
+          activityTitle: getActiveTitleFromState(closedId),
+          tempos: result.temposAwarded,
+        });
+      },
+      (closedId) => {
+        interruptActivity(closedId);
+        setLastReward({
+          activityTitle: getActiveTitleFromState(closedId),
+          tempos: 0,
+        });
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Helper para obtener título desde el state actual
   const getActiveTitleFromState = (id: UUID): string => {
@@ -163,33 +201,21 @@ const DayPage: React.FC = () => {
   const handleEndDayConfirm = () => {
     try {
       // Schema v2+: si hay activa, abrir CompletionModal primero; endDay va después.
+      // El contexto ejecuta los handlers registrados (onConfirm/onInterrupt) que
+      // ya llaman a completeActivity/interruptActivity con endTime congelado.
+      // La continuation solo corre si el cierre tuvo éxito.
       if (activeActivity) {
         closeEndDayModal();
-        completionFlow.requestCloseActive(
-          activeActivity.id,
-          () => {
+        completionFlow.requestCloseActive(activeActivity.id, () => {
+          try {
             endDay();
             navigate("/overview");
-          },
-          (closedId, score) => {
-            try {
-              completeActivity(closedId, { satisfactionScore: score });
-              endDay();
-              navigate("/overview");
-            } catch (e) {
-              console.error("Error al completar antes de endDay:", e);
-            }
-          },
-          (closedId) => {
-            try {
-              interruptActivity(closedId);
-              endDay();
-              navigate("/overview");
-            } catch (e) {
-              console.error("Error al interrumpir antes de endDay:", e);
-            }
+          } catch (e) {
+            setError(
+              `Error al finalizar el día: ${e instanceof Error ? e.message : "Error desconocido"}`
+            );
           }
-        );
+        });
         return;
       }
       endDay();
@@ -416,42 +442,21 @@ const DayPage: React.FC = () => {
         </Box>
       </DragDropContext>
 
-      {/* CompletionModal único compartido */}
+      {/* CompletionModal único compartido.
+          Aquí NO llamamos completeActivity/interruptActivity: el contexto es la
+          única autoridad. Solo le decimos "el usuario eligió score=N" (resolve)
+          o "el usuario eligió interrumpir" (reject). El endTime congelado se
+          pasó en el momento de registrar el onConfirm (completionRequest.requestedAt). */}
       <CompletionModal
         open={!!completionFlow.pendingCloseId && !!completionRequest}
         request={completionRequest}
         onConfirm={(assessment) => {
-          const id = completionFlow.pendingCloseId;
           setCompletionRequest(null);
-          if (id) {
-            // Pasar endTime congelado para que la duración no cambie
-            // mientras el usuario decidía
-            const result = completeActivity(id, {
-              satisfactionScore: assessment.satisfactionScore,
-              endTime: completionFlow.requestedAt || undefined,
-            });
-            setLastReward({
-              activityTitle: getActiveTitleFromState(id),
-              tempos: result.temposAwarded,
-            });
-            completionFlow.resolve(assessment.satisfactionScore);
-          }
+          completionFlow.resolve(assessment.satisfactionScore);
         }}
         onInterrupt={() => {
-          const id = completionFlow.pendingCloseId;
           setCompletionRequest(null);
-          if (id) {
-            try {
-              interruptActivity(id);
-              setLastReward({
-                activityTitle: getActiveTitleFromState(id),
-                tempos: 0,
-              });
-            } catch (e) {
-              console.error("Error al interrumpir:", e);
-            }
-            completionFlow.reject();
-          }
+          completionFlow.reject();
         }}
         onClose={() => {
           setCompletionRequest(null);
