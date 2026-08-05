@@ -56,17 +56,6 @@ jest.mock("../containers/EventLibraryModalContainer", () => ({
     </div>
   ),
 }));
-jest.mock("../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: (props: { onClose: () => void }) => (
-    <div data-testid="variable-modal-container">
-      VariableModalContainer
-      <button data-testid="close-variable" onClick={props.onClose}>
-        Close
-      </button>
-    </div>
-  ),
-}));
 jest.mock("../modals/ActivityInstanceModal", () => ({
   __esModule: true,
   default: (props: { onClose: () => void }) => (
@@ -102,7 +91,6 @@ jest.mock("@hello-pangea/dnd", () => ({
 describe("DayPage", () => {
   // Mock valores por defecto para el hook useSystemCore
   const mockGetActiveActivity = jest.fn().mockReturnValue(null);
-  const mockCanUpdateVariables = jest.fn().mockReturnValue(true);
   const mockCreateActivityInstance = jest.fn();
 
   // Helper para construir un mock base. `state.global` y demás campos
@@ -110,7 +98,6 @@ describe("DayPage", () => {
   const buildMock = (overrides: Record<string, unknown> = {}) => ({
     isDayActive: jest.fn().mockReturnValue(true),
     getActiveActivity: mockGetActiveActivity,
-    canUpdateVariables: mockCanUpdateVariables,
     createActivityInstance: mockCreateActivityInstance,
     getUserPreferences: jest.fn().mockReturnValue({ hiddenSubjectiveVariableIds: [] }),
     toggleVariableVisibility: jest.fn(),
@@ -233,54 +220,15 @@ describe("DayPage", () => {
     fireEvent.click(screen.getByTestId("close-timeblock"));
   });
 
-  test("Abre y cierra el modal de variables subjetivas y maneja el estado de habilitación", () => {
-    // Primer render: botón habilitado
-    const { unmount } = render(
-      <MemoryRouter>
-        <DayPage />
-      </MemoryRouter>
-    );
-
-    // Usar data-testid para hacerlo más específico
-    const buttons = screen.getAllByRole("button");
-    const variableButton = buttons.find(
-      (button) => button.getAttribute("aria-label") === "actualizar variables subjetivas"
-    );
-
-    // Comprobar que el botón está habilitado por defecto
-    expect(variableButton).toBeDefined();
-    expect(variableButton).toBeEnabled();
-
-    // Clic en el botón de variables subjetivas
-    fireEvent.click(variableButton!);
-
-    // Verificar que se abre el modal
-    expect(screen.getByTestId("variable-modal-container")).toBeInTheDocument();
-
-    // Cerrar el modal usando el testId específico
-    fireEvent.click(screen.getByTestId("close-variable"));
-
-    // Limpiar el primer render
-    unmount();
-
-    // Simular que no se pueden actualizar las variables (cooldown)
-    mockCanUpdateVariables.mockReturnValue(false);
-
-    // Segundo render: botón deshabilitado
+  test("el botón de variables subjetivas fue removido (schema v2+)", () => {
     render(
       <MemoryRouter>
         <DayPage />
       </MemoryRouter>
     );
-
-    // Usar el mismo enfoque, pero esta vez debería estar deshabilitado
-    const newButtons = screen.getAllByRole("button");
-    const disabledButton = newButtons.find(
-      (button) => button.getAttribute("aria-label") === "actualizar variables subjetivas"
-    );
-
-    // El botón debería estar deshabilitado ahora
-    expect(disabledButton).toBeDefined();
-    expect(disabledButton).toBeDisabled();
+    // El botón y el modal de variables subjetivas ya no existen.
+    expect(
+      screen.queryByLabelText("actualizar variables subjetivas")
+    ).not.toBeInTheDocument();
   });
 });

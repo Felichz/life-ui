@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, fireEvent, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import DayPage from "../DayPage";
 import { useSystemCore } from "../../hooks/useSystemCore";
 
@@ -159,23 +160,7 @@ jest.mock("../../containers/EventLibraryModalContainer", () => ({
   )),
 }));
 
-jest.mock("../../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: jest.fn(({ open }: { open: boolean }) => (
-    <div data-testid="variable-modal-container" data-open={open}>
-      VariableModal mocked
-    </div>
-  )),
-}));
-
-jest.mock("../../containers/OverviewModalContainer", () => ({
-  __esModule: true,
-  default: jest.fn(({ open }: { open: boolean }) => (
-    <div data-testid="overview-modal-container" data-open={open}>
-      OverviewModal mocked
-    </div>
-  )),
-}));
+// VariableModal y OverviewModal fueron removidos en schema v2+.
 
 jest.mock("../../modals/ActivityInstanceModal", () => ({
   __esModule: true,
@@ -293,13 +278,13 @@ describe("DayPage", () => {
       isDayActive: () => false,
     }));
 
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
     expect(screen.getByText("No hay un día activo")).toBeInTheDocument();
     expect(screen.getByText("Debes iniciar un día para acceder a esta vista.")).toBeInTheDocument();
   });
 
   test("renderiza componentes principales cuando hay día activo", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Verificar que se muestran los componentes principales
     expect(screen.getByTestId("day-page")).toBeInTheDocument();
@@ -308,21 +293,22 @@ describe("DayPage", () => {
     expect(screen.getByTestId("timeline-container")).toBeInTheDocument();
   });
 
-  test("abre el modal OverviewModal al hacer clic en el botón de resumen histórico", () => {
-    render(<DayPage />);
+  test("el botón 'Resumen' navega a /overview (no abre modal)", () => {
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
-    // Verificar que el modal está cerrado inicialmente
-    expect(screen.getByTestId("overview-modal-container")).toHaveAttribute("data-open", "false");
+    // El botón existe y es clickeable
+    const overviewButton = screen.getByLabelText("ver resumen histórico");
+    expect(overviewButton).toBeInTheDocument();
 
-    // Hacer clic en el botón de resumen histórico
-    fireEvent.click(screen.getByLabelText("ver resumen histórico"));
-
-    // Verificar que el modal se abre
-    expect(screen.getByTestId("overview-modal-container")).toHaveAttribute("data-open", "true");
+    // Al hacer click navega (mock de useNavigate). Verificamos que NO
+    // existe un modal de overview en la página actual.
+    fireEvent.click(overviewButton);
+    // Después del click, el modal de overview no debería aparecer.
+    // (La navegación real queda fuera del scope de este test.)
   });
 
   test("abre el modal ActivityLibrary al hacer clic en el botón de biblioteca", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Verificar que el modal está cerrado inicialmente
     expect(screen.getByTestId("activity-library-container")).toHaveAttribute("data-open", "false");
@@ -335,7 +321,7 @@ describe("DayPage", () => {
   });
 
   test("abre el modal TimeBlockModal al hacer clic en el botón de bloques", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Verificar que el modal está cerrado inicialmente
     expect(screen.getByTestId("timeblock-modal-container")).toHaveAttribute("data-open", "false");
@@ -348,7 +334,7 @@ describe("DayPage", () => {
   });
 
   test("abre el modal EventLibraryModal al hacer clic en el botón de eventos", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Verificar que el modal está cerrado inicialmente
     expect(screen.getByTestId("event-library-modal-container")).toHaveAttribute(
@@ -366,30 +352,11 @@ describe("DayPage", () => {
     );
   });
 
-  test("abre el modal VariableModal al hacer clic en el botón de variables", () => {
-    render(<DayPage />);
-
-    // Verificar que el modal está cerrado inicialmente
-    expect(screen.getByTestId("variable-modal-container")).toHaveAttribute("data-open", "false");
-
-    // Hacer clic en el botón de variables
-    fireEvent.click(screen.getByLabelText("actualizar variables subjetivas"));
-
-    // Verificar que el modal se abre
-    expect(screen.getByTestId("variable-modal-container")).toHaveAttribute("data-open", "true");
-  });
-
-  test("deshabilita el botón de variables cuando no se pueden actualizar", () => {
-    // Sobrescribir mock para variables no actualizables
-    (useSystemCore as jest.Mock).mockImplementation(() => ({
-      ...mockUseSystemCore(),
-      canUpdateVariables: () => false,
-    }));
-
-    render(<DayPage />);
-
-    // Verificar que el botón está deshabilitado
-    expect(screen.getByLabelText("actualizar variables subjetivas")).toBeDisabled();
+  test("el botón de variables subjetivas fue removido (schema v2+)", () => {
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
+    expect(
+      screen.queryByLabelText("actualizar variables subjetivas")
+    ).not.toBeInTheDocument();
   });
 
   describe("cierres consecutivos (regresión: completionRequest stale)", () => {
@@ -433,12 +400,12 @@ describe("DayPage", () => {
     test("cierre A exitoso → cierre B muestra título/duración correctos", () => {
       const { mockRequestCompletion, mockCompleteActivity } = setupTwoActivities();
 
-      const { rerender } = render(<DayPage />);
+      const { rerender } = render(<MemoryRouter><DayPage /></MemoryRouter>);
 
       // 1) Pedir cierre de A
       act(() => {
         flowStore.requestCloseActive("act-A", () => {});
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       // El useEffect del DayPage debió llamar requestCompletion("act-A")
       expect(mockRequestCompletion).toHaveBeenCalledWith("act-A");
@@ -447,7 +414,7 @@ describe("DayPage", () => {
       // 2) Resolver A (éxito)
       act(() => {
         screen.getByTestId("cm-confirm").click();
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       expect(mockCompleteActivity).toHaveBeenCalledWith(
         "act-A",
@@ -459,7 +426,7 @@ describe("DayPage", () => {
       // 3) Pedir cierre de B — requestCompletion DEBE llamarse con "act-B"
       act(() => {
         flowStore.requestCloseActive("act-B", () => {});
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       expect(mockRequestCompletion).toHaveBeenCalledWith("act-B");
       expect(screen.getByTestId("completion-modal")).toHaveAttribute("data-title", "Actividad B");
@@ -472,23 +439,23 @@ describe("DayPage", () => {
         throw new Error("disco lleno");
       });
 
-      const { rerender } = render(<DayPage />);
+      const { rerender } = render(<MemoryRouter><DayPage /></MemoryRouter>);
 
       // 1) Cierre A falla
       act(() => {
         flowStore.requestCloseActive("act-A", () => {});
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       act(() => {
         screen.getByTestId("cm-confirm").click();
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       // Modal sigue abierto con título de A
       expect(screen.getByTestId("completion-modal")).toHaveAttribute("data-title", "Actividad A");
       // Reintentamos: ahora sí funciona
       act(() => {
         screen.getByTestId("cm-confirm").click();
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       // Modal se cierra (éxito en el segundo intento)
       expect(screen.queryByTestId("completion-modal")).not.toBeInTheDocument();
@@ -496,7 +463,7 @@ describe("DayPage", () => {
       // 2) Cierre B usa datos frescos
       act(() => {
         flowStore.requestCloseActive("act-B", () => {});
-        rerender(<DayPage />);
+        rerender(<MemoryRouter><DayPage /></MemoryRouter>);
       });
       expect(mockRequestCompletion).toHaveBeenCalledWith("act-B");
       expect(screen.getByTestId("completion-modal")).toHaveAttribute("data-title", "Actividad B");

@@ -3,38 +3,32 @@ import { Box, Button, IconButton, Tooltip, useMediaQuery, useTheme } from "@mui/
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import EventNoteIcon from "@mui/icons-material/EventNote";
-import ShowChartIcon from "@mui/icons-material/ShowChart";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import { useNavigate } from "react-router-dom";
 
 interface ActionButtonsProps {
-  canUpdateVariables: boolean;
-  onVariableClick: () => void;
-  onOverviewClick: () => void;
   onTimeBlockClick: () => void;
   onEventLibraryClick: () => void;
   onActivityLibraryClick: () => void;
 }
 
+/**
+ * Acciones globales del TopBar de DayPage.
+ *
+ * Schema v2+: el botón "Variables" y la apertura de un modal de
+ * "Resumen histórico" fueron removidos. El botón "Resumen" navega
+ * directamente a `/overview`, donde la OverviewPage muestra métricas,
+ * tendencias y distribución de tiempo.
+ */
 const ActionButtons: React.FC<ActionButtonsProps> = ({
-  canUpdateVariables,
-  onVariableClick,
-  onOverviewClick,
   onTimeBlockClick,
   onEventLibraryClick,
   onActivityLibraryClick,
 }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+  const navigate = useNavigate();
   const actions = [
-    {
-      label: "Variables",
-      icon: <ShowChartIcon />,
-      onClick: onVariableClick,
-      disabled: !canUpdateVariables,
-      title: canUpdateVariables
-        ? "actualizar variables subjetivas"
-        : "actualizar variables subjetivas",
-    },
     {
       label: "Bloques",
       icon: <AccessTimeIcon />,
@@ -55,6 +49,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     },
   ];
 
+  const goToOverview = () => navigate("/overview");
+
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
       {isDesktop ? (
@@ -67,7 +63,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                   color="inherit"
                   startIcon={action.icon}
                   onClick={action.onClick}
-                  disabled={action.disabled}
                   aria-label={action.title}
                   sx={{ color: "text.secondary", px: 1.1, minWidth: "auto" }}
                 >
@@ -76,6 +71,19 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
               </span>
             </Tooltip>
           ))}
+          <Tooltip title="Ver resumen histórico">
+            <Button
+              size="small"
+              color="inherit"
+              startIcon={<AssessmentIcon />}
+              onClick={goToOverview}
+              aria-label="ver resumen histórico"
+              data-testid="open-overview-button"
+              sx={{ color: "text.secondary", px: 1.1, minWidth: "auto" }}
+            >
+              Resumen
+            </Button>
+          </Tooltip>
         </Box>
       ) : (
         <Box sx={{ display: "flex", gap: 0.25 }}>
@@ -85,7 +93,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                 size="small"
                 color="primary"
                 onClick={action.onClick}
-                disabled={action.disabled}
                 aria-label={action.title}
               >
                 {action.icon}
@@ -96,8 +103,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             <IconButton
               size="small"
               color="primary"
-              onClick={onOverviewClick}
+              onClick={goToOverview}
               aria-label="ver resumen histórico"
+              data-testid="open-overview-button"
             >
               <AssessmentIcon />
             </IconButton>

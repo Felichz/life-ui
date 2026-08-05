@@ -23,8 +23,6 @@ import TimelineContainer from "../containers/TimelineContainer";
 import ActivityLibraryContainer from "../containers/ActivityLibraryContainer";
 import TimeBlockModalContainer from "../containers/TimeBlockModalContainer";
 import EventLibraryModalContainer from "../containers/EventLibraryModalContainer";
-import VariableModalContainer from "../containers/VariableModalContainer";
-import OverviewModalContainer from "../containers/OverviewModalContainer";
 import ActivityInstanceModal from "../modals/ActivityInstanceModal";
 import CompletionModal from "../modals/CompletionModal";
 import TempoBanner from "../components/TempoBanner";
@@ -46,7 +44,6 @@ const DayPage: React.FC = () => {
     requestCompletion,
     completeActivity,
     interruptActivity,
-    canUpdateVariables,
     endDay,
   } = useSystemCore();
 
@@ -71,23 +68,15 @@ const DayPage: React.FC = () => {
     open: openEventLibraryModal,
     close: closeEventLibraryModal,
   } = useModal(false);
-  const {
-    isOpen: isVariableModalOpen,
-    open: openVariableModal,
-    close: closeVariableModal,
-  } = useModal(false);
-  const {
-    isOpen: isOverviewModalOpen,
-    open: openOverviewModal,
-    close: closeOverviewModal,
-  } = useModal(false);
+  // VariableModal y OverviewModal fueron removidos en schema v2.
+  // El botón "Variables" ya no existe y "Resumen" navega a /overview
+  // vía ActionButtons.
   const { isOpen: isEndDayModalOpen, open: openEndDayModal, close: closeEndDayModal } = useModal();
   const [selectedTemplateId, setSelectedTemplateId] = useState<UUID | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<UUID | null>(null);
   const [error, setError] = useState<string | null>(null);
   const kanbanRef = useRef<{ handleDragEnd: (result: DropResult) => void } | null>(null);
   const activeActivity = getActiveActivity();
-  const canUpdate = canUpdateVariables();
   const inRouter = useInRouterContext();
   // DayPage is normally rendered inside BrowserRouter. The fallback keeps the
   // guarded empty-state renderable in isolation (e.g. component tests).
@@ -243,9 +232,6 @@ const DayPage: React.FC = () => {
         onEndDayClick={openEndDayModal}
         actionButtons={
           <ActionButtons
-            canUpdateVariables={canUpdate}
-            onVariableClick={openVariableModal}
-            onOverviewClick={openOverviewModal}
             onTimeBlockClick={openTimeBlockModal}
             onEventLibraryClick={openEventLibraryModal}
             onActivityLibraryClick={openLibraryModal}
@@ -372,16 +358,9 @@ const DayPage: React.FC = () => {
                 <Box>
                   <Typography variant="h5">Lo que ocurrió</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Actividades completadas, eventos e interrupciones.
+                    Actividades completadas y eventos del día.
                   </Typography>
                 </Box>
-                <Button
-                  variant="text"
-                  onClick={openOverviewModal}
-                  startIcon={<TimelineRoundedIcon />}
-                >
-                  Ver detalle
-                </Button>
               </Box>
               <Box sx={{ height: { xs: 150, md: 180 }, overflow: "auto" }}>
                 <TimelineContainer />
@@ -428,18 +407,12 @@ const DayPage: React.FC = () => {
             open={isEventLibraryModalOpen}
             onClose={closeEventLibraryModal}
           />
-          <OverviewModalContainer open={isOverviewModalOpen} onClose={closeOverviewModal} />
           <ActivityInstanceModal
             open={isInstanceModalOpen}
             onClose={closeInstanceModal}
             templateId={selectedTemplateId}
             blockId={selectedBlockId}
             onConfirm={handleConfirmInstanceModal}
-          />
-          <VariableModalContainer
-            open={isVariableModalOpen}
-            onClose={closeVariableModal}
-            relatedActivityIds={activeActivity ? [activeActivity.id] : []}
           />
           <ConfirmEndDayModal
             open={isEndDayModalOpen}

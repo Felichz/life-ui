@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import DayPage from "../pages/DayPage";
 import { useSystemCore } from "../hooks/useSystemCore";
 
@@ -64,17 +65,6 @@ jest.mock("../containers/EventLibraryModalContainer", () => ({
   ),
 }));
 
-// Mock de VariableModalContainer
-jest.mock("../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: ({ open, onClose }: { open: boolean; onClose: () => void }) => (
-    <div data-testid="variable-modal" data-open={open}>
-      Modal de Variables Subjetivas
-      {open && <button onClick={onClose}>Cerrar</button>}
-    </div>
-  ),
-}));
-
 // Mock de ActivityInstanceModal
 jest.mock("../modals/ActivityInstanceModal", () => ({
   __esModule: true,
@@ -94,7 +84,6 @@ describe("DayPage", () => {
     moveActivityInstance: jest.fn(),
     createActivityInstance: jest.fn(),
     getActiveActivity: jest.fn().mockReturnValue(null),
-    canUpdateVariables: jest.fn().mockReturnValue(true),
     requestCompletion: jest.fn(() => ({
       activityTitle: "T",
       durationMinutes: 30,
@@ -147,7 +136,7 @@ describe("DayPage", () => {
   });
 
   test("renderiza la página cuando hay un día activo", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     expect(screen.getByTestId("day-page")).toBeInTheDocument();
     expect(screen.getByText("Kanban Container")).toBeInTheDocument();
@@ -159,7 +148,7 @@ describe("DayPage", () => {
       buildMock({ isDayActive: jest.fn().mockReturnValue(false) })
     );
 
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Verificar que se muestra el mensaje de error
     expect(screen.getByText("No hay un día activo")).toBeInTheDocument();
@@ -170,7 +159,7 @@ describe("DayPage", () => {
   });
 
   test("apertura y cierre del modal de biblioteca de actividades", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Inicialmente el modal debería estar cerrado
     expect(screen.getByTestId("activity-library-modal")).toHaveAttribute("data-open", "false");
@@ -193,7 +182,7 @@ describe("DayPage", () => {
   });
 
   test("apertura del modal también desde el IconButton de la AppBar", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Inicialmente el modal debería estar cerrado
     expect(screen.getByTestId("activity-library-modal")).toHaveAttribute("data-open", "false");
@@ -206,7 +195,7 @@ describe("DayPage", () => {
   });
 
   test("apertura y cierre del modal de gestión de bloques de tiempo desde AppBar", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Inicialmente el modal debería estar cerrado
     expect(screen.getByTestId("timeblock-modal")).toHaveAttribute("data-open", "false");
@@ -229,7 +218,7 @@ describe("DayPage", () => {
   });
 
   test("apertura del modal de bloques de tiempo desde el botón del Kanban", () => {
-    render(<DayPage />);
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
 
     // Inicialmente el modal debería estar cerrado
     expect(screen.getByTestId("timeblock-modal")).toHaveAttribute("data-open", "false");
@@ -241,26 +230,11 @@ describe("DayPage", () => {
     expect(screen.getByTestId("timeblock-modal")).toHaveAttribute("data-open", "true");
   });
 
-  test("apertura y cierre del modal de variables subjetivas", () => {
-    render(<DayPage />);
-
-    // Inicialmente el modal debería estar cerrado
-    expect(screen.getByTestId("variable-modal")).toHaveAttribute("data-open", "false");
-
-    // Hacer clic en el botón de variables subjetivas
-    fireEvent.click(screen.getByLabelText("actualizar variables subjetivas"));
-
-    // Ahora el modal debería estar abierto
-    expect(screen.getByTestId("variable-modal")).toHaveAttribute("data-open", "true");
-
-    // El botón de cerrar debería estar visible
-    const closeButton = screen.getByText("Cerrar");
-    expect(closeButton).toBeInTheDocument();
-
-    // Hacer clic para cerrar
-    fireEvent.click(closeButton);
-
-    // El modal debería cerrarse
-    expect(screen.getByTestId("variable-modal")).toHaveAttribute("data-open", "false");
+  test("el botón de variables subjetivas fue removido (schema v2+)", () => {
+    render(<MemoryRouter><DayPage /></MemoryRouter>);
+    // El botón ya no existe: las variables subjetivas fueron removidas.
+    expect(
+      screen.queryByLabelText("actualizar variables subjetivas")
+    ).not.toBeInTheDocument();
   });
 });

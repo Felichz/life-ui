@@ -67,15 +67,7 @@ jest.mock("../../containers/EventLibraryModalContainer", () => ({
   default: jest.fn(() => <div data-testid="event-library-modal-container">EventLibrary mocked</div>),
 }));
 
-jest.mock("../../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: jest.fn(() => <div data-testid="variable-modal-container">Variable mocked</div>),
-}));
-
-jest.mock("../../containers/OverviewModalContainer", () => ({
-  __esModule: true,
-  default: jest.fn(() => <div data-testid="overview-modal-container">Overview mocked</div>),
-}));
+// VariableModal y OverviewModal fueron removidos en schema v2+.
 
 jest.mock("../../modals/ActivityInstanceModal", () => ({
   __esModule: true,
@@ -129,7 +121,6 @@ describe("DayPage - Finalizar día (T22)", () => {
       requestedAt: "2023-01-01T12:00:00.000Z",
     })),
     endDay: jest.fn(),
-    canUpdateVariables: jest.fn(() => true),
     getCurrentDay: jest.fn(() => null),
     getTimeBlocks: jest.fn(() => []),
     getTempoSummary: jest.fn(() => ({

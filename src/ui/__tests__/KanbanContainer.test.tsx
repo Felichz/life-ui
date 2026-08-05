@@ -51,43 +51,27 @@ interface MockColumn {
   activities: ActivityInstance[];
 }
 
-// Mock para InterruptionModalContainer
-jest.mock("../containers/InterruptionModalContainer", () => ({
+// Mock de ActivityInstanceModal
+jest.mock("../modals/ActivityInstanceModal", () => ({
   __esModule: true,
   default: (props: {
     open: boolean;
     onClose: () => void;
-    activityId?: string;
-    onInterruptSuccess?: (id: string) => void;
-  }) => (
-    <div data-testid="interruption-modal">
-      {props.open && (
-        <button data-testid="interruption-close" onClick={props.onClose}>
-          Cerrar Interrupción
+    onConfirm: (templateId: string, blockId: string, settings: Record<string, unknown>) => void;
+  }) =>
+    props.open ? (
+      <div data-testid="activity-modal">
+        <button
+          data-testid="confirm-button"
+          onClick={() => props.onConfirm("template-123", "block-123", {})}
+        >
+          Confirmar
         </button>
-      )}
-    </div>
-  ),
-}));
-
-// Mock para VariableModalContainer
-jest.mock("../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: (props: {
-    open: boolean;
-    onClose: () => void;
-    relatedActivityIds?: string[];
-    relatedEventIds?: string[];
-    onSuccess?: () => void;
-  }) => (
-    <div data-testid="variable-modal">
-      {props.open && (
-        <button data-testid="variable-close" onClick={props.onClose}>
-          Cerrar Variables
+        <button data-testid="cancel-button" onClick={props.onClose}>
+          Cancelar
         </button>
-      )}
-    </div>
-  ),
+      </div>
+    ) : null,
 }));
 
 // Mock para el componente KanbanBoard

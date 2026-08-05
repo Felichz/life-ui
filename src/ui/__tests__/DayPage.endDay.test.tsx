@@ -93,16 +93,6 @@ jest.mock("../containers/EventLibraryModalContainer", () => ({
   default: () => <div>Event Library Modal Container</div>,
 }));
 
-jest.mock("../containers/VariableModalContainer", () => ({
-  __esModule: true,
-  default: () => <div>Variable Modal Container</div>,
-}));
-
-jest.mock("../containers/OverviewModalContainer", () => ({
-  __esModule: true,
-  default: () => <div>Overview Modal Container</div>,
-}));
-
 jest.mock("../modals/ActivityInstanceModal", () => ({
   __esModule: true,
   default: () => <div>Activity Instance Modal</div>,
@@ -129,7 +119,6 @@ const buildSystemCoreMock = (overrides: Record<string, unknown> = {}) => ({
     requestedAt: "2023-01-01T12:00:00.000Z",
   })),
   endDay: jest.fn(),
-  canUpdateVariables: jest.fn().mockReturnValue(true),
   getTimeBlocks: jest.fn().mockReturnValue([]),
   createActivityInstance: jest.fn(),
   getCurrentDay: jest.fn(() => null),
