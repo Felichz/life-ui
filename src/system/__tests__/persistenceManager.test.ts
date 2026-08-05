@@ -679,5 +679,44 @@ describe("PersistenceManager", () => {
       expect(result.global.days).toEqual(original.global.days);
       expect(result.global.userPreferences).toEqual(original.global.userPreferences);
     });
+
+    // Hardening: payload v3 con legacy fields inyectados debe normalizarse
+    it("payload v3 con legacy fields inyectados se normaliza (stripLegacyFields)", () => {
+      const v3WithLegacy = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            hiddenSubjectiveVariableIds: ["v1"],
+            dailyTempoTarget: 1000,
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [],
+          eventInstances: [],
+          // Payload manipulado: declara v3 pero trae legacy fields
+          subjectiveVariables: [{ id: "v1", name: "Energía" }],
+          interruptionCauses: [{ id: "c1" }],
+          subjectiveVariableSnapshots: [{ id: "s1" }],
+        },
+        currentDay: null,
+        schemaVersion: 3,
+      };
+
+      const result = persistenceManager.deserialize(JSON.stringify(v3WithLegacy));
+      const global = result.global as unknown as Record<string, unknown>;
+
+      // El runtime NO debe contener los legacy fields, ni siquiera en memoria
+      expect(global.subjectiveVariables).toBeUndefined();
+      expect(global.interruptionCauses).toBeUndefined();
+      expect(global.subjectiveVariableSnapshots).toBeUndefined();
+      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
+        .toBeUndefined();
+
+      // Sin migración (ya era v3) -> sin legacyArchive (no había datos para archivar
+      // porque stripLegacyFields los eliminó directamente)
+      expect(global.legacyArchive).toBeUndefined();
+    });
   });
 });

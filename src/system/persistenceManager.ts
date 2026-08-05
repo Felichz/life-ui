@@ -64,9 +64,13 @@ export class PersistenceManager implements IPersistenceManager {
   }
 
   /**
-   * Parsea + valida + migra un JSON a AppState. Si es de una versión
-   * anterior, ejecuta la cadena de migraciones (v1→v2→v3) y archiva los
-   * campos legacy en `legacyArchive` antes de retornarlo.
+   * Parsea + valida + migra + normaliza un JSON a AppState.
+   * - Si es de una versión anterior, ejecuta la cadena de migraciones
+   *   (v1→v2→v3) y archiva los campos legacy en `legacyArchive`.
+   * - Aunque la versión sea la actual (v3+), aplica `stripLegacyFields`
+   *   como hardening contra payloads manipulados con campos legacy.
+   * Garantía: el AppState retornado nunca contiene legacy fields en su
+   * shape principal (salvo `legacyArchive` para auditoría).
    * Lanza Error si el JSON es inválido o no parseable.
    */
   public deserialize(json: string): AppState {
@@ -93,7 +97,11 @@ export class PersistenceManager implements IPersistenceManager {
       console.warn("Migración de estado:", migration.warnings);
     }
 
-    return migration.state;
+    // Hardening: aunque la versión sea la actual (v3+), puede llegar un
+    // payload manipulado con campos legacy (subjectiveVariables, etc.).
+    // El runtime NUNCA debe recibirlos, ni siquiera en memoria durante
+    // la sesión. stripLegacyFields los elimina idempotentemente.
+    return this.stripLegacyFields(migration.state);
   }
 
   /**
