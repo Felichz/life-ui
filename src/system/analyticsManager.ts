@@ -4,10 +4,8 @@ import type {
   ISystemCore,
   TimelineData,
   TimeDistributionData,
-  SubjectiveVariablesData,
   ActivityStatistics,
   CompletedActivityRecord,
-  InterruptionStatistics,
   DayMinutes,
   TempoSummary,
   TempoTrendPoint,
@@ -286,97 +284,6 @@ export class AnalyticsManager {
   }
 
   /**
-   * Genera datos para visualización de variables subjetivas
-   * @param dayId ID opcional del día específico a analizar (si no se proporciona, usa todos los días)
-   * @returns Datos formateados para gráficos de variables subjetivas
-   */
-  public getSubjectiveVariablesData(dayId?: UUID): SubjectiveVariablesData {
-    const state = this.systemCore.getState();
-
-    // Filtrar snapshots por día si se especifica
-    const snapshots = state.global.subjectiveVariableSnapshots.filter(
-      (snapshot) => !dayId || snapshot.dayId === dayId
-    );
-
-    // Ordenar snapshots por timestamp
-    const sortedSnapshots = [...snapshots].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-
-    // Obtener todas las variables del sistema
-    const allVariables = state.global.subjectiveVariables;
-
-    // Determinar rango de tiempo
-    let timeRange = {
-      start: new Date().toISOString(),
-      end: new Date().toISOString(),
-    };
-
-    if (sortedSnapshots.length > 0) {
-      timeRange = {
-        start: sortedSnapshots[0].timestamp,
-        end: sortedSnapshots[sortedSnapshots.length - 1].timestamp,
-      };
-    } else if (dayId) {
-      // Si hay un día específico pero no hay snapshots, usar el inicio/fin del día
-      const day = state.global.days.find((d) => d.id === dayId);
-      if (day && day.startTime && day.endTime) {
-        timeRange = {
-          start: day.startTime,
-          end: day.endTime,
-        };
-      }
-    }
-
-    // Crear mapas para búsqueda rápida de actividades y eventos
-    const activitiesMap = new Map(
-      state.global.completedActivityRecords.map((activity) => [activity.id, activity.templateTitle])
-    );
-
-    const eventsMap = new Map(
-      state.global.eventInstances.map((event) => [event.id, event.templateName])
-    );
-
-    // Crear estructura de datos para cada variable
-    const variables = allVariables.map((variable) => {
-      // Filtrar valores para esta variable específica
-      const variableSnapshots = sortedSnapshots
-        .filter((snapshot) => snapshot.values.some((value) => value.variableId === variable.id))
-        .map((snapshot) => {
-          const valueObj = snapshot.values.find((v) => v.variableId === variable.id);
-
-          // Obtener títulos de actividades relacionadas
-          const relatedActivities = snapshot.relatedActivityIds
-            .map((id) => activitiesMap.get(id) || "")
-            .filter((title) => title !== "");
-
-          // Obtener nombres de eventos relacionados
-          const relatedEvents = snapshot.relatedEventIds
-            .map((id) => eventsMap.get(id) || "")
-            .filter((name) => name !== "");
-
-          return {
-            timestamp: snapshot.timestamp,
-            value: valueObj ? valueObj.currentValue : 0,
-            relatedActivities,
-            relatedEvents,
-          };
-        });
-
-      return {
-        id: variable.id,
-        name: variable.name,
-        values: variableSnapshots,
-      };
-    });
-
-    return {
-      variables,
-      timeRange,
-    };
-  }
-
-  /**
    * Calcula estadísticas para una actividad específica o todas
    * @param templateId ID opcional de la plantilla de actividad para filtrar (si no se proporciona, analiza todas)
    * @returns Estadísticas de actividad
@@ -431,33 +338,6 @@ export class AnalyticsManager {
       estimationAccuracy = accuracySum / activitiesWithEstimation.length;
     }
 
-    // Schema v2+: causas de interrupción eliminadas del modelo.
-    // Se preserva la interfaz pero siempre retorna undefined.
-    let frequentInterruptionCauses:
-      | { cause: string; count: number; percentage: number }[]
-      | undefined;
-
-    const interruptedActivities = activities.filter((activity) => activity.state === "interrupted");
-
-    if (interruptedActivities.length > 0) {
-      // Contar ocurrencias (sin causa, agrupamos como "Sin clasificar")
-      const causeCounts = new Map<string, number>();
-
-      interruptedActivities.forEach(() => {
-        const cause = "Sin clasificar";
-        causeCounts.set(cause, (causeCounts.get(cause) || 0) + 1);
-      });
-
-      // Convertir a array y ordenar por frecuencia
-      frequentInterruptionCauses = Array.from(causeCounts.entries())
-        .map(([cause, count]) => ({
-          cause,
-          count,
-          percentage: (count / interruptedActivities.length) * 100,
-        }))
-        .sort((a, b) => b.count - a.count);
-    }
-
     return {
       totalInstances,
       completedInstances,
@@ -466,7 +346,6 @@ export class AnalyticsManager {
       averageDuration: Number(averageDuration.toFixed(2)),
       estimationAccuracy:
         estimationAccuracy !== undefined ? Number(estimationAccuracy.toFixed(2)) : undefined,
-      frequentInterruptionCauses,
     };
   }
 
@@ -480,53 +359,12 @@ export class AnalyticsManager {
   }
 
   /**
-   * Calcula la tasa de interrupción de actividades
-   * @returns Porcentaje de actividades interrumpidas sobre el total
-   */
-  public getInterruptionRate(): number {
-    const stats = this.getActivityStats();
-    return stats.totalInstances > 0
-      ? Number(((stats.interruptedInstances / stats.totalInstances) * 100).toFixed(2))
-      : 0;
-  }
-
-  /**
    * Calcula la precisión de las estimaciones de tiempo
    * @returns Porcentaje promedio de precisión de estimación (0-100)
    */
   public getEstimationAccuracy(): number {
     const stats = this.getActivityStats();
     return stats.estimationAccuracy || 0;
-  }
-
-  /**
-   * Obtiene estadísticas de interrupciones
-   *
-   * Schema v2+: las interrupciones ya no se clasifican (evitable/innevitable)
-   * ni se agrupan por causa. Se preserva la interfaz para no romper consumidores,
-   * pero `topCauses` siempre viene vacío y los contadores de clasificación son 0.
-   *
-   * @returns Estadísticas detalladas sobre interrupciones
-   */
-  public getInterruptionStats(): InterruptionStatistics {
-    const state = this.systemCore.getState();
-    const activities = state.global.completedActivityRecords;
-
-    const interruptedActivities = activities.filter((activity) => activity.state === "interrupted");
-
-    const totalInterruptions = interruptedActivities.length;
-    // Sin clasificación evitable/innevitable en schema v2+
-    const avoidableInterruptions = 0;
-    const unavoidableInterruptions = totalInterruptions;
-    const avoidablePercentage = 0;
-
-    return {
-      totalInterruptions,
-      avoidableInterruptions,
-      unavoidableInterruptions,
-      avoidablePercentage: Number(avoidablePercentage.toFixed(2)),
-      topCauses: [],
-    };
   }
 
   /**

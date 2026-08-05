@@ -44,16 +44,12 @@ describe("PersistenceManager", () => {
       days: [],
       activityTemplates: [],
       eventTemplates: [],
-      subjectiveVariables: [],
-      interruptionCauses: [],
       timeBlocks: [],
       userPreferences: {
-        hiddenSubjectiveVariableIds: [],
         updatedAt: new Date().toISOString(),
       },
       completedActivityRecords: [],
       eventInstances: [],
-      subjectiveVariableSnapshots: [],
     },
     currentDay: null,
   };
@@ -225,17 +221,13 @@ describe("PersistenceManager", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             // NO dailyTempoTarget (es v1)
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
         },
         currentDay: null,
         // NO schemaVersion
@@ -253,17 +245,13 @@ describe("PersistenceManager", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             dailyTempoTarget: 500, // usuario lo había configurado
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
         },
         currentDay: null,
       };
@@ -279,11 +267,8 @@ describe("PersistenceManager", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [
@@ -302,7 +287,6 @@ describe("PersistenceManager", () => {
             },
           ],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
         },
         currentDay: null,
       };
@@ -340,13 +324,10 @@ describe("PersistenceManager", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           // NO userPreferences
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
         },
         currentDay: null,
       };
@@ -356,7 +337,6 @@ describe("PersistenceManager", () => {
       expect(result).not.toBeNull();
       expect(result!.global.userPreferences).toBeDefined();
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
-      expect(result!.global.userPreferences.hiddenSubjectiveVariableIds).toEqual([]);
     });
 
     it("RECONSTRUYE completedActivityRecords si falta el array", () => {
@@ -365,16 +345,12 @@ describe("PersistenceManager", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           // NO completedActivityRecords
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
         },
         currentDay: null,
       };
@@ -392,17 +368,13 @@ describe("PersistenceManager", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             dailyTempoTarget: 750, // valor custom del usuario
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
         },
         currentDay: null,
         schemaVersion: 2,

@@ -1,4 +1,4 @@
-import type { ISystemCore, UserPreferences, UUID } from "../types";
+import type { ISystemCore, UserPreferences } from "../types";
 
 /**
  * Gestor de preferencias de usuario
@@ -51,46 +51,6 @@ export class UserPreferencesManager {
 
     // Devolver las preferencias actualizadas
     return this.getUserPreferences();
-  }
-
-  /**
-   * Alterna la visibilidad de una variable subjetiva específica
-   * @param variableId ID de la variable a alternar visibilidad
-   */
-  public toggleVariableVisibility(variableId: UUID): void {
-    this.systemCore.updateState((state) => {
-      const currentPreferences = state.global.userPreferences;
-      const hiddenIds = [...currentPreferences.hiddenSubjectiveVariableIds];
-
-      // Alternar visibilidad
-      const isCurrentlyHidden = hiddenIds.includes(variableId);
-      const updatedHiddenIds = isCurrentlyHidden
-        ? hiddenIds.filter((id) => id !== variableId) // Mostrar (quitar de ocultos)
-        : [...hiddenIds, variableId]; // Ocultar (añadir a ocultos)
-
-      // Actualizar estado manteniendo inmutabilidad
-      return {
-        ...state,
-        global: {
-          ...state.global,
-          userPreferences: {
-            ...currentPreferences,
-            hiddenSubjectiveVariableIds: updatedHiddenIds,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      };
-    });
-  }
-
-  /**
-   * Verifica si una variable subjetiva está visible
-   * @param variableId ID de la variable a verificar
-   * @returns true si la variable está visible, false si está oculta
-   */
-  public isVariableVisible(variableId: UUID): boolean {
-    const preferences = this.getUserPreferences();
-    return !preferences.hiddenSubjectiveVariableIds.includes(variableId);
   }
 
   /**

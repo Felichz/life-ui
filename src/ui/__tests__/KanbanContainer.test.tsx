@@ -11,15 +11,11 @@ jest.mock("../hooks/useSystemCore", () => ({
         days: [],
         activityTemplates: [],
         eventTemplates: [],
-        subjectiveVariables: [],
-        interruptionCauses: [],
         userPreferences: {
-          hiddenSubjectiveVariableIds: [],
           updatedAt: "",
         },
         completedActivityRecords: [],
         eventInstances: [],
-        subjectiveVariableSnapshots: [],
       },
       currentDay: null,
     },
@@ -29,7 +25,6 @@ jest.mock("../hooks/useSystemCore", () => ({
     createActivityInstance: jest.fn(),
     getActivityTemplates: jest.fn().mockReturnValue([]),
     isTimeBlockAvailable: jest.fn().mockReturnValue(true),
-    getInterruptionCauses: jest.fn().mockReturnValue([]),
     getActiveActivity: jest.fn(),
     completeActivity: jest.fn().mockReturnValue({
       id: "completed-activity-id",
@@ -38,7 +33,6 @@ jest.mock("../hooks/useSystemCore", () => ({
     interruptActivity: jest.fn().mockReturnValue({
       id: "interrupted-activity-id",
     }),
-    createInterruptionCause: jest.fn(),
   })),
 }));
 
@@ -159,15 +153,11 @@ const createMockState = (
     days: [],
     activityTemplates: [],
     eventTemplates: [],
-    subjectiveVariables: [],
-    interruptionCauses: [],
     userPreferences: {
-      hiddenSubjectiveVariableIds: [],
       updatedAt: "",
     },
     completedActivityRecords: [],
     eventInstances: [],
-    subjectiveVariableSnapshots: [],
   },
   currentDay:
     activities.length > 0
@@ -199,7 +189,6 @@ describe("KanbanContainer", () => {
       createActivityInstance: jest.fn(),
       getActivityTemplates: jest.fn().mockReturnValue([]),
       isTimeBlockAvailable: jest.fn().mockReturnValue(true),
-      getInterruptionCauses: jest.fn().mockReturnValue([]),
       getActiveActivity: jest.fn(),
       completeActivity: jest.fn().mockReturnValue({
         id: "completed-activity-id",
@@ -208,7 +197,6 @@ describe("KanbanContainer", () => {
       interruptActivity: jest.fn().mockReturnValue({
         id: "interrupted-activity-id",
       }),
-      createInterruptionCause: jest.fn(),
     });
 
     render(<KanbanContainer />);
@@ -228,7 +216,6 @@ describe("KanbanContainer", () => {
       createActivityInstance: jest.fn(),
       getActivityTemplates: jest.fn().mockReturnValue([]),
       isTimeBlockAvailable: jest.fn().mockReturnValue(true),
-      getInterruptionCauses: jest.fn().mockReturnValue([]),
       getActiveActivity: jest.fn(),
       completeActivity: jest.fn().mockReturnValue({
         id: "completed-activity-id",
@@ -237,7 +224,6 @@ describe("KanbanContainer", () => {
       interruptActivity: jest.fn().mockReturnValue({
         id: "interrupted-activity-id",
       }),
-      createInterruptionCause: jest.fn(),
     });
 
     render(<KanbanContainer />);
@@ -266,7 +252,6 @@ describe("KanbanContainer", () => {
       createActivityInstance: jest.fn(),
       getActivityTemplates: jest.fn().mockReturnValue([]),
       isTimeBlockAvailable: jest.fn().mockReturnValue(true),
-      getInterruptionCauses: jest.fn().mockReturnValue([]),
       getActiveActivity: jest.fn(),
       completeActivity: jest.fn().mockReturnValue({
         id: "completed-activity-id",
@@ -275,7 +260,6 @@ describe("KanbanContainer", () => {
       interruptActivity: jest.fn().mockReturnValue({
         id: "interrupted-activity-id",
       }),
-      createInterruptionCause: jest.fn(),
     });
 
     render(<KanbanContainer />);

@@ -97,17 +97,13 @@ describe("ActivityManager", () => {
         days: [],
         activityTemplates: [],
         eventTemplates: [],
-        subjectiveVariables: [],
-        interruptionCauses: [],
         timeBlocks: [],
         userPreferences: {
-          hiddenSubjectiveVariableIds: [],
           dailyTempoTarget: 1000,
           updatedAt: "2023-01-01T00:00:00.000Z",
         },
         completedActivityRecords: [],
         eventInstances: [],
-        subjectiveVariableSnapshots: [],
       },
       currentDay: null,
     };

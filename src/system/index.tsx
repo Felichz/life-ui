@@ -9,16 +9,11 @@ import type {
   CompletedActivityRecord,
   TimeBlock,
   DayMinutes,
-  SubjectiveVariable,
-  SubjectiveVariableSnapshot,
   EventTemplate,
   EventInstance,
-  InterruptionCause,
   TimelineData,
   TimeDistributionData,
-  SubjectiveVariablesData,
   ActivityStatistics,
-  InterruptionStatistics,
   UserPreferences,
   UUID,
   CompletionRequest,
@@ -31,9 +26,7 @@ import { PersistenceManager } from "./persistenceManager";
 import { DayManager } from "./dayManager";
 import { ActivityManager } from "./activityManager";
 import { TimeBlockManager } from "./timeBlockManager";
-import { SubjectiveVariableManager } from "./subjectiveVariableManager";
 import { EventManager } from "./eventManager";
-import { InterruptionManager } from "./interruptionManager";
 import { AnalyticsManager } from "./analyticsManager";
 import { UserPreferencesManager } from "./userPreferencesManager";
 import { UtilityService } from "./utilityService";
@@ -55,9 +48,7 @@ export class SystemCore implements ISystemCore {
   private dayManager: DayManager;
   private activityManager: ActivityManager;
   private timeBlockManager: TimeBlockManager;
-  private subjectiveVariableManager: SubjectiveVariableManager;
   private eventManager: EventManager;
-  private interruptionManager: InterruptionManager;
   private analyticsManager: AnalyticsManager;
   private userPreferencesManager: UserPreferencesManager;
 
@@ -76,9 +67,7 @@ export class SystemCore implements ISystemCore {
     this.dayManager = new DayManager(this);
     this.activityManager = new ActivityManager(this);
     this.timeBlockManager = new TimeBlockManager(this);
-    this.subjectiveVariableManager = new SubjectiveVariableManager(this);
     this.eventManager = new EventManager(this);
-    this.interruptionManager = new InterruptionManager(this);
     this.analyticsManager = new AnalyticsManager(this);
     this.userPreferencesManager = new UserPreferencesManager(this);
 
@@ -332,72 +321,6 @@ export class SystemCore implements ISystemCore {
   }
 
   // ===============================================
-  // Métodos de SubjectiveVariableManager
-  // ===============================================
-
-  /**
-   * Crea una nueva variable subjetiva
-   */
-  public createSubjectiveVariable(name: string): SubjectiveVariable {
-    return this.subjectiveVariableManager.createSubjectiveVariable(name);
-  }
-
-  /**
-   * Actualiza una variable subjetiva existente
-   */
-  public updateSubjectiveVariable(id: UUID, data: Partial<SubjectiveVariable>): SubjectiveVariable {
-    return this.subjectiveVariableManager.updateSubjectiveVariable(id, data);
-  }
-
-  /**
-   * Elimina una variable subjetiva
-   */
-  public deleteSubjectiveVariable(id: UUID): void {
-    this.subjectiveVariableManager.deleteSubjectiveVariable(id);
-  }
-
-  /**
-   * Crea un nuevo snapshot de variables subjetivas
-   */
-  public createSnapshot(
-    values: { variableId: UUID; currentValue: number }[],
-    relatedActivityIds?: UUID[],
-    relatedEventIds?: UUID[]
-  ): SubjectiveVariableSnapshot | null {
-    return this.subjectiveVariableManager.createSnapshot(
-      values,
-      relatedActivityIds,
-      relatedEventIds
-    );
-  }
-
-  /**
-   * Obtiene snapshots de variables subjetivas con filtros opcionales
-   */
-  public getSnapshots(filters?: {
-    dayId?: UUID;
-    variableIds?: UUID[];
-    since?: string;
-    until?: string;
-  }): SubjectiveVariableSnapshot[] {
-    return this.subjectiveVariableManager.getSnapshots(filters);
-  }
-
-  /**
-   * Obtiene los últimos valores de todas las variables subjetivas
-   */
-  public getLatestValues(): Record<UUID, number> {
-    return this.subjectiveVariableManager.getLatestValues();
-  }
-
-  /**
-   * Verifica si se pueden actualizar las variables (restricción temporal)
-   */
-  public canUpdateVariables(): boolean {
-    return this.subjectiveVariableManager.canUpdateVariables();
-  }
-
-  // ===============================================
   // Métodos de EventManager
   // ===============================================
 
@@ -448,45 +371,6 @@ export class SystemCore implements ISystemCore {
   }
 
   // ===============================================
-  // Métodos de InterruptionManager
-  // ===============================================
-
-  /**
-   * Crea una nueva causa de interrupción
-   */
-  public createInterruptionCause(description: string): InterruptionCause {
-    return this.interruptionManager.createInterruptionCause(description);
-  }
-
-  /**
-   * Actualiza una causa de interrupción existente
-   */
-  public updateInterruptionCause(id: UUID, data: Partial<InterruptionCause>): InterruptionCause {
-    return this.interruptionManager.updateInterruptionCause(id, data);
-  }
-
-  /**
-   * Elimina una causa de interrupción
-   */
-  public deleteInterruptionCause(id: UUID): void {
-    this.interruptionManager.deleteInterruptionCause(id);
-  }
-
-  /**
-   * Obtiene todas las causas de interrupción
-   */
-  public getInterruptionCauses(): InterruptionCause[] {
-    return this.interruptionManager.getInterruptionCauses();
-  }
-
-  /**
-   * Obtiene estadísticas de interrupciones
-   */
-  public getInterruptionStatistics(): InterruptionStatistics {
-    return this.interruptionManager.getInterruptionStatistics();
-  }
-
-  // ===============================================
   // Métodos de AnalyticsManager
   // ===============================================
 
@@ -505,13 +389,6 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Genera datos para visualización de variables subjetivas
-   */
-  public getSubjectiveVariablesData(dayId?: UUID): SubjectiveVariablesData {
-    return this.analyticsManager.getSubjectiveVariablesData(dayId);
-  }
-
-  /**
    * Obtiene estadísticas para un tipo de actividad específico
    */
   public getActivityStats(templateId?: UUID): ActivityStatistics {
@@ -523,13 +400,6 @@ export class SystemCore implements ISystemCore {
    */
   public getCompletionRate(): number {
     return this.analyticsManager.getCompletionRate();
-  }
-
-  /**
-   * Obtiene la tasa de interrupciones
-   */
-  public getInterruptionRate(): number {
-    return this.analyticsManager.getInterruptionRate();
   }
 
   /**
@@ -572,20 +442,6 @@ export class SystemCore implements ISystemCore {
    */
   public getUserPreferences(): UserPreferences {
     return this.userPreferencesManager.getUserPreferences();
-  }
-
-  /**
-   * Alterna la visibilidad de una variable subjetiva
-   */
-  public toggleVariableVisibility(variableId: UUID): void {
-    this.userPreferencesManager.toggleVariableVisibility(variableId);
-  }
-
-  /**
-   * Verifica si una variable está visible
-   */
-  public isVariableVisible(variableId: UUID): boolean {
-    return this.userPreferencesManager.isVariableVisible(variableId);
   }
 
   /**
@@ -647,17 +503,13 @@ export class SystemCore implements ISystemCore {
       days: [],
       activityTemplates: [],
       eventTemplates: [],
-      subjectiveVariables: [],
-      interruptionCauses: [],
       timeBlocks: [],
       userPreferences: {
-        hiddenSubjectiveVariableIds: [],
         dailyTempoTarget: 1000,
         updatedAt: timestamp,
       },
       completedActivityRecords: [],
       eventInstances: [],
-      subjectiveVariableSnapshots: [],
       schemaVersion: 2,
     };
 

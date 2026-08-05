@@ -202,54 +202,6 @@ export interface EventInstance {
 }
 
 /**
- * Definición de Variable Subjetiva
- * Variable personalizada que el usuario puede crear y actualizar
- */
-export interface SubjectiveVariable {
-  id: UUID;
-  name: string;
-
-  createdAt: ISODateTimeString;
-  updatedAt: ISODateTimeString;
-}
-
-/**
- * Snapshot de Variables Subjetivas
- * Registro de un conjunto de valores de variables en un momento específico
- */
-export interface SubjectiveVariableSnapshot {
-  id: UUID;
-  timestamp: ISODateTimeString;
-  dayId: UUID; // Día al que pertenece
-
-  // Valores para cada variable
-  values: {
-    variableId: UUID;
-    variableName: string; // Para facilitar visualización
-    previousValue: number; // Escala 1-10
-    currentValue: number; // Escala 1-10
-  }[];
-
-  // Actividades/eventos relacionados
-  relatedActivityIds: UUID[];
-  relatedEventIds: UUID[];
-
-  createdAt: ISODateTimeString;
-}
-
-/**
- * Causa de Interrupción
- * Razón por la que una actividad fue interrumpida (para causas evitables)
- */
-export interface InterruptionCause {
-  id: UUID;
-  description: string;
-
-  createdAt: ISODateTimeString;
-  updatedAt: ISODateTimeString;
-}
-
-/**
  * Día
  * Representa un día dentro del sistema
  */
@@ -268,7 +220,6 @@ export interface Day {
  * Configuraciones personalizadas persistentes
  */
 export interface UserPreferences {
-  hiddenSubjectiveVariableIds: UUID[]; // Variables ocultas en gráficos
   dailyTempoTarget?: number; // Schema v2+: default 1000, opcional para legacy
 
   updatedAt: ISODateTimeString;
@@ -287,21 +238,28 @@ export interface GlobalState {
   days: Day[];
   activityTemplates: ActivityTemplate[];
   eventTemplates: EventTemplate[];
-  subjectiveVariables: SubjectiveVariable[];
-  interruptionCauses: InterruptionCause[];
   timeBlocks: TimeBlock[]; // Bloques de tiempo son persistentes
   userPreferences: UserPreferences;
 
   // Datos históricos
   completedActivityRecords: CompletedActivityRecord[];
   eventInstances: EventInstance[];
-  subjectiveVariableSnapshots: SubjectiveVariableSnapshot[];
 
   // Datos transitorios entre días
   pendingActivityInstances?: ActivityInstance[]; // Actividades pendientes al pasar de un día a otro
 
   // Versión del esquema persistido (para migraciones). Default 2.
   schemaVersion?: number;
+
+  /**
+   * Campos legacy de schema v1 (subjective variables + interruption causes).
+   * Solo presentes en estados pre-existentes en localStorage; el runtime ya
+   * no los crea ni los usa. Se aceptan en carga por compatibilidad pero
+   * pueden ignorarse o limpiarse en futuras migraciones.
+   */
+  subjectiveVariables?: unknown[];
+  interruptionCauses?: unknown[];
+  subjectiveVariableSnapshots?: unknown[];
 }
 
 /**
@@ -376,26 +334,6 @@ export interface TimeDistributionData {
 }
 
 /**
- * Datos para visualización de variables subjetivas
- */
-export interface SubjectiveVariablesData {
-  variables: {
-    id: UUID;
-    name: string;
-    values: {
-      timestamp: ISODateTimeString;
-      value: number;
-      relatedActivities: string[];
-      relatedEvents: string[];
-    }[];
-  }[];
-  timeRange: {
-    start: ISODateTimeString;
-    end: ISODateTimeString;
-  };
-}
-
-/**
  * Estadísticas de actividad para análisis
  */
 export interface ActivityStatistics {
@@ -405,27 +343,6 @@ export interface ActivityStatistics {
   completionRate: number;
   averageDuration: number;
   estimationAccuracy?: number;
-  frequentInterruptionCauses?: {
-    cause: string;
-    count: number;
-    percentage: number;
-  }[];
-}
-
-/**
- * Estadísticas de interrupciones para análisis
- */
-export interface InterruptionStatistics {
-  totalInterruptions: number;
-  avoidableInterruptions: number;
-  unavoidableInterruptions: number;
-  avoidablePercentage: number;
-  topCauses: {
-    id: UUID;
-    description: string;
-    count: number;
-    percentage: number;
-  }[];
 }
 
 /**
@@ -558,24 +475,6 @@ export interface ISystemCore {
   isTimeBlockAvailable(blockId: UUID): boolean;
   isTimeBlockExisting(blockId: UUID): boolean;
 
-  // Métodos de SubjectiveVariableManager
-  createSubjectiveVariable(name: string): SubjectiveVariable;
-  updateSubjectiveVariable(id: UUID, data: Partial<SubjectiveVariable>): SubjectiveVariable;
-  deleteSubjectiveVariable(id: UUID): void;
-  createSnapshot(
-    values: { variableId: UUID; currentValue: number }[],
-    relatedActivityIds?: UUID[],
-    relatedEventIds?: UUID[]
-  ): SubjectiveVariableSnapshot | null;
-  getSnapshots(filters?: {
-    dayId?: UUID;
-    variableIds?: UUID[];
-    since?: string;
-    until?: string;
-  }): SubjectiveVariableSnapshot[];
-  getLatestValues(): Record<UUID, number>;
-  canUpdateVariables(): boolean;
-
   // Métodos de EventManager
   createEventTemplate(name: string): EventTemplate;
   updateEventTemplate(id: UUID, data: Partial<EventTemplate>): EventTemplate;
@@ -584,20 +483,11 @@ export interface ISystemCore {
   getEventInstances(filters?: { dayId?: UUID; since?: string; until?: string }): EventInstance[];
   getRecentEvents(minutesWindow?: number): EventInstance[];
 
-  // Métodos de InterruptionManager
-  createInterruptionCause(description: string): InterruptionCause;
-  updateInterruptionCause(id: UUID, data: Partial<InterruptionCause>): InterruptionCause;
-  deleteInterruptionCause(id: UUID): void;
-  getInterruptionCauses(): InterruptionCause[];
-  getInterruptionStatistics(): InterruptionStatistics;
-
   // Métodos de AnalyticsManager
   getTimelineData(dayId?: UUID): TimelineData;
   getTimeDistributionData(dayId?: UUID): TimeDistributionData;
-  getSubjectiveVariablesData(dayId?: UUID): SubjectiveVariablesData;
   getActivityStats(templateId?: UUID): ActivityStatistics;
   getCompletionRate(): number;
-  getInterruptionRate(): number;
   getEstimationAccuracy(): number;
   getTempoSummary(dayId: UUID): TempoSummary;
   getTempoTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): TempoTrendPoint[];
@@ -605,8 +495,6 @@ export interface ISystemCore {
   // Métodos de UserPreferencesManager
   updateUserPreferences(preferences: Partial<UserPreferences>): UserPreferences;
   getUserPreferences(): UserPreferences;
-  toggleVariableVisibility(variableId: UUID): void;
-  isVariableVisible(variableId: UUID): boolean;
   updateDailyTempoTarget(target: number): UserPreferences;
 
   // Métodos de PersistenceManager

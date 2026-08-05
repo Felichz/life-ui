@@ -110,17 +110,13 @@ describe("DayPage", () => {
         days: [],
         activityTemplates: [],
         eventTemplates: [],
-        subjectiveVariables: [],
-        interruptionCauses: [],
         timeBlocks: [],
         userPreferences: {
-          hiddenSubjectiveVariableIds: [],
           dailyTempoTarget: 1000,
           updatedAt: "",
         },
         completedActivityRecords: [],
         eventInstances: [],
-        subjectiveVariableSnapshots: [],
         schemaVersion: 2,
       },
       currentDay: {

@@ -99,8 +99,7 @@ describe("DayPage", () => {
     isDayActive: jest.fn().mockReturnValue(true),
     getActiveActivity: mockGetActiveActivity,
     createActivityInstance: mockCreateActivityInstance,
-    getUserPreferences: jest.fn().mockReturnValue({ hiddenSubjectiveVariableIds: [] }),
-    toggleVariableVisibility: jest.fn(),
+    getUserPreferences: jest.fn().mockReturnValue({ dailyTempoTarget: 1000, updatedAt: "" }),
     requestCompletion: jest.fn(() => ({
       activityTitle: "T",
       durationMinutes: 30,
@@ -127,17 +126,13 @@ describe("DayPage", () => {
         days: [],
         activityTemplates: [],
         eventTemplates: [],
-        subjectiveVariables: [],
-        interruptionCauses: [],
         timeBlocks: [],
         userPreferences: {
-          hiddenSubjectiveVariableIds: [],
           dailyTempoTarget: 1000,
           updatedAt: "",
         },
         completedActivityRecords: [],
         eventInstances: [],
-        subjectiveVariableSnapshots: [],
         schemaVersion: 2,
       },
       currentDay: {

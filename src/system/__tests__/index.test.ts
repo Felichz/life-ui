@@ -8,9 +8,7 @@ jest.mock("../persistenceManager");
 jest.mock("../dayManager");
 jest.mock("../activityManager");
 jest.mock("../timeBlockManager");
-jest.mock("../subjectiveVariableManager");
 jest.mock("../eventManager");
-jest.mock("../interruptionManager");
 jest.mock("../analyticsManager");
 jest.mock("../userPreferencesManager");
 jest.mock("../utilityService");
@@ -50,17 +48,13 @@ describe("SystemCore", () => {
           days: [],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             dailyTempoTarget: 1000,
             updatedAt: mockTimestamp,
           },
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
           schemaVersion: 2,
         },
         currentDay: null,
@@ -81,17 +75,13 @@ describe("SystemCore", () => {
           ],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             dailyTempoTarget: 1000,
             updatedAt: "2023-01-01T10:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
           schemaVersion: 2,
         },
         currentDay: {
@@ -287,53 +277,6 @@ describe("SystemCore", () => {
       expect(getBlocksSpy).toHaveBeenCalled();
     });
 
-    it("debe delegar correctamente los métodos de SubjectiveVariableManager", () => {
-      // Restaurar los mocks originales para probar la delegación
-      jest.restoreAllMocks();
-
-      // Crear spies para los métodos de SubjectiveVariableManager
-      const createVariableSpy = jest.spyOn(
-        systemCore["subjectiveVariableManager"],
-        "createSubjectiveVariable"
-      );
-      const updateVariableSpy = jest.spyOn(
-        systemCore["subjectiveVariableManager"],
-        "updateSubjectiveVariable"
-      );
-      const deleteVariableSpy = jest.spyOn(
-        systemCore["subjectiveVariableManager"],
-        "deleteSubjectiveVariable"
-      );
-      const createSnapshotSpy = jest.spyOn(
-        systemCore["subjectiveVariableManager"],
-        "createSnapshot"
-      );
-      const getLatestValuesSpy = jest.spyOn(
-        systemCore["subjectiveVariableManager"],
-        "getLatestValues"
-      );
-
-      // Datos de ejemplo
-      const variableName = "Concentración";
-      const values = [{ variableId: mockUUID, currentValue: 8 }];
-
-      // Probar las delegaciones
-      systemCore.createSubjectiveVariable(variableName);
-      expect(createVariableSpy).toHaveBeenCalledWith(variableName);
-
-      systemCore.updateSubjectiveVariable(mockUUID, { name: "Foco" });
-      expect(updateVariableSpy).toHaveBeenCalledWith(mockUUID, { name: "Foco" });
-
-      systemCore.deleteSubjectiveVariable(mockUUID);
-      expect(deleteVariableSpy).toHaveBeenCalledWith(mockUUID);
-
-      systemCore.createSnapshot(values);
-      expect(createSnapshotSpy).toHaveBeenCalledWith(values, undefined, undefined);
-
-      systemCore.getLatestValues();
-      expect(getLatestValuesSpy).toHaveBeenCalled();
-    });
-
     it("debe delegar correctamente los métodos de UserPreferencesManager", () => {
       // Restaurar los mocks originales para probar la delegación
       jest.restoreAllMocks();
@@ -347,30 +290,20 @@ describe("SystemCore", () => {
         systemCore["userPreferencesManager"],
         "getUserPreferences"
       );
-      const toggleVisibilitySpy = jest.spyOn(
+      const updateDailyTempoTargetSpy = jest.spyOn(
         systemCore["userPreferencesManager"],
-        "toggleVariableVisibility"
+        "updateDailyTempoTarget"
       );
-      const isVariableVisibleSpy = jest.spyOn(
-        systemCore["userPreferencesManager"],
-        "isVariableVisible"
-      );
-
-      // Datos de ejemplo
-      const preferences = { hiddenSubjectiveVariableIds: ["var-1", "var-2"] };
 
       // Probar las delegaciones
-      systemCore.updateUserPreferences(preferences);
-      expect(updatePreferencesSpy).toHaveBeenCalledWith(preferences);
+      systemCore.updateUserPreferences({ dailyTempoTarget: 1500 });
+      expect(updatePreferencesSpy).toHaveBeenCalledWith({ dailyTempoTarget: 1500 });
 
       systemCore.getUserPreferences();
       expect(getPreferencesSpy).toHaveBeenCalled();
 
-      systemCore.toggleVariableVisibility(mockUUID);
-      expect(toggleVisibilitySpy).toHaveBeenCalledWith(mockUUID);
-
-      systemCore.isVariableVisible(mockUUID);
-      expect(isVariableVisibleSpy).toHaveBeenCalledWith(mockUUID);
+      systemCore.updateDailyTempoTarget(2000);
+      expect(updateDailyTempoTargetSpy).toHaveBeenCalledWith(2000);
     });
 
     it("debe delegar correctamente los métodos de AnalyticsManager", () => {
@@ -383,16 +316,8 @@ describe("SystemCore", () => {
         systemCore["analyticsManager"],
         "getTimeDistributionData"
       );
-      const getVariablesDataSpy = jest.spyOn(
-        systemCore["analyticsManager"],
-        "getSubjectiveVariablesData"
-      );
       const getStatsSpy = jest.spyOn(systemCore["analyticsManager"], "getActivityStats");
       const getCompletionRateSpy = jest.spyOn(systemCore["analyticsManager"], "getCompletionRate");
-      const getInterruptionRateSpy = jest.spyOn(
-        systemCore["analyticsManager"],
-        "getInterruptionRate"
-      );
       const getEstimationAccuracySpy = jest.spyOn(
         systemCore["analyticsManager"],
         "getEstimationAccuracy"
@@ -405,17 +330,11 @@ describe("SystemCore", () => {
       systemCore.getTimeDistributionData();
       expect(getDistributionSpy).toHaveBeenCalled();
 
-      systemCore.getSubjectiveVariablesData(mockUUID);
-      expect(getVariablesDataSpy).toHaveBeenCalledWith(mockUUID);
-
       systemCore.getActivityStats(mockUUID);
       expect(getStatsSpy).toHaveBeenCalledWith(mockUUID);
 
       systemCore.getCompletionRate();
       expect(getCompletionRateSpy).toHaveBeenCalled();
-
-      systemCore.getInterruptionRate();
-      expect(getInterruptionRateSpy).toHaveBeenCalled();
 
       systemCore.getEstimationAccuracy();
       expect(getEstimationAccuracySpy).toHaveBeenCalled();
@@ -446,17 +365,13 @@ describe("SystemCore", () => {
           ],
           activityTemplates: [],
           eventTemplates: [],
-          subjectiveVariables: [],
-          interruptionCauses: [],
           timeBlocks: [],
           userPreferences: {
-            hiddenSubjectiveVariableIds: [],
             dailyTempoTarget: 1000,
             updatedAt: "2023-01-01T08:00:00.000Z",
           },
           completedActivityRecords: [],
           eventInstances: [],
-          subjectiveVariableSnapshots: [],
           schemaVersion: 2,
         },
         currentDay: null,

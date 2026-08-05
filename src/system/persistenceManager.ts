@@ -162,7 +162,6 @@ export class PersistenceManager implements IPersistenceManager {
     // Reconstruir userPreferences si falta
     const existingPrefs = state.global?.userPreferences;
     const userPreferences = {
-      hiddenSubjectiveVariableIds: existingPrefs?.hiddenSubjectiveVariableIds ?? [],
       dailyTempoTarget:
         typeof existingPrefs?.dailyTempoTarget === "number" ? existingPrefs.dailyTempoTarget : 1000,
       updatedAt: existingPrefs?.updatedAt ?? new Date().toISOString(),

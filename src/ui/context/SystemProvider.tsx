@@ -97,15 +97,6 @@ export const useSystemCore = () => {
     isTimeBlockAvailable: core.isTimeBlockAvailable.bind(core),
     isTimeBlockExisting: core.isTimeBlockExisting.bind(core),
 
-    // Métodos de SubjectiveVariableManager
-    createSubjectiveVariable: core.createSubjectiveVariable.bind(core),
-    updateSubjectiveVariable: core.updateSubjectiveVariable.bind(core),
-    deleteSubjectiveVariable: core.deleteSubjectiveVariable.bind(core),
-    createSnapshot: core.createSnapshot.bind(core),
-    getSnapshots: core.getSnapshots.bind(core),
-    getLatestValues: core.getLatestValues.bind(core),
-    canUpdateVariables: core.canUpdateVariables.bind(core),
-
     // Métodos de EventManager
     createEventTemplate: core.createEventTemplate.bind(core),
     updateEventTemplate: core.updateEventTemplate.bind(core),
@@ -114,20 +105,11 @@ export const useSystemCore = () => {
     getEventInstances: core.getEventInstances.bind(core),
     getRecentEvents: core.getRecentEvents.bind(core),
 
-    // Métodos de InterruptionManager
-    createInterruptionCause: core.createInterruptionCause.bind(core),
-    updateInterruptionCause: core.updateInterruptionCause.bind(core),
-    deleteInterruptionCause: core.deleteInterruptionCause.bind(core),
-    getInterruptionCauses: core.getInterruptionCauses.bind(core),
-    getInterruptionStatistics: core.getInterruptionStatistics.bind(core),
-
     // Métodos de AnalyticsManager
     getTimelineData: core.getTimelineData.bind(core),
     getTimeDistributionData: core.getTimeDistributionData.bind(core),
-    getSubjectiveVariablesData: core.getSubjectiveVariablesData.bind(core),
     getActivityStats: core.getActivityStats.bind(core),
     getCompletionRate: core.getCompletionRate.bind(core),
-    getInterruptionRate: core.getInterruptionRate.bind(core),
     getEstimationAccuracy: core.getEstimationAccuracy.bind(core),
     getTempoSummary: core.getTempoSummary.bind(core),
     getTempoTrends: core.getTempoTrends.bind(core),
@@ -135,8 +117,6 @@ export const useSystemCore = () => {
     // Métodos de UserPreferencesManager
     updateUserPreferences: core.updateUserPreferences.bind(core),
     getUserPreferences: core.getUserPreferences.bind(core),
-    toggleVariableVisibility: core.toggleVariableVisibility.bind(core),
-    isVariableVisible: core.isVariableVisible.bind(core),
     updateDailyTempoTarget: core.updateDailyTempoTarget.bind(core),
 
     // Métodos de PersistenceManager
