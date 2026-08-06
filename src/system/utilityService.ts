@@ -175,6 +175,37 @@ export class UtilityService {
   };
 
   /**
+   * Resuelve la base sobre la que se calculan los tempos: estimado si
+   * es válido (número > 0), sino duración real. Si ambos son 0/negativos,
+   * retorna 0.
+   *
+   * Esta es la **fuente única** de la lógica "estimado o duración". Si
+   * cambia (por ejemplo, para añadir un fallback o log), tanto el cálculo
+   * final (`calculateTemposAwarded`) como el preview de la UI
+   * (`calculatePreviewTempos`) la usan a través de este helper.
+   *
+   * Importante: `estimatedMinutes === 0` NO se considera válido (no es
+   * un estimado real). Esto previene el bug en el que un estado legacy
+   * o corrupto con estimado 0 hacía divergir el preview del core.
+   *
+   * @param estimatedMinutes Estimado de la actividad (puede ser undefined,
+   *   null, 0 o negativo)
+   * @param durationMinutes Duración real (puede ser 0 si se confirmó
+   *   en los primeros 30s)
+   * @returns La base resuelta (>= 0)
+   */
+  public static resolveBaseMinutes(
+    estimatedMinutes: number | undefined | null,
+    durationMinutes: number
+  ): number {
+    const estimated =
+      typeof estimatedMinutes === "number" && estimatedMinutes > 0
+        ? estimatedMinutes
+        : durationMinutes;
+    return estimated > 0 ? estimated : 0;
+  }
+
+  /**
    * Calcula el preview de tempos para un score y baseMinutos dados.
    * Usado por la UI (CompletionModal) para mostrar en vivo cuántos
    * tempos recibirá el usuario según el score seleccionado.
@@ -236,17 +267,15 @@ export class UtilityService {
     // Validaciones de entrada: durationMinutes puede ser 0 si el usuario
     // confirma honestamente en los primeros 30s y Math.round redondea a 0.
     // El bug original era retornar 0 en ese caso; ahora usamos el
-    // estimado si está disponible (ver abajo).
+    // estimado si está disponible (ver resolveBaseMinutes).
     if (typeof durationMinutes !== "number" || durationMinutes < 0) return 0;
     if (typeof satisfactionScore !== "number") return 0;
     if (satisfactionScore < 0 || satisfactionScore > 10) return 0;
     if (!Number.isInteger(satisfactionScore)) return 0;
 
-    // Base: estimado si es válido, sino duración real.
-    const base =
-      typeof estimatedMinutes === "number" && estimatedMinutes > 0
-        ? estimatedMinutes
-        : durationMinutes;
+    // Base resuelta por helper compartido con calculatePreviewTempos.
+    // estimatedMinutes === 0 o negativo NO es válido: cae a durationMinutes.
+    const base = UtilityService.resolveBaseMinutes(estimatedMinutes, durationMinutes);
 
     // Delegamos al helper compartido (misma fuente que el preview).
     return UtilityService.calculatePreviewTempos(satisfactionScore, base);

@@ -78,16 +78,15 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
 
   const preview = useMemo(() => {
     if (!request) return { base: 0, multiplier: 1, total: 0 };
-    // Base: estimado si está disponible, sino duración real.
-    // Importante: si durationMinutes es 0 (confirmado en los primeros
-    // 30s), seguimos usando el estimado para evitar el bug de "0 tempos".
-    const base =
-      request.estimatedMinutes !== undefined
-        ? request.estimatedMinutes
-        : request.durationMinutes;
-    // Fuente única de verdad: utilityService.calculatePreviewTempos
-    // comparte la misma tabla SCORE_MULTIPLIERS que calculateTemposAwarded.
-    // El preview SIEMPRE coincide con el cálculo final del core.
+    // Fuente única de verdad: utilityService.resolveBaseMinutes
+    // aplica la misma lógica que el core (estimatedMinutes > 0 es el
+    // único caso válido; 0 cae a duración real). Así el preview y el
+    // cálculo final NUNCA divergen, incluso con estados corruptos o
+    // legacy con estimado 0.
+    const base = UtilityService.resolveBaseMinutes(
+      request.estimatedMinutes,
+      request.durationMinutes
+    );
     const multiplier = UtilityService.SCORE_MULTIPLIERS[score] ?? 0;
     const total = UtilityService.calculatePreviewTempos(score, base);
     return { base, multiplier, total };

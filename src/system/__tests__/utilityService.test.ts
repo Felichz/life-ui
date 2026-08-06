@@ -324,4 +324,57 @@ describe("UtilityService", () => {
       }
     });
   });
+
+  // Resolución de la base: estimado si es válido (> 0), sino duración real.
+  // Fuente única compartida por core (calculateTemposAwarded) y UI
+  // (CompletionModal.preview) para garantizar consistencia incluso
+  // ante estados corruptos/legacy.
+  describe("resolveBaseMinutes (fuente única de la base)", () => {
+    it("estimado válido (> 0) → retorna el estimado", () => {
+      expect(UtilityService.resolveBaseMinutes(30, 15)).toBe(30);
+      expect(UtilityService.resolveBaseMinutes(45, 5)).toBe(45);
+    });
+
+    it("estimado 0 NO es válido: cae a duración real", () => {
+      // Bug defensivo: estado legacy con estimado 0 (no es un estimado
+      // real) debe usar la duración real para que preview y core
+      // coincidan.
+      expect(UtilityService.resolveBaseMinutes(0, 25)).toBe(25);
+    });
+
+    it("estimado negativo NO es válido: cae a duración real", () => {
+      expect(UtilityService.resolveBaseMinutes(-10, 25)).toBe(25);
+    });
+
+    it("estimado undefined → usa duración real", () => {
+      expect(UtilityService.resolveBaseMinutes(undefined, 20)).toBe(20);
+    });
+
+    it("estimado null → usa duración real", () => {
+      expect(UtilityService.resolveBaseMinutes(null, 20)).toBe(20);
+    });
+
+    it("ambos 0 → retorna 0 (no se premia nada)", () => {
+      expect(UtilityService.resolveBaseMinutes(0, 0)).toBe(0);
+      expect(UtilityService.resolveBaseMinutes(undefined, 0)).toBe(0);
+    });
+
+    it("INVARIANTE: resolveBaseMinutes === base que usa calculateTemposAwarded", () => {
+      // El core y la UI deben usar la misma base para cualquier caso.
+      for (const estimated of [undefined, null, 0, -5, 30, 60]) {
+        for (const duration of [0, 5, 30, 60]) {
+          const baseFromHelper = UtilityService.resolveBaseMinutes(
+            estimated,
+            duration
+          );
+          // Simula la lógica anterior de calculateTemposAwarded
+          const baseFromLegacy =
+            typeof estimated === "number" && estimated > 0
+              ? estimated
+              : duration;
+          expect(baseFromHelper).toBe(baseFromLegacy);
+        }
+      }
+    });
+  });
 });
