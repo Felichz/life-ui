@@ -64,6 +64,28 @@ describe("CompletionModal (fórmula MVP v3)", () => {
       );
       expect(screen.queryByTestId("estimate-info")).not.toBeInTheDocument();
     });
+
+    it("NO muestra estimado si estimatedMinutes es 0 (defensivo)", () => {
+      // Estado legacy/corrupto: estimado 0 no es válido, no debe
+      // mostrarse como "Estimado: 0 min" (sería confuso).
+      render(
+        <CompletionModal
+          {...defaultProps}
+          request={{ ...mockRequest, estimatedMinutes: 0 }}
+        />
+      );
+      expect(screen.queryByTestId("estimate-info")).not.toBeInTheDocument();
+    });
+
+    it("NO muestra estimado si estimatedMinutes es negativo (defensivo)", () => {
+      render(
+        <CompletionModal
+          {...defaultProps}
+          request={{ ...mockRequest, estimatedMinutes: -10 }}
+        />
+      );
+      expect(screen.queryByTestId("estimate-info")).not.toBeInTheDocument();
+    });
   });
 
   describe("slider y heurísticas", () => {

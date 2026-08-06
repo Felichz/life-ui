@@ -131,7 +131,7 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
             <Typography variant="h5" sx={{ fontWeight: 700 }}>
               {request.durationMinutes} min
             </Typography>
-            {request.estimatedMinutes !== undefined && (
+            {request.estimatedMinutes !== undefined && request.estimatedMinutes > 0 && (
               <Typography
                 variant="body2"
                 color={request.beatEstimate ? "success.main" : "text.secondary"}
