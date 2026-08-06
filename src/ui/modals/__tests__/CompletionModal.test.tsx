@@ -67,12 +67,13 @@ describe("CompletionModal (fórmula MVP v3)", () => {
   });
 
   describe("slider y heurísticas", () => {
-    it("auto-10 cuando canApplyBonus=true (reward por eficiencia)", () => {
+    it("default a score 7 incluso con canApplyBonus=true (no auto-10)", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
-      expect(screen.getByTestId("score-label")).toHaveTextContent("10/10");
+      // Codex review: el bonus debe ser decisión del usuario, no auto.
+      expect(screen.getByTestId("score-label")).toHaveTextContent("7/10");
     });
 
-    it("default a score 7 (umbral de recompensa) cuando NO hay bonus", () => {
+    it("default a score 7 cuando NO hay bonus", () => {
       render(<CompletionModal {...defaultProps} />);
       expect(screen.getByTestId("score-label")).toHaveTextContent("7/10");
     });
@@ -91,10 +92,10 @@ describe("CompletionModal (fórmula MVP v3)", () => {
       expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
     });
 
-    it("score 10 + estimado 30 min → 39 tempos (130%)", () => {
+    it("canApplyBonus es solo informativo: score=7 → 100% × estimado (no 130%)", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
-      // canApplyBonus=true → auto-10 → 130% × 30 = 39
-      expect(screen.getByTestId("preview-total")).toHaveTextContent("39");
+      // Codex review: beat ya no otorga auto-bonus. Score default 7 = 100% × 30 = 30.
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
     });
 
     it("score < 7 → preview 0", () => {
@@ -176,9 +177,18 @@ describe("CompletionModal (fórmula MVP v3)", () => {
       );
     });
 
-    it("muestra 'Guardar y recibir 39 tempos' cuando hay bonus (score 10)", () => {
+    it("score 10 explícito (no auto) → 39 tempos", () => {
+      // Codex review: el bonus debe ser decisión del usuario, no auto.
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
-      // Score 10 (auto), estimado 30 → 39 tempos
+      // Forzamos score=10 vía slider
+      const slider = screen
+        .getByTestId("satisfaction-slider")
+        .querySelector('input[type="range"]');
+      if (slider) {
+        // 7 → 10 es +3 clicks derecha (MUI step=1)
+        fireEvent.change(slider, { target: { value: "10" } });
+      }
+      // Score 10 × 130% × 30 estimado = 39
       expect(screen.getByTestId("confirm-button")).toHaveTextContent(
         "Guardar y recibir 39 tempos"
       );

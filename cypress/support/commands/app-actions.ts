@@ -192,8 +192,8 @@ Cypress.Commands.add("interruptActivity", (activityTitle: string) => {
 
 Cypress.Commands.add("confirmCompletionWithScore", (score: number) => {
   cy.dataTestId("completion-modal").should("be.visible");
-  // Mover slider al score deseado (slider inicia en 5)
-  const delta = score - 5;
+  // Mover slider al score deseado (MVP v3: slider inicia en 7, NO en 5)
+  const delta = score - 7;
   if (delta > 0) {
     for (let i = 0; i < delta; i++) {
       cy.dataTestId("satisfaction-slider").focus().type("{rightarrow}");

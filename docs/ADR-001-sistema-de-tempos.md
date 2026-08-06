@@ -40,30 +40,71 @@ Construir un sistema de tempos con las siguientes propiedades simultáneas:
 
 1. **Recompensa inmutable, no moneda**: `temposAwarded` se guarda en cada actividad completada. No hay ledger, no hay saldo mutable, no hay gasto. El total del día se deriva sumando registros.
 
-2. **Fórmula porcentual honesta, calculada por el core**:
+2. **Fórmula porcentual honesta, calculada por el core (MVP v3 simplificada)**:
+
+   El score (0-10) **NO modifica la duración real**. El score 7 es el umbral
+   de recompensa; los scores 8/9/10 son bonus explícitos por elección del
+   usuario. Esto elimina el bug clásico de "0 tempos porque la actividad
+   estuvo activa menos de 1 minuto".
 
    ```
-   baseTempos = ceil(actualMinutes × satisfactionScore / 10)
-   bonusTempos = +5 si aplicaBonus   (ver reglas abajo)
-   totalTempos = baseTempos + bonusTempos (pero 0 si score === 0)
+   // score 0-6 → 0 tempos (este día no fue; honestidad)
+   // score 7-10 → ceil(baseMinutos × multiplicador)
+   //
+   // Tabla de multiplicadores:
+   //   score 7  → 1.0  (100% × base)
+   //   score 8  → 1.1  (110% × base)
+   //   score 9  → 1.2  (120% × base)
+   //   score 10 → 1.3  (130% × base)
+   //
+   //    base = minutos estimados (si hay) | duración real (si no)
+   //
+   // Si durationMinutes === 0 pero hay estimado > 0, se usa el estimado
+   // (no se pierde la recompensa por haber confirmado en los primeros 30s).
    ```
 
-3. **Reglas de bonus por tipo de actividad** (calculadas en el core, nunca en la UI):
+   **Por qué la base es el estimado (no la duración real)**:
 
-   - **`clear-objective`**: aplica bonus si `actualMinutes > 0 && actualMinutes <= estimatedMinutes × 0.8`.
-   - **`flexible-duration`**: **no aplica bonus** (el rango es informativo, no hay un estimado puntual).
-   - **`timeboxing`**: **no aplica bonus** (el propósito del timeboxing es respetar la ventana, no batirla).
-   - Si el score es `0`, el bonus tampoco se otorga (coherencia con "0 = nada").
+   Si el usuario confirma honestamente una tarea a los 30 segundos (antes
+   de completar el primer minuto y con `Math.round` → 0), todavía debe
+   recibir la recompensa correspondiente. Premiar sobre el estimado
+   elimina el bug clásico de "0 tempos porque acabo de iniciar". Además,
+   es coherente con la decisión de "tiempo libre es tiempo libre": no
+   cobramos al usuario por no haber esperado más.
 
-4. **Tiempo libre es tiempo libre**: no hay drenaje pasivo, no hay penalización por no estar haciendo nada. El tiempo fuera de actividades declaradas **no cuesta nada**.
+   Solo cuando **no hay estimado** (flexible-duration, timeboxing sin
+   rango) se usa la duración real como base.
 
-5. **Un único ritual de cierre**: `CompletionModal`. Toda finalización de actividad — completar, cambiar a otra, cerrar el día, terminar timeboxing — pasa por él.
+3. **Decisión del usuario, no heurística automática**:
 
-6. **El target es orientación, no obligación**: se muestra como `"42% de tu referencia diaria"`, **nunca** como `"te faltan 580 tempos"`.
+   A diferencia del diseño original (donde `canApplyBonus` auto-ponía el
+   slider en 10 cuando se batía el estimado), en MVP v3 el bonus es
+   siempre decisión explícita del usuario en el slider:
 
-7. **Interrupciones mínimas**: solo se registra `state: "interrupted"` y `durationMinutes`. Sin causas configurables, sin pregunta de evitable, sin snapshot causal. No suman tempos ni restan nada.
+   - **`beatEstimate`**: se conserva como métrica informativa del record
+     (mostrada en CompletionModal como "✓ batiste el estimado") y del
+     `CompletedActivityRecord.beatEstimate`, pero **NO** modifica el score
+     inicial ni otorga bonus automático.
+   - Score default del slider al abrir el modal: **siempre 7** (umbral).
+   - El usuario decide explícitamente si su satisfacción amerita 8 (110%),
+     9 (120%) o 10 (130%).
 
-8. **Variables subjetivas fuera del producto**: no hay modal, no hay gráficos, no hay feature flag visible. Si existen datos históricos, se preservan en localStorage pero no se muestran ni participan en la lógica.
+4. **Tipos de actividad y `beatEstimate`** (calculado en el core):
+
+   - **`clear-objective`**: tiene estimado puntual. Se calcula `beatEstimate`
+     para mostrarla como info, pero NO modifica la fórmula.
+   - **`flexible-duration`**: rango informativo, no hay estimado puntual.
+   - **`timeboxing`**: ventana intencional (respetar, no batir).
+
+5. **Tiempo libre es tiempo libre**: no hay drenaje pasivo, no hay penalización por no estar haciendo nada. El tiempo fuera de actividades declaradas **no cuesta nada**.
+
+6. **Un único ritual de cierre**: `CompletionModal`. Toda finalización de actividad — completar, cambiar a otra, cerrar el día, terminar timeboxing — pasa por él.
+
+7. **El target es orientación, no obligación**: se muestra como `"42% de tu referencia diaria"`, **nunca** como `"te faltan 580 tempos"`.
+
+8. **Interrupciones mínimas**: solo se registra `state: "interrupted"` y `durationMinutes`. Sin causas configurables, sin pregunta de evitable, sin snapshot causal. No suman tempos ni restan nada.
+
+9. **Variables subjetivas fuera del producto**: no hay modal, no hay gráficos, no hay feature flag visible. Si existen datos históricos, se preservan en localStorage pero no se muestran ni participan en la lógica.
 
 ### Por qué razón
 
@@ -81,19 +122,26 @@ La UI nunca recalcula la fórmula. Solo envía:
 }
 ```
 
-El core decide si hay bonus, calcula el total, y devuelve:
+El core aplica la tabla de multiplicadores, decide la base (estimado vs
+duración real), calcula el total, y devuelve:
 
 ```ts
 {
   record: CompletedActivityRecord,
   temposAwarded: number,
   dailyTempoTotal: number,
-  targetProgress: number,   // 0..1
+  targetProgress: number,   // ratio real sin cap (puede ser > 1)
   beatEstimate: boolean
 }
 ```
 
-Esto evita que la UI, una futura API, o un cliente externo implementen reglas distintas.
+Importante: `targetProgress` es **el ratio real sin capear**, puede
+ser > 1 si el usuario supera su target diario (ej: 1847 / 1000 = 1.847).
+La UI muestra este ratio sin cap en `displayPercent` y capeado a 100 en
+`progressBarValue`.
+
+Esto evita que la UI, una futura API, o un cliente externo implementen
+reglas distintas.
 
 #### El bonus solo donde hay un estimado puntual
 
@@ -105,13 +153,12 @@ Esto evita que la UI, una futura API, o un cliente externo implementen reglas di
 
 Por eso solo el primer tipo aplica bonus.
 
-#### El score 0 = 0 tempos totales
+#### El score 0-6 = 0 tempos totales
 
-Si el usuario evalúa con 0, está diciendo "esto no cuenta". Por coherencia, no hay bonus. La fórmula explícita:
-
-```ts
-if (satisfactionScore === 0) return 0;
-```
+Si el usuario evalúa con 0-6, está diciendo "este día no fue para esta
+actividad". Por coherencia, no hay tempos. Esto es decisión explícita:
+el umbral para recibir recompensa es 7. Los scores 7/8/9/10 son los
+únicos que premian, con multiplicadores 100%/110%/120%/130%.
 
 #### Una sola vía de cierre: `requestCompletion` → modal → `completeActivity`
 

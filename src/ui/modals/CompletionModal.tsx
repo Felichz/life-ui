@@ -64,15 +64,16 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
 }) => {
   const [score, setScore] = useState<number>(SCORE_DEFAULT);
 
-  // Si la actividad califica para bonus (clear-objective completada antes
-  // del estimado), subimos el default al máximo para reflejar el logro.
+  // Reset a 7 (default) cada vez que se abre el modal con un nuevo
+  // request. NO auto-10 por beat estimate: el bonus debe ser decisión
+  // explícita del usuario en el slider (score 8/9/10 = 110%/120%/130%).
+  // `canApplyBonus` se conserva como métrica informativa (mostrada en
+  // "✓ batiste el estimado") pero ya no sesga el score.
   useEffect(() => {
-    if (open && request?.canApplyBonus) {
-      setScore(10);
-    } else if (open) {
+    if (open) {
       setScore(SCORE_DEFAULT);
     }
-  }, [open, request?.canApplyBonus]);
+  }, [open, request?.activityTitle]);
 
   const preview = useMemo(() => {
     if (!request) return { base: 0, multiplier: 1, total: 0 };

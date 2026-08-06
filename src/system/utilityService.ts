@@ -164,14 +164,21 @@ export class UtilityService {
    * Calcula la recompensa de tempos por una actividad completada.
    *
    * Reglas:
-   * - durationMinutes <= 0 → 0 tempos (no se premia tiempo nulo)
-   * - score inválido (< 0 o > 10) → 0 tempos
-   * - score 0-6 → 0 tempos (no cuenta)
+   * - score inválido (< 0 o > 10, no entero) → 0 tempos
+   * - score 0-6 → 0 tempos (este día no fue; honestidad)
    * - score 7-10 → ceil(baseMinutos × multiplicador)
+   * - Base:
+   *     - Si hay estimado válido (> 0), se premia sobre el estimado.
+   *       Esto evita el bug de "0 tempos porque la actividad estuvo activa
+   *       menos de 1 minuto y Math.round devolvió 0".
+   *     - Si no hay estimado, se premia sobre la duración real.
+   *     - Si ambos son 0/negativos, retorna 0 (no se premia nada).
    *
-   * @param durationMinutes Duración real invertida
+   * @param durationMinutes Duración real invertida (puede ser 0 si se
+   *   acaba de iniciar y se confirma honestamente).
    * @param satisfactionScore Auto-evaluación 0-10
-   * @param estimatedMinutes Estimado original (si hay). Si no, se usa durationMinutes.
+   * @param estimatedMinutes Estimado original (si hay). Si no, se usa
+   *   durationMinutes como base.
    * @returns Total de tempos otorgados (>= 0)
    */
   public static calculateTemposAwarded(
@@ -179,7 +186,7 @@ export class UtilityService {
     satisfactionScore: number,
     estimatedMinutes: number | undefined
   ): number {
-    if (typeof durationMinutes !== "number" || durationMinutes <= 0) return 0;
+    if (typeof durationMinutes !== "number" || durationMinutes < 0) return 0;
     if (typeof satisfactionScore !== "number") return 0;
     if (satisfactionScore < 0 || satisfactionScore > 10) return 0;
     if (!Number.isInteger(satisfactionScore)) return 0;
@@ -190,12 +197,16 @@ export class UtilityService {
       return 0;
     }
 
-    // Si hay estimación válida, se premia sobre el estimado (no sobre
-    // la duración real). Si no, sobre la duración real.
+    // Base: estimado si es válido, sino duración real.
+    // Importante: NO exigimos durationMinutes > 0. Si el usuario confirma
+    // honestamente en los primeros 30s y durationMinutes redondea a 0,
+    // todavía premiamos el estimado (no el tiempo nulo).
     const base =
       typeof estimatedMinutes === "number" && estimatedMinutes > 0
         ? estimatedMinutes
         : durationMinutes;
+
+    if (base <= 0) return 0;
 
     return Math.ceil(base * multiplier);
   }

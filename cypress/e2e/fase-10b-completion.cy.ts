@@ -58,7 +58,7 @@ describe("Fase 10b / schema v3: CompletionModal + tempos", () => {
     // Verificar que abre el CompletionModal con slider
     cy.dataTestId("completion-modal").should("be.visible");
     cy.dataTestId("satisfaction-slider").should("be.visible");
-    cy.dataTestId("score-label").should("contain", "5/10"); // default inicial
+    cy.dataTestId("score-label").should("contain", "7/10"); // default inicial (umbral MVP v3)
     cy.dataTestId("preview-total").should("be.visible");
 
     // NO debe existir el modal subjetivo legacy
@@ -79,8 +79,8 @@ describe("Fase 10b / schema v3: CompletionModal + tempos", () => {
 
     cy.dataTestId("completion-modal").should("be.visible");
 
-    // Score inicial = 5
-    cy.dataTestId("score-label").should("contain", "5/10");
+    // Score inicial = 7 (umbral MVP v3)
+    cy.dataTestId("score-label").should("contain", "7/10");
     cy.dataTestId("preview-total").should("be.visible");
 
     // Cerrar modal con Escape (no estamos probando el slider aquí, solo
@@ -101,8 +101,8 @@ describe("Fase 10b / schema v3: CompletionModal + tempos", () => {
     cy.dataTestId("completion-modal").should("be.visible");
     cy.dataTestId("satisfaction-slider").should("be.visible");
 
-    // Score inicial = 5 (no necesitamos cambiarlo)
-    cy.dataTestId("score-label").should("contain", "5/10");
+    // Score inicial = 7 (no necesitamos cambiarlo, umbral MVP v3)
+    cy.dataTestId("score-label").should("contain", "7/10");
 
     // Confirmar
     cy.dataTestId("confirm-button").click();

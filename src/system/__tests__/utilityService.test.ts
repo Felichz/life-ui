@@ -227,8 +227,21 @@ describe("UtilityService", () => {
       }
     });
 
-    it("duration 0 → 0 tempos (no se premia tiempo nulo)", () => {
-      expect(UtilityService.calculateTemposAwarded(0, 10, 30)).toBe(0);
+    it("BUG FIX: duration 0 con estimado válido → usa estimado (no 0)", () => {
+      // Caso reportado por Codex: si la actividad estuvo activa menos de
+      // 1 minuto y Math.round devuelve 0, NO debemos devolver 0 tempos
+      // cuando hay un estimado. Usamos el estimado como base.
+      expect(UtilityService.calculateTemposAwarded(0, 10, 30)).toBe(39); // 130% × 30
+      expect(UtilityService.calculateTemposAwarded(0, 7, 45)).toBe(45); // 100% × 45
+    });
+
+    it("duration 0 sin estimado → 0 tempos (no hay base válida)", () => {
+      expect(UtilityService.calculateTemposAwarded(0, 10, undefined)).toBe(0);
+      expect(UtilityService.calculateTemposAwarded(0, 10, 0)).toBe(0);
+    });
+
+    it("duration negativa → 0 tempos (sanidad)", () => {
+      expect(UtilityService.calculateTemposAwarded(-10, 10, 30)).toBe(0);
     });
 
     it("duration negativa → 0 tempos", () => {
