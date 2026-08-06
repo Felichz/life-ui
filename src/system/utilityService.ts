@@ -140,34 +140,63 @@ export class UtilityService {
   }
 
   /**
+   * Tabla de multiplicadores según el score de satisfacción.
+   *
+   * Diseño MVP v3 (simplificado):
+   * - score 0-6 → 0 tempos (este día no fue; coherencia con la honestidad
+   *   del sistema)
+   * - score 7   → 100% × baseMinutos (default del slider: "Cumpliste")
+   * - score 8   → 110%
+   * - score 9   → 120%
+   * - score 10  → 130%
+   *
+   * Esto elimina el bug clásico de "0 tempos porque la actividad estuvo
+   * activa 0 minutos" y hace que la recompensa sea predecible.
+   */
+  private static readonly SCORE_MULTIPLIERS: Record<number, number> = {
+    7: 1.0,
+    8: 1.1,
+    9: 1.2,
+    10: 1.3,
+  };
+
+  /**
    * Calcula la recompensa de tempos por una actividad completada.
    *
    * Reglas:
-   * - score === 0 → 0 tempos (coherencia)
    * - durationMinutes <= 0 → 0 tempos (no se premia tiempo nulo)
    * - score inválido (< 0 o > 10) → 0 tempos
-   * - base = ceil(durationMinutes × score / 10) (siempre a favor del usuario)
-   * - bonus = +5 si shouldApplyBonus(...) y score > 0
+   * - score 0-6 → 0 tempos (no cuenta)
+   * - score 7-10 → ceil(baseMinutos × multiplicador)
    *
    * @param durationMinutes Duración real invertida
    * @param satisfactionScore Auto-evaluación 0-10
-   * @param canApplyBonus Si la actividad es elegible para bonus
+   * @param estimatedMinutes Estimado original (si hay). Si no, se usa durationMinutes.
    * @returns Total de tempos otorgados (>= 0)
    */
   public static calculateTemposAwarded(
     durationMinutes: number,
     satisfactionScore: number,
-    canApplyBonus: boolean
+    estimatedMinutes: number | undefined
   ): number {
     if (typeof durationMinutes !== "number" || durationMinutes <= 0) return 0;
     if (typeof satisfactionScore !== "number") return 0;
     if (satisfactionScore < 0 || satisfactionScore > 10) return 0;
     if (!Number.isInteger(satisfactionScore)) return 0;
-    if (satisfactionScore === 0) return 0;
 
-    const baseTempos = Math.ceil((durationMinutes * satisfactionScore) / 10);
-    const bonusTempos = canApplyBonus ? 5 : 0;
+    const multiplier = UtilityService.SCORE_MULTIPLIERS[satisfactionScore];
+    if (multiplier === undefined) {
+      // score 0-6 → 0 tempos
+      return 0;
+    }
 
-    return baseTempos + bonusTempos;
+    // Si hay estimación válida, se premia sobre el estimado (no sobre
+    // la duración real). Si no, sobre la duración real.
+    const base =
+      typeof estimatedMinutes === "number" && estimatedMinutes > 0
+        ? estimatedMinutes
+        : durationMinutes;
+
+    return Math.ceil(base * multiplier);
   }
 }

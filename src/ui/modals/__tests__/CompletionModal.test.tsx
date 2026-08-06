@@ -21,7 +21,7 @@ const mockRequestBeat: CompletionRequest = {
   canApplyBonus: true,
 };
 
-describe("CompletionModal", () => {
+describe("CompletionModal (fórmula MVP v3)", () => {
   const defaultProps = {
     open: true,
     request: mockRequest,
@@ -67,50 +67,69 @@ describe("CompletionModal", () => {
   });
 
   describe("slider y heurísticas", () => {
-    it("auto-10 cuando canApplyBonus=true", () => {
+    it("auto-10 cuando canApplyBonus=true (reward por eficiencia)", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
       expect(screen.getByTestId("score-label")).toHaveTextContent("10/10");
     });
 
-    it("default a score 5 cuando NO hay bonus", () => {
+    it("default a score 7 (umbral de recompensa) cuando NO hay bonus", () => {
       render(<CompletionModal {...defaultProps} />);
-      expect(screen.getByTestId("score-label")).toHaveTextContent("5/10");
+      expect(screen.getByTestId("score-label")).toHaveTextContent("7/10");
     });
 
-    it("muestra la heurística correcta para cada score", () => {
-      const { rerender } = render(<CompletionModal {...defaultProps} />);
-      // Score 5: "Cumplí lo mínimo sin extras. Está bien."
-      expect(screen.getByTestId("score-label")).toHaveTextContent(/Cumplí lo mínimo sin extras/);
-
-      // Cambiar a score 8
-      const slider = screen.getByTestId("satisfaction-slider").querySelector('input[type="range"]');
-      if (slider) {
-        fireEvent.change(slider, { target: { value: "8" } });
-      }
-      rerender(<CompletionModal {...defaultProps} />);
-      // Después del cambio, el preview debe actualizarse
-      expect(screen.getByTestId("preview-total")).toHaveTextContent(/24/); // 8*30/10
+    it("muestra la heurística correcta para el score default", () => {
+      render(<CompletionModal {...defaultProps} />);
+      // Score 7: "Lo hiciste. Eso es lo que cuenta."
+      expect(screen.getByTestId("score-label")).toHaveTextContent(/Lo hiciste/);
     });
   });
 
-  describe("preview de tempos", () => {
-    it("calcula preview sin bonus: 30 min × 5 = 15 tempos", () => {
+  describe("preview de tempos (fórmula MVP v3)", () => {
+    it("score 7 + estimado 30 min → 30 tempos (100%)", () => {
       render(<CompletionModal {...defaultProps} />);
-      expect(screen.getByTestId("preview-total")).toHaveTextContent("15");
+      // score default es 7 → 100% × 30 estimado = 30
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
     });
 
-    it("calcula preview con bonus: 20 min × 10 + 5 = 25 tempos", () => {
+    it("score 10 + estimado 30 min → 39 tempos (130%)", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
-      expect(screen.getByTestId("preview-total")).toHaveTextContent("25");
+      // canApplyBonus=true → auto-10 → 130% × 30 = 39
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("39");
     });
 
-    it("score 0 → preview 0", () => {
+    it("score < 7 → preview 0", () => {
       render(<CompletionModal {...defaultProps} />);
-      const slider = screen.getByTestId("satisfaction-slider").querySelector('input[type="range"]');
+      const slider = screen
+        .getByTestId("satisfaction-slider")
+        .querySelector('input[type="range"]');
       if (slider) {
-        fireEvent.change(slider, { target: { value: "0" } });
+        fireEvent.change(slider, { target: { value: "5" } });
       }
+      // Score 5 → 0 tempos (no recompensa)
       expect(screen.getByTestId("preview-total")).toHaveTextContent("0");
+    });
+
+    it("usa el estimado (no la duración real) cuando está presente", () => {
+      // duración real baja (acaba de iniciar) pero estimado es 30
+      const requestLowDuration: CompletionRequest = {
+        ...mockRequest,
+        durationMinutes: 2,
+        estimatedMinutes: 30,
+      };
+      render(<CompletionModal {...defaultProps} request={requestLowDuration} />);
+      // Score default 7 → 100% × 30 estimado = 30
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
+    });
+
+    it("sin estimado: usa la duración real", () => {
+      const requestNoEstimate: CompletionRequest = {
+        ...mockRequest,
+        durationMinutes: 25,
+        estimatedMinutes: undefined,
+      };
+      render(<CompletionModal {...defaultProps} request={requestNoEstimate} />);
+      // Score 7 → 100% × 25 duración = 25
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("25");
     });
   });
 
@@ -118,7 +137,7 @@ describe("CompletionModal", () => {
     it("llama onConfirm con el score al pulsar 'Guardar'", () => {
       render(<CompletionModal {...defaultProps} />);
       fireEvent.click(screen.getByTestId("confirm-button"));
-      expect(defaultProps.onConfirm).toHaveBeenCalledWith({ satisfactionScore: 5 });
+      expect(defaultProps.onConfirm).toHaveBeenCalledWith({ satisfactionScore: 7 });
     });
 
     it("llama onInterrupt al pulsar 'No la terminé'", () => {
@@ -149,19 +168,31 @@ describe("CompletionModal", () => {
   });
 
   describe("label del botón cambia según el preview", () => {
-    it("muestra 'Guardar y recibir N tempos' cuando hay reward", () => {
+    it("muestra 'Guardar y recibir 30 tempos' cuando hay reward (score 7)", () => {
       render(<CompletionModal {...defaultProps} />);
-      // Score 5, 30 min: preview = 15
-      expect(screen.getByTestId("confirm-button")).toHaveTextContent("Guardar y recibir 15 tempos");
+      // Score 7, estimado 30 → 30 tempos
+      expect(screen.getByTestId("confirm-button")).toHaveTextContent(
+        "Guardar y recibir 30 tempos"
+      );
     });
 
-    it("muestra solo 'Guardar' cuando preview=0", () => {
+    it("muestra 'Guardar y recibir 39 tempos' cuando hay bonus (score 10)", () => {
+      render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
+      // Score 10 (auto), estimado 30 → 39 tempos
+      expect(screen.getByTestId("confirm-button")).toHaveTextContent(
+        "Guardar y recibir 39 tempos"
+      );
+    });
+
+    it("muestra solo 'Guardar' cuando preview=0 (score bajo)", () => {
       render(<CompletionModal {...defaultProps} />);
-      const slider = screen.getByTestId("satisfaction-slider").querySelector('input[type="range"]');
+      const slider = screen
+        .getByTestId("satisfaction-slider")
+        .querySelector('input[type="range"]');
       if (slider) {
         fireEvent.change(slider, { target: { value: "0" } });
       }
-      // Después de setear a 0, el label debe ser "Guardar"
+      // Después de setear a 0, el label debe ser "Guardar" sin número
       const button = screen.getByTestId("confirm-button");
       expect(button.textContent).toMatch(/^Guardar$/);
     });

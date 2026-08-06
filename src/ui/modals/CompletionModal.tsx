@@ -24,12 +24,19 @@ const SCORE_LABELS: Record<number, string> = {
   3: "Me costó mucho. Pero registré y eso cuenta.",
   4: "Avancé a medias. Reconocerlo es un paso.",
   5: "Cumplí lo mínimo sin extras. Está bien.",
-  6: "Cumpliste. Base sólida para mañana.",
-  7: "Buen trabajo. Hubo avance real y mantenido.",
-  8: "Muy bien. Foco sostenido con pocas fricciones.",
-  9: "Excelente. Fluiste casi todo el tiempo.",
-  10: "Hyperfocus + eficiente. Tu estándar.",
+  6: "Cumpliste algo. Reconocerlo es un paso.",
+  7: "Lo hiciste. Eso es lo que cuenta.",
+  8: "Bien hecho. Bonus del 10% por encima.",
+  9: "Muy bien. Bonus del 20% por encima.",
+  10: "Excelente. Bonus del 30% por encima.",
 };
+
+/**
+ * Score mínimo que otorga tempos (default del slider al abrir).
+ * Score 7 = 100% × minutos estimados.
+ */
+const SCORE_REWARD_THRESHOLD = 7;
+const SCORE_DEFAULT = 7;
 
 interface CompletionModalProps {
   open: boolean;
@@ -55,22 +62,35 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
   onClose,
   onRetry,
 }) => {
-  const [score, setScore] = useState<number>(5);
+  const [score, setScore] = useState<number>(SCORE_DEFAULT);
 
-  // Auto-10 si aplica bonus y se cerró temprano
+  // Si la actividad califica para bonus (clear-objective completada antes
+  // del estimado), subimos el default al máximo para reflejar el logro.
   useEffect(() => {
     if (open && request?.canApplyBonus) {
       setScore(10);
     } else if (open) {
-      setScore(5);
+      setScore(SCORE_DEFAULT);
     }
   }, [open, request?.canApplyBonus]);
 
   const preview = useMemo(() => {
-    if (!request) return { base: 0, bonus: 0, total: 0 };
-    const base = Math.ceil((request.durationMinutes * score) / 10);
-    const bonus = request.canApplyBonus && score > 0 ? 5 : 0;
-    return { base, bonus, total: score === 0 ? 0 : base + bonus };
+    if (!request) return { base: 0, multiplier: 1, total: 0 };
+    // El score 7 es el umbral: 100% × base. Los scores 8/9/10 son
+    // bonus 110%/120%/130%. Score 0-6 = 0 tempos.
+    const multipliers: Record<number, number> = {
+      7: 1.0,
+      8: 1.1,
+      9: 1.2,
+      10: 1.3,
+    };
+    const multiplier = multipliers[score] ?? 0;
+    const base =
+      request.estimatedMinutes !== undefined
+        ? request.estimatedMinutes
+        : request.durationMinutes;
+    const total = Math.ceil(base * multiplier);
+    return { base, multiplier, total };
   }, [request, score]);
 
   if (!request) return null;
@@ -180,18 +200,15 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
             {preview.total > 0 && (
               <Stack spacing={0.5} sx={{ mt: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  {score} × {request.durationMinutes} min = {preview.base} base
+                  {preview.base} min × {Math.round(preview.multiplier * 100)}% = {preview.total} tempos
                 </Typography>
-                {preview.bonus > 0 && (
-                  <Typography variant="caption" color="success.main">
-                    + {preview.bonus} bonus por eficiencia
-                  </Typography>
-                )}
               </Stack>
             )}
-            {score === 0 && (
+            {score < SCORE_REWARD_THRESHOLD && (
               <Typography variant="caption" color="text.secondary">
-                Un 0/10 no otorga tempos. Está bien, no todos los días rinden igual.
+                {score < SCORE_REWARD_THRESHOLD
+                  ? `Un score ${score}/10 no otorga tempos. Mueve el slider a ${SCORE_REWARD_THRESHOLD}+ para registrar tu esfuerzo.`
+                  : null}
               </Typography>
             )}
           </Paper>

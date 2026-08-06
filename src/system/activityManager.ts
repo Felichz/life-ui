@@ -674,7 +674,7 @@ export class ActivityManager {
       temposAwarded = UtilityService.calculateTemposAwarded(
         durationMinutes,
         satisfactionScore,
-        beatEstimate
+        estimatedMinutes
       );
 
       const completedRecord: CompletedActivityRecord = {

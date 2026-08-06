@@ -8,8 +8,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src_new"),
-      "@shadcn": path.resolve(__dirname, "./src_new/ui/components/shadcn"),
+      "@": path.resolve(__dirname, "./src"),
+      "@shadcn": path.resolve(__dirname, "./src/ui/components/shadcn"),
     },
   },
 });
