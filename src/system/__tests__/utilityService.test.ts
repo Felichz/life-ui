@@ -271,4 +271,57 @@ describe("UtilityService", () => {
       expect(UtilityService.calculateTemposAwarded(120, 10, 120)).toBe(156);
     });
   });
+
+  // Helper compartido entre core y UI (CompletionModal) para el preview
+  // en vivo. Garantía: calculatePreviewTempos(N, base) === resultado del
+  // cálculo final con esa base. Si la fórmula cambia, preview se actualiza
+  // automáticamente.
+  describe("calculatePreviewTempos (helper compartido preview ↔ core)", () => {
+    it("score 7 + base 30 → 30 tempos", () => {
+      expect(UtilityService.calculatePreviewTempos(7, 30)).toBe(30);
+    });
+
+    it("score 8 + base 30 → 33 tempos (110%)", () => {
+      expect(UtilityService.calculatePreviewTempos(8, 30)).toBe(33);
+    });
+
+    it("score 9 + base 30 → 36 tempos (120%)", () => {
+      expect(UtilityService.calculatePreviewTempos(9, 30)).toBe(36);
+    });
+
+    it("score 10 + base 30 → 39 tempos (130%)", () => {
+      expect(UtilityService.calculatePreviewTempos(10, 30)).toBe(39);
+    });
+
+    it("score 0-6 → 0 tempos", () => {
+      for (let s = 0; s <= 6; s++) {
+        expect(UtilityService.calculatePreviewTempos(s, 30)).toBe(0);
+      }
+    });
+
+    it("base 0 o negativa → 0 tempos", () => {
+      expect(UtilityService.calculatePreviewTempos(10, 0)).toBe(0);
+      expect(UtilityService.calculatePreviewTempos(10, -5)).toBe(0);
+    });
+
+    it("score inválido (>10, <0, no entero) → 0 tempos", () => {
+      expect(UtilityService.calculatePreviewTempos(11, 30)).toBe(0);
+      expect(UtilityService.calculatePreviewTempos(-1, 30)).toBe(0);
+      expect(UtilityService.calculatePreviewTempos(7.5, 30)).toBe(0);
+    });
+
+    it("INVARIANTE: preview === calculateTemposAwarded(score, base, base)", () => {
+      // El preview SIEMPRE coincide con el cálculo final cuando se usa
+      // la misma base (estimado cuando hay, duración cuando no).
+      for (const score of [7, 8, 9, 10]) {
+        for (const base of [10, 25, 30, 60, 120]) {
+          const preview = UtilityService.calculatePreviewTempos(score, base);
+          // estimatedMinutes === base simula el caso donde la duración
+          // real coincide con el estimado.
+          const finalT = UtilityService.calculateTemposAwarded(base, score, base);
+          expect(preview).toBe(finalT);
+        }
+      }
+    });
+  });
 });

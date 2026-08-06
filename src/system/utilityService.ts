@@ -149,9 +149,9 @@ export class UtilityService {
   }
 
   /**
-   * Tabla de multiplicadores según el score de satisfacción.
+   * Tabla de multiplicadores según el score de satisfacción (MVP v3).
    *
-   * Diseño MVP v3 (simplificado):
+   * Diseño:
    * - score 0-6 → 0 tempos (este día no fue; coherencia con la honestidad
    *   del sistema)
    * - score 7   → 100% × baseMinutos (default del slider: "Cumpliste")
@@ -161,13 +161,51 @@ export class UtilityService {
    *
    * Esto elimina el bug clásico de "0 tempos porque la actividad estuvo
    * activa 0 minutos" y hace que la recompensa sea predecible.
+   *
+   * **Esta tabla es la fuente única de verdad**: tanto el cálculo final
+   * (`calculateTemposAwarded`) como el preview en vivo
+   * (`calculatePreviewTempos`) la consumen. Si cambia, ambos se
+   * actualizan automáticamente.
    */
-  private static readonly SCORE_MULTIPLIERS: Record<number, number> = {
+  public static readonly SCORE_MULTIPLIERS: Record<number, number> = {
     7: 1.0,
     8: 1.1,
     9: 1.2,
     10: 1.3,
   };
+
+  /**
+   * Calcula el preview de tempos para un score y baseMinutos dados.
+   * Usado por la UI (CompletionModal) para mostrar en vivo cuántos
+   * tempos recibirá el usuario según el score seleccionado.
+   *
+   * Equivalente a `calculateTemposAwarded` pero sin requerir todos los
+   * parámetros de duración/estimado — solo la base (que el caller
+   * ya calculó como estimado o duración real) y el score actual del
+   * slider.
+   *
+   * Garantía: **el preview SIEMPRE coincide con el cálculo final del
+   * core**. Si la fórmula cambia aquí, el preview se actualiza en la
+   * misma operación.
+   *
+   * @param score Score 0-10 actual del slider
+   * @param baseMinutes Base sobre la que se calcula (estimado si hay, sino
+   *   duración real). Math.ceil aplicado al final.
+   * @returns Total de tempos que se otorgarían al confirmar
+   */
+  public static calculatePreviewTempos(score: number, baseMinutes: number): number {
+    if (typeof score !== "number" || !Number.isInteger(score)) return 0;
+    if (score < 0 || score > 10) return 0;
+    if (typeof baseMinutes !== "number" || baseMinutes <= 0) return 0;
+
+    const multiplier = UtilityService.SCORE_MULTIPLIERS[score];
+    if (multiplier === undefined) {
+      // score 0-6 → 0 tempos
+      return 0;
+    }
+
+    return Math.ceil(baseMinutes * multiplier);
+  }
 
   /**
    * Calcula la recompensa de tempos por una actividad completada.
@@ -195,28 +233,22 @@ export class UtilityService {
     satisfactionScore: number,
     estimatedMinutes: number | undefined
   ): number {
+    // Validaciones de entrada: durationMinutes puede ser 0 si el usuario
+    // confirma honestamente en los primeros 30s y Math.round redondea a 0.
+    // El bug original era retornar 0 en ese caso; ahora usamos el
+    // estimado si está disponible (ver abajo).
     if (typeof durationMinutes !== "number" || durationMinutes < 0) return 0;
     if (typeof satisfactionScore !== "number") return 0;
     if (satisfactionScore < 0 || satisfactionScore > 10) return 0;
     if (!Number.isInteger(satisfactionScore)) return 0;
 
-    const multiplier = UtilityService.SCORE_MULTIPLIERS[satisfactionScore];
-    if (multiplier === undefined) {
-      // score 0-6 → 0 tempos
-      return 0;
-    }
-
     // Base: estimado si es válido, sino duración real.
-    // Importante: NO exigimos durationMinutes > 0. Si el usuario confirma
-    // honestamente en los primeros 30s y durationMinutes redondea a 0,
-    // todavía premiamos el estimado (no el tiempo nulo).
     const base =
       typeof estimatedMinutes === "number" && estimatedMinutes > 0
         ? estimatedMinutes
         : durationMinutes;
 
-    if (base <= 0) return 0;
-
-    return Math.ceil(base * multiplier);
+    // Delegamos al helper compartido (misma fuente que el preview).
+    return UtilityService.calculatePreviewTempos(satisfactionScore, base);
   }
 }

@@ -16,6 +16,7 @@ import {
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import type { CompletionRequest } from "../../types";
+import { UtilityService } from "../../system/utilityService";
 
 const SCORE_LABELS: Record<number, string> = {
   0: "No completé. Está bien, lo importante es que lo declaré.",
@@ -77,20 +78,18 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
 
   const preview = useMemo(() => {
     if (!request) return { base: 0, multiplier: 1, total: 0 };
-    // El score 7 es el umbral: 100% × base. Los scores 8/9/10 son
-    // bonus 110%/120%/130%. Score 0-6 = 0 tempos.
-    const multipliers: Record<number, number> = {
-      7: 1.0,
-      8: 1.1,
-      9: 1.2,
-      10: 1.3,
-    };
-    const multiplier = multipliers[score] ?? 0;
+    // Base: estimado si está disponible, sino duración real.
+    // Importante: si durationMinutes es 0 (confirmado en los primeros
+    // 30s), seguimos usando el estimado para evitar el bug de "0 tempos".
     const base =
       request.estimatedMinutes !== undefined
         ? request.estimatedMinutes
         : request.durationMinutes;
-    const total = Math.ceil(base * multiplier);
+    // Fuente única de verdad: utilityService.calculatePreviewTempos
+    // comparte la misma tabla SCORE_MULTIPLIERS que calculateTemposAwarded.
+    // El preview SIEMPRE coincide con el cálculo final del core.
+    const multiplier = UtilityService.SCORE_MULTIPLIERS[score] ?? 0;
+    const total = UtilityService.calculatePreviewTempos(score, base);
     return { base, multiplier, total };
   }, [request, score]);
 
