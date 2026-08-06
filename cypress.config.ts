@@ -2,7 +2,7 @@ import { defineConfig } from "cypress";
 
 export default defineConfig({
   e2e: {
-    baseUrl: "http://localhost:5173", // URL predeterminada del servidor de desarrollo de Vite
+    baseUrl: "http://localhost:5174", // life-ui vite server (5173 ocupado por otro proyecto)
     specPattern: "cypress/e2e/**/*.{js,jsx,ts,tsx}",
     supportFile: "cypress/support/e2e.ts",
     videosFolder: "cypress/videos",

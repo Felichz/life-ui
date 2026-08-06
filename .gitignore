@@ -5,9 +5,13 @@ personal_design.txt
 
 # Local artifacts
 dev.log
+dev2.log
 cypress-typecheck.log
 modal-flow-run.log
-cypress/screenshots/
-cypress/videos/
+harness.log
+harness-mf.log
+tl-run*.log
+mf-run.log
+debug-*.log
 $null
 tsconfig.app.tsbuildinfo
