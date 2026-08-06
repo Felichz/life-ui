@@ -73,6 +73,65 @@ declare namespace Cypress {
     closeActivityLibraryModal(): Chainable<void>;
     getInstanceIdFromKanbanCard(activityTitle: string): Chainable<string>;
     confirmActivityInstance(): Chainable<void>;
+
+    // Comandos para layout/mediciones
+    getBox(
+      selector: string
+    ): Chainable<{
+      left: number;
+      top: number;
+      width: number;
+      height: number;
+      right: number;
+      bottom: number;
+    }>;
+    assertPositionRelative(
+      aSelector: string,
+      bSelector: string,
+      relation: "leftOf" | "rightOf" | "above" | "below"
+    ): Chainable<void>;
+    assertAlignedHorizontally(
+      aSelector: string,
+      bSelector: string,
+      minOverlapRatio?: number
+    ): Chainable<void>;
+    assertAlignedVertically(
+      aSelector: string,
+      bSelector: string,
+      minOverlapRatio?: number
+    ): Chainable<void>;
+    assertWidthFraction(
+      selector: string,
+      minFrac: number,
+      maxFrac: number
+    ): Chainable<void>;
+    assertHeightBetween(
+      selector: string,
+      minPx: number,
+      maxPx: number
+    ): Chainable<void>;
+    assertLinearProgressBarMatches(
+      barSelector: string,
+      expectedPct: number,
+      tolerance?: number
+    ): Chainable<void>;
+    assertLeftPercent(
+      selector: string,
+      parentSelector: string,
+      expectedPct: number,
+      tolerance?: number
+    ): Chainable<void>;
+    assertWidthRatioOf(
+      selector: string,
+      parentSelector: string,
+      expectedPct: number,
+      tolerance?: number
+    ): Chainable<void>;
+    assertCountPrefix(
+      containerSelector: string,
+      prefix: string,
+      count: number
+    ): Chainable<void>;
   }
 }
 
@@ -85,7 +144,7 @@ import "cypress-real-events";
 
 // Comando global para data-testid
 Cypress.Commands.add("dataTestId", (testId: string) => {
-  return cy.get(`[data-testid=${testId}]`);
+  return cy.get(`[data-testid="${testId}"]`);
 });
 
 // Prevenir fallos por errores no controlados

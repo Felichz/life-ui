@@ -112,7 +112,7 @@ Cypress.Commands.add(
 // --- Comandos para Flujo 3: Time Blocks ---
 
 Cypress.Commands.add("openTimeBlockManager", () => {
-  cy.get('[aria-label="gestionar bloques de tiempo"]').click();
+  cy.get('[aria-label="gestionar bloques de tiempo"]').first().click();
   cy.dataTestId("time-block-modal").should("be.visible");
   cy.dataTestId("new-time-block-button").should("be.visible");
 });
@@ -122,6 +122,8 @@ Cypress.Commands.add("createTimeBlock", (name: string, startTime: string, endTim
   cy.dataTestId("block-name-input").type(name);
   cy.dataTestId("start-time-input").type(startTime);
   cy.dataTestId("end-time-input").type(endTime);
+  // Esperar a que el botón save deje de estar disabled (validateForm es asíncrono)
+  cy.dataTestId("save-block-button").should("not.be.disabled");
   cy.dataTestId("save-block-button").click();
   cy.dataTestId("time-blocks-list").contains(name).should("be.visible");
 });
@@ -378,8 +380,8 @@ Cypress.Commands.add("instantiateAndVerifyInTodo", (title: string) => {
 
 Cypress.Commands.add("closeActivityLibraryModal", () => {
   const modalSelector = '[role="dialog"]:contains("Biblioteca de Actividades")';
-  cy.get(modalSelector).should("be.visible");
-  cy.get(modalSelector).contains("button", "Cerrar").click();
+  cy.get(modalSelector).last().should("be.visible");
+  cy.get(modalSelector).last().contains("button", "Cerrar").click();
   cy.get(modalSelector).should("not.exist");
 });
 
@@ -416,7 +418,7 @@ Cypress.Commands.add("confirmActivityInstance", () => {
 // --- Comandos para Flujo 5: Eventos ---
 
 Cypress.Commands.add("openEventLibrary", () => {
-  cy.get('[aria-label="gestionar biblioteca de eventos"]').click();
+  cy.get('[aria-label="gestionar biblioteca de eventos"]').first().click();
   cy.get('[role="dialog"]:contains("Biblioteca de Eventos")', { timeout: 10000 }).should(
     "be.visible"
   );
@@ -468,6 +470,198 @@ Cypress.Commands.add("verifyEventInTimeline", (eventName: string) => {
   cy.get(`[data-testid^="timeline-event-"][aria-label^="Evento ${eventName} a las"]`).should(
     "be.visible"
   );
+});
+
+// --- Comandos para layout/mediciones relativas ---
+
+/**
+ * Lee un bounding box (left, top, width, height) desde el DOM como Promise<DOMRect>.
+ * Cypress no expone .rect() encadenable, así que medimos con .then().
+ */
+Cypress.Commands.add("getBox", (selector: string) => {
+  return cy.dataTestId(selector).then(($el) => {
+    const r = $el[0].getBoundingClientRect();
+    return cy.wrap({
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
+      right: r.right,
+      bottom: r.bottom,
+    });
+  });
+});
+
+
+
+/**
+ * Assert: el selector A está a la izquierda/encima del B dentro del viewport.
+ * Usa el ancho del viewport (viewportWidth) para tolerar layouts responsive.
+ */
+Cypress.Commands.add(
+  "assertPositionRelative",
+  (aSelector: string, bSelector: string, relation: "leftOf" | "rightOf" | "above" | "below") => {
+    cy.dataTestId(aSelector).then(($a) => {
+      cy.dataTestId(bSelector).then(($b) => {
+        const ra = $a[0].getBoundingClientRect();
+        const rb = $b[0].getBoundingClientRect();
+        switch (relation) {
+          case "leftOf":
+            expect(ra.right).to.be.lessThan(rb.left + 1);
+            break;
+          case "rightOf":
+            expect(ra.left).to.be.greaterThan(rb.right - 1);
+            break;
+          case "above":
+            expect(ra.bottom).to.be.lessThan(rb.top + 1);
+            break;
+          case "below":
+            expect(ra.top).to.be.greaterThan(rb.bottom - 1);
+            break;
+        }
+      });
+    });
+  }
+);
+
+/**
+ * Assert: dos selectores comparten la misma fila horizontal (sus top/bottom
+ * se solapan por encima de un mínimo de píxeles).
+ */
+Cypress.Commands.add("assertAlignedHorizontally", (aSelector: string, bSelector: string, minOverlapRatio = 0.5) => {
+  cy.dataTestId(aSelector).then(($a) => {
+    cy.dataTestId(bSelector).then(($b) => {
+      const ra = $a[0].getBoundingClientRect();
+      const rb = $b[0].getBoundingClientRect();
+      const overlap = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+      const minHeight = Math.min(ra.height, rb.height);
+      expect(overlap).to.be.greaterThan(minHeight * minOverlapRatio);
+    });
+  });
+});
+
+/**
+ * Assert: dos selectores comparten la misma columna vertical (sus left/right
+ * se solapan por encima de un mínimo de píxeles).
+ */
+Cypress.Commands.add("assertAlignedVertically", (aSelector: string, bSelector: string, minOverlapRatio = 0.5) => {
+  cy.dataTestId(aSelector).then(($a) => {
+    cy.dataTestId(bSelector).then(($b) => {
+      const ra = $a[0].getBoundingClientRect();
+      const rb = $b[0].getBoundingClientRect();
+      const overlap = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+      const minWidth = Math.min(ra.width, rb.width);
+      expect(overlap).to.be.greaterThan(minWidth * minOverlapRatio);
+    });
+  });
+});
+
+/**
+ * Assert: el ancho del selector está dentro de [minFrac*viewport, maxFrac*viewport].
+ * Útil para verificar que un banner ocupa un % esperado del viewport.
+ */
+Cypress.Commands.add(
+  "assertWidthFraction",
+  (selector: string, minFrac: number, maxFrac: number) => {
+    cy.dataTestId(selector).then(($el) => {
+      const r = $el[0].getBoundingClientRect();
+      const vw = Cypress.config("viewportWidth") as number;
+      const frac = r.width / vw;
+      expect(frac, `widthFraction de ${selector}`).to.be.at.least(minFrac);
+      expect(frac, `widthFraction de ${selector}`).to.be.at.most(maxFrac);
+    });
+  }
+);
+
+/**
+ * Assert: la altura del selector está dentro de un rango absoluto (px).
+ */
+Cypress.Commands.add("assertHeightBetween", (selector: string, minPx: number, maxPx: number) => {
+  cy.dataTestId(selector).then(($el) => {
+    const r = $el[0].getBoundingClientRect();
+    expect(r.height, `altura de ${selector}`).to.be.at.least(minPx);
+    expect(r.height, `altura de ${selector}`).to.be.at.most(maxPx);
+  });
+});
+
+/**
+ * Assert: el progreso lineal (% del tempos target) tiene un ratio
+ * progressBarWidth/totalWidth coherente con el porcentaje indicado.
+ *
+ * MUI LinearProgress: el contenedor tiene aria-valuenow y la barra interior
+ * aplica `transform: translateX(-X%)` para esconder la parte NO rellenada.
+ * Por lo tanto el porcentaje "rellenado" = 100 - |translateXPx|/containerWidth * 100.
+ */
+Cypress.Commands.add("assertLinearProgressBarMatches", (barSelector: string, expectedPct: number, tolerance = 5) => {
+  cy.dataTestId(barSelector).then(($el) => {
+    const r = $el[0].getBoundingClientRect();
+    const fill = $el[0].querySelector(".MuiLinearProgress-bar") as HTMLElement | null;
+    expect(fill, `fill de la barra ${barSelector}`).to.not.equal(null);
+    const transform = getComputedStyle(fill!).transform;
+    // Si no hay transform (status "indeterminate" o 0%), trátalo como 0%.
+    let emptyPct: number;
+    if (!transform || transform === "none") {
+      // Transformado = 100% → valor = 0%. Pero para valor=100%, MUI no
+      // aplica transform; en ese caso, fill debería estar a 100%.
+      // Distinguimos vía aria-valuenow.
+      const v = $el[0].getAttribute("aria-valuenow");
+      emptyPct = v === null || v === "100" ? 0 : 100;
+    } else {
+      const matrix = new DOMMatrix(transform);
+      emptyPct = (-matrix.e / r.width) * 100;
+    }
+    const clampedExpected = Math.max(0, Math.min(100, expectedPct));
+    const filledPct = 100 - emptyPct;
+    expect(Math.abs(filledPct - clampedExpected)).to.be.lessThan(tolerance);
+  });
+});
+
+/**
+ * Assert: la posición left% de un selector coincide con el porcentaje
+ * esperado con tolerancia (en puntos porcentuales).
+ */
+Cypress.Commands.add(
+  "assertLeftPercent",
+  (selector: string, parentSelector: string, expectedPct: number, tolerance = 1.5) => {
+    cy.dataTestId(parentSelector).then(($parent) => {
+      cy.dataTestId(selector).then(($child) => {
+        const rp = $parent[0].getBoundingClientRect();
+        const rc = $child[0].getBoundingClientRect();
+        const leftPct = ((rc.left - rp.left) / rp.width) * 100;
+        // La usamos robusta porque la barra TimelineBar está centrada
+        // y translateX(-50%) se aplica al marker, pero no a la barra.
+        expect(Math.abs(leftPct - expectedPct)).to.be.lessThan(tolerance);
+      });
+    });
+  }
+);
+
+/**
+ * Assert: el ancho visual de un selector es la fracción exacta del
+ * padre (con tolerancia) respecto al % esperado.
+ */
+Cypress.Commands.add(
+  "assertWidthRatioOf",
+  (selector: string, parentSelector: string, expectedPct: number, tolerance = 1.5) => {
+    cy.dataTestId(parentSelector).then(($parent) => {
+      cy.dataTestId(selector).then(($child) => {
+        const rp = $parent[0].getBoundingClientRect();
+        const rc = $child[0].getBoundingClientRect();
+        const widthPct = (rc.width / rp.width) * 100;
+        expect(Math.abs(widthPct - expectedPct)).to.be.lessThan(tolerance);
+      });
+    });
+  }
+);
+
+/**
+ * Assert: el número de hijos con data-testid que cumplen /^prefix-/ dentro
+ * de un contenedor es exactamente count.
+ */
+Cypress.Commands.add("assertCountPrefix", (containerSelector: string, prefix: string, count: number) => {
+  cy.dataTestId(containerSelector).within(() => {
+    cy.get(`[data-testid^="${prefix}"]`).should("have.length", count);
+  });
 });
 
 export {};

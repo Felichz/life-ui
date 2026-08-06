@@ -2,3 +2,12 @@ node_modules
 dist
 backup.json
 personal_design.txt
+
+# Local artifacts
+dev.log
+cypress-typecheck.log
+modal-flow-run.log
+cypress/screenshots/
+cypress/videos/
+$null
+tsconfig.app.tsbuildinfo
