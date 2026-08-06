@@ -89,7 +89,7 @@ describe("SystemCore", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 1000,
+            dailyTempoTarget: 100,
             updatedAt: mockTimestamp,
           },
           completedActivityRecords: [],
@@ -116,7 +116,7 @@ describe("SystemCore", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 1000,
+            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T10:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -408,7 +408,7 @@ describe("SystemCore", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 1000,
+            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T08:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -514,7 +514,7 @@ describe("SystemCore", () => {
       const global = state.global as unknown as Record<string, unknown>;
 
       // dailyTempoTarget creado por v1→v2
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
       // Legacy archivado por v2→v3
       expect(global.legacyArchive).toBeDefined();
     });

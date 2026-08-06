@@ -99,7 +99,7 @@ describe("ActivityManager", () => {
         eventTemplates: [],
         timeBlocks: [],
         userPreferences: {
-          dailyTempoTarget: 1000,
+          dailyTempoTarget: 100,
           updatedAt: "2023-01-01T00:00:00.000Z",
         },
         completedActivityRecords: [],
@@ -688,8 +688,8 @@ describe("ActivityManager", () => {
         }).toThrow("Solo se puede completar la actividad activa actual");
       });
 
-      it("debe calcular tempos correctamente: clear-objective score 10 = 130%", () => {
-        // 30 min estimado, 30 min real → score 10 = 130% × 30 = 39
+      it("debe calcular tempos correctamente: clear-objective score 10 (MVP v3.1)", () => {
+        // 30 min estimado, 30 min real → ceil(30 × 10 / 7) = 43
         const instanceId = "instance-no-bonus";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -707,15 +707,15 @@ describe("ActivityManager", () => {
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
 
         expect(result.beatEstimate).toBe(false);
-        // Fórmula MVP v3: score 10 × 130% × 30 estimado = 39
-        expect(result.temposAwarded).toBe(39);
+        // Fórmula MVP v3.1: ceil(30 × 10 / 7) = ceil(42.86) = 43
+        expect(result.temposAwarded).toBe(43);
         expect(result.record.beatEstimate).toBe(false);
-        expect(result.record.temposAwarded).toBe(39);
+        expect(result.record.temposAwarded).toBe(43);
       });
 
-      it("debe usar el estimado (no la duración) cuando hay beat", () => {
-        // 30 min estimado, 20 min real (66%) → beat, score 10 = 130% × 30 = 39
-        // El beat ya no otorga +5 bonus, pero el score sí recompensa más
+      it("debe usar el estimado (no la duración) cuando hay beat (MVP v3.1)", () => {
+        // 30 min estimado, 20 min real (66%) → beat
+        // ceil(30 × 10 / 7) = 43 (usa estimado, no duración real)
         const instanceId = "instance-bonus";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -733,12 +733,12 @@ describe("ActivityManager", () => {
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
 
         expect(result.beatEstimate).toBe(true);
-        // Fórmula MVP v3: score 10 × 130% × 30 estimado (no 20 real) = 39
-        expect(result.temposAwarded).toBe(39);
+        // Fórmula MVP v3.1: ceil(30 × 10 / 7) = 43
+        expect(result.temposAwarded).toBe(43);
         expect(result.record.beatEstimate).toBe(true);
       });
 
-      it("debe NO dar bonus para timeboxing aunque batiera el estimado", () => {
+      it("debe NO dar bonus para timeboxing aunque batiera el estimado (MVP v3.1)", () => {
         // Cambiar plantilla a timeboxing
         mockAppState.global.activityTemplates[0].type = "timeboxing";
         mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
@@ -764,11 +764,11 @@ describe("ActivityManager", () => {
 
         // timeboxing NUNCA tiene beatEstimate (no hay estimado en el mismo sentido)
         expect(result.beatEstimate).toBe(false);
-        // Fórmula MVP v3: score 10 × 130% × 15 duración (no hay estimado) = 20
-        expect(result.temposAwarded).toBe(20);
+        // Fórmula MVP v3.1: ceil(15 × 10 / 7) = ceil(21.43) = 22
+        expect(result.temposAwarded).toBe(22);
       });
 
-      it("score 0 → 0 tempos totales, aunque haya beat", () => {
+      it("score 0 → 0 tempos totales, aunque haya beat (MVP v3.1)", () => {
         // 30 min estimado, 20 min real (66%) → beat disponible, pero score 0
         const instanceId = "instance-zero";
         mockAppState.currentDay!.activityInstances.push({
@@ -786,7 +786,7 @@ describe("ActivityManager", () => {
 
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 0 });
 
-        // Fórmula MVP v3: score 0-6 = 0 tempos
+        // Fórmula MVP v3.1: score 0 → 0 tempos
         expect(result.temposAwarded).toBe(0);
       });
 

@@ -40,28 +40,36 @@ Construir un sistema de tempos con las siguientes propiedades simultáneas:
 
 1. **Recompensa inmutable, no moneda**: `temposAwarded` se guarda en cada actividad completada. No hay ledger, no hay saldo mutable, no hay gasto. El total del día se deriva sumando registros.
 
-2. **Fórmula porcentual honesta, calculada por el core (MVP v3 simplificada)**:
+2. **Fórmula lineal honesta, calculada por el core (MVP v3.1)**:
 
-   El score (0-10) **NO modifica la duración real**. El score 7 es el umbral
-   de recompensa; los scores 8/9/10 son bonus explícitos por elección del
-   usuario. Esto elimina el bug clásico de "0 tempos porque la actividad
-   estuvo activa menos de 1 minuto".
+   `tempos = ceil(baseMinutos × score / 7)`. La escala es lineal: cada
+   punto del slider aumenta la recompensa un ~14% de la base. No hay
+   umbral: score 1 ya recompensa algo, score 0 no.
 
    ```
-   // score 0-6 → 0 tempos (este día no fue; honestidad)
-   // score 7-10 → ceil(baseMinutos × multiplicador)
+   // score 0  → 0%   (no completó; coherencia con honestidad)
+   // score 1  → 14%  (1/7)
+   // score 5  → 71%  (5/7)
+   // score 7  → 100% (default del slider: "Lo hiciste")
+   // score 10 → 143% (10/7)
    //
-   // Tabla de multiplicadores:
-   //   score 7  → 1.0  (100% × base)
-   //   score 8  → 1.1  (110% × base)
-   //   score 9  → 1.2  (120% × base)
-   //   score 10 → 1.3  (130% × base)
-   //
-   //    base = minutos estimados (si hay) | duración real (si no)
+   // base = minutos estimados (si hay) | duración real (si no)
    //
    // Si durationMinutes === 0 pero hay estimado > 0, se usa el estimado
    // (no se pierde la recompensa por haber confirmado en los primeros 30s).
    ```
+
+   **Por qué 7 como divisor**: 7 = 100% (score 7 = 1.0×). Es un número
+   natural para la escala 0-10. Otros valores comunes (10) harían que
+   score 5 = 50% y dejarían poco rango entre "lo hice" (5) y "lo hice
+   perfecto" (10); 7 da 71% en score 5 y 143% en score 10, permitiendo
+   reflejar más finamente el esfuerzo percibido.
+
+   **Por qué lineal y no por tabla**: la tabla anterior (MVP v3 con
+   umbrales 7-10) hacía que score 1-6 = 0 tempos, lo cual contradecía
+   la idea de que "cualquier progreso cuenta algo". Con la fórmula
+   lineal, una tarea de 30 min con score 5 da 22 tempos (en lugar de 0),
+   y score 1 da 5. Esto refleja mejor el esfuerzo del usuario.
 
    **Por qué la base es el estimado (no la duración real)**:
 
@@ -157,12 +165,11 @@ informativa únicamente**: no modifica el score inicial del slider ni
 otorga bonus automático. El usuario decide explícitamente el bonus
 moviendo el slider a 8/9/10.
 
-#### El score 0-6 = 0 tempos totales
+#### El score 0 = 0 tempos totales
 
-Si el usuario evalúa con 0-6, está diciendo "este día no fue para esta
-actividad". Por coherencia, no hay tempos. Esto es decisión explícita:
-el umbral para recibir recompensa es 7. Los scores 7/8/9/10 son los
-únicos que premian, con multiplicadores 100%/110%/120%/130%.
+Si el usuario evalúa con 0, está diciendo "esto no cuenta". Por
+coherencia, no hay tempos. Los scores 1-10 siempre premian algo,
+escalando linealmente desde 14% (score 1) hasta 143% (score 10).
 
 #### Una sola vía de cierre: `requestCompletion` → modal → `completeActivity`
 
@@ -368,22 +375,22 @@ interface ISystemCore {
 │                                                     │
 │   ¿Qué tan satisfecho estás con lo que hiciste?     │
 │                                                     │
-│   ━━━━━●━━━━━━━━  8/10                              │
-│   "Muy bien. Bonus del 10% por encima."            │
+│   ━━━━━●━━━━━━━━  5/10                              │
+│   "Cumplí lo mínimo sin extras. Está bien."        │
 │                                                     │
 │   ┌───────────────────────────────────────┐         │
-│   │  30 min × 110%  =  33 tempos          │         │
+│   │  30 min × 5/7  ≈  22 tempos           │         │
 │   │  ═══════════════════════════════       │         │
-│   │  TOTAL                  33 tempos      │         │
+│   │  TOTAL                  22 tempos      │         │
 │   └───────────────────────────────────────┘         │
 │                                                     │
-│   [ Guardar y recibir 33 tempos ]                    │
+│   [ Guardar y recibir 22 tempos ]                    │
 │   [ No la terminé ]                                  │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Sin auto-10**. El slider siempre arranca en 7 (umbral MVP v3). El usuario decide explícitamente si su satisfacción amerita 8 (110%), 9 (120%) o 10 (130%). `beatEstimate` se conserva como métrica informativa (mostrada como "✓ batiste el estimado") pero no sesga el score.
+   - **Sin auto-10**. El slider siempre arranca en 7 (100% de la base). El usuario decide explícitamente si su satisfacción amerita más (score 8/9/10) o menos (score 1-6). `beatEstimate` se conserva como métrica informativa (mostrada como "✓ batiste el estimado") pero no sesga el score.
 - **Botón "No la terminé"** aparece siempre. Llama `interruptActivity(id)`, registra interrupción sin tempos, snackbar positivo: _"Está bien. Mañana es otra oportunidad."_
 - Si el usuario cierra el modal sin elegir, la actividad sigue activa. Nada se registra.
 
@@ -518,7 +525,7 @@ Migración v1 → v2:
 
 ### Fase 5 — `CompletionModal` (componente nuevo)
 
-- `modals/CompletionModal.tsx`: slider 0-10, preview en vivo, default score = 7 (umbral MVP v3, sin auto-10), botón "No la terminó", heurísticas visibles. `beatEstimate` se muestra como info ("✓ batiste el estimado") sin alterar el score.
+- `modals/CompletionModal.tsx`: slider 0-10, preview en vivo, default score = 7 (= 100% de la base, fórmula MVP v3.1 lineal), botón "No la terminó", heurísticas visibles. `beatEstimate` se muestra como info ("✓ batiste el estimado") sin alterar el score.
 - Tests completos
 
 ### Fase 6 — Wire `CompletionModal` en todos los paths de cierre

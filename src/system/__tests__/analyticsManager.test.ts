@@ -101,7 +101,7 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       durationMinutes: 60,
       dayId: days[0].id,
       satisfactionScore: 9,
-      temposAwarded: 54,
+      temposAwarded: 78, // ceil(60 × 9 / 7) = 77.14 → 78
       beatEstimate: true,
       createdAt: TODAY.toISOString(),
     },
@@ -130,7 +130,7 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       durationMinutes: 30,
       dayId: days[0].id,
       satisfactionScore: 8,
-      temposAwarded: 24,
+      temposAwarded: 35, // ceil(30 × 8 / 7) = 34.29 → 35
       beatEstimate: false,
       createdAt: TODAY.toISOString(),
     },
@@ -162,7 +162,7 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       eventTemplates: [],
       timeBlocks: [],
       userPreferences: {
-        dailyTempoTarget: 1000,
+        dailyTempoTarget: 100,
         updatedAt: TODAY.toISOString(),
       },
       completedActivityRecords,
@@ -378,15 +378,15 @@ describe("AnalyticsManager", () => {
     it("suma tempos solo de records completed del día", () => {
       const state = createMockState(true);
       // Override target para controlar el ratio
-      state.global.userPreferences.dailyTempoTarget = 1000;
+      state.global.userPreferences.dailyTempoTarget = 100;
       const manager = new AnalyticsManager(createMockSystemCore(state));
 
       // todayId es el día activo (mockState.global.days[0].id)
       const todayId = state.global.days[0].id;
       const summary = manager.getTempoSummary(todayId);
 
-      // 54 (completed 1) + 24 (completed 3) = 78
-      expect(summary.totalTempos).toBe(78);
+      // 78 (completed 1: ceil(60 × 9 / 7)) + 35 (completed 3: ceil(30 × 8 / 7)) = 113
+      expect(summary.totalTempos).toBe(113);
       expect(summary.completedActivities).toBe(2);
     });
 
@@ -398,12 +398,12 @@ describe("AnalyticsManager", () => {
 
       const summary = manager.getTempoSummary(todayId);
 
-      // 78 / 50 = 1.56
-      expect(summary.targetProgress).toBeCloseTo(1.56, 2);
+      // 113 / 50 = 2.26
+      expect(summary.targetProgress).toBeCloseTo(2.26, 2);
       // progressBarValue capeado a 100
       expect(summary.progressBarValue).toBe(100);
-      // displayPercent: 156% (sin capear)
-      expect(summary.displayPercent).toBe(156);
+      // displayPercent: 226% (sin capear)
+      expect(summary.displayPercent).toBe(226);
     });
 
     it("devuelve ceros y lastReward undefined sin actividades", () => {
@@ -441,7 +441,7 @@ describe("AnalyticsManager", () => {
       state.global.completedActivityRecords = state.global.completedActivityRecords.map(
         (r) => ({ ...r, dayId: todayId })
       );
-      state.global.userPreferences.dailyTempoTarget = 1000;
+      state.global.userPreferences.dailyTempoTarget = 100;
       const manager = new AnalyticsManager(createMockSystemCore(state));
 
       const trends = manager.getTempoTrends({
@@ -450,8 +450,10 @@ describe("AnalyticsManager", () => {
       });
 
       expect(trends.length).toBe(1);
-      expect(trends[0].totalTempos).toBe(78); // 54 + 24
-      expect(trends[0].targetProgress).toBeCloseTo(0.078, 3);
+      // 78 (60min × 9/7) + 35 (30min × 8/7) = 113
+      expect(trends[0].totalTempos).toBe(113);
+      // 113 / 100 = 1.13
+      expect(trends[0].targetProgress).toBeCloseTo(1.13, 2);
       // averageSatisfaction = (9 + 8) / 2 = 8.5
       expect(trends[0].averageSatisfaction).toBeCloseTo(8.5, 1);
     });

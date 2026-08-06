@@ -218,7 +218,7 @@ describe("PersistenceManager", () => {
       localStorage.clear = jest.fn(() => clearMockStorage());
     });
 
-    it("estado sin schemaVersion (v1) se migra a v2 con dailyTempoTarget default 1000", () => {
+    it("estado sin schemaVersion (v1) se migra a v2 con dailyTempoTarget default 100", () => {
       // Guardar un estado v1 (sin schemaVersion)
       const v1State = {
         global: {
@@ -240,7 +240,7 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
     });
 
     it("preserva dailyTempoTarget si ya existe (no sobrescribe)", () => {
@@ -317,9 +317,9 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      // Debe haber reconstruido userPreferences con dailyTempoTarget=1000
+      // Debe haber reconstruido userPreferences con dailyTempoTarget=100
       expect(result!.global.userPreferences).toBeDefined();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
     });
 
     it("RECONSTRUYE userPreferences si el objeto global existe pero userPreferences falta", () => {
@@ -340,7 +340,7 @@ describe("PersistenceManager", () => {
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
       expect(result!.global.userPreferences).toBeDefined();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(1000);
+      expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
     });
 
     it("RECONSTRUYE completedActivityRecords si falta el array", () => {
@@ -409,7 +409,7 @@ describe("PersistenceManager", () => {
           timeBlocks: [],
           userPreferences: {
             hiddenSubjectiveVariableIds: ["var-1"],
-            dailyTempoTarget: 1000,
+            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -457,7 +457,7 @@ describe("PersistenceManager", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 1000,
+            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -529,7 +529,7 @@ describe("PersistenceManager", () => {
       const global = result!.global as unknown as Record<string, unknown>;
 
       // dailyTempoTarget creado por v1→v2
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
 
       // Campos legacy archivados por v2→v3
       expect(global.subjectiveVariables).toBeUndefined();
@@ -643,7 +643,7 @@ describe("PersistenceManager", () => {
       const global = result.global as unknown as Record<string, unknown>;
 
       // dailyTempoTarget creado por v1→v2
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1000);
+      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
       // Legacy archivado por v2→v3
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
@@ -690,7 +690,7 @@ describe("PersistenceManager", () => {
           timeBlocks: [],
           userPreferences: {
             hiddenSubjectiveVariableIds: ["v1"],
-            dailyTempoTarget: 1000,
+            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],

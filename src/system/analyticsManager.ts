@@ -389,7 +389,7 @@ export class AnalyticsManager {
    */
   public getTempoSummary(dayId: UUID): TempoSummary {
     const state = this.systemCore.getState();
-    const target = state.global.userPreferences.dailyTempoTarget || 1000;
+    const target = state.global.userPreferences.dailyTempoTarget || 100;
 
     const dayRecords = state.global.completedActivityRecords.filter(
       (r) => r.dayId === dayId && r.state === "completed"
@@ -430,7 +430,7 @@ export class AnalyticsManager {
     to: ISODateTimeString;
   }): TempoTrendPoint[] {
     const state = this.systemCore.getState();
-    const target = state.global.userPreferences.dailyTempoTarget || 1000;
+    const target = state.global.userPreferences.dailyTempoTarget || 100;
     const fromMs = new Date(range.from).getTime();
     const toMs = new Date(range.to).getTime();
 

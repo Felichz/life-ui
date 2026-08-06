@@ -506,7 +506,7 @@ export class SystemCore implements ISystemCore {
       eventTemplates: [],
       timeBlocks: [],
       userPreferences: {
-        dailyTempoTarget: 1000,
+        dailyTempoTarget: 100,
         updatedAt: timestamp,
       },
       completedActivityRecords: [],

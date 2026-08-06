@@ -139,7 +139,7 @@ const buildSystemCoreMock = (overrides: Record<string, unknown> = {}) => ({
       eventTemplates: [],
       timeBlocks: [],
       userPreferences: {
-        dailyTempoTarget: 1000,
+        dailyTempoTarget: 100,
         updatedAt: "",
       },
       completedActivityRecords: [],

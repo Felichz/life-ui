@@ -633,7 +633,7 @@ export class ActivityManager {
     let beatEstimate = false;
     let temposAwarded = 0;
     let dailyTotal = 0;
-    let target = 1000;
+    let target = 100;
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
@@ -703,7 +703,7 @@ export class ActivityManager {
       }
 
       resultRecord = completedRecord;
-      target = state.global.userPreferences.dailyTempoTarget || 1000;
+      target = state.global.userPreferences.dailyTempoTarget || 100;
       dailyTotal =
         state.global.completedActivityRecords.reduce((sum, r) => sum + (r.temposAwarded || 0), 0) +
         temposAwarded;

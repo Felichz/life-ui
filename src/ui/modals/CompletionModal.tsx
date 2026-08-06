@@ -20,23 +20,22 @@ import { UtilityService } from "../../system/utilityService";
 
 const SCORE_LABELS: Record<number, string> = {
   0: "No completé. Está bien, lo importante es que lo declaré.",
-  1: "No pude hoy. Volver a intentar.",
-  2: "Casi no empecé. Mañana es otra oportunidad.",
-  3: "Me costó mucho. Pero registré y eso cuenta.",
-  4: "Avancé a medias. Reconocerlo es un paso.",
+  1: "Casi nada. Lo reconozco igual.",
+  2: "Algo avancé. Mejor que nada.",
+  3: "Me costó, pero registré.",
+  4: "A medias, pero es honesto.",
   5: "Cumplí lo mínimo sin extras. Está bien.",
-  6: "Cumpliste algo. Reconocerlo es un paso.",
+  6: "Cumpliste algo. Buen punto de partida.",
   7: "Lo hiciste. Eso es lo que cuenta.",
-  8: "Bien hecho. Bonus del 10% por encima.",
-  9: "Muy bien. Bonus del 20% por encima.",
-  10: "Excelente. Bonus del 30% por encima.",
+  8: "Bien hecho. Por encima del 100%.",
+  9: "Muy bien. Casi el máximo.",
+  10: "Excelente. Lo diste todo.",
 };
 
 /**
- * Score mínimo que otorga tempos (default del slider al abrir).
- * Score 7 = 100% × minutos estimados.
+ * Score default del slider al abrir (= 100% de la base).
+ * Fórmula: tempos = ceil(base × score / 7), por lo que score=7 da 100%.
  */
-const SCORE_REWARD_THRESHOLD = 7;
 const SCORE_DEFAULT = 7;
 
 interface CompletionModalProps {
@@ -65,9 +64,9 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
 }) => {
   const [score, setScore] = useState<number>(SCORE_DEFAULT);
 
-  // Reset a 7 (default) cada vez que se abre el modal con un nuevo
-  // request. NO auto-10 por beat estimate: el bonus debe ser decisión
-  // explícita del usuario en el slider (score 8/9/10 = 110%/120%/130%).
+  // Reset al default (7 = 100% de la base) cada vez que se abre el
+  // modal con un nuevo request. NO auto-10 por beat estimate: el
+  // score es siempre decisión explícita del usuario en el slider.
   // `beatEstimate` se conserva como métrica informativa (mostrada en
   // "✓ batiste el estimado") pero ya no sesga el score.
   useEffect(() => {
@@ -77,17 +76,15 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
   }, [open, request?.activityTitle]);
 
   const preview = useMemo(() => {
-    if (!request) return { base: 0, multiplier: 1, total: 0 };
-    // Fuente única de verdad: utilityService.resolveBaseMinutes
-    // aplica la misma lógica que el core (estimatedMinutes > 0 es el
-    // único caso válido; 0 cae a duración real). Así el preview y el
-    // cálculo final NUNCA divergen, incluso con estados corruptos o
-    // legacy con estimado 0.
+    if (!request) return { base: 0, multiplier: 0, total: 0 };
+    // Fuente única de verdad: utilityService.resolveBaseMinutes +
+    // calculatePreviewTempos. Mismo cálculo que el core (no puede divergir).
     const base = UtilityService.resolveBaseMinutes(
       request.estimatedMinutes,
       request.durationMinutes
     );
-    const multiplier = UtilityService.SCORE_MULTIPLIERS[score] ?? 0;
+    // Fórmula lineal: cada punto del slider = base / 7 de recompensa.
+    const multiplier = score / UtilityService.SCORE_DIVISOR;
     const total = UtilityService.calculatePreviewTempos(score, base);
     return { base, multiplier, total };
   }, [request, score]);
@@ -199,15 +196,13 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
             {preview.total > 0 && (
               <Stack spacing={0.5} sx={{ mt: 1 }}>
                 <Typography variant="caption" color="text.secondary">
-                  {preview.base} min × {Math.round(preview.multiplier * 100)}% = {preview.total} tempos
+                  {preview.base} min × {score}/7 ≈ {preview.total} tempos
                 </Typography>
               </Stack>
             )}
-            {score < SCORE_REWARD_THRESHOLD && (
+            {score === 0 && (
               <Typography variant="caption" color="text.secondary">
-                {score < SCORE_REWARD_THRESHOLD
-                  ? `Un score ${score}/10 no otorga tempos. Mueve el slider a ${SCORE_REWARD_THRESHOLD}+ para registrar tu esfuerzo.`
-                  : null}
+                Un 0/10 no otorga tempos. Está bien, no todos los días rinden igual.
               </Typography>
             )}
           </Paper>

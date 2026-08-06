@@ -149,30 +149,27 @@ export class UtilityService {
   }
 
   /**
-   * Tabla de multiplicadores según el score de satisfacción (MVP v3).
+   * Score divisor: el porcentaje de recompensa se calcula como
+   * `score / SCORE_DIVISOR`, donde SCORE_DIVISOR es el score que
+   * representa 100% de la base.
    *
-   * Diseño:
-   * - score 0-6 → 0 tempos (este día no fue; coherencia con la honestidad
-   *   del sistema)
-   * - score 7   → 100% × baseMinutos (default del slider: "Cumpliste")
-   * - score 8   → 110%
-   * - score 9   → 120%
-   * - score 10  → 130%
+   * Diseño MVP v3.1:
+   * - score 0  → 0%   (no completó)
+   * - score 1  → 14%  (1/7)
+   * - score 5  → 71%  (5/7)
+   * - score 7  → 100% (default)
+   * - score 10 → 143% (10/7)
    *
-   * Esto elimina el bug clásico de "0 tempos porque la actividad estuvo
-   * activa 0 minutos" y hace que la recompensa sea predecible.
+   * Fórmula completa: `tempos = ceil(baseMinutos × score / SCORE_DIVISOR)`.
    *
-   * **Esta tabla es la fuente única de verdad**: tanto el cálculo final
-   * (`calculateTemposAwarded`) como el preview en vivo
+   * Ejemplo: tarea estimada 30 min, score 5 → ceil(30 × 5 / 7) = 22.
+   *
+   * **Esta constante es la fuente única de verdad**: tanto el cálculo
+   * final (`calculateTemposAwarded`) como el preview en vivo
    * (`calculatePreviewTempos`) la consumen. Si cambia, ambos se
    * actualizan automáticamente.
    */
-  public static readonly SCORE_MULTIPLIERS: Record<number, number> = {
-    7: 1.0,
-    8: 1.1,
-    9: 1.2,
-    10: 1.3,
-  };
+  public static readonly SCORE_DIVISOR = 7;
 
   /**
    * Resuelve la base sobre la que se calculan los tempos: estimado si
@@ -215,6 +212,7 @@ export class UtilityService {
    * ya calculó como estimado o duración real) y el score actual del
    * slider.
    *
+   * Fórmula: `tempos = ceil(baseMinutes × score / SCORE_DIVISOR)`.
    * Garantía: **el preview SIEMPRE coincide con el cálculo final del
    * core**. Si la fórmula cambia aquí, el preview se actualiza en la
    * misma operación.
@@ -229,22 +227,21 @@ export class UtilityService {
     if (score < 0 || score > 10) return 0;
     if (typeof baseMinutes !== "number" || baseMinutes <= 0) return 0;
 
-    const multiplier = UtilityService.SCORE_MULTIPLIERS[score];
-    if (multiplier === undefined) {
-      // score 0-6 → 0 tempos
-      return 0;
-    }
-
-    return Math.ceil(baseMinutes * multiplier);
+    // Fórmula lineal: ceil(base × score / 7)
+    return Math.ceil((baseMinutes * score) / UtilityService.SCORE_DIVISOR);
   }
 
   /**
    * Calcula la recompensa de tempos por una actividad completada.
    *
+   * Fórmula: `tempos = ceil(baseMinutos × score / SCORE_DIVISOR)`,
+   * donde baseMinutos viene de `resolveBaseMinutes(estimado, duración)`.
+   *
    * Reglas:
    * - score inválido (< 0 o > 10, no entero) → 0 tempos
-   * - score 0-6 → 0 tempos (este día no fue; honestidad)
-   * - score 7-10 → ceil(baseMinutos × multiplicador)
+   * - score 0 → 0 tempos (no completó)
+   * - score 1-10 → ceil(baseMinutos × score / 7). Escala lineal: cada
+   *   punto del slider aumenta la recompensa un ~14% de la base.
    * - Base:
    *     - Si hay estimado válido (> 0), se premia sobre el estimado.
    *       Esto evita el bug de "0 tempos porque la actividad estuvo activa

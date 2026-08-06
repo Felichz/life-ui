@@ -253,7 +253,7 @@ describe("DayPage", () => {
         activityTemplates: [],
         eventTemplates: [],
         timeBlocks: [],
-        userPreferences: { dailyTempoTarget: 1000, updatedAt: "" },
+        userPreferences: { dailyTempoTarget: 100, updatedAt: "" },
         completedActivityRecords: [],
         eventInstances: [],
         schemaVersion: 2,

@@ -107,28 +107,62 @@ describe("CompletionModal (fórmula MVP v3)", () => {
     });
   });
 
-  describe("preview de tempos (fórmula MVP v3)", () => {
-    it("score 7 + estimado 30 min → 30 tempos (100%)", () => {
+  describe("preview de tempos (fórmula MVP v3.1 lineal)", () => {
+    it("score 5 + estimado 30 min → 22 tempos (ejemplo del usuario)", () => {
       render(<CompletionModal {...defaultProps} />);
-      // score default es 7 → 100% × 30 estimado = 30
-      expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
+      // Forzamos score=5 en el slider
+      const slider = screen
+        .getByTestId("satisfaction-slider")
+        .querySelector('input[type="range"]');
+      if (slider) {
+        // 7 → 5 son -2 clicks
+        fireEvent.change(slider, { target: { value: "5" } });
+      }
+      // ceil(30 × 5 / 7) = ceil(21.43) = 22
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("22");
     });
 
-    it("beatEstimate es solo informativo: score=7 → 100% × estimado (no 130%)", () => {
-      render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
-      // Codex review: beat ya no otorga auto-bonus. Score default 7 = 100% × 30 = 30.
-      expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
-    });
-
-    it("score < 7 → preview 0", () => {
+    it("score 1 + estimado 30 min → 5 tempos", () => {
       render(<CompletionModal {...defaultProps} />);
       const slider = screen
         .getByTestId("satisfaction-slider")
         .querySelector('input[type="range"]');
       if (slider) {
-        fireEvent.change(slider, { target: { value: "5" } });
+        // 7 → 1 son -6 clicks
+        fireEvent.change(slider, { target: { value: "1" } });
       }
-      // Score 5 → 0 tempos (no recompensa)
+      // ceil(30 × 1 / 7) = ceil(4.28) = 5
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("5");
+    });
+
+    it("score 7 + estimado 30 min → 30 tempos (100%, default)", () => {
+      render(<CompletionModal {...defaultProps} />);
+      // default score = 7 → ceil(30 × 7 / 7) = 30
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
+    });
+
+    it("score 10 + estimado 30 min → 43 tempos", () => {
+      render(<CompletionModal {...defaultProps} />);
+      const slider = screen
+        .getByTestId("satisfaction-slider")
+        .querySelector('input[type="range"]');
+      if (slider) {
+        // 7 → 10 son +3 clicks
+        fireEvent.change(slider, { target: { value: "10" } });
+      }
+      // ceil(30 × 10 / 7) = ceil(42.86) = 43
+      expect(screen.getByTestId("preview-total")).toHaveTextContent("43");
+    });
+
+    it("score 0 → preview 0", () => {
+      render(<CompletionModal {...defaultProps} />);
+      const slider = screen
+        .getByTestId("satisfaction-slider")
+        .querySelector('input[type="range"]');
+      if (slider) {
+        fireEvent.change(slider, { target: { value: "0" } });
+      }
+      // Score 0 → 0 tempos
       expect(screen.getByTestId("preview-total")).toHaveTextContent("0");
     });
 
@@ -140,7 +174,7 @@ describe("CompletionModal (fórmula MVP v3)", () => {
         estimatedMinutes: 30,
       };
       render(<CompletionModal {...defaultProps} request={requestLowDuration} />);
-      // Score default 7 → 100% × 30 estimado = 30
+      // Score default 7 → ceil(30 × 7 / 7) = 30
       expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
     });
 
@@ -151,7 +185,7 @@ describe("CompletionModal (fórmula MVP v3)", () => {
         estimatedMinutes: undefined,
       };
       render(<CompletionModal {...defaultProps} request={requestNoEstimate} />);
-      // Score 7 → 100% × 25 duración = 25
+      // Score 7 → ceil(25 × 7 / 7) = 25
       expect(screen.getByTestId("preview-total")).toHaveTextContent("25");
     });
   });
@@ -193,26 +227,25 @@ describe("CompletionModal (fórmula MVP v3)", () => {
   describe("label del botón cambia según el preview", () => {
     it("muestra 'Guardar y recibir 30 tempos' cuando hay reward (score 7)", () => {
       render(<CompletionModal {...defaultProps} />);
-      // Score 7, estimado 30 → 30 tempos
+      // Score 7, estimado 30 → ceil(30 × 7 / 7) = 30
       expect(screen.getByTestId("confirm-button")).toHaveTextContent(
         "Guardar y recibir 30 tempos"
       );
     });
 
-    it("score 10 explícito (no auto) → 39 tempos", () => {
-      // Codex review: el bonus debe ser decisión del usuario, no auto.
+    it("score 10 explícito (no auto) → 43 tempos", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
       // Forzamos score=10 vía slider
       const slider = screen
         .getByTestId("satisfaction-slider")
         .querySelector('input[type="range"]');
       if (slider) {
-        // 7 → 10 es +3 clicks derecha (MUI step=1)
+        // 7 → 10 son +3 clicks
         fireEvent.change(slider, { target: { value: "10" } });
       }
-      // Score 10 × 130% × 30 estimado = 39
+      // ceil(30 × 10 / 7) = ceil(42.86) = 43
       expect(screen.getByTestId("confirm-button")).toHaveTextContent(
-        "Guardar y recibir 39 tempos"
+        "Guardar y recibir 43 tempos"
       );
     });
 

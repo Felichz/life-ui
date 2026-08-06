@@ -190,49 +190,52 @@ describe("UtilityService", () => {
     });
   });
 
-  // Schema v2+: calculateTemposAwarded (Fórmula MVP v3 simplificada)
-// score 7 → 100% × base, score 8 → 110%, score 9 → 120%, score 10 → 130%
-// score 0-6 → 0 tempos
-  describe("calculateTemposAwarded (fórmula MVP v3)", () => {
+  // Schema v2+: calculateTemposAwarded (Fórmula MVP v3.1 lineal)
+  // tempos = ceil(baseMinutos × score / 7)
+  // score 0 → 0, score 1 → 14%, score 7 → 100%, score 10 → 143%
+  describe("calculateTemposAwarded (fórmula MVP v3.1 lineal)", () => {
+    it("score 5 + estimado 30 min → 22 tempos (ejemplo del usuario)", () => {
+      // ceil(30 × 5 / 7) = ceil(21.43) = 22
+      expect(UtilityService.calculateTemposAwarded(30, 5, 30)).toBe(22);
+    });
+
+    it("score 1 + estimado 30 min → 5 tempos (ejemplo del usuario)", () => {
+      // ceil(30 × 1 / 7) = ceil(4.28) = 5
+      expect(UtilityService.calculateTemposAwarded(30, 1, 30)).toBe(5);
+    });
+
     it("score 7 + estimado 30 min → 30 tempos (100%)", () => {
+      // ceil(30 × 7 / 7) = ceil(30) = 30
       expect(UtilityService.calculateTemposAwarded(30, 7, 30)).toBe(30);
     });
 
-    it("score 8 + estimado 30 min → 33 tempos (110% × 30)", () => {
-      expect(UtilityService.calculateTemposAwarded(30, 8, 30)).toBe(33);
-    });
-
-    it("score 9 + estimado 30 min → 36 tempos (120% × 30)", () => {
-      expect(UtilityService.calculateTemposAwarded(30, 9, 30)).toBe(36);
-    });
-
-    it("score 10 + estimado 30 min → 39 tempos (130% × 30)", () => {
-      expect(UtilityService.calculateTemposAwarded(30, 10, 30)).toBe(39);
+    it("score 10 + estimado 30 min → 43 tempos (143%)", () => {
+      // ceil(30 × 10 / 7) = ceil(42.86) = 43
+      expect(UtilityService.calculateTemposAwarded(30, 10, 30)).toBe(43);
     });
 
     it("se usa el estimado (no la duración real) cuando hay estimado", () => {
       // duración real baja (acaba de iniciar) pero estimado es 45
-      // El score 7 da 100% × 45 = 45, no sobre la duración real
+      // score 7: ceil(45 × 7 / 7) = 45
       expect(UtilityService.calculateTemposAwarded(2, 7, 45)).toBe(45);
     });
 
     it("sin estimado: usa la duración real", () => {
-      // flexible-duration sin estimado → usa 25 min × 100% = 25
+      // flexible-duration sin estimado → ceil(25 × 7 / 7) = 25
       expect(UtilityService.calculateTemposAwarded(25, 7, undefined)).toBe(25);
     });
 
-    it("score 0-6 → 0 tempos (este día no fue)", () => {
-      for (let s = 0; s <= 6; s++) {
-        expect(UtilityService.calculateTemposAwarded(30, s, 30)).toBe(0);
-      }
+    it("score 0 → 0 tempos (no completó)", () => {
+      expect(UtilityService.calculateTemposAwarded(30, 0, 30)).toBe(0);
     });
 
     it("BUG FIX: duration 0 con estimado válido → usa estimado (no 0)", () => {
-      // Caso reportado por Codex: si la actividad estuvo activa menos de
-      // 1 minuto y Math.round devuelve 0, NO debemos devolver 0 tempos
-      // cuando hay un estimado. Usamos el estimado como base.
-      expect(UtilityService.calculateTemposAwarded(0, 10, 30)).toBe(39); // 130% × 30
-      expect(UtilityService.calculateTemposAwarded(0, 7, 45)).toBe(45); // 100% × 45
+      // Si la actividad estuvo activa menos de 1 minuto y Math.round
+      // devuelve 0, NO debemos devolver 0 tempos cuando hay estimado.
+      // score 10 + estimado 30: ceil(30 × 10 / 7) = 43
+      expect(UtilityService.calculateTemposAwarded(0, 10, 30)).toBe(43);
+      // score 7 + estimado 45: ceil(45 × 7 / 7) = 45
+      expect(UtilityService.calculateTemposAwarded(0, 7, 45)).toBe(45);
     });
 
     it("duration 0 sin estimado → 0 tempos (no hay base válida)", () => {
@@ -241,10 +244,6 @@ describe("UtilityService", () => {
     });
 
     it("duration negativa → 0 tempos (sanidad)", () => {
-      expect(UtilityService.calculateTemposAwarded(-10, 10, 30)).toBe(0);
-    });
-
-    it("duration negativa → 0 tempos", () => {
       expect(UtilityService.calculateTemposAwarded(-10, 10, 30)).toBe(0);
     });
 
@@ -262,13 +261,24 @@ describe("UtilityService", () => {
 
     it("estimado 0 o negativo: cae a la duración real", () => {
       // estimado 0 no es válido, usa duración real
+      // ceil(20 × 7 / 7) = 20
       expect(UtilityService.calculateTemposAwarded(20, 7, 0)).toBe(20);
       expect(UtilityService.calculateTemposAwarded(20, 7, -5)).toBe(20);
     });
 
-    it("caso extremo: score 10, estimado 120 min → 156 tempos", () => {
-      // 120 × 1.3 = 156
-      expect(UtilityService.calculateTemposAwarded(120, 10, 120)).toBe(156);
+    it("caso extremo: score 10, estimado 120 min → 172 tempos", () => {
+      // ceil(120 × 10 / 7) = ceil(171.43) = 172
+      expect(UtilityService.calculateTemposAwarded(120, 10, 120)).toBe(172);
+    });
+
+    it("escala lineal: cada punto del slider aumenta ~14% de la base", () => {
+      // Para base=30: score N → ceil(30 × N / 7)
+      // score 1 → 5, score 2 → 9, score 3 → 13, score 4 → 18, score 5 → 22
+      // score 6 → 26, score 7 → 30, score 8 → 35, score 9 → 39, score 10 → 43
+      const expected = [5, 9, 13, 18, 22, 26, 30, 35, 39, 43];
+      for (let s = 1; s <= 10; s++) {
+        expect(UtilityService.calculateTemposAwarded(30, s, 30)).toBe(expected[s - 1]);
+      }
     });
   });
 
@@ -277,26 +287,24 @@ describe("UtilityService", () => {
   // cálculo final con esa base. Si la fórmula cambia, preview se actualiza
   // automáticamente.
   describe("calculatePreviewTempos (helper compartido preview ↔ core)", () => {
-    it("score 7 + base 30 → 30 tempos", () => {
+    it("score 5 + base 30 → 22 tempos (ejemplo del usuario)", () => {
+      expect(UtilityService.calculatePreviewTempos(5, 30)).toBe(22);
+    });
+
+    it("score 1 + base 30 → 5 tempos", () => {
+      expect(UtilityService.calculatePreviewTempos(1, 30)).toBe(5);
+    });
+
+    it("score 7 + base 30 → 30 tempos (100%)", () => {
       expect(UtilityService.calculatePreviewTempos(7, 30)).toBe(30);
     });
 
-    it("score 8 + base 30 → 33 tempos (110%)", () => {
-      expect(UtilityService.calculatePreviewTempos(8, 30)).toBe(33);
+    it("score 10 + base 30 → 43 tempos (143%)", () => {
+      expect(UtilityService.calculatePreviewTempos(10, 30)).toBe(43);
     });
 
-    it("score 9 + base 30 → 36 tempos (120%)", () => {
-      expect(UtilityService.calculatePreviewTempos(9, 30)).toBe(36);
-    });
-
-    it("score 10 + base 30 → 39 tempos (130%)", () => {
-      expect(UtilityService.calculatePreviewTempos(10, 30)).toBe(39);
-    });
-
-    it("score 0-6 → 0 tempos", () => {
-      for (let s = 0; s <= 6; s++) {
-        expect(UtilityService.calculatePreviewTempos(s, 30)).toBe(0);
-      }
+    it("score 0 → 0 tempos", () => {
+      expect(UtilityService.calculatePreviewTempos(0, 30)).toBe(0);
     });
 
     it("base 0 o negativa → 0 tempos", () => {

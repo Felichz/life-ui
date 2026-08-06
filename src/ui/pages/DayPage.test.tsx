@@ -99,7 +99,7 @@ describe("DayPage", () => {
     isDayActive: jest.fn().mockReturnValue(true),
     getActiveActivity: mockGetActiveActivity,
     createActivityInstance: mockCreateActivityInstance,
-    getUserPreferences: jest.fn().mockReturnValue({ dailyTempoTarget: 1000, updatedAt: "" }),
+    getUserPreferences: jest.fn().mockReturnValue({ dailyTempoTarget: 100, updatedAt: "" }),
     requestCompletion: jest.fn(() => ({
       activityTitle: "T",
       durationMinutes: 30,
@@ -128,7 +128,7 @@ describe("DayPage", () => {
         eventTemplates: [],
         timeBlocks: [],
         userPreferences: {
-          dailyTempoTarget: 1000,
+          dailyTempoTarget: 100,
           updatedAt: "",
         },
         completedActivityRecords: [],

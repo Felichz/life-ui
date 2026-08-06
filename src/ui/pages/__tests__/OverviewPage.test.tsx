@@ -53,7 +53,7 @@ describe("OverviewPage", () => {
         eventTemplates: [],
         timeBlocks: [],
         userPreferences: {
-          dailyTempoTarget: 1000,
+          dailyTempoTarget: 100,
           updatedAt: "",
         },
         completedActivityRecords: [],

@@ -232,7 +232,7 @@ export class PersistenceManager implements IPersistenceManager {
     const existingPrefs = state.global?.userPreferences;
     const userPreferences = {
       dailyTempoTarget:
-        typeof existingPrefs?.dailyTempoTarget === "number" ? existingPrefs.dailyTempoTarget : 1000,
+        typeof existingPrefs?.dailyTempoTarget === "number" ? existingPrefs.dailyTempoTarget : 100,
       updatedAt: existingPrefs?.updatedAt ?? new Date().toISOString(),
     };
     warnings.push("userPreferences reconstruido con defaults");
