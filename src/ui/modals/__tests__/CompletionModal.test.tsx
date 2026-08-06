@@ -11,14 +11,14 @@ const mockRequest: CompletionRequest = {
   activityTitle: "Leer libro",
   durationMinutes: 30,
   estimatedMinutes: 30,
-  canApplyBonus: false,
+  beatEstimate: false,
   requestedAt: "2023-01-01T12:00:00.000Z",
 };
 
 const mockRequestBeat: CompletionRequest = {
   ...mockRequest,
   durationMinutes: 20,
-  canApplyBonus: true,
+  beatEstimate: true,
 };
 
 describe("CompletionModal (fórmula MVP v3)", () => {
@@ -50,7 +50,7 @@ describe("CompletionModal (fórmula MVP v3)", () => {
       expect(screen.getByTestId("estimate-info")).toHaveTextContent("Estimado: 30 min");
     });
 
-    it("indica 'batiste el estimado' cuando canApplyBonus=true", () => {
+    it("indica 'batiste el estimado' cuando beatEstimate=true", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
       expect(screen.getByTestId("estimate-info")).toHaveTextContent(/batiste el estimado/);
     });
@@ -67,7 +67,7 @@ describe("CompletionModal (fórmula MVP v3)", () => {
   });
 
   describe("slider y heurísticas", () => {
-    it("default a score 7 incluso con canApplyBonus=true (no auto-10)", () => {
+    it("default a score 7 incluso con beatEstimate=true (no auto-10)", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
       // Codex review: el bonus debe ser decisión del usuario, no auto.
       expect(screen.getByTestId("score-label")).toHaveTextContent("7/10");
@@ -92,7 +92,7 @@ describe("CompletionModal (fórmula MVP v3)", () => {
       expect(screen.getByTestId("preview-total")).toHaveTextContent("30");
     });
 
-    it("canApplyBonus es solo informativo: score=7 → 100% × estimado (no 130%)", () => {
+    it("beatEstimate es solo informativo: score=7 → 100% × estimado (no 130%)", () => {
       render(<CompletionModal {...defaultProps} request={mockRequestBeat} />);
       // Codex review: beat ya no otorga auto-bonus. Score default 7 = 100% × 30 = 30.
       expect(screen.getByTestId("preview-total")).toHaveTextContent("30");

@@ -67,7 +67,7 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
   // Reset a 7 (default) cada vez que se abre el modal con un nuevo
   // request. NO auto-10 por beat estimate: el bonus debe ser decisión
   // explícita del usuario en el slider (score 8/9/10 = 110%/120%/130%).
-  // `canApplyBonus` se conserva como métrica informativa (mostrada en
+  // `beatEstimate` se conserva como métrica informativa (mostrada en
   // "✓ batiste el estimado") pero ya no sesga el score.
   useEffect(() => {
     if (open) {
@@ -136,12 +136,12 @@ const CompletionModal: React.FC<CompletionModalProps> = ({
             {request.estimatedMinutes !== undefined && (
               <Typography
                 variant="body2"
-                color={request.canApplyBonus ? "success.main" : "text.secondary"}
+                color={request.beatEstimate ? "success.main" : "text.secondary"}
                 sx={{ mt: 0.5 }}
                 data-testid="estimate-info"
               >
                 Estimado: {request.estimatedMinutes} min
-                {request.canApplyBonus && " ✓ batiste el estimado"}
+                {request.beatEstimate && " ✓ batiste el estimado"}
               </Typography>
             )}
           </Box>

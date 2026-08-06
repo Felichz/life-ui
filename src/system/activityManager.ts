@@ -585,7 +585,7 @@ export class ActivityManager {
         ? template.clearObjectiveSettings.estimatedDurationMinutes
         : undefined;
 
-    const canApplyBonus = UtilityService.shouldApplyBonus(
+    const beatEstimate = UtilityService.calculateBeatEstimate(
       template.type,
       durationMinutes,
       estimatedMinutes
@@ -595,7 +595,7 @@ export class ActivityManager {
       activityTitle: template.title,
       durationMinutes,
       estimatedMinutes,
-      canApplyBonus,
+      beatEstimate,
       requestedAt,
     };
   }
@@ -665,7 +665,7 @@ export class ActivityManager {
           ? instance.clearObjectiveSettings.estimatedDurationMinutes
           : undefined;
 
-      beatEstimate = UtilityService.shouldApplyBonus(
+      beatEstimate = UtilityService.calculateBeatEstimate(
         template.type,
         durationMinutes,
         estimatedMinutes

@@ -77,8 +77,9 @@ Construir un sistema de tempos con las siguientes propiedades simultáneas:
 
 3. **Decisión del usuario, no heurística automática**:
 
-   A diferencia del diseño original (donde `canApplyBonus` auto-ponía el
-   slider en 10 cuando se batía el estimado), en MVP v3 el bonus es
+   A diferencia del diseño original (donde `beatEstimate` (antes
+   `canApplyBonus`) auto-ponía el slider en 10 cuando se batía el
+   estimado), en MVP v3 el bonus es
    siempre decisión explícita del usuario en el slider:
 
    - **`beatEstimate`**: se conserva como métrica informativa del record
@@ -151,7 +152,10 @@ reglas distintas.
 
 `timeboxing` tiene una ventana intencional (mínimo o máximo). El propósito no es batirla sino respetarla.
 
-Por eso solo el primer tipo aplica bonus.
+Por eso solo el primer tipo calcula `beatEstimate`, y como **métrica
+informativa únicamente**: no modifica el score inicial del slider ni
+otorga bonus automático. El usuario decide explícitamente el bonus
+moviendo el slider a 8/9/10.
 
 #### El score 0-6 = 0 tempos totales
 
@@ -282,7 +286,11 @@ interface ISystemCore {
     activityTitle: string;
     durationMinutes: number;
     estimatedMinutes?: number; // solo si clear-objective
-    canApplyBonus: boolean;
+    /**
+     * MVP v3: métrica informativa únicamente (no afecta fórmula).
+     * Indica si la actividad se completó antes del 80% del estimado.
+     */
+    beatEstimate: boolean;
   };
 
   completeActivity(
@@ -361,22 +369,21 @@ interface ISystemCore {
 │   ¿Qué tan satisfecho estás con lo que hiciste?     │
 │                                                     │
 │   ━━━━━●━━━━━━━━  8/10                              │
-│   "Muy bien. Fluiste casi todo el tiempo."          │
+│   "Muy bien. Bonus del 10% por encima."            │
 │                                                     │
 │   ┌───────────────────────────────────────┐         │
-│   │  8 × 38 min  =  304 tempos            │         │
-│   │  + bonus eficiencia      +5           │         │
+│   │  30 min × 110%  =  33 tempos          │         │
 │   │  ═══════════════════════════════       │         │
-│   │  TOTAL                  309 tempos     │         │
+│   │  TOTAL                  33 tempos      │         │
 │   └───────────────────────────────────────┘         │
 │                                                     │
-│   [ Guardar y recibir 309 tempos ]                   │
+│   [ Guardar y recibir 33 tempos ]                    │
 │   [ No la terminé ]                                  │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 ```
 
-- **Auto-10** solo si `canApplyBonus && beatEstimate`. Mensaje: _"Completaste en X min cuando estimabas Y. Un 10 es justo aquí."_
+- **Sin auto-10**. El slider siempre arranca en 7 (umbral MVP v3). El usuario decide explícitamente si su satisfacción amerita 8 (110%), 9 (120%) o 10 (130%). `beatEstimate` se conserva como métrica informativa (mostrada como "✓ batiste el estimado") pero no sesga el score.
 - **Botón "No la terminé"** aparece siempre. Llama `interruptActivity(id)`, registra interrupción sin tempos, snackbar positivo: _"Está bien. Mañana es otra oportunidad."_
 - Si el usuario cierra el modal sin elegir, la actividad sigue activa. Nada se registra.
 
@@ -511,7 +518,7 @@ Migración v1 → v2:
 
 ### Fase 5 — `CompletionModal` (componente nuevo)
 
-- `modals/CompletionModal.tsx`: slider 0-10, preview en vivo, auto-10 si bonus aplica, botón "No la terminó", heurísticas visibles
+- `modals/CompletionModal.tsx`: slider 0-10, preview en vivo, default score = 7 (umbral MVP v3, sin auto-10), botón "No la terminó", heurísticas visibles. `beatEstimate` se muestra como info ("✓ batiste el estimado") sin alterar el score.
 - Tests completos
 
 ### Fase 6 — Wire `CompletionModal` en todos los paths de cierre

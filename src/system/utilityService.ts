@@ -119,16 +119,25 @@ export class UtilityService {
     return copy as T;
   }
 
-  /**
+/**
    * Determina si una actividad cumple la condición de "beat estimate".
-   * El bonus SOLO aplica si el tipo es clear-objective y hay un estimado puntual.
+   *
+   * En el MVP v3 esto es **métrica informativa únicamente**: no se usa
+   * para calcular bonus automático en la fórmula de tempos. Sirve como
+   * dato del record (`beatEstimate: boolean`) y se muestra en el modal
+   * de completion como "✓ batiste el estimado". El usuario decide
+   * explícitamente el bonus moviendo el slider a 8/9/10.
+   *
+   * Regla: solo `clear-objective` con estimado puntual puede batir.
+   * `flexible-duration` (rango) y `timeboxing` (ventana intencional)
+   * no son elegibles.
    *
    * @param activityType Tipo de actividad
    * @param actualMinutes Duración real en minutos
    * @param estimatedMinutes Duración estimada (solo presente para clear-objective)
-   * @returns true si cumple la condición para aplicar bonus
+   * @returns true si cumple la condición para `beatEstimate`
    */
-  public static shouldApplyBonus(
+  public static calculateBeatEstimate(
     activityType: "clear-objective" | "flexible-duration" | "timeboxing",
     actualMinutes: number,
     estimatedMinutes: number | undefined

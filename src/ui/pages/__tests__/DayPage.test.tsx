@@ -224,7 +224,7 @@ describe("DayPage", () => {
       activityTitle: "Test",
       durationMinutes: 30,
       estimatedMinutes: 30,
-      canApplyBonus: false,
+      beatEstimate: false,
       requestedAt: "2023-01-01T12:00:00.000Z",
     })),
     completeActivity: jest.fn(() => ({
@@ -369,13 +369,13 @@ describe("DayPage", () => {
           activityTitle: string;
           durationMinutes: number;
           estimatedMinutes: number;
-          canApplyBonus: boolean;
+          beatEstimate: boolean;
           requestedAt: string;
         } => ({
           activityTitle: id === "act-A" ? "Actividad A" : "Actividad B",
           durationMinutes: id === "act-A" ? 30 : 45,
           estimatedMinutes: id === "act-A" ? 30 : 60,
-          canApplyBonus: id === "act-A" ? false : true,
+          beatEstimate: id === "act-A" ? false : true,
           requestedAt: "2023-01-01T12:00:00.000Z",
         })
       );

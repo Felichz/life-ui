@@ -119,8 +119,8 @@ describe("ActivityManager", () => {
     // (auto-mock las habría dejado como undefined)
     const actualUtilityService = jest.requireActual("../utilityService")
       .UtilityService as typeof UtilityService;
-    (UtilityService.shouldApplyBonus as jest.Mock).mockImplementation(
-      actualUtilityService.shouldApplyBonus
+    (UtilityService.calculateBeatEstimate as jest.Mock).mockImplementation(
+      actualUtilityService.calculateBeatEstimate
     );
     (UtilityService.calculateTemposAwarded as jest.Mock).mockImplementation(
       actualUtilityService.calculateTemposAwarded
@@ -890,11 +890,11 @@ describe("ActivityManager", () => {
         expect(req.durationMinutes).toBe(30);
         expect(req.estimatedMinutes).toBe(30);
         // 30 min real, 30 estimado → 100% → no bonus
-        expect(req.canApplyBonus).toBe(false);
+        expect(req.beatEstimate).toBe(false);
         expect(req.requestedAt).toBeDefined();
       });
 
-      it("marca canApplyBonus=true cuando se bate el estimado", () => {
+      it("marca beatEstimate=true cuando se bate el estimado", () => {
         const instanceId = "req-2";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -911,10 +911,10 @@ describe("ActivityManager", () => {
         const req = activityManager.requestCompletion(instanceId);
 
         expect(req.durationMinutes).toBe(15);
-        expect(req.canApplyBonus).toBe(true);
+        expect(req.beatEstimate).toBe(true);
       });
 
-      it("canApplyBonus=false para timeboxing aunque bata el estimado", () => {
+      it("beatEstimate=false para timeboxing aunque bata el estimado", () => {
         mockAppState.global.activityTemplates[0].type = "timeboxing";
         mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
         mockAppState.global.activityTemplates[0].timeboxingSettings = {
@@ -937,7 +937,7 @@ describe("ActivityManager", () => {
 
         const req = activityManager.requestCompletion(instanceId);
 
-        expect(req.canApplyBonus).toBe(false);
+        expect(req.beatEstimate).toBe(false);
       });
 
       it("lanza error si no hay actividad activa", () => {

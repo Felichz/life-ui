@@ -117,7 +117,7 @@ describe("DayPage - Finalizar día (T22)", () => {
       activityTitle: "T",
       durationMinutes: 30,
       estimatedMinutes: 30,
-      canApplyBonus: false,
+      beatEstimate: false,
       requestedAt: "2023-01-01T12:00:00.000Z",
     })),
     endDay: jest.fn(),

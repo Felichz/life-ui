@@ -406,7 +406,16 @@ export interface CompletionRequest {
   activityTitle: string;
   durationMinutes: number;
   estimatedMinutes?: number;
-  canApplyBonus: boolean;
+  /**
+   * Métrica informativa: indica si la actividad se completó antes del 80%
+   * del estimado (solo aplica a clear-objective con estimado puntual).
+   *
+   * En el MVP v3 NO afecta la fórmula de tempos: el usuario decide el
+   * bonus explícitamente moviendo el slider a 8/9/10. Este flag se
+   * conserva solo como información en el CompletionModal ("✓ batiste
+   * el estimado") y como dato del record para futuras analíticas.
+   */
+  beatEstimate: boolean;
   requestedAt: ISODateTimeString;
 }
 

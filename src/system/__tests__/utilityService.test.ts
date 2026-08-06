@@ -151,42 +151,42 @@ describe("UtilityService", () => {
     });
   });
 
-  // Schema v2+: shouldApplyBonus
-  describe("shouldApplyBonus", () => {
+  // Schema v2+: calculateBeatEstimate
+  describe("calculateBeatEstimate", () => {
     it("NO aplica bonus para flexible-duration aunque haya estimado", () => {
       // Aunque flexible-duration tiene rango 5-10 min, no aplica bonus
-      const canApply = UtilityService.shouldApplyBonus("flexible-duration", 4, 10);
-      expect(canApply).toBe(false);
+      const beatsEstimate = UtilityService.calculateBeatEstimate("flexible-duration", 4, 10);
+      expect(beatsEstimate).toBe(false);
     });
 
     it("NO aplica bonus para timeboxing aunque haya estimado", () => {
-      const canApply = UtilityService.shouldApplyBonus("timeboxing", 5, 10);
-      expect(canApply).toBe(false);
+      const beatsEstimate = UtilityService.calculateBeatEstimate("timeboxing", 5, 10);
+      expect(beatsEstimate).toBe(false);
     });
 
     it("SÍ aplica bonus para clear-objective cuando duration <= 80% del estimado", () => {
       // 45 min estimado, 30 min real (66%) → bonus aplica
-      expect(UtilityService.shouldApplyBonus("clear-objective", 30, 45)).toBe(true);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 30, 45)).toBe(true);
       // Caso límite exacto: 36 min de 45 (80%)
-      expect(UtilityService.shouldApplyBonus("clear-objective", 36, 45)).toBe(true);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 36, 45)).toBe(true);
     });
 
     it("NO aplica bonus para clear-objective cuando duration > 80% del estimado", () => {
       // 37 min de 45 (82%) → no bonus
-      expect(UtilityService.shouldApplyBonus("clear-objective", 37, 45)).toBe(false);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 37, 45)).toBe(false);
     });
 
     it("NO aplica bonus si duration es 0", () => {
-      expect(UtilityService.shouldApplyBonus("clear-objective", 0, 45)).toBe(false);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 0, 45)).toBe(false);
     });
 
     it("NO aplica bonus si estimated es 0 o undefined", () => {
-      expect(UtilityService.shouldApplyBonus("clear-objective", 30, 0)).toBe(false);
-      expect(UtilityService.shouldApplyBonus("clear-objective", 30, undefined)).toBe(false);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 30, 0)).toBe(false);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 30, undefined)).toBe(false);
     });
 
     it("NO aplica bonus si estimated es negativo", () => {
-      expect(UtilityService.shouldApplyBonus("clear-objective", 30, -5)).toBe(false);
+      expect(UtilityService.calculateBeatEstimate("clear-objective", 30, -5)).toBe(false);
     });
   });
 
