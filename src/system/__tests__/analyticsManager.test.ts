@@ -288,10 +288,7 @@ describe("AnalyticsManager", () => {
     it("calcula porcentajes que suman ~100%", () => {
       const distribution = analyticsManager.getTimeDistributionData();
 
-      const totalPercentage = distribution.categories.reduce(
-        (sum, c) => sum + c.percentage,
-        0
-      );
+      const totalPercentage = distribution.categories.reduce((sum, c) => sum + c.percentage, 0);
       expect(totalPercentage).toBeCloseTo(100, 1);
     });
 
@@ -360,12 +357,11 @@ describe("AnalyticsManager", () => {
   describe("getEstimationAccuracy", () => {
     it("devuelve 0 cuando no hay actividades con estimación", () => {
       const noEstimation = createMockState();
-      noEstimation.global.completedActivityRecords = noEstimation.global.completedActivityRecords.map(
-        (r) => ({
+      noEstimation.global.completedActivityRecords =
+        noEstimation.global.completedActivityRecords.map((r) => ({
           ...r,
           clearObjectiveSettings: undefined,
-        })
-      );
+        }));
       const manager = new AnalyticsManager(createMockSystemCore(noEstimation));
 
       expect(manager.getEstimationAccuracy()).toBe(0);
@@ -373,8 +369,6 @@ describe("AnalyticsManager", () => {
   });
 
   describe("getTempoSummary", () => {
-    const tempoDayId = "tempo-day";
-
     it("suma tempos solo de records completed del día", () => {
       const state = createMockState(true);
       // Override target para controlar el ratio
@@ -438,9 +432,10 @@ describe("AnalyticsManager", () => {
       // Mantener solo el primer día en el rango y mapear sus records a ese día
       const todayId = state.global.days[0].id;
       state.global.days = [state.global.days[0]];
-      state.global.completedActivityRecords = state.global.completedActivityRecords.map(
-        (r) => ({ ...r, dayId: todayId })
-      );
+      state.global.completedActivityRecords = state.global.completedActivityRecords.map((r) => ({
+        ...r,
+        dayId: todayId,
+      }));
       state.global.userPreferences.dailyTempoTarget = 100;
       const manager = new AnalyticsManager(createMockSystemCore(state));
 

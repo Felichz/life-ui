@@ -371,15 +371,10 @@ describe("UtilityService", () => {
       // El core y la UI deben usar la misma base para cualquier caso.
       for (const estimated of [undefined, null, 0, -5, 30, 60]) {
         for (const duration of [0, 5, 30, 60]) {
-          const baseFromHelper = UtilityService.resolveBaseMinutes(
-            estimated,
-            duration
-          );
+          const baseFromHelper = UtilityService.resolveBaseMinutes(estimated, duration);
           // Simula la lógica anterior de calculateTemposAwarded
           const baseFromLegacy =
-            typeof estimated === "number" && estimated > 0
-              ? estimated
-              : duration;
+            typeof estimated === "number" && estimated > 0 ? estimated : duration;
           expect(baseFromHelper).toBe(baseFromLegacy);
         }
       }

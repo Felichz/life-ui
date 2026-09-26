@@ -1,6 +1,5 @@
 import { SystemCore } from "../index";
 import { EventManager } from "../eventManager";
-import { PersistenceManager } from "../persistenceManager";
 
 // Mock localStorage para las pruebas
 beforeEach(() => {

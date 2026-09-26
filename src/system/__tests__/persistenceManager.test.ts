@@ -2,11 +2,7 @@
  * @jest-environment jsdom
  */
 
-import {
-  PersistenceManager,
-  STORAGE_KEY,
-  CURRENT_SCHEMA_VERSION,
-} from "../persistenceManager";
+import { PersistenceManager, STORAGE_KEY, CURRENT_SCHEMA_VERSION } from "../persistenceManager";
 import type { AppState } from "../../types";
 
 // Mock directo de localStorage
@@ -36,8 +32,8 @@ beforeAll(() => {
 });
 
 // Silenciamos console.error durante las pruebas
-const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
-const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation();
+jest.spyOn(console, "error").mockImplementation();
+jest.spyOn(console, "warn").mockImplementation();
 
 describe("PersistenceManager", () => {
   let persistenceManager: PersistenceManager;
@@ -535,8 +531,9 @@ describe("PersistenceManager", () => {
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
-      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
-        .toBeUndefined();
+      expect(
+        (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
+      ).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
     });
   });
@@ -612,8 +609,9 @@ describe("PersistenceManager", () => {
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
-      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
-        .toBeUndefined();
+      expect(
+        (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
+      ).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
       // dailyTempoTarget preservado por la migración
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(800);
@@ -711,8 +709,9 @@ describe("PersistenceManager", () => {
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
-      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
-        .toBeUndefined();
+      expect(
+        (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
+      ).toBeUndefined();
 
       // Sin migración (ya era v3) -> sin legacyArchive (no había datos para archivar
       // porque stripLegacyFields los eliminó directamente)

@@ -1,17 +1,29 @@
+# Dependencies and build output
 node_modules
 dist
-backup.json
-personal_design.txt
+*.tsbuildinfo
 
-# Local artifacts
-dev.log
-dev2.log
-cypress-typecheck.log
-modal-flow-run.log
-harness.log
-harness-mf.log
-tl-run*.log
-mf-run.log
-debug-*.log
+# Test artifacts
+cypress/screenshots
+cypress/videos
+coverage
+
+# Local tooling
+.claude/
+.impeccable/
+.vercel
+.visual-review*/
+*.log
 $null
-tsconfig.app.tsbuildinfo
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example

@@ -18,9 +18,7 @@ jest.mock("../persistenceManager", () => {
       sharedPersistence.serialize = jest.fn((state: AppState) =>
         JSON.stringify({ ...state, schemaVersion: 3 })
       );
-      sharedPersistence.deserialize = jest.fn((json: string) =>
-        JSON.parse(json) as AppState
-      );
+      sharedPersistence.deserialize = jest.fn((json: string) => JSON.parse(json) as AppState);
     }
     return sharedPersistence;
   });
@@ -68,9 +66,7 @@ describe("SystemCore", () => {
     mockPersistence.serialize.mockImplementation((state: AppState) =>
       JSON.stringify({ ...state, schemaVersion: 3 })
     );
-    mockPersistence.deserialize.mockImplementation((json: string) =>
-      JSON.parse(json) as AppState
-    );
+    mockPersistence.deserialize.mockImplementation((json: string) => JSON.parse(json) as AppState);
 
     // Obtener el estado inicial
     mockAppState = systemCore.getState();
@@ -471,8 +467,9 @@ describe("SystemCore", () => {
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
-      expect((global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds)
-        .toBeUndefined();
+      expect(
+        (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
+      ).toBeUndefined();
       // Pero el archivo está disponible
       expect(global.legacyArchive).toBeDefined();
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1500);

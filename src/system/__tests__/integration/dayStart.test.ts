@@ -1,5 +1,5 @@
 import { SystemCore } from "../../index";
-import type { ActivityTemplate, ActivityType, TimeBlock, ActivityInstance } from "../../../types";
+import type { ActivityType } from "../../../types";
 
 /**
  * Tests de integración para el Flujo 1: Inicio del día
@@ -24,7 +24,7 @@ describe("Flujo 1: Inicio del día", () => {
     expect(system.getState().global.days.length).toBe(0);
 
     // Iniciar el día (equivalente a hacer clic en "Comenzar día")
-    const nuevoDia = system.startDay();
+    system.startDay();
 
     // Verificar que el día se haya iniciado correctamente
     expect(system.isDayActive()).toBe(true);
@@ -126,7 +126,7 @@ describe("Flujo 1: Inicio del día", () => {
     expect(system.getState().global.completedActivityRecords.length).toBeGreaterThan(0);
 
     // Iniciar nuevo día
-    const nuevoDia = system.startDay();
+    system.startDay();
 
     // Verificar que el día se ha iniciado correctamente
     expect(system.isDayActive()).toBe(true);

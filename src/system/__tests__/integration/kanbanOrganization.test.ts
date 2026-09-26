@@ -331,7 +331,7 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
     }).not.toThrow();
 
     // Crear nueva instancia en bloque actual
-    const instancia2 = system.createActivityInstance(templates[1].id, mediodiaBlock.id);
+    system.createActivityInstance(templates[1].id, mediodiaBlock.id);
 
     // Intentar mover a bloque pasado (debería fallar - no implementado en SystemCore)
     // En el sistema real, esta validación podría estar en la capa de UI o en SystemCore

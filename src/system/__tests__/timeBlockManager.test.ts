@@ -1,7 +1,7 @@
 import { TimeBlockManager } from "../timeBlockManager";
 import { SystemCore } from "../index";
 import { UtilityService } from "../utilityService";
-import type { AppState, TimeBlock } from "../../types";
+import type { AppState } from "../../types";
 
 // Mock para SystemCore
 jest.mock("../index");
@@ -818,7 +818,6 @@ describe("TimeBlockManager", () => {
   });
 
   describe("isTimeBlockAvailable", () => {
-    let defaultBlockId: string;
     let morningBlockId: string;
     let afternoonBlockId: string;
 
@@ -871,7 +870,6 @@ describe("TimeBlockManager", () => {
       };
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
-      defaultBlockId = "default-block-id";
       morningBlockId = mockUUID;
       afternoonBlockId = mockUUID2;
 

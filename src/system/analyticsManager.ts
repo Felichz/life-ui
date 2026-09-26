@@ -228,11 +228,6 @@ export class AnalyticsManager {
       (record) => !dayId || record.dayId === dayId
     );
 
-    // Crear mapa de plantillas para obtener los títulos
-    const templatesMap = new Map(
-      state.global.activityTemplates.map((template) => [template.id, template.title])
-    );
-
     // Agrupar actividades por tipo
     const activitiesByCategory = new Map<string, CompletedActivityRecord[]>();
 

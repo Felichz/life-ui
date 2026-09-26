@@ -119,7 +119,7 @@ export class UtilityService {
     return copy as T;
   }
 
-/**
+  /**
    * Determina si una actividad cumple la condición de "beat estimate".
    *
    * En el MVP v3 esto es **métrica informativa únicamente**: no se usa

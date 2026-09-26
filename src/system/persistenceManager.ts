@@ -89,9 +89,7 @@ export class PersistenceManager implements IPersistenceManager {
       throw new Error("Estructura de estado inválida");
     }
 
-    const migration = this.migrateIfNeeded(
-      parsedState as AppState & { schemaVersion?: number }
-    );
+    const migration = this.migrateIfNeeded(parsedState as AppState & { schemaVersion?: number });
 
     if (migration.warnings.length > 0) {
       console.warn("Migración de estado:", migration.warnings);
@@ -133,10 +131,7 @@ export class PersistenceManager implements IPersistenceManager {
       try {
         return this.deserialize(serializedState);
       } catch (deserializeError) {
-        console.error(
-          "Error al deserializar el estado desde localStorage:",
-          deserializeError
-        );
+        console.error("Error al deserializar el estado desde localStorage:", deserializeError);
         return null;
       }
     } catch (error) {
