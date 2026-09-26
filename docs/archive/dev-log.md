@@ -785,3 +785,22 @@ Notas para siguientes tickets:
 - Para futuros desarrollos, esta estructura facilita la expansión a una vista diaria completa más intuitiva.
 - El Timeline ahora utiliza mejor el espacio horizontal, especialmente importante en dispositivos con pantallas más anchas.
 - Esta implementación refuerza el patrón visual de organización cronológica de actividades (línea de tiempo arriba, organización de tareas abajo).
+
+## Ticket ID: UI v4
+
+Título: Nueva interfaz desde cero
+
+Resumen de cambios:
+
+- UI reescrita desde cero en `src/app/` (se retira `src/ui/`, MUI y Emotion). Tailwind con tokens en variables CSS, tema claro/oscuro según el sistema, Radix UI, Inter autoalojada (la app sigue siendo offline-first).
+- Navegación: barra lateral en escritorio, barra inferior en móvil, paleta de comandos (`Ctrl/⌘ K`) y atajos de teclado.
+- Hoy: panel de foco con cronómetro y progreso contra el contrato de duración; accesos rápidos a actividades ancladas (`ActivityTemplate.pinned`); plan por bloques en lista o tablero con arrastrar y soltar; registro con la tira del día.
+- Ritual de cierre único (`ClosingFlowProvider`): escala 0–10 con teclado, vista previa de tempos desde la misma fuente que el core, aviso de qué pasará después, "No la terminé" sin juicio, y "Seguir con ella" explícito.
+- Biblioteca (actividades, eventos, bloques con presets), Resumen (métricas, tabla, tendencias frente a la referencia) y Ajustes (referencia, tema, exportar/importar/borrar).
+- Correcciones en el core: `requestCompletion` y `completeActivity` usan el mismo estimado (el de la instancia, con la plantilla como respaldo); `dailyTempoTotal` solo suma el día actual; `moveActivityInstance` con posición inserta y renumera el bloque.
+- Tests: `src/app/__tests__/` (lógica de presentación y flujos de Hoy contra el core real), `closingRitual.test.ts` en el core y una suite Cypress nueva (`cypress/e2e/qualia.cy.ts`) que recorre el producto completo. Las specs de la UI anterior se retiraron.
+
+Notas para siguientes tickets:
+
+- La UI no debe recalcular reglas: si hace falta un dato nuevo, se añade al core.
+- `PRODUCT.md` recoge la verdad de producto y `DESIGN.md` el sistema visual.

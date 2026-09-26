@@ -94,9 +94,9 @@ Construir un sistema de tempos con las siguientes propiedades simultáneas:
      (mostrada en CompletionModal como "✓ batiste el estimado") y del
      `CompletedActivityRecord.beatEstimate`, pero **NO** modifica el score
      inicial ni otorga bonus automático.
-   - Score default del slider al abrir el modal: **siempre 7** (umbral).
-   - El usuario decide explícitamente si su satisfacción amerita 8 (110%),
-     9 (120%) o 10 (130%).
+   - Score default del slider al abrir el modal: **siempre 7** (= 100% de la base).
+   - El usuario decide explícitamente si su satisfacción amerita 8, 9 o 10;
+     la vista previa muestra la recompensa exacta según la fórmula lineal.
 
 4. **Tipos de actividad y `beatEstimate`** (calculado en el core):
 
@@ -131,8 +131,8 @@ La UI nunca recalcula la fórmula. Solo envía:
 }
 ```
 
-El core aplica la tabla de multiplicadores, decide la base (estimado vs
-duración real), calcula el total, y devuelve:
+El core aplica la fórmula lineal `ceil(baseMinutos × score / 7)`, decide
+la base (estimado vs duración real), calcula el total, y devuelve:
 
 ```ts
 {
@@ -145,7 +145,7 @@ duración real), calcula el total, y devuelve:
 ```
 
 Importante: `targetProgress` es **el ratio real sin capear**, puede
-ser > 1 si el usuario supera su target diario (ej: 1847 / 1000 = 1.847).
+ser > 1 si el usuario supera su target diario (ej: 184 / 100 = 1.84).
 La UI muestra este ratio sin cap en `displayPercent` y capeado a 100 en
 `progressBarValue`.
 
@@ -198,10 +198,10 @@ Esto aplica a:
 
 #### Target = orientación
 
-`dailyTempoTarget` es un número configurable (default 1000). La UI lo muestra como porcentaje del día:
+`dailyTempoTarget` es un número configurable (default 100). La UI lo muestra como porcentaje del día:
 
 ```text
-Hoy: 420 / 1000 tempos   (42% de tu referencia diaria)
+Hoy: 42 / 100 tempos   (42% de tu referencia diaria)
 ```
 
 Nunca:
@@ -258,7 +258,7 @@ interface CompletedActivityRecord {
 
 interface UserPreferences {
   updatedAt: ISODateTimeString;
-  dailyTempoTarget: number; // default 1000
+  dailyTempoTarget: number; // default 100
 }
 
 interface TempoSummary {
@@ -390,7 +390,7 @@ interface ISystemCore {
 └─────────────────────────────────────────────────────┘
 ```
 
-   - **Sin auto-10**. El slider siempre arranca en 7 (100% de la base). El usuario decide explícitamente si su satisfacción amerita más (score 8/9/10) o menos (score 1-6). `beatEstimate` se conserva como métrica informativa (mostrada como "✓ batiste el estimado") pero no sesga el score.
+- **Sin auto-10**. El slider siempre arranca en 7 (100% de la base). El usuario decide explícitamente si su satisfacción amerita más (score 8/9/10) o menos (score 1-6). `beatEstimate` se conserva como métrica informativa (mostrada como "✓ batiste el estimado") pero no sesga el score.
 - **Botón "No la terminé"** aparece siempre. Llama `interruptActivity(id)`, registra interrupción sin tempos, snackbar positivo: _"Está bien. Mañana es otra oportunidad."_
 - Si el usuario cierra el modal sin elegir, la actividad sigue activa. Nada se registra.
 
@@ -400,7 +400,7 @@ interface ISystemCore {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Hoy: 420 / 1000 tempos  ████░░░░  42% de tu       │
+│  Hoy: 42 / 100 tempos   ████░░░░  42% de tu       │
 │                                   referencia diaria  │
 │                                                     │
 │  Última: Escribir informe  ·  +309 tempos            │
@@ -425,7 +425,7 @@ interface MigrationResult {
 
 Migración v1 → v2:
 
-- Agrega `dailyTempoTarget: 1000` si falta en `userPreferences`.
+- Agrega `dailyTempoTarget: 100` si falta en `userPreferences`.
 - `completedActivityRecords` antiguos quedan con `temposAwarded: 0`, `satisfactionScore: 0`, `beatEstimate: false`.
 - `subjectiveVariables`, `subjectiveVariableSnapshots`, `interruptionCauses` se **preservan** en localStorage (no se borran), pero **no se cargan** en `AppState`. Si el usuario exporta datos, los incluye como archivo histórico.
 - `interruptionData.isAvoidable` queda ignorado.

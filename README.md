@@ -1,390 +1,106 @@
-# Qualia Control: Una Interfaz para la Vida
+# Qualia Control
 
-## Concepto Base
+**A HUD for real life.** Plan your day, focus on one thing at a time, and close each activity with an honest self-assessment that earns _tempos_, a reward that only ever goes up.
 
-Qualia Control es una aplicación que funciona como una verdadera interfaz de usuario (UI) para la vida real, similar a cómo los videojuegos tienen una interfaz que proporciona información relevante al jugador. La aplicación asume que "la vida en sí es el único juego real, es la única fuente de la verdad" y simplemente proporciona una interfaz que complementa esta realidad sin sustituirla.
+Built for (and by) someone with ADHD: one obvious next action, what's running always visible, no streaks, no debt, and free time never costs anything.
 
-## Filosofía del Proyecto
+> The interface is in Spanish. Code, architecture and this README are meant to be readable by anyone.
 
-- **La vida es el juego, la aplicación es solo la interfaz**: La aplicación no pretende crear un sistema artificial de gamificación, sino complementar y visualizar la vida real del usuario.
-- **Enfoque en datos reales**: Recopilar y mostrar información precisa sobre las actividades y tiempo del usuario, sin distracciones innecesarias.
-- **El usuario mantiene el control**: La responsabilidad final sobre la motivación y las decisiones recae en el usuario, no en la aplicación.
-- **Valor directo y optimización de la experiencia**: El sistema está puramente enfocado en aportar valor directo al usuario, ayudándole a optimizar su experiencia real según sus propios criterios.
+<p align="center">
+  <img src="docs/screenshots/today-light.png" alt="Today screen: the running activity with its timer, quick starts, the day's plan by time blocks and the day's log" width="100%" />
+</p>
 
-## Funcionalidades Principales
+<p align="center">
+  <img src="docs/screenshots/mobile-today.png" alt="Today on a phone" width="32%" />
+  &nbsp;
+  <img src="docs/screenshots/mobile-closing.png" alt="The closing ritual as a bottom sheet on a phone, dark theme" width="32%" />
+</p>
 
-### 1. Gestión de Actividades y Bloques de Tiempo
+## How it works
 
-#### Biblioteca de Actividades
+1. **Library.** Save the activities you repeat, each with a duration contract:
+   - _Clear objective_: has an end; you estimate it (`~45 min`).
+   - _Flexible_: varies within a known range (`5–10 min`).
+   - _Timebox_: you commit to a minimum, a maximum or both, and get notified when you reach them.
+2. **Plan.** Drop them into the day's time blocks (Morning, Afternoon…) or _To do_. Only _To do_ and the block you're in right now can be started.
+3. **Focus.** Exactly one activity runs at a time. The timer and its progress against the contract are always on screen, in the tab title, and in a floating bar on mobile.
+4. **The closing ritual.** Every ending (finishing, switching to something else, ending the day) goes through one dialog: _how satisfied are you with what you did, 0–10?_
 
-- **Definición**: Repositorio donde el usuario crea y configura plantillas de actividades que puede reutilizar
-- **Propiedades inmutables** (no cambian al incorporar la actividad al día):
-  - Nombre y descripción de la actividad
-  - Tipo de actividad (objetivo claro, duración flexible, timeboxing)
-  - Categoría o etiquetas para clasificación
-  - Icono o representación visual
-- **Propiedades dinámicas** (tienen valores predeterminados pero pueden modificarse al incorporar al día):
-  - Para actividades con objetivo claro: tiempo estimado predeterminado (ej. "~45 min")
-  - Para actividades de duración flexible: rango de tiempo predeterminado (ej. "entre 5-10 minutos")
-  - Para actividades de timeboxing: configuración predeterminada (ej. "mínimo 10 minutos")
+   `tempos = ceil(base minutes × score / 7)`, where the base is your estimate when there is one and the real time otherwise. A 7 is 100%. A 0 counts nothing, and "I didn't finish it" is recorded without judgment.
 
-#### Incorporación de Actividades al Día
+5. **Review.** Each day's tempos against a daily reference (shown as a percentage, never as what's "missing"), what actually happened hour by hour, and the trend across days.
 
-- Cuando el usuario selecciona una actividad de la biblioteca para añadirla al día:
-  - Las propiedades inmutables se mantienen fijas
-  - Las propiedades dinámicas se cargan con sus valores predeterminados
-  - El usuario puede modificar las propiedades dinámicas según las necesidades específicas del día
-  - Esta configuración de actividad específica para el día es la que se utiliza en todos los análisis y registros
+<p align="center">
+  <img src="docs/screenshots/closing-ritual.png" alt="The closing ritual: real vs estimated time, a 0–10 satisfaction scale and a live reward preview" width="80%" />
+</p>
 
-#### Bloques de Tiempo
+## Architecture
 
-- **Definición**: Rangos horarios predefinidos que el usuario puede crear para organizar su día
-- **Ejemplos**: "Mañana" (6:00-12:00), "Tarde" (12:00-18:00), "Noche" (18:00-23:00)
-- **Función**: Permiten al usuario hacer declaraciones flexibles como "voy a hacer X actividad en la mañana"
+The domain logic and the UI are separate layers. The UI never re-implements a rule: it reads state and calls the core.
 
-#### Planes de Acción
+```mermaid
+flowchart LR
+  subgraph UI["src/app · React UI"]
+    Screens["Screens<br/>Today · Library · Review · Settings"]
+    Flow["ClosingFlowProvider<br/>single closing path"]
+  end
+  subgraph Core["src/system · domain core (framework-free TS)"]
+    SC["SystemCore<br/>state + subscriptions"]
+    M["Managers<br/>Day · Activity · TimeBlock · Event<br/>Analytics · Preferences"]
+    U["UtilityService<br/>tempo formula (single source)"]
+    P["PersistenceManager<br/>versioned schema + migrations"]
+  end
+  Screens -- "reads state / calls methods" --> SC
+  Flow -- "requestCompletion → completeActivity" --> SC
+  SC --> M --> U
+  SC --> P --> LS[("localStorage")]
+```
 
-- **Definición**: Agrupaciones predefinidas de actividades, posiblemente con un orden sugerido
-- **Función**: Permiten al usuario reutilizar secuencias comunes de actividades sin necesidad de recrearlas
-- **Ejemplo**: "Plan matutino" (que incluye: meditación, ejercicio, desayuno, revisión de correos)
+- **`src/system`** is plain TypeScript with no React. `SystemCore` owns an immutable state tree, persists every change, and notifies subscribers. Managers encapsulate each area, and the persistence layer versions the schema and migrates old data (v1 → v3).
+- **`src/app`** is the React UI. `state/` wraps the core in a provider plus the closing flow, `features/` holds one folder per screen, `components/ui` holds the design-system primitives, and `lib/` holds formatting and read-only view helpers.
+- **One closing path.** Finishing, switching activity and ending the day all run through `requestCompletion → dialog → completeActivity | interruptActivity`. The next action only runs if the close was saved, and dismissing the dialog leaves the activity running.
+- **Preview = result.** The reward preview in the dialog calls the same `UtilityService` functions the core uses to award tempos, so what you see is what you get.
+- **Offline-first.** No backend, and all data stays in the browser. Settings can export and import a JSON backup.
 
-### 2. Sistema de Organización de Actividades (Estilo Kanban)
+Decisions are documented rather than implied:
 
-#### Columnas de Organización
+- [`docs/adr/001-sistema-de-tempos.md`](docs/adr/001-sistema-de-tempos.md): the tempo system and what was deliberately removed.
+- [`PRODUCT.md`](PRODUCT.md): users, purpose and product principles.
+- [`DESIGN.md`](DESIGN.md): the visual system (tokens, type, components, rules).
 
-- **Columna "Por Hacer" (Todo)**:
+## Tech stack
 
-  - Contiene actividades pendientes sin tiempo específico asignado
-  - Funciona como un backlog general de tareas
+React 18 · TypeScript (strict) · Vite · Tailwind CSS with CSS-variable tokens (light/dark follows the system) · Radix UI primitives · `@hello-pangea/dnd` · Inter (self-hosted) · Jest + Testing Library · Cypress
 
-- **Columnas de Bloques de Tiempo**:
-  - Cada columna representa un bloque de tiempo definido
-  - El usuario puede crear y personalizar estos bloques
-  - Las actividades colocadas en estas columnas están asignadas a ese rango horario
+## Getting started
 
-#### Restricciones Temporales
+Requires Node 20+.
 
-- El sistema solo permite activar actividades de la columna "Por Hacer" o del bloque de tiempo actual
-- Las actividades en bloques futuros aparecen deshabilitadas
-- Para activar una actividad fuera de su bloque, el usuario debe reasignarla
+```bash
+npm install
+npm run dev          # http://localhost:5174
+```
 
-#### Flujo de Trabajo
+| Script              | What it does                                                |
+| ------------------- | ----------------------------------------------------------- |
+| `npm run build`     | Type-check and build for production into `dist/`            |
+| `npm run typecheck` | Type-check app, tooling and Cypress projects                |
+| `npm run lint`      | ESLint + Prettier, zero warnings allowed                    |
+| `npm test`          | Unit and integration tests (Jest)                           |
+| `npm run test:e2e`  | End-to-end run through the whole day (Cypress, needs `dev`) |
 
-1. El usuario selecciona una actividad de su biblioteca (que ya tiene un tipo definido)
-2. Ajusta las propiedades dinámicas según las necesidades del día (estimación de tiempo, rango, etc.)
-3. Selecciona un bloque de tiempo (columna) o lo deja en "Por Hacer"
-4. Las actividades aparecen organizadas en las columnas correspondientes
-5. El usuario puede reorganizarlas según necesite mediante arrastrar y soltar
+Keyboard: `Ctrl/⌘ K` command palette · `N` add activity · `E` log event · `T` finish the running activity · `G` then `H`/`B`/`R`/`A` to navigate · `0–9` to score in the closing ritual.
 
-### 3. Sistema de Estimaciones y Seguimiento
+## Testing
 
-**Actividades con Objetivo Claro**
+- **Core:** unit tests for every manager plus integration tests for the main flows (starting a day, library, planning, the closing ritual, persistence and migrations).
+- **UI:** view-logic tests and flow tests that render the real app against a real `SystemCore`. They cover closing with the previewed reward, switching activity through the ritual, cancelling, "I didn't finish it", and quick starts.
+- **End to end:** one Cypress spec walks the whole product in the browser, from first run through ending the day, plus a mobile check.
 
-- **Definición**: Actividades con un inicio y fin definidos y un resultado específico que completar
-- **Propósito**: Planificar cuánto tiempo tomará alcanzar un objetivo concreto
-- **Estimación**: El usuario estima un tiempo aproximado para completar la actividad ("~45 min" en lugar de un valor exacto)
-- **Seguimiento**: Se compara el tiempo real con la estimación; las desviaciones indican planificación imprecisa
-- **Ejemplo**: 📝 Escribir informe - Estimado: ~45 min | Real: 60 min ❌ (+15 min)
+## Deploying
 
-**Actividades de Duración Flexible**
+It's a static SPA. On Vercel, import the repo and deploy: [`vercel.json`](vercel.json) sets the Vite build, the SPA rewrite for client-side routes, and long-term caching for hashed assets.
 
-- **Definición**: Actividades cuya duración puede variar pero tienen un rango típico predecible
-- **Propósito**: Informativo - dar al usuario una noción de cuánto tiempo esperar dedicar
-- **Estimación**: Se define un rango de tiempo estimado basado en experiencia previa (ej. 5-10 minutos)
-- **Naturaleza**: Es una predicción o expectativa, no un límite estructural
-- **Seguimiento**: Se verifica si el tiempo real cae dentro del rango establecido
-- **Sin temporizador activo**: No hay notificaciones de límites, solo registro posterior
-- **Ejemplo**: 🧹 Barrer - Rango estimado: 5-10 min | Real: 8 min ✅
+## License
 
-**Actividades de Timeboxing con Modalidades Avanzadas**
-
-- **Definición**: Actividades donde el usuario establece deliberadamente límites de tiempo estructurales
-- **Propósito**: Estructurar intencionalmente el tiempo (no solo predecirlo)
-- **Naturaleza**: Refleja una decisión consciente, no una predicción
-- **Temporizador activo**: Notifica al usuario al alcanzar límites establecidos
-- **Tipos**:
-  - **Tiempo mínimo**: "Declaro que voy a leer al menos 10 minutos" (para vencer la resistencia inicial)
-    - Notifica cuando se alcanza el mínimo, permitiendo continuar si hay flujo
-  - **Tiempo máximo**: "Declaro que voy a revisar correos máximo 15 minutos" (para limitar actividades expansivas)
-    - Alerta cuando se aproxima el límite máximo establecido
-  - **Rango de tiempo**: "Declaro que voy a caminar mínimo 15 minutos pero máximo 1 hora"
-    - Combina los beneficios de tener un compromiso mínimo para comenzar con un límite máximo para no extenderse
-- **Ejemplo**: 📚 Leer - Timebox: mínimo 20 min | Real: 35 min ✅ (extensión voluntaria)
-
-### 4. Gestión de Estados de Actividad y Descanso
-
-#### Actividades Universales del Sistema
-
-- **Piloto automático**: Estado activo por defecto cuando el usuario no declara ninguna actividad específica
-
-  - Se registra automáticamente cuando no hay otra actividad declarada
-  - Funciona como un "fallback" universal para evitar periodos sin registro
-  - Representa el tiempo donde permitimos que la mente haga lo que quiera
-
-- **Meditación**: Actividad estructurada de recuperación mental
-
-  - Requiere esfuerzo y disciplina pero busca la recuperación
-  - Se registra como actividad regular pero con propósito de recuperación
-
-- **Descanso consciente**: Actividad donde el usuario intencionalmente descansa
-  - A diferencia del piloto automático, es un descanso deliberado
-  - El usuario procura no realizar actividades demandantes
-  - Puede configurarse con timeboxes específicos ("Descanso de 15 minutos")
-
-#### Barra de Acceso Rápido
-
-- Implementada como una "hotbar" donde el usuario puede seleccionar una colección de actividades frecuentes
-- Botones con iconos distintivos para actividades fundamentales
-- Tooltips que aparecen al hacer hover mostrando detalles de cada actividad
-- Posibilidad de personalizar la barra añadiendo actividades frecuentes
-
-#### Manejo de Timeboxes Finalizados
-
-- Cuando un timebox termina y el usuario no ha interactuado con la aplicación:
-  - El sistema registra ese tiempo como "Tiempo extendido no confirmado"
-  - Al regresar, el usuario puede confirmar la actividad o reclasificar ese tiempo
-- Se mantiene un registro tanto del timebox original como de las extensiones
-
-### 5. Gestión de Estados Subjetivos
-
-#### Variables Subjetivas del Usuario
-
-- **Variables subjetivas personalizables**:
-
-  - El usuario puede definir y actualizar variables que reflejen su estado (energía, concentración, dolor de cabeza, etc.)
-  - Escala adaptable según la variable (1-5, 1-10, etc.)
-  - Posibilidad de crear variables personalizadas según necesidades específicas
-
-- **Actualización en cualquier momento**:
-
-  - El usuario puede actualizar sus variables de estado cuando lo desee
-  - El sistema sugiere actualizaciones en checkpoints específicos (fin de actividad, registro de evento)
-  - Se registran tanto el valor inicial como el final para cada cambio
-
-- **Registro completo de estados**:
-  - Se captura un snapshot completo de todas las variables en cada actualización
-  - Permite analizar también cuando una actividad prolongada no genera fatiga
-- **Sistema de referencias entre estados y actividades/eventos**:
-  - Cada snapshot de variables incluye multiselect para relacionarlo con actividades o eventos
-  - En checkpoints como fin de actividad, la actividad terminada aparece preseleccionada
-  - Durante una actividad activa, esa actividad aparece preseleccionada
-  - El usuario puede seleccionar múltiples actividades y eventos como causas del cambio
-  - Permite capturar efectos retardados de eventos anteriores (como medicación)
-  - Este sistema facilita el análisis causal entre acciones y cambios en estados subjetivos
-
-#### Métricas Relacionadas con Actividades
-
-- **Satisfacción con la actividad**: Escala del 1 al 10 para medir la satisfacción general
-- **Percepción de valor por tiempo invertido**: Evalúa si el tiempo dedicado valió la pena
-
-#### Variables Globales del Sistema
-
-- **Momentum**: Variable derivada que representa la continuidad y densidad de actividades planificadas
-  - Aumenta cuando el usuario completa actividades consecutivamente con descansos breves
-  - Disminuye durante periodos largos de "piloto automático"
-  - Permite identificar cuándo los niveles de momentum son óptimos para ciertos tipos de actividades
-
-#### Eventos Puntuales
-
-- **Registro de eventos discretos**:
-  - El usuario puede registrar eventos puntuales como "Tomé ibuprofeno", "Comí algo con cafeína", etc.
-  - Al registrar un evento, se ofrece la opción de actualizar variables subjetivas
-  - El sistema reconoce que muchos eventos tienen efectos retardados (no inmediatos)
-- **Visualización y referencias**:
-  - Estos eventos aparecen como marcadores en la visualización principal
-  - Cuando el usuario actualiza variables más tarde, puede seleccionar eventos anteriores como causas
-  - El sistema puede sugerir eventos recientes que podrían estar relacionados con cambios actuales
-  - Se pueden establecer múltiples relaciones causales para análisis más precisos
-
-### 6. Causas de Interrupción
-
-- **Registro de causas de interrupción evitables**:
-
-  - Cuando el usuario no completa una actividad según lo planeado, puede registrar la causa
-  - El sistema ofrece una distinción simple: "¿Fue por una causa que podrías evitar en el futuro?" (Sí/No)
-  - Solo se registran con detalle las causas evitables, ya que son las únicas sobre las que el usuario puede actuar
-
-- **Causas personalizadas**:
-
-  - El usuario puede crear causas personalizadas específicas a su situación
-  - Estas causas se guardan para su uso posterior, simplificando el proceso de registro
-
-- **Análisis de patrones de interrupción**:
-  - El sistema muestra estadísticas como "30% de tus actividades fueron interrumpidas por causas evitables"
-  - Identifica las causas de interrupción más frecuentes
-  - La información se presenta de forma diagnóstica y constructiva, no punitiva
-
-### 7. Visualización de Datos
-
-#### Visualización Principal (Estilo Kanban)
-
-- **Columnas de Organización**:
-
-  - Columna "Por Hacer" para actividades sin bloque de tiempo asignado
-  - Columnas para cada bloque de tiempo definido por el usuario
-  - Indicadores visuales que muestran qué columnas están actualmente disponibles
-
-- **Visualización de Actividades**:
-  - Las actividades aparecen como tarjetas en las columnas correspondientes
-  - Información visual sobre tipo de actividad, duración estimada, y estado
-
-#### Otras Visualizaciones
-
-- **Comparativa de estimaciones vs. tiempo real**:
-
-  - Para actividades con objetivo claro: barras de comparación entre estimación y realidad
-  - Para actividades flexibles: indicadores de si el tiempo real cayó dentro del rango
-  - Para timeboxing: marcadores de cumplimiento del bloque establecido y registro de extensiones
-
-- **Visualización de estados subjetivos**:
-
-  - Gráficos que muestran la evolución de variables subjetivas a lo largo del día
-  - Correlación visual con actividades y descansos
-
-- **Representación de momentum y eventos puntuales**:
-  - Línea de tendencia para el momentum a lo largo del día
-  - Marcadores para eventos puntuales que pueden influir en las variables
-
-### 8. Declaraciones Default por Grupos de Días
-
-- **Configuración de patrones por días**:
-
-  - El usuario puede definir conjuntos de declaraciones predeterminadas para diferentes grupos de días:
-    - Días laborables (Lunes a Viernes)
-    - Fin de semana (Sábado y Domingo)
-    - Días específicos (solo Martes y Jueves, etc.)
-    - Patrones personalizados
-
-- **Declaraciones automáticas**:
-
-  - En base a estos patrones, el sistema carga automáticamente actividades y planes de acción en las columnas correspondientes
-  - Ejemplos:
-    - "Haré Plan de acción: Rutina matutina en bloque Mañana" (L-V)
-    - "Haré Actividad: Tiempo familiar en bloque Tarde" (S-D)
-
-- **Ajustes diarios**:
-  - El usuario puede modificar las actividades precargadas según necesite
-  - El sistema mantiene la estructura básica mientras permite flexibilidad
-
-## Responsabilidades del Usuario y la Aplicación
-
-### Responsabilidades del Usuario:
-
-- Declarar el inicio y finalización de actividades
-- Actualizar sus variables de estado subjetivas cuando lo considere necesario
-- Definir sus actividades, timeboxes y estimaciones de tiempo
-- Establecer sus bloques de tiempo personalizados
-- Crear sus planes de acción para reutilizar secuencias de actividades
-- Configurar las declaraciones default para diferentes grupos de días
-- Registrar eventos puntuales relevantes
-- Registrar las causas de interrupción cuando no completa actividades
-
-### Responsabilidades de la App:
-
-- Registrar con precisión los tiempos de actividades y descansos
-- Visualizar la información de manera clara y accesible
-- Mostrar comparaciones entre tiempos estimados y reales
-- Detectar patrones en los datos del usuario
-- Calcular y mantener variables derivadas como el momentum
-- Proporcionar notificaciones sutiles sobre límites de tiempo
-- Solicitar actualizaciones de variables subjetivas en momentos oportunos
-- Identificar correlaciones entre actividades y cambios en estados subjetivos
-- Analizar patrones de interrupciones y proporcionar insights útiles
-
-## Aspectos Técnicos
-
-### Arquitectura de la Interfaz de Usuario
-
-**Estructura Principal**
-
-- **Panel de Organización Kanban**:
-
-  - Columnas para "Por Hacer" y bloques de tiempo
-  - Tarjetas de actividades arrastrables
-  - Indicadores de estado y tiempo
-
-- **Panel de Estados Subjetivos**:
-
-  - Controles intuitivos para actualizar variables subjetivas
-  - Visualización de tendencias a lo largo del día/semana
-
-- **Barra de Acceso Rápido**:
-
-  - Botones con iconos distintivos para actividades frecuentes
-  - Acceso rápido a actividades especiales como Meditación y Piloto Automático
-
-- **Panel de Biblioteca de Actividades**:
-  - Repositorio donde el usuario crea y configura sus actividades
-  - Opciones para crear nuevos planes de acción
-  - Interfaz para establecer propiedades de actividades
-
-### Arquitectura de Datos
-
-**Modelo de Datos**
-
-- **Actividades en Biblioteca**:
-
-  - Plantillas de actividades con propiedades inmutables y valores predeterminados para propiedades dinámicas
-  - Funcionan como base para crear instancias específicas de actividades
-
-- **Actividades Realizadas**:
-
-  - Instancias específicas de actividades incorporadas al día
-  - Mantienen todas las propiedades inmutables de la actividad original
-  - Contienen los valores específicos de las propiedades dinámicas definidas para esa instancia
-  - Registran tiempo real de ejecución, interrupciones, extensiones, etc.
-  - Incluyen referencias a los bloques de tiempo asignados
-
-- **Referencias a Actividades**:
-
-  - Cuando se hace referencia a una actividad (ej. desde un snapshot de variables):
-    - Se guarda el ID de la instancia específica de la actividad (no solo el ID de la plantilla)
-    - Se incluyen los valores de las propiedades dinámicas de esa instancia específica
-    - Esto permite análisis precisos de causa-efecto (ej. cómo afecta un timebox de "mínimo 30 min" vs uno de "mínimo 10 min" para la misma actividad)
-
-- **Bloques de Tiempo**:
-
-  - Definiciones de rangos horarios creados por el usuario
-  - Referencias a actividades asignadas a cada bloque
-
-- **Planes de Acción**:
-
-  - Colecciones de actividades predefinidas
-  - Información sobre orden sugerido y configuración
-
-- **Variables de Estado**:
-
-  - Snapshots completos e inmutables de todas las variables en cada actualización
-  - Cada snapshot incluye:
-    - Valores actuales de todas las variables (incluso las que no cambiaron)
-    - Valores iniciales y magnitud del cambio para cada variable
-    - Referencias a múltiples actividades/eventos que pudieron influir en el cambio
-    - Timestamp exacto de la actualización
-  - No se sobrescriben valores anteriores, cada actualización crea un nuevo registro
-
-- **Eventos Puntuales**:
-
-  - Registro de eventos discretos como tomar medicación
-  - Timestamp exacto de ocurrencia
-  - Mantiene referencias a qué snapshots de variables están relacionados con él
-
-- **Causas de Interrupción**:
-
-  - Registro de actividades interrumpidas con sus causas
-
-- **Variables de Sistema**:
-
-  - Registro de variables derivadas como momentum
-
-- **Declaraciones Default**:
-  - Configuraciones de actividades y planes de acción por grupos de días
-
-**Mecanismo de Referencias**
-
-- Cuando el usuario actualiza variables subjetivas:
-  - Se crea un snapshot completo de todas las variables
-  - A través de multiselects, puede relacionar este snapshot con:
-    - Múltiples actividades previas o en curso
-    - Múltiples eventos puntuales registrados anteriormente
-  - El sistema ofrece preselecciones contextuales (actividad actual, evento reciente)
-  - Estas referencias permiten análisis causales precisos y detección de patrones temporales
+[MIT](LICENSE) © Felix Andersson
