@@ -365,33 +365,48 @@ export class ActivityManager {
         throw new Error("No se puede mover una actividad activa");
       }
 
-      // Determinar el nuevo orden
-      let order: number;
-      if (newOrder !== undefined) {
-        order = newOrder;
-      } else {
-        // Si no se proporciona un orden, ponerla al final del bloque destino
-        const blockInstances = state.currentDay.activityInstances.filter(
-          (instance) => instance.blockId === targetBlockId && instance.id !== id
-        );
-        order =
-          blockInstances.length > 0
-            ? Math.max(...blockInstances.map((instance) => instance.order)) + 1
-            : 0;
-      }
-
-      // Actualizar la instancia
       const timestamp = UtilityService.getCurrentISODateTime();
-      updatedInstance = {
-        ...instance,
-        blockId: targetBlockId,
-        order,
-        updatedAt: timestamp,
-      };
+      const siblings = state.currentDay.activityInstances
+        .filter((other) => other.blockId === targetBlockId && other.id !== id)
+        .sort((a, b) => a.order - b.order);
 
-      // Crear nuevo array con la instancia actualizada
-      const updatedInstances = [...state.currentDay.activityInstances];
-      updatedInstances[instanceIndex] = updatedInstance;
+      let updatedInstances: ActivityInstance[];
+
+      if (newOrder !== undefined) {
+        // `newOrder` es la posición visible dentro del bloque destino.
+        // Se inserta ahí y se renumera el bloque 0..n para que el orden
+        // nunca quede ambiguo (dos instancias con el mismo `order`).
+        const position = Math.max(0, Math.min(newOrder, siblings.length));
+        updatedInstance = {
+          ...instance,
+          blockId: targetBlockId,
+          order: position,
+          updatedAt: timestamp,
+        };
+        const sequence = [...siblings];
+        sequence.splice(position, 0, updatedInstance);
+        const orderById = new Map(sequence.map((item, index) => [item.id, index]));
+
+        updatedInstances = state.currentDay.activityInstances.map((item) => {
+          if (item.id === id) return updatedInstance as ActivityInstance;
+          const nextOrder = orderById.get(item.id);
+          return nextOrder !== undefined && nextOrder !== item.order
+            ? { ...item, order: nextOrder }
+            : item;
+        });
+      } else {
+        // Sin posición explícita: al final del bloque destino
+        const order =
+          siblings.length > 0 ? Math.max(...siblings.map((other) => other.order)) + 1 : 0;
+        updatedInstance = {
+          ...instance,
+          blockId: targetBlockId,
+          order,
+          updatedAt: timestamp,
+        };
+        updatedInstances = [...state.currentDay.activityInstances];
+        updatedInstances[instanceIndex] = updatedInstance;
+      }
 
       return {
         ...state,
@@ -580,10 +595,7 @@ export class ActivityManager {
       ? this.calculateDuration(instance.startTime, requestedAt)
       : 0;
 
-    const estimatedMinutes =
-      template.type === "clear-objective" && template.clearObjectiveSettings
-        ? template.clearObjectiveSettings.estimatedDurationMinutes
-        : undefined;
+    const estimatedMinutes = this.resolveEstimatedMinutes(instance, template);
 
     const beatEstimate = UtilityService.calculateBeatEstimate(
       template.type,
@@ -660,10 +672,7 @@ export class ActivityManager {
         ? this.calculateDuration(instance.startTime, timestamp)
         : 0;
 
-      const estimatedMinutes =
-        template.type === "clear-objective" && instance.clearObjectiveSettings
-          ? instance.clearObjectiveSettings.estimatedDurationMinutes
-          : undefined;
+      const estimatedMinutes = this.resolveEstimatedMinutes(instance, template);
 
       beatEstimate = UtilityService.calculateBeatEstimate(
         template.type,
@@ -704,9 +713,11 @@ export class ActivityManager {
 
       resultRecord = completedRecord;
       target = state.global.userPreferences.dailyTempoTarget || 100;
+      const dayId = state.currentDay.day.id;
       dailyTotal =
-        state.global.completedActivityRecords.reduce((sum, r) => sum + (r.temposAwarded || 0), 0) +
-        temposAwarded;
+        state.global.completedActivityRecords
+          .filter((r) => r.dayId === dayId && r.state === "completed")
+          .reduce((sum, r) => sum + (r.temposAwarded || 0), 0) + temposAwarded;
 
       const updatedInstances = state.currentDay.activityInstances.filter(
         (_, idx) => idx !== instanceIndex
@@ -890,6 +901,23 @@ export class ActivityManager {
   // ===============================================
   // Métodos de utilidad
   // ===============================================
+
+  /**
+   * Estimado puntual vigente de una instancia clear-objective: el de la
+   * instancia (ajustado para hoy) y, si no tiene, el de la plantilla.
+   * Fuente única para requestCompletion (preview) y completeActivity (final),
+   * así la vista previa del cierre nunca diverge de lo que se guarda.
+   */
+  private resolveEstimatedMinutes(
+    instance: ActivityInstance,
+    template: ActivityTemplate
+  ): number | undefined {
+    if (template.type !== "clear-objective") return undefined;
+    return (
+      instance.clearObjectiveSettings?.estimatedDurationMinutes ??
+      template.clearObjectiveSettings?.estimatedDurationMinutes
+    );
+  }
 
   /**
    * Calcula la duración en minutos entre dos timestamps ISO

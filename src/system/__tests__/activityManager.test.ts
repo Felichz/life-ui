@@ -416,15 +416,29 @@ describe("ActivityManager", () => {
         expect(result.order).toBe(0); // Primer elemento en el nuevo bloque
       });
 
-      it("debe permitir especificar un nuevo orden", () => {
-        // Crear una instancia primero
+      it("debe insertar en la posición indicada y renumerar el bloque", () => {
+        (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("a");
+        const a = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
+        (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("b");
+        const b = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
+        (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("c");
+        const c = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
+
+        // Mover la última al principio
+        const result = activityManager.moveActivityInstance(c.id, mockBlockId, 0);
+        expect(result.order).toBe(0);
+
+        const ordered = mockAppState
+          .currentDay!.activityInstances.filter((i) => i.blockId === mockBlockId)
+          .sort((x, y) => x.order - y.order)
+          .map((i) => i.id);
+        expect(ordered).toEqual([c.id, a.id, b.id]);
+      });
+
+      it("debe acotar una posición fuera de rango al final del bloque", () => {
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
-
-        // Mover la instancia especificando un orden
         const result = activityManager.moveActivityInstance(instance.id, mockBlockId, 5);
-
-        // Verificar que se actualizó el orden
-        expect(result.order).toBe(5);
+        expect(result.order).toBe(0);
       });
 
       it("debe lanzar un error si se intenta mover una actividad activa", () => {
