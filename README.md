@@ -2,7 +2,7 @@
 
 **A HUD for real life.** Plan your day, focus on one thing at a time, and close each activity with an honest self-assessment that earns _tempos_, a reward that only ever goes up.
 
-Built for (and by) someone with ADHD: one obvious next action, what's running always visible, no streaks, no debt, and free time never costs anything.
+One obvious next action, what's running always visible, no streaks, no debt, and free time never costs anything.
 
 > The interface is in Spanish. Code, architecture and this README are meant to be readable by anyone.
 
