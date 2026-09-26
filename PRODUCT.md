@@ -14,7 +14,7 @@ Later: other people with ADHD. The product is personal today but should be under
 
 ## Product Purpose
 
-Qualia Control is "a UI for real life": like a game HUD, it shows the information that matters about the day without replacing the day. Life is the only real game; the app is only its interface.
+LifeUI is "a UI for real life": like a game HUD, it shows the information that matters about the day without replacing the day. Life is the only real game; the app is only its interface.
 
 The loop: plan the day (library → time blocks), focus on exactly one active activity, close it through a single honest ritual (self-assessed satisfaction 0–10), and receive tempos. Tempos are an immutable reward, never a currency: they only go up, they never drain, and free time costs nothing.
 
@@ -34,18 +34,19 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 - Timeline of the day: completed and interrupted activities, the running one, events.
 - Overview: day metrics (tempos, % of reference, completed count, average satisfaction) and multi-day trends.
 - Settings: daily tempo reference (default 100), export / import JSON, clear data.
-- Offline-first; localStorage is the only source of truth. Spanish UI.
+- Offline-first; localStorage is the only source of truth.
+- Bilingual UI: English and Spanish, switchable at any time; the first launch follows the browser language. Spanish is the reference copy; English must stay equivalent in tone (kind, never judging).
 
 ## Capabilities and Constraints
 
 - Architecture: `src/system` is the domain core (SystemCore + managers) and owns all business logic, including the tempo formula `ceil(base × score / 7)`. The UI never recomputes rules; it only calls the core and renders. The preview in the closing ritual uses `UtilityService.calculatePreviewTempos` / `resolveBaseMinutes`, the same source the core uses.
 - Stack: React 18 + TypeScript + Vite + react-router. Jest + Testing Library for unit tests, Cypress for E2E.
 - Removed on purpose (ADR-001): subjective variables, interruption causes, "was it avoidable?" questions, causal snapshots. Do not reintroduce them.
-- Terminology: día, foco / actividad activa, biblioteca, plantilla, bloque, "Por hacer", evento, tempos, referencia diaria, cierre, satisfacción, interrumpida ("No la terminé").
+- Terminology (ES / EN): día / day, foco / focus, en marcha / running, biblioteca / library, bloque / time block, "Por hacer" / "To do", evento / event, tempos / tempos, referencia diaria / daily reference, cierre / close, satisfacción / satisfaction, "No la terminé" / "I didn't finish it".
 
 ## Brand Commitments
 
-- Name: Qualia Control.
+- Name: LifeUI (formerly Qualia Control; the old name survives only in the localStorage key so existing data keeps loading).
 - Voice: always kind to the user. Positive tone, rounding in their favor, optimistic defaults. The daily target is an anchor, never a debt: "42% de tu referencia diaria", never "te faltan 58". Interruptions carry no moral judgment ("Está bien. Mañana es otra oportunidad.").
 - Honest dopamine only: no fake streaks, no rewards for looking at the screen, no punitive drains.
 

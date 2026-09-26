@@ -1,25 +1,25 @@
-# Qualia Control
+# LifeUI
 
 **A HUD for real life.** Plan your day, focus on one thing at a time, and close each activity with an honest self-assessment that earns _tempos_, a reward that only ever goes up.
 
 One obvious next action, what's running always visible, no streaks, no debt, and free time never costs anything.
 
-> The interface is in Spanish. Code, architecture and this README are meant to be readable by anyone.
+The interface is available in **English and Spanish** (switch in Settings or from the command palette); it follows your browser language on first launch.
 
 <p align="center">
-  <img src="docs/screenshots/today-light.png" alt="Today screen: the running activity with its timer, quick starts, the day's plan by time blocks and the day's log" width="100%" />
+  <img src="docs/screenshots/today.png" alt="Today screen: the running activity with its timer, quick starts, the day's plan by time blocks and the day's log" width="100%" />
 </p>
 
 <p align="center">
   <img src="docs/screenshots/mobile-today.png" alt="Today on a phone" width="32%" />
   &nbsp;
-  <img src="docs/screenshots/mobile-closing.png" alt="The closing ritual as a bottom sheet on a phone, dark theme" width="32%" />
+  <img src="docs/screenshots/mobile-closing.png" alt="The closing ritual as a bottom sheet on a phone" width="32%" />
 </p>
 
 ## How it works
 
 1. **Library.** Save the activities you repeat, each with a duration contract:
-   - _Clear objective_: has an end; you estimate it (`~45 min`).
+   - _Clear goal_: has an end; you estimate it (`~45 min`).
    - _Flexible_: varies within a known range (`5–10 min`).
    - _Timebox_: you commit to a minimum, a maximum or both, and get notified when you reach them.
 2. **Plan.** Drop them into the day's time blocks (Morning, Afternoon…) or _To do_. Only _To do_ and the block you're in right now can be started.
@@ -32,6 +32,11 @@ One obvious next action, what's running always visible, no streaks, no debt, and
 
 <p align="center">
   <img src="docs/screenshots/closing-ritual.png" alt="The closing ritual: real vs estimated time, a 0–10 satisfaction scale and a live reward preview" width="80%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/review.png" alt="Review: the day's tempos against the reference, an hour-by-hour strip, time by activity type and every close" width="49%" />
+  <img src="docs/screenshots/library.png" alt="Library: reusable activities with their duration contract, usage and quick-start pins" width="49%" />
 </p>
 
 ## Architecture
@@ -58,6 +63,7 @@ flowchart LR
 
 - **`src/system`** is plain TypeScript with no React. `SystemCore` owns an immutable state tree, persists every change, and notifies subscribers. Managers encapsulate each area, and the persistence layer versions the schema and migrates old data (v1 → v3).
 - **`src/app`** is the React UI. `state/` wraps the core in a provider plus the closing flow, `features/` holds one folder per screen, `components/ui` holds the design-system primitives, and `lib/` holds formatting and read-only view helpers.
+- **`src/app/i18n`** is a small typed i18n layer with no dependencies. `es.ts` defines the keys and `en.ts` must provide exactly the same ones (TypeScript enforces it; a test checks that every translation uses the same `{placeholders}`). Plurals use `Intl.PluralRules`, and dates and numbers use `Intl` in the active language.
 - **One closing path.** Finishing, switching activity and ending the day all run through `requestCompletion → dialog → completeActivity | interruptActivity`. The next action only runs if the close was saved, and dismissing the dialog leaves the activity running.
 - **Preview = result.** The reward preview in the dialog calls the same `UtilityService` functions the core uses to award tempos, so what you see is what you get.
 - **Offline-first.** No backend, and all data stays in the browser. Settings can export and import a JSON backup.
@@ -70,7 +76,7 @@ Decisions are documented rather than implied:
 
 ## Tech stack
 
-React 18 · TypeScript (strict) · Vite · Tailwind CSS with CSS-variable tokens (light/dark follows the system) · Radix UI primitives · `@hello-pangea/dnd` · Inter (self-hosted) · Jest + Testing Library · Cypress
+React 18 · TypeScript (strict) · Vite · typed i18n (EN/ES) · Tailwind CSS with CSS-variable tokens (light/dark follows the system) · Radix UI primitives · `@hello-pangea/dnd` · Inter (self-hosted) · Jest + Testing Library · Cypress
 
 ## Getting started
 
@@ -94,8 +100,10 @@ Keyboard: `Ctrl/⌘ K` command palette · `N` add activity · `E` log event · `
 ## Testing
 
 - **Core:** unit tests for every manager plus integration tests for the main flows (starting a day, library, planning, the closing ritual, persistence and migrations).
-- **UI:** view-logic tests and flow tests that render the real app against a real `SystemCore`. They cover closing with the previewed reward, switching activity through the ritual, cancelling, "I didn't finish it", and quick starts.
-- **End to end:** one Cypress spec walks the whole product in the browser, from first run through ending the day, plus a mobile check.
+- **UI:** view-logic tests and flow tests that render the real app against a real `SystemCore`. They cover closing with the previewed reward, switching activity through the ritual, cancelling, "I didn't finish it", quick starts and switching language.
+- **End to end:** a Cypress spec walks the whole product in the browser, from first run through ending the day, plus mobile navigation, the language switch and legacy URL redirects.
+
+The screenshots in this README are generated by Cypress with synthetic demo data: `npx cypress run --config-file cypress.screenshots.config.ts` (with `npm run dev` running).
 
 ## Deploying
 

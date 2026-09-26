@@ -1,5 +1,5 @@
 ---
-name: Qualia Control
+name: LifeUI
 description: Una interfaz para tu día real. A calm, Linear-grade HUD for one running activity, one honest close, and tempos that only go up.
 colors:
   canvas: "#fcfcfd"
@@ -291,13 +291,13 @@ components:
     padding: "12px 8px 12px 12px"
 ---
 
-# Design System: Qualia Control
+# Design System: LifeUI
 
 ## Overview
 
 **Creative North Star: "The Quiet HUD"**
 
-Qualia Control is a heads-up display for a real day, built to the standard of a modern tool like Linear. It shows only what matters right now (what is running, for how long, and how many tempos the day has earned) and stays out of the way of everything else. The screen is mostly cool, near-white or near-black neutral surfaces separated by 1px lines. Color is scarce and every hue has one job, so a glance tells the user what kind of thing they are looking at: indigo is something you can do, green is something happening, amber is something earned.
+LifeUI is a heads-up display for a real day, built to the standard of a modern tool like Linear. It shows only what matters right now (what is running, for how long, and how many tempos the day has earned) and stays out of the way of everything else. The screen is mostly cool, near-white or near-black neutral surfaces separated by 1px lines. Color is scarce and every hue has one job, so a glance tells the user what kind of thing they are looking at: indigo is something you can do, green is something happening, amber is something earned.
 
 Density is moderate and deliberately calm. The user has ADHD, so each surface leads with one obvious next action, keeps running state always visible, and avoids piles of cards and metrics. The Today screen is a focus panel, not a dashboard: a large title and a tabular clock, one filled "Terminar" button, and supporting lists below. Numbers are set in Inter with tabular figures so running values never jitter.
 
@@ -500,7 +500,7 @@ A center dialog. It shows the real/estimated fact pair, an 11-step 0-10 score sc
 
 ### Copy in Components
 
-The UI is Spanish and addresses the user as tú. Copy is always kind: the reference is an anchor ("79% de tu referencia diaria"), never a debt ("te faltan…"). Interruptions and overruns carry no judgment ("No la terminé", "Sin problema: ciérrala cuando termines.", "Más larga que de costumbre. Está bien."). Idle time is framed as free ("Tiempo libre es tiempo libre."). Empty states tell the user the next step ("Nada aquí todavía. Arrastra algo o añade con +."). Use the product vocabulary exactly: día, foco / en marcha, biblioteca, plantilla, bloque, "Por hacer", evento, tempos, referencia diaria, cierre, satisfacción. PRODUCT.md is the source for voice; this section records only how it lands in UI strings.
+The UI ships in English and Spanish (`src/app/i18n`; Spanish is the reference dictionary, English must stay equivalent in tone), and the Spanish copy addresses the user as tú. Every visible string goes through `t()`/`tp()`/`tr()`; no literal copy in components. Quotation marks belong to the dictionary (« » in Spanish, “ ” in English), and times follow the locale ("9:40" / "9:40 AM"), so time columns must not wrap. Copy is always kind: the reference is an anchor ("79% de tu referencia diaria"), never a debt ("te faltan…"). Interruptions and overruns carry no judgment ("No la terminé", "Sin problema: ciérrala cuando termines.", "Más larga que de costumbre. Está bien."). Idle time is framed as free ("Tiempo libre es tiempo libre."). Empty states tell the user the next step ("Nada aquí todavía. Arrastra algo o añade con +."). Use the product vocabulary exactly: día, foco / en marcha, biblioteca, plantilla, bloque, "Por hacer", evento, tempos, referencia diaria, cierre, satisfacción. PRODUCT.md is the source for voice; this section records only how it lands in UI strings.
 
 ## Do's and Don'ts
 
