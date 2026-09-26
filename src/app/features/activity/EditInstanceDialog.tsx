@@ -20,6 +20,7 @@ import {
   settingsForType,
   validateSettings,
 } from "./DurationFields";
+import { t } from "../../i18n";
 
 /** Ajusta bloque y duración de una actividad del plan de hoy. */
 export function EditInstanceDialog({
@@ -63,10 +64,10 @@ export function EditInstanceDialog({
       core.updateActivityInstance(instance.id, settingsForType(template.type, settings));
       if (blockId !== instance.blockId && !isActive)
         core.moveActivityInstance(instance.id, blockId);
-      toast({ title: "Cambios guardados" });
+      toast({ title: t("toast.saved") });
       onClose();
     } catch (caught) {
-      toast({ tone: "error", title: "No se pudo guardar", description: errorMessage(caught) });
+      toast({ tone: "error", title: t("error.save"), description: errorMessage(caught) });
     }
   };
 
@@ -78,27 +79,22 @@ export function EditInstanceDialog({
             <DialogHeader>
               <DialogTitle>{template.title}</DialogTitle>
               <DialogDescription>
-                {TYPE_META[template.type].label} · Los cambios valen solo para hoy; la biblioteca no
-                cambia.
+                {TYPE_META[template.type].label} · {t("edit.todayOnly")}
               </DialogDescription>
             </DialogHeader>
             <DialogBody className="flex flex-col gap-5 pb-5">
               <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium text-ink">Bloque</h3>
+                <h3 className="text-sm font-medium text-ink">{t("block.label")}</h3>
                 <BlockPicker
                   blocks={core.getTimeBlocks()}
                   value={blockId}
                   onChange={setBlockId}
                   disabled={isActive}
                 />
-                {isActive && (
-                  <p className="text-sm text-ink-2">
-                    Está en marcha, así que se queda en su bloque.
-                  </p>
-                )}
+                {isActive && <p className="text-sm text-ink-2">{t("edit.runningStays")}</p>}
               </section>
               <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium text-ink">Duración</h3>
+                <h3 className="text-sm font-medium text-ink">{t("edit.duration")}</h3>
                 <div className="rounded-lg border border-line bg-subtle/60 p-3.5">
                   <DurationFields
                     type={template.type}
@@ -111,10 +107,10 @@ export function EditInstanceDialog({
             </DialogBody>
             <DialogFooter>
               <Button variant="secondary" onClick={onClose}>
-                Cancelar
+                {t("common.cancel")}
               </Button>
               <Button variant="primary" onClick={save}>
-                Guardar
+                {t("common.save")}
               </Button>
             </DialogFooter>
           </>

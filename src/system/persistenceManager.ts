@@ -3,6 +3,8 @@ import type { AppState, IPersistenceManager } from "../types";
 /**
  * Clave utilizada para almacenar el estado de la aplicación en localStorage
  */
+// Clave histórica (del nombre anterior del producto): se mantiene para no perder
+// los datos que ya están guardados en el navegador.
 export const STORAGE_KEY = "qualia_control_app_state";
 
 /**

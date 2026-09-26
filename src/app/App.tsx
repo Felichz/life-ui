@@ -1,7 +1,8 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import type { ISystemCore } from "../types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { LocaleProvider, type Locale } from "./i18n";
 import { TooltipProvider } from "./components/ui/Tooltip";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
@@ -17,17 +18,28 @@ const ReviewPage = lazy(() =>
   import("./features/review/ReviewPage").then((module) => ({ default: module.ReviewPage }))
 );
 
-export function AppProviders({ children, core }: { children: ReactNode; core?: ISystemCore }) {
+export function AppProviders({
+  children,
+  core,
+  locale,
+}: {
+  children: ReactNode;
+  core?: ISystemCore;
+  /** Fija el idioma (tests); si no, se detecta y se recuerda. */
+  locale?: Locale;
+}) {
   return (
-    <ThemeProvider>
-      <SystemProvider core={core}>
-        <TooltipProvider delayDuration={400} skipDelayDuration={200}>
-          <ToastProvider>
-            <ClosingFlowProvider>{children}</ClosingFlowProvider>
-          </ToastProvider>
-        </TooltipProvider>
-      </SystemProvider>
-    </ThemeProvider>
+    <LocaleProvider initial={locale}>
+      <ThemeProvider>
+        <SystemProvider core={core}>
+          <TooltipProvider delayDuration={400} skipDelayDuration={200}>
+            <ToastProvider>
+              <ClosingFlowProvider>{children}</ClosingFlowProvider>
+            </ToastProvider>
+          </TooltipProvider>
+        </SystemProvider>
+      </ThemeProvider>
+    </LocaleProvider>
   );
 }
 
@@ -37,24 +49,34 @@ export function AppRoutes() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<TodayPage />} />
-          <Route path="biblioteca" element={<LibraryPage />} />
+          <Route path="library" element={<LibraryPage />} />
           <Route
-            path="resumen"
+            path="review"
             element={
               <Suspense fallback={<div className="p-10" />}>
                 <ReviewPage />
               </Suspense>
             }
           />
-          <Route path="ajustes" element={<SettingsPage />} />
-          {/* Rutas de la UI anterior */}
+          <Route path="settings" element={<SettingsPage />} />
+          {/* Rutas anteriores (en español y de la primera UI) */}
+          <Route path="biblioteca" element={<Navigate to="/library" replace />} />
+          <Route path="resumen" element={<LegacyReviewRedirect />} />
+          <Route path="ajustes" element={<Navigate to="/settings" replace />} />
           <Route path="start" element={<Navigate to="/" replace />} />
-          <Route path="overview" element={<Navigate to="/resumen" replace />} />
+          <Route path="overview" element={<Navigate to="/review" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </ShellProvider>
   );
+}
+
+/** /resumen?dia=… → /review?day=… */
+function LegacyReviewRedirect() {
+  const [params] = useSearchParams();
+  const day = params.get("dia");
+  return <Navigate to={day ? `/review?day=${day}` : "/review"} replace />;
 }
 
 export default function App() {

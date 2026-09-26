@@ -29,14 +29,15 @@ import { useNow } from "../../lib/useNow";
 import { useSystem } from "../../state/system";
 import { buildStrip } from "../today/DayLog";
 import { TrendChart } from "./TrendChart";
+import { t, tp } from "../../i18n";
 
 function dayLabel(day: Day, now: Date): string {
   const start = new Date(dayStart(day));
-  if (day.state === "active") return "Hoy";
+  if (day.state === "active") return t("nav.today");
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
-  if (isSameLocalDay(start, yesterday)) return "Ayer";
-  if (isSameLocalDay(start, now)) return "Hoy";
+  if (isSameLocalDay(start, yesterday)) return t("review.yesterday");
+  if (isSameLocalDay(start, now)) return t("nav.today");
   return formatDateLong(start);
 }
 
@@ -45,7 +46,7 @@ export function ReviewPage() {
   const [params, setParams] = useSearchParams();
   const now = useNow(60_000);
   const days = daysNewestFirst(state);
-  const selectedId = params.get("dia");
+  const selectedId = params.get("day");
   const selectedIndex = Math.max(
     0,
     days.findIndex((day) => day.id === selectedId)
@@ -55,36 +56,33 @@ export function ReviewPage() {
   if (!day) {
     return (
       <Page width="narrow">
-        <PageHeader title="Resumen" />
+        <PageHeader title={t("nav.review")} />
         <div className="mt-8 rounded-xl border border-line bg-panel px-6 py-10 text-center shadow-xs">
           <BarChart3 className="mx-auto size-6 text-ink-3" />
-          <p className="mt-3 text-base font-medium text-ink">Todavía no hay días registrados</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-ink-2">
-            Cuando empieces y cierres actividades, aquí verás tus tempos, tu satisfacción y cómo fue
-            cada día.
-          </p>
+          <p className="mt-3 text-base font-medium text-ink">{t("review.empty.title")}</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-ink-2">{t("review.empty.body")}</p>
           <Link to="/" className="mt-5 inline-block">
-            <Button variant="primary">Ir a Hoy</Button>
+            <Button variant="primary">{t("review.goToday")}</Button>
           </Link>
         </div>
       </Page>
     );
   }
 
-  const select = (id: string) => setParams({ dia: id }, { replace: true });
+  const select = (id: string) => setParams({ day: id }, { replace: true });
   const older = days[selectedIndex + 1];
   const newer = days[selectedIndex - 1];
 
   return (
     <Page width="narrow">
       <PageHeader
-        title="Resumen"
-        subtitle="Mirar para ajustar, no para juzgarte."
+        title={t("nav.review")}
+        subtitle={t("review.subtitle")}
         wrap
         actions={
           <div className="flex items-center gap-1">
             <IconButton
-              label="Día anterior"
+              label={t("review.previousDay")}
               variant="secondary"
               disabled={!older}
               onClick={() => older && select(older.id)}
@@ -105,13 +103,15 @@ export function ReviewPage() {
                     checked={item.id === day.id}
                     onSelect={() => select(item.id)}
                   >
-                    {item.state === "active" ? "Hoy (en curso)" : formatDateShort(dayStart(item))}
+                    {item.state === "active"
+                      ? t("review.todayRunning")
+                      : formatDateShort(dayStart(item))}
                   </MenuCheckItem>
                 ))}
               </MenuContent>
             </Menu>
             <IconButton
-              label="Día siguiente"
+              label={t("review.nextDay")}
               variant="secondary"
               disabled={!newer}
               onClick={() => newer && select(newer.id)}
@@ -124,7 +124,7 @@ export function ReviewPage() {
       <DayReview key={day.id} state={state} day={day} now={now} />
       <section aria-labelledby="trend-title" className="mt-12">
         <SectionTitle>
-          <span id="trend-title">Últimos días</span>
+          <span id="trend-title">{t("review.recentDays")}</span>
         </SectionTitle>
         <TrendChart days={days.slice(0, 14).reverse()} selectedId={day.id} onSelect={select} />
       </section>
@@ -152,28 +152,27 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
 
   return (
     <div className="mt-6 flex flex-col gap-10">
-      <section aria-label="Tempos del día" className="flex flex-col gap-3">
-        <TempoMeter summary={summary} label={isLive ? "tempos hoy" : "tempos"} />
+      <section aria-label={t("review.temposLabel")} className="flex flex-col gap-3">
+        <TempoMeter summary={summary} label={isLive ? t("tempo.today") : t("tempo.unit")} />
         <p className="text-sm text-ink-2">
           {summary.completedActivities > 0 ? (
             <>
-              {summary.completedActivities === 1
-                ? "1 completada"
-                : `${summary.completedActivities} completadas`}{" "}
-              · satisfacción media{" "}
+              {tp("start.completed", summary.completedActivities)} · {t("today.avgSatisfaction")}{" "}
               <span className="tabular font-medium text-ink">
                 {formatNumber(summary.averageSatisfaction, 1)}
               </span>
             </>
           ) : (
-            "Sin actividades completadas este día."
+            t("review.noCompleted")
           )}
         </p>
       </section>
 
       <section aria-labelledby="journey-title">
-        <SectionTitle meta={interrupted > 0 ? `${interrupted} sin terminar` : undefined}>
-          <span id="journey-title">Cómo fue el día</span>
+        <SectionTitle
+          meta={interrupted > 0 ? t("review.notFinishedCount", { count: interrupted }) : undefined}
+        >
+          <span id="journey-title">{t("review.howItWent")}</span>
         </SectionTitle>
         <DayStrip
           segments={segments}
@@ -187,33 +186,31 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
 
       <section aria-labelledby="records-title">
         <SectionTitle meta={records.length || undefined}>
-          <span id="records-title">Actividades</span>
+          <span id="records-title">{t("library.tab.activities")}</span>
         </SectionTitle>
         {records.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-2">
-            {isLive
-              ? "Todavía no cerraste ninguna actividad hoy."
-              : "Este día no tiene actividades cerradas."}
+            {isLive ? t("review.noRecordsToday") : t("review.noRecords")}
           </p>
         ) : (
           <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-xs">
             <table className="w-full text-left text-sm">
               <thead className="hidden border-b border-line bg-subtle text-xs text-ink-2 sm:table-header-group">
                 <tr>
-                  <th scope="col" className="w-20 px-4 py-2 font-medium">
-                    Hora
+                  <th scope="col" className="w-24 px-4 py-2 font-medium">
+                    {t("review.col.time")}
                   </th>
                   <th scope="col" className="px-2 py-2 font-medium">
-                    Actividad
+                    {t("review.col.activity")}
                   </th>
                   <th scope="col" className="px-2 py-2 font-medium">
-                    Real · esperado
+                    {t("review.col.actualExpected")}
                   </th>
                   <th scope="col" className="w-24 px-2 py-2 text-right font-medium">
-                    Satisfacción
+                    {t("review.col.satisfaction")}
                   </th>
                   <th scope="col" className="w-24 px-4 py-2 text-right font-medium">
-                    Tempos
+                    {t("review.col.tempos")}
                   </th>
                 </tr>
               </thead>
@@ -227,7 +224,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                       key={record.id}
                       className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-b border-line px-4 py-2.5 last:border-b-0 sm:table-row sm:px-0 sm:py-0"
                     >
-                      <td className="tabular order-1 text-ink-3 sm:px-4 sm:py-2.5">
+                      <td className="tabular order-1 whitespace-nowrap text-ink-3 sm:px-4 sm:py-2.5">
                         {formatTime(record.startTime)}
                       </td>
                       <td className="order-2 min-w-0 flex-1 sm:px-2 sm:py-2.5">
@@ -240,7 +237,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                           </span>
                           {!done && (
                             <span className="shrink-0 rounded bg-hover px-1.5 py-px text-xs text-ink-2">
-                              Sin terminar
+                              {t("log.notFinished")}
                             </span>
                           )}
                         </span>
@@ -252,7 +249,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                             {" "}
                             · {contract.label}
                             {done && within === true && (
-                              <span className="text-success"> · dentro</span>
+                              <span className="text-success"> · {t("review.within")}</span>
                             )}
                           </span>
                         )}
@@ -288,7 +285,7 @@ function TypeSplit({ totals, total }: { totals: Record<ActivityType, number>; to
   return (
     <div className="mt-6">
       <p className="mb-2 text-sm font-medium text-ink">
-        Tiempo registrado{" "}
+        {t("review.tracked")}{" "}
         <span className="tabular font-normal text-ink-2">· {formatMinutes(total)}</span>
       </p>
       <div

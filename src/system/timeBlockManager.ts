@@ -3,7 +3,7 @@ import { UtilityService } from "./utilityService";
 import type { SystemCore } from "./index";
 
 /**
- * Gestor de bloques de tiempo del sistema Qualia Control
+ * Gestor de bloques de tiempo del sistema LifeUI
  * Responsable de la creación, actualización y gestión de bloques de tiempo
  * que representan franjas horarias para organizar actividades
  */

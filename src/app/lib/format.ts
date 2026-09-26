@@ -1,4 +1,4 @@
-const LOCALE = "es-ES";
+import { intlLocale, t } from "../i18n";
 
 /** 45 → "45 min", 60 → "1 h", 75 → "1 h 15 min" */
 export function formatMinutes(total: number): string {
@@ -31,7 +31,7 @@ export function formatClock(ms: number): string {
 
 /** ISO → "14:30" en hora local */
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString(intlLocale(), { hour: "numeric", minute: "2-digit" });
 }
 
 /** Minutos del día → "14:00" */
@@ -54,11 +54,11 @@ export function parseDayMinutes(value: string): number | null {
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** "Jueves, 26 de septiembre" */
+/** "Jueves, 26 de septiembre" / "Thursday, September 26" */
 export function formatDateLong(date: Date | string): string {
   const value = typeof date === "string" ? new Date(date) : date;
   return capitalize(
-    value.toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "long" })
+    value.toLocaleDateString(intlLocale(), { weekday: "long", day: "numeric", month: "long" })
   );
 }
 
@@ -66,7 +66,7 @@ export function formatDateLong(date: Date | string): string {
 export function formatDateShort(date: Date | string): string {
   const value = typeof date === "string" ? new Date(date) : date;
   return value
-    .toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "short" })
+    .toLocaleDateString(intlLocale(), { weekday: "short", day: "numeric", month: "short" })
     .replace(/\./g, "")
     .replace(",", "");
 }
@@ -74,11 +74,13 @@ export function formatDateShort(date: Date | string): string {
 /** "26 sep" */
 export function formatDayMonth(date: Date | string): string {
   const value = typeof date === "string" ? new Date(date) : date;
-  return value.toLocaleDateString(LOCALE, { day: "numeric", month: "short" }).replace(".", "");
+  return value
+    .toLocaleDateString(intlLocale(), { day: "numeric", month: "short" })
+    .replace(".", "");
 }
 
 export function formatNumber(value: number, maximumFractionDigits = 0): string {
-  return value.toLocaleString(LOCALE, { maximumFractionDigits });
+  return value.toLocaleString(intlLocale(), { maximumFractionDigits });
 }
 
 export function isSameLocalDay(a: Date, b: Date): boolean {
@@ -95,12 +97,8 @@ export function minutesOfDay(date: Date): number {
 
 export function greeting(date = new Date()): string {
   const hour = date.getHours();
-  if (hour < 6) return "Buenas noches";
-  if (hour < 13) return "Buenos días";
-  if (hour < 20) return "Buenas tardes";
-  return "Buenas noches";
-}
-
-export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
-  return `${formatNumber(count)} ${count === 1 ? singular : pluralForm}`;
+  if (hour < 6) return t("greeting.night");
+  if (hour < 13) return t("greeting.morning");
+  if (hour < 20) return t("greeting.afternoon");
+  return t("greeting.night");
 }

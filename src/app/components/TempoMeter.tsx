@@ -1,3 +1,4 @@
+import { t, tr } from "../i18n";
 import { useEffect, useRef, useState } from "react";
 import type { TempoSummary } from "../../types";
 import { cn } from "../lib/cn";
@@ -10,7 +11,7 @@ import { formatNumber } from "../lib/format";
 export function TempoMeter({
   summary,
   variant = "full",
-  label = "tempos hoy",
+  label = t("tempo.today"),
 }: {
   summary: TempoSummary;
   variant?: "full" | "compact";
@@ -23,7 +24,10 @@ export function TempoMeter({
     return (
       <div
         className="flex flex-col gap-1.5"
-        aria-label={`${summary.totalTempos} tempos, ${summary.displayPercent}% de tu referencia diaria`}
+        aria-label={t("tempo.aria", {
+          total: summary.totalTempos,
+          percent: summary.displayPercent,
+        })}
       >
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <span className="text-ink-2">
@@ -36,7 +40,7 @@ export function TempoMeter({
             >
               {formatNumber(summary.totalTempos)}
             </span>{" "}
-            tempos
+            {t("tempo.unit")}
           </span>
           <span className="tabular text-xs text-ink-3">{summary.displayPercent}%</span>
         </div>
@@ -61,8 +65,11 @@ export function TempoMeter({
           <span className="text-md text-ink-2">{label}</span>
         </p>
         <p className="text-sm text-ink-2">
-          <span className="tabular font-medium text-ink">{summary.displayPercent}%</span> de tu
-          referencia diaria
+          {tr("tempo.ofReference", {
+            percent: (
+              <span className="tabular font-medium text-ink">{summary.displayPercent}%</span>
+            ),
+          })}
           <span className="text-ink-3"> · {formatNumber(summary.target)}</span>
         </p>
       </div>

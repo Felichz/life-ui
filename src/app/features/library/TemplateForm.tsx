@@ -11,6 +11,7 @@ import {
   settingsForType,
   validateSettings,
 } from "../activity/DurationFields";
+import { t } from "../../i18n";
 
 export interface TemplateDraft {
   title: string;
@@ -67,7 +68,7 @@ interface TemplateFormProps {
 export function TemplateForm({ id, initial, onSubmit, error, children }: TemplateFormProps) {
   const [draft, setDraft] = useState<TemplateDraft>(initial);
   const [touched, setTouched] = useState(false);
-  const titleError = touched && !draft.title.trim() ? "Ponle un nombre." : null;
+  const titleError = touched && !draft.title.trim() ? t("template.error.name") : null;
   const settingsError = touched ? validateSettings(draft.type, draft.settings) : null;
 
   const submit = (event: FormEvent) => {
@@ -86,7 +87,7 @@ export function TemplateForm({ id, initial, onSubmit, error, children }: Templat
 
   return (
     <form id={id} onSubmit={submit} noValidate className="flex flex-col gap-5">
-      <Field label="Nombre" error={titleError}>
+      <Field label={t("template.name")} error={titleError}>
         {(fieldId, describedBy) => (
           <Input
             id={fieldId}
@@ -94,13 +95,13 @@ export function TemplateForm({ id, initial, onSubmit, error, children }: Templat
             value={draft.title}
             aria-invalid={Boolean(titleError) || undefined}
             aria-describedby={describedBy}
-            placeholder="Escribir informe, Leer, Revisar correo…"
+            placeholder={t("template.namePlaceholder")}
             onChange={(event) => setDraft({ ...draft, title: event.target.value })}
           />
         )}
       </Field>
 
-      <Field label="Descripción" hint="Opcional. Para recordar qué cuenta como hecho.">
+      <Field label={t("template.description")} hint={t("template.descriptionHint")}>
         {(fieldId, describedBy) => (
           <Textarea
             id={fieldId}
@@ -113,8 +114,10 @@ export function TemplateForm({ id, initial, onSubmit, error, children }: Templat
       </Field>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-sm font-medium text-ink">¿Cómo es su duración?</legend>
-        <div role="radiogroup" aria-label="Tipo de actividad" className="flex flex-col gap-1.5">
+        <legend className="mb-1.5 text-sm font-medium text-ink">
+          {t("template.durationQuestion")}
+        </legend>
+        <div role="radiogroup" aria-label={t("template.type")} className="flex flex-col gap-1.5">
           {TYPES.map((type) => {
             const selected = draft.type === type;
             const meta = TYPE_META[type];
@@ -163,10 +166,10 @@ export function TemplateForm({ id, initial, onSubmit, error, children }: Templat
         />
       </div>
 
-      <Field label="Acceso rápido">
+      <Field label={t("template.quickStart")}>
         {(fieldId) => (
           <div className="flex items-center justify-between gap-4 rounded-lg border border-line px-3.5 py-3">
-            <p className="text-sm text-ink-2">Anclarla en Hoy para empezarla con un toque.</p>
+            <p className="text-sm text-ink-2">{t("template.quickStartHint")}</p>
             <Switch
               id={fieldId}
               checked={draft.pinned}

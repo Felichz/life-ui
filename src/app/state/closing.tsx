@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import type { CompletionRequest, UUID } from "../../types";
+import { t } from "../i18n";
 import { ClosingDialog } from "../features/activity/ClosingDialog";
 import { planItem, templateMap, type PlanItem } from "../lib/domain";
 import { errorMessage, useSystem } from "./system";
@@ -58,7 +59,7 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
       try {
         const request = core.requestCompletion(activeId);
         const instance = state.currentDay.activityInstances.find((item) => item.id === activeId);
-        if (!instance) throw new Error("No encontramos la actividad en marcha");
+        if (!instance) throw new Error(t("error.runningNotFound"));
         setError(null);
         setPending({
           activityId: activeId,
@@ -69,7 +70,7 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
       } catch (caught) {
         toast({
           tone: "error",
-          title: "No pudimos abrir el cierre",
+          title: t("error.openClosing"),
           description: errorMessage(caught),
         });
       }
@@ -100,16 +101,19 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
                 tone: "reward",
                 tempos: result.temposAwarded,
                 title: current.request.activityTitle,
-                description: `Llevas ${summary.totalTempos} tempos · ${summary.displayPercent}% de tu referencia diaria`,
+                description: t("closing.toast.reward", {
+                  total: summary.totalTempos,
+                  percent: summary.displayPercent,
+                }),
               }
             : {
                 title: current.request.activityTitle,
-                description: "Guardada sin tempos. Contó igual que la registraras.",
+                description: t("closing.toast.noTempos"),
               }
         );
         finish(current);
       } catch (caught) {
-        setError(errorMessage(caught, "No se pudo guardar el cierre"));
+        setError(errorMessage(caught, t("error.saveClosing")));
       } finally {
         setBusy(false);
       }
@@ -124,12 +128,14 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
     try {
       core.interruptActivity(current.activityId);
       toast({
-        title: "Está bien. Mañana es otra oportunidad.",
-        description: `«${current.request.activityTitle}» quedó como no terminada.`,
+        title: t("closing.toast.interrupted"),
+        description: t("closing.toast.interruptedDetail", {
+          title: current.request.activityTitle,
+        }),
       });
       finish(current);
     } catch (caught) {
-      setError(errorMessage(caught, "No se pudo guardar"));
+      setError(errorMessage(caught, t("error.save")));
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,5 @@
 import type { TimeBlock } from "../../types";
+import { setLocale } from "../i18n";
 import { blockStatus, contractOf, sortBlocks, withinContract } from "../lib/domain";
 import { formatClock, formatMinutes, parseDayMinutes } from "../lib/format";
 
@@ -13,6 +14,8 @@ const block = (overrides: Partial<TimeBlock>): TimeBlock => ({
   updatedAt: "",
   ...overrides,
 });
+
+beforeAll(() => setLocale("es"));
 
 describe("contractOf", () => {
   it("describe cada tipo de contrato de duración", () => {

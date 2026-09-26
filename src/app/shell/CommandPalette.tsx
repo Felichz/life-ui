@@ -7,6 +7,7 @@ import {
   CircleStop,
   CornerDownLeft,
   Flag,
+  Languages,
   Library,
   Monitor,
   Moon,
@@ -17,6 +18,7 @@ import {
   Sun,
   Sunrise,
 } from "lucide-react";
+import { LOCALES, LOCALE_NAMES, t, useLocale } from "../i18n";
 import { TypeIcon } from "../components/TypeIcon";
 import { Kbd } from "../components/ui/Kbd";
 import { cn } from "../lib/cn";
@@ -106,15 +108,15 @@ export function CommandPalette({
             }
           }}
         >
-          <RadixDialog.Title className="sr-only">Paleta de comandos</RadixDialog.Title>
+          <RadixDialog.Title className="sr-only">{t("palette.title")}</RadixDialog.Title>
           <div className="flex items-center gap-2.5 border-b border-line px-4">
             <Search className="size-[18px] shrink-0 text-ink-3" />
             <input
               autoFocus
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Empezar, registrar, ir a…"
-              aria-label="Buscar comando"
+              placeholder={t("palette.placeholder")}
+              aria-label={t("palette.searchLabel")}
               aria-controls="command-list"
               aria-activedescendant={
                 filtered[cursor] ? `command-${filtered[cursor].id}` : undefined
@@ -131,7 +133,7 @@ export function CommandPalette({
           >
             {filtered.length === 0 && (
               <p className="px-3 py-8 text-center text-sm text-ink-2">
-                Nada coincide con «{query}».
+                {t("palette.noResults", { query })}
               </p>
             )}
             {filtered.map((command, index) => {
@@ -192,6 +194,7 @@ function useCommands(): Command[] {
   const { openAddActivity, openTemplateEditor } = useShell();
   const { setPreference } = useTheme();
   const navigate = useNavigate();
+  const { locale, setLocale } = useLocale();
 
   return useMemo(() => {
     const list: Command[] = [];
@@ -206,21 +209,21 @@ function useCommands(): Command[] {
         const title = active ? templates.get(active.templateId)?.title : undefined;
         list.push({
           id: "close-active",
-          group: "En marcha",
-          label: `Terminar «${title ?? "actividad"}»`,
+          group: t("palette.group.running"),
+          label: t("palette.finish", { title: title ?? t("activity.fallbackName") }),
           icon: <CircleStop />,
-          keywords: "cerrar completar terminar",
+          keywords: t("palette.kw.finish"),
           run: () => requestClose(),
         });
       }
 
       list.push({
         id: "add",
-        group: "Plan",
-        label: "Añadir actividad al plan",
+        group: t("palette.group.plan"),
+        label: t("palette.addActivity"),
         icon: <Plus />,
         shortcut: ["N"],
-        keywords: "nueva agregar",
+        keywords: t("palette.kw.add"),
         run: () => openAddActivity(),
       });
 
@@ -232,11 +235,11 @@ function useCommands(): Command[] {
           const item = planItem(instance, templates);
           list.push({
             id: `start-${instance.id}`,
-            group: "Empezar del plan",
+            group: t("palette.group.startPlan"),
             label: item.title,
             hint: item.contract?.label,
             icon: <Play />,
-            keywords: "empezar iniciar",
+            keywords: t("palette.kw.start"),
             run: () => startInstance(instance.id),
           });
         }
@@ -245,11 +248,11 @@ function useCommands(): Command[] {
       for (const template of state.global.activityTemplates) {
         list.push({
           id: `start-template-${template.id}`,
-          group: "Empezar ahora",
+          group: t("palette.group.startNow"),
           label: template.title,
           hint: contractOf(template.type, template)?.label,
           icon: <TypeIcon type={template.type} />,
-          keywords: "empezar iniciar biblioteca",
+          keywords: t("palette.kw.startLibrary"),
           run: () => startTemplate(template.id),
         });
       }
@@ -257,20 +260,20 @@ function useCommands(): Command[] {
       for (const event of state.global.eventTemplates) {
         list.push({
           id: `event-${event.id}`,
-          group: "Registrar evento",
+          group: t("palette.group.logEvent"),
           label: event.name,
           icon: <Flag />,
-          keywords: "evento registrar marcar",
+          keywords: t("palette.kw.event"),
           run: () => logEvent(event.id),
         });
       }
     } else {
       list.push({
         id: "start-day",
-        group: "Día",
-        label: "Empezar el día",
+        group: t("palette.group.day"),
+        label: t("start.cta"),
         icon: <Sunrise />,
-        keywords: "iniciar comenzar",
+        keywords: t("palette.kw.startDay"),
         run: () => {
           core.startDay();
           navigate("/");
@@ -281,76 +284,84 @@ function useCommands(): Command[] {
     list.push(
       {
         id: "go-today",
-        group: "Ir a",
-        label: "Hoy",
+        group: t("palette.group.goTo"),
+        label: t("nav.today"),
         icon: <CalendarCheck2 />,
         shortcut: ["G", "H"],
         run: () => navigate("/"),
       },
       {
         id: "go-library",
-        group: "Ir a",
-        label: "Biblioteca",
+        group: t("palette.group.goTo"),
+        label: t("nav.library"),
         icon: <Library />,
         shortcut: ["G", "B"],
-        run: () => navigate("/biblioteca"),
+        run: () => navigate("/library"),
       },
       {
         id: "go-blocks",
-        group: "Ir a",
-        label: "Bloques horarios",
+        group: t("palette.group.goTo"),
+        label: t("library.tab.blocks"),
         icon: <Library />,
-        keywords: "franjas",
-        run: () => navigate("/biblioteca?tab=bloques"),
+        keywords: t("palette.kw.blocks"),
+        run: () => navigate("/library?tab=blocks"),
       },
       {
         id: "go-review",
-        group: "Ir a",
-        label: "Resumen",
+        group: t("palette.group.goTo"),
+        label: t("nav.review"),
         icon: <BarChart3 />,
         shortcut: ["G", "R"],
-        run: () => navigate("/resumen"),
+        run: () => navigate("/review"),
       },
       {
         id: "go-settings",
-        group: "Ir a",
-        label: "Ajustes",
+        group: t("palette.group.goTo"),
+        label: t("nav.settings"),
         icon: <Settings />,
         shortcut: ["G", "A"],
-        run: () => navigate("/ajustes"),
+        run: () => navigate("/settings"),
       },
       {
         id: "new-template",
-        group: "Biblioteca",
-        label: "Nueva actividad en la biblioteca",
+        group: t("palette.group.library"),
+        label: t("palette.newTemplate"),
         icon: <Plus />,
-        keywords: "plantilla crear",
+        keywords: t("palette.kw.template"),
         run: () => openTemplateEditor(),
       },
       {
         id: "theme-system",
-        group: "Apariencia",
-        label: "Tema del sistema",
+        group: t("palette.group.appearance"),
+        label: t("palette.themeSystem"),
         icon: <Monitor />,
-        keywords: "tema",
+        keywords: t("palette.kw.theme"),
         run: () => setPreference("system"),
       },
       {
         id: "theme-light",
-        group: "Apariencia",
-        label: "Tema claro",
+        group: t("palette.group.appearance"),
+        label: t("palette.themeLight"),
         icon: <Sun />,
-        keywords: "tema",
+        keywords: t("palette.kw.theme"),
         run: () => setPreference("light"),
       },
       {
         id: "theme-dark",
-        group: "Apariencia",
-        label: "Tema oscuro",
+        group: t("palette.group.appearance"),
+        label: t("palette.themeDark"),
         icon: <Moon />,
-        keywords: "tema",
+        keywords: t("palette.kw.theme"),
         run: () => setPreference("dark"),
-      }
+      },
+      ...LOCALES.filter((option) => option !== locale).map((option) => ({
+        id: `locale-${option}`,
+        group: t("palette.group.language"),
+        label: LOCALE_NAMES[option],
+        icon: <Languages />,
+        keywords: t("palette.kw.language"),
+        run: () => setLocale(option),
+      }))
     );
 
     return list;
@@ -362,6 +373,8 @@ function useCommands(): Command[] {
     openTemplateEditor,
     requestClose,
     setPreference,
+    locale,
+    setLocale,
     startInstance,
     startTemplate,
     state,

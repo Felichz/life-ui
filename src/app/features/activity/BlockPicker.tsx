@@ -3,13 +3,11 @@ import { blockName, blockRange, blockStatus, sortBlocks, type BlockStatus } from
 import { cn } from "../../lib/cn";
 import { minutesOfDay } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
+import { t } from "../../i18n";
 
-export const STATUS_LABEL: Record<BlockStatus, string> = {
-  always: "Siempre disponible",
-  now: "Ahora",
-  later: "Más tarde",
-  past: "Ya pasó",
-};
+export function statusLabel(status: BlockStatus): string {
+  return t(`block.status.${status}`);
+}
 
 interface BlockPickerProps {
   blocks: TimeBlock[];
@@ -23,7 +21,7 @@ export function BlockPicker({ blocks, value, onChange, disabled }: BlockPickerPr
   return (
     <div
       role="radiogroup"
-      aria-label="Bloque"
+      aria-label={t("block.label")}
       className="flex flex-col overflow-hidden rounded-lg border border-line"
     >
       {sortBlocks(blocks).map((block) => {
@@ -65,7 +63,7 @@ export function BlockPicker({ blocks, value, onChange, disabled }: BlockPickerPr
                 status === "now" ? "bg-accent/10 text-accent-ink" : "text-ink-3"
               )}
             >
-              {STATUS_LABEL[status]}
+              {statusLabel(status)}
             </span>
           </button>
         );

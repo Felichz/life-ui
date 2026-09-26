@@ -7,6 +7,7 @@ import { Tooltip } from "../../components/ui/Tooltip";
 import { useDayActions } from "../../state/actions";
 import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
+import { t } from "../../i18n";
 
 export function EventTemplates() {
   const { state, core } = useSystem();
@@ -20,7 +21,7 @@ export function EventTemplates() {
     const trimmed = name.trim();
     if (!trimmed) return;
     if (templates.some((template) => template.name.toLowerCase() === trimmed.toLowerCase())) {
-      setError("Ya tienes un evento con ese nombre.");
+      setError(t("events.duplicate"));
       return;
     }
     try {
@@ -43,10 +44,7 @@ export function EventTemplates() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="max-w-xl text-base text-ink-2">
-        Cosas puntuales que quieres dejar marcadas en el día, como un café o una medicación. Se
-        registran con un toque desde Hoy y aparecen en la tira del día.
-      </p>
+      <p className="max-w-xl text-base text-ink-2">{t("events.intro")}</p>
       <form onSubmit={add} className="flex flex-col gap-1.5">
         <div className="flex gap-2">
           <Input
@@ -55,8 +53,8 @@ export function EventTemplates() {
               setName(event.target.value);
               setError(null);
             }}
-            placeholder="Nuevo evento: café, ibuprofeno, llamada…"
-            aria-label="Nombre del nuevo evento"
+            placeholder={t("events.newPlaceholder")}
+            aria-label={t("events.newLabel")}
             aria-invalid={Boolean(error) || undefined}
             className="flex-1"
           />
@@ -67,7 +65,7 @@ export function EventTemplates() {
             className="h-9 coarse:h-11"
           >
             <Plus />
-            Añadir
+            {t("common.add")}
           </Button>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
@@ -83,7 +81,7 @@ export function EventTemplates() {
               used={used.has(template.id)}
               canLog={Boolean(dayId)}
               onError={(message) =>
-                toast({ tone: "error", title: "No se pudo guardar", description: message })
+                toast({ tone: "error", title: t("error.save"), description: message })
               }
             />
           ))}
@@ -131,14 +129,14 @@ function EventRow({
             autoFocus
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            aria-label="Nombre del evento"
+            aria-label={t("events.nameLabel")}
             className="h-8 flex-1"
           />
-          <IconButton label="Guardar" type="submit" size="sm">
+          <IconButton label={t("common.save")} type="submit" size="sm">
             <Check />
           </IconButton>
           <IconButton
-            label="Cancelar"
+            label={t("common.cancel")}
             size="sm"
             onClick={() => {
               setDraft(template.name);
@@ -158,10 +156,14 @@ function EventRow({
       <span className="min-w-0 flex-1 truncate text-base font-medium text-ink">
         {template.name}
       </span>
-      {todayCount > 0 && <span className="tabular text-sm text-ink-3">{todayCount} hoy</span>}
+      {todayCount > 0 && (
+        <span className="tabular text-sm text-ink-3">
+          {t("events.todayCount", { count: todayCount })}
+        </span>
+      )}
       {confirming ? (
         <span className="flex items-center gap-1.5">
-          <span className="text-sm text-ink-2">¿Eliminar?</span>
+          <span className="text-sm text-ink-2">{t("common.deleteQuestion")}</span>
           <Button
             size="sm"
             variant="danger"
@@ -173,34 +175,32 @@ function EventRow({
               }
             }}
           >
-            Sí
+            {t("common.yes")}
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-            No
+            {t("common.no")}
           </Button>
         </span>
       ) : (
         <>
           {canLog && (
             <Button size="sm" variant="subtle" onClick={() => logEvent(template.id)}>
-              Registrar
+              {t("events.log")}
             </Button>
           )}
-          <Tooltip content="Renombrar">
+          <Tooltip content={t("common.rename")}>
             <IconButton
-              label={`Renombrar ${template.name}`}
+              label={t("common.renameNamed", { name: template.name })}
               size="sm"
               onClick={() => setEditing(true)}
             >
               <Pencil />
             </IconButton>
           </Tooltip>
-          <Tooltip
-            content={used ? "Tiene registros en tu historial, así que se conserva" : "Eliminar"}
-          >
+          <Tooltip content={used ? t("events.keptForHistory") : t("common.delete")}>
             <span>
               <IconButton
-                label={`Eliminar ${template.name}`}
+                label={t("common.deleteNamed", { name: template.name })}
                 size="sm"
                 disabled={used}
                 onClick={() => setConfirming(true)}

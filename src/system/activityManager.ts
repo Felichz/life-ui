@@ -11,7 +11,7 @@ import type {
 } from "../types";
 
 /**
- * Gestor del ciclo de vida de actividades en Qualia Control
+ * Gestor del ciclo de vida de actividades en LifeUI
  * Permite crear y gestionar plantillas de actividad, instancias y registros de actividades completadas
  */
 export class ActivityManager {

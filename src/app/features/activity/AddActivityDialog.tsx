@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { ArrowLeft, Pin, Plus, Search } from "lucide-react";
 import type { ActivityTemplate, UUID } from "../../../types";
+import { t, tr } from "../../i18n";
 import { Button } from "../../components/ui/Button";
 import {
   Dialog,
@@ -158,15 +159,15 @@ function PickStep({
         }
       }}
     >
-      <DialogTitle className="sr-only">Añadir actividad al plan</DialogTitle>
+      <DialogTitle className="sr-only">{t("palette.addActivity")}</DialogTitle>
       <div className="flex items-center gap-2.5 border-b border-line px-4">
         <Search className="size-[18px] shrink-0 text-ink-3" />
         <input
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="¿Qué vas a hacer? Busca en tu biblioteca…"
-          aria-label="Buscar en la biblioteca"
+          placeholder={t("add.searchPlaceholder")}
+          aria-label={t("add.searchLabel")}
           className="h-[52px] flex-1 bg-transparent text-md text-ink outline-none placeholder:text-ink-3"
         />
         <RadixDialog.Close asChild>
@@ -179,16 +180,13 @@ function PickStep({
       <div
         ref={listRef}
         role="listbox"
-        aria-label="Actividades de la biblioteca"
+        aria-label={t("add.listLabel")}
         className="min-h-0 flex-1 overflow-y-auto p-1.5"
       >
         {state.global.activityTemplates.length === 0 && (
           <div className="px-4 pb-2 pt-6 text-center">
-            <p className="text-base font-medium text-ink">Tu biblioteca está vacía</p>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-ink-2">
-              Escribe arriba lo que vas a hacer y créalo en un momento. Queda guardado para
-              reutilizarlo otros días.
-            </p>
+            <p className="text-base font-medium text-ink">{t("add.emptyTitle")}</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-ink-2">{t("add.emptyBody")}</p>
           </div>
         )}
         {templates.map((template, index) => (
@@ -217,10 +215,12 @@ function PickStep({
           </span>
           {createLabel ? (
             <span>
-              Crear <span className="font-medium text-ink">«{createLabel}»</span>
+              {tr("add.createNamed", {
+                name: <span className="font-medium text-ink">{createLabel}</span>,
+              })}
             </span>
           ) : (
-            <span>Nueva actividad</span>
+            <span>{t("template.new")}</span>
           )}
         </div>
       </div>
@@ -285,7 +285,7 @@ function StepHeader({
       <button
         type="button"
         onClick={onBack}
-        aria-label="Volver"
+        aria-label={t("common.back")}
         className="flex size-8 items-center justify-center rounded text-ink-2 hover:bg-hover hover:text-ink"
       >
         <ArrowLeft className="size-[18px]" />
@@ -311,11 +311,7 @@ function CreateStep({
   const [error, setError] = useState<string | null>(null);
   return (
     <>
-      <StepHeader
-        title="Nueva actividad"
-        subtitle="Se guarda en tu biblioteca para reutilizarla."
-        onBack={onBack}
-      />
+      <StepHeader title={t("template.new")} subtitle={t("add.createSubtitle")} onBack={onBack} />
       <DialogBody className="py-5">
         <TemplateForm
           id="create-template-form"
@@ -334,10 +330,10 @@ function CreateStep({
       </DialogBody>
       <DialogFooter>
         <Button variant="secondary" onClick={onBack}>
-          Volver
+          {t("common.back")}
         </Button>
         <Button variant="primary" type="submit" form="create-template-form">
-          Crear y continuar
+          {t("add.createAndContinue")}
         </Button>
       </DialogFooter>
     </>
@@ -387,11 +383,11 @@ function ConfigureStep({
     try {
       core.createActivityInstance(template.id, blockId, clean);
       toast({
-        title: `«${template.title}» añadida`,
-        description: `En ${block ? blockName(block) : "el plan"}`,
+        title: t("add.added", { title: template.title }),
+        description: t("add.addedIn", { block: block ? blockName(block) : t("add.thePlan") }),
       });
     } catch (caught) {
-      toast({ tone: "error", title: "No se pudo añadir", description: errorMessage(caught) });
+      toast({ tone: "error", title: t("error.add"), description: errorMessage(caught) });
     }
   };
 
@@ -404,11 +400,11 @@ function ConfigureStep({
       />
       <DialogBody className="flex flex-col gap-5 py-5">
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-ink">¿Cuándo?</h3>
+          <h3 className="text-sm font-medium text-ink">{t("add.when")}</h3>
           <BlockPicker blocks={blocks} value={blockId} onChange={setBlockId} />
         </section>
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-ink">Para hoy</h3>
+          <h3 className="text-sm font-medium text-ink">{t("add.forToday")}</h3>
           <div className="rounded-lg border border-line bg-subtle/60 p-3.5">
             <DurationFields
               type={template.type}
@@ -421,15 +417,15 @@ function ConfigureStep({
       </DialogBody>
       <DialogFooter>
         <Button variant="secondary" onClick={() => submit(false)}>
-          Añadir al plan
+          {t("add.addToPlan")}
         </Button>
         <Button
           variant="primary"
           onClick={() => submit(true)}
           disabled={!canStartNow}
-          title={canStartNow ? undefined : "Este bloque no está disponible ahora"}
+          title={canStartNow ? undefined : t("add.blockUnavailable")}
         >
-          {running ? "Añadir y cambiar a esta" : "Añadir y empezar"}
+          {running ? t("add.addAndSwitch") : t("add.addAndStart")}
         </Button>
       </DialogFooter>
     </>

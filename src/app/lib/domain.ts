@@ -14,6 +14,7 @@ import type {
   TimeBlock,
   UUID,
 } from "../../types";
+import { t } from "../i18n";
 import { formatDayMinutes } from "./format";
 
 export const TYPE_META: Record<
@@ -21,25 +22,43 @@ export const TYPE_META: Record<
   { label: string; short: string; hint: string; color: string; bg: string; text: string }
 > = {
   "clear-objective": {
-    label: "Objetivo claro",
-    short: "Objetivo",
-    hint: "Tiene un final definido. Estimas cuánto vas a tardar.",
+    get label() {
+      return t("type.objective.label");
+    },
+    get short() {
+      return t("type.objective.short");
+    },
+    get hint() {
+      return t("type.objective.hint");
+    },
     color: "rgb(var(--objective))",
     bg: "bg-objective",
     text: "text-objective",
   },
   "flexible-duration": {
-    label: "Duración flexible",
-    short: "Flexible",
-    hint: "Varía, pero sabes el rango en el que suele caer.",
+    get label() {
+      return t("type.flexible.label");
+    },
+    get short() {
+      return t("type.flexible.short");
+    },
+    get hint() {
+      return t("type.flexible.hint");
+    },
     color: "rgb(var(--flexible))",
     bg: "bg-flexible",
     text: "text-flexible",
   },
   timeboxing: {
-    label: "Timebox",
-    short: "Timebox",
-    hint: "Decides un mínimo, un máximo o ambos. Te avisamos al llegar.",
+    get label() {
+      return t("type.timebox.label");
+    },
+    get short() {
+      return t("type.timebox.short");
+    },
+    get hint() {
+      return t("type.timebox.hint");
+    },
     color: "rgb(var(--timebox))",
     bg: "bg-timebox",
     text: "text-timebox",
@@ -77,20 +96,21 @@ export function contractOf(
 
   if (type === "clear-objective") {
     const estimate = pick("clearObjectiveSettings")?.estimatedDurationMinutes;
-    return estimate ? { label: `~${estimate} min`, estimate } : null;
+    return estimate ? { label: t("contract.estimate", { n: estimate }), estimate } : null;
   }
   if (type === "flexible-duration") {
     const settings = pick("flexibleDurationSettings");
     if (!settings) return null;
     const { minimumDurationMinutes: min, maximumDurationMinutes: max } = settings;
-    return { label: `${min}–${max} min`, min, max };
+    return { label: t("contract.range", { min, max }), min, max };
   }
   const settings = pick("timeboxingSettings");
   if (!settings) return null;
   const { type: boxType, minimumDurationMinutes: min, maximumDurationMinutes: max } = settings;
-  if (boxType === "minimum-time" && min) return { label: `mín ${min} min`, min };
-  if (boxType === "maximum-time" && max) return { label: `máx ${max} min`, max };
-  if (boxType === "both" && min && max) return { label: `${min}–${max} min`, min, max };
+  if (boxType === "minimum-time" && min) return { label: t("contract.min", { n: min }), min };
+  if (boxType === "maximum-time" && max) return { label: t("contract.max", { n: max }), max };
+  if (boxType === "both" && min && max)
+    return { label: t("contract.range", { min, max }), min, max };
   return null;
 }
 
@@ -107,7 +127,7 @@ export function blockRange(block: TimeBlock): string {
 }
 
 export function blockName(block: TimeBlock): string {
-  return block.isDefault ? "Por hacer" : block.name;
+  return block.isDefault ? t("block.todo") : block.name;
 }
 
 /** "Por hacer" primero, luego cronológico. */
@@ -141,7 +161,7 @@ export function planItem(
   return {
     instance,
     template,
-    title: template?.title ?? "Actividad sin plantilla",
+    title: template?.title ?? t("activity.untitled"),
     type,
     contract: contractOf(type, instance, template),
     isActive: instance.id === activeId,

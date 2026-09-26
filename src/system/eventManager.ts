@@ -3,7 +3,7 @@ import type { SystemCore } from "./index";
 import type { EventTemplate, EventInstance, UUID, ISODateTimeString } from "../types";
 
 /**
- * Gestor de eventos puntuales en Qualia Control
+ * Gestor de eventos puntuales en LifeUI
  * Permite crear y gestionar plantillas de eventos y sus instancias
  */
 export class EventManager {

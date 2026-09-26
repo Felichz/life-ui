@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { UUID, ISODateTimeString, DayMinutes } from "../types";
 
 /**
- * Servicio de utilidades compartidas para el sistema Qualia Control
+ * Servicio de utilidades compartidas para el sistema LifeUI
  * Proporciona funciones comunes para evitar duplicación de código
  */
 export class UtilityService {

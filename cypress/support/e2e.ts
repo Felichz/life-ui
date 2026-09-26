@@ -3,17 +3,18 @@
 declare global {
   namespace Cypress {
     interface Chainable {
-      /** Abre la app con el almacenamiento vacío (primer uso). */
-      visitFresh(path?: string): Chainable<void>;
+      /** Abre la app con el almacenamiento vacío (primer uso), en el idioma dado. */
+      visitFresh(path?: string, locale?: "es" | "en"): Chainable<void>;
     }
   }
 }
 
-Cypress.Commands.add("visitFresh", (path = "/") => {
+Cypress.Commands.add("visitFresh", (path = "/", locale = "es") => {
   cy.visit(path, {
     onBeforeLoad(win) {
       win.localStorage.clear();
-      win.localStorage.setItem("qualia.theme", "light");
+      win.localStorage.setItem("lifeui.theme", "light");
+      win.localStorage.setItem("lifeui.locale", locale);
     },
   });
 });

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { SystemCore } from "../../system";
 import type { AppState, ISystemCore } from "../../types";
+import { t } from "../i18n";
 
 interface SystemContextValue {
   core: ISystemCore;
@@ -27,7 +28,7 @@ export function SystemProvider({
     setState(core.getState());
     // Solo en local: acceso al core desde la consola para depurar
     if (window.location.hostname === "localhost")
-      (window as unknown as { __qualia?: ISystemCore }).__qualia = core;
+      (window as unknown as { __lifeui?: ISystemCore }).__lifeui = core;
     return core.onStateChange(setState);
   }, [core]);
 
@@ -41,6 +42,6 @@ export function useSystem(): SystemContextValue {
   return context;
 }
 
-export function errorMessage(error: unknown, fallback = "Algo salió mal"): string {
+export function errorMessage(error: unknown, fallback = t("error.generic")): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }

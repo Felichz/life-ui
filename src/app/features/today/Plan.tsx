@@ -44,6 +44,7 @@ import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
 import { useShell } from "../../shell/ShellContext";
 import { EditInstanceDialog } from "../activity/EditInstanceDialog";
+import { t } from "../../i18n";
 
 export interface PlanGroup {
   block: TimeBlock;
@@ -52,7 +53,7 @@ export interface PlanGroup {
 }
 
 type View = "list" | "board";
-const VIEW_KEY = "qualia.planView";
+const VIEW_KEY = "lifeui.planView";
 
 function readView(): View {
   try {
@@ -84,7 +85,7 @@ export function Plan({ groups, total }: { groups: PlanGroup[]; total: number }) 
     try {
       core.moveActivityInstance(draggableId, destination.droppableId, destination.index);
     } catch (caught) {
-      toast({ tone: "error", title: "No se pudo mover", description: errorMessage(caught) });
+      toast({ tone: "error", title: t("error.move"), description: errorMessage(caught) });
     }
   };
 
@@ -95,29 +96,29 @@ export function Plan({ groups, total }: { groups: PlanGroup[]; total: number }) 
         actions={
           <>
             <Segmented
-              label="Vista del plan"
+              label={t("plan.view")}
               size="sm"
               value={view}
               onChange={changeView}
               className="hidden md:inline-flex"
               options={[
-                { value: "list", label: "Lista", icon: <List /> },
-                { value: "board", label: "Tablero", icon: <Columns3 /> },
+                { value: "list", label: t("plan.view.list"), icon: <List /> },
+                { value: "board", label: t("plan.view.board"), icon: <Columns3 /> },
               ]}
             />
-            <Tooltip content="Editar bloques horarios">
+            <Tooltip content={t("plan.editBlocks")}>
               <Link
-                to="/biblioteca?tab=bloques"
+                to="/library?tab=blocks"
                 className="ml-1 inline-flex h-7 items-center gap-1.5 rounded px-2 text-sm font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink coarse:h-9"
               >
                 <Clock3 className="size-4" />
-                Bloques
+                {t("plan.blocks")}
               </Link>
             </Tooltip>
           </>
         }
       >
-        <span id="plan-title">Plan del día</span>
+        <span id="plan-title">{t("plan.title")}</span>
       </SectionTitle>
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -144,12 +145,14 @@ function StatusTag({ status }: { status: BlockStatus }) {
   if (status === "now") {
     return (
       <span className="rounded bg-accent/10 px-1.5 py-px text-xs font-medium text-accent-ink">
-        Ahora
+        {t("block.status.now")}
       </span>
     );
   }
-  if (status === "past") return <span className="text-xs text-ink-3">Ya pasó</span>;
-  if (status === "later") return <span className="text-xs text-ink-3">Más tarde</span>;
+  if (status === "past")
+    return <span className="text-xs text-ink-3">{t("block.status.past")}</span>;
+  if (status === "later")
+    return <span className="text-xs text-ink-3">{t("block.status.later")}</span>;
   return null;
 }
 
@@ -165,7 +168,7 @@ function GroupHeader({ group, compact = false }: { group: PlanGroup; compact?: b
       <StatusTag status={status} />
       <span className="tabular text-sm text-ink-3">{items.length > 0 ? items.length : ""}</span>
       <IconButton
-        label={`Añadir a ${blockName(block)}`}
+        label={t("plan.addTo", { block: blockName(block) })}
         size="sm"
         className="ml-auto"
         onClick={() => openAddActivity({ blockId: block.id })}
@@ -183,7 +186,7 @@ function PastNotice({ group }: { group: PlanGroup }) {
   const todo = core.getTimeBlocks().find((block) => block.isDefault);
   return (
     <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 rounded-md bg-subtle px-3 py-2 text-sm text-ink-2">
-      <span>Este bloque ya pasó; para empezarlas, muévelas.</span>
+      <span>{t("plan.pastNotice")}</span>
       {todo && (
         <Button
           variant="ghost"
@@ -191,11 +194,11 @@ function PastNotice({ group }: { group: PlanGroup }) {
           className="-my-1"
           onClick={() => {
             for (const item of group.items) core.moveActivityInstance(item.instance.id, todo.id);
-            toast({ title: `Movidas a Por hacer (${group.items.length})` });
+            toast({ title: t("plan.movedToTodo", { count: group.items.length }) });
           }}
         >
           <ArrowRightLeft />
-          Mover a Por hacer
+          {t("plan.moveToTodo")}
         </Button>
       )}
     </div>
@@ -221,7 +224,7 @@ function ListGroup({ group, onEdit }: { group: PlanGroup; onEdit: (id: UUID) => 
           >
             {group.items.length === 0 && !snapshot.isDraggingOver && (
               <p className="flex h-[42px] items-center px-3 text-sm text-ink-3">
-                Nada aquí todavía. Arrastra algo o añade con +.
+                {t("plan.emptyBlock")}
               </p>
             )}
             {group.items.map((item, index) => (
@@ -295,8 +298,11 @@ function PlanRow({ item, index, status, block, onEdit, card = false }: PlanRowPr
   const available = status === "always" || status === "now";
   const lockedReason =
     status === "later"
-      ? `Disponible de ${formatDayMinutes(block.startMinute)} a ${formatDayMinutes(block.endMinute)}`
-      : "Este bloque ya pasó. Muévela para empezarla.";
+      ? t("plan.availableFrom", {
+          start: formatDayMinutes(block.startMinute),
+          end: formatDayMinutes(block.endMinute),
+        })
+      : t("plan.pastLocked");
 
   return (
     <Draggable draggableId={item.instance.id} index={index} isDragDisabled={item.isActive}>
@@ -305,7 +311,7 @@ function PlanRow({ item, index, status, block, onEdit, card = false }: PlanRowPr
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          aria-roledescription="actividad arrastrable"
+          aria-roledescription={t("plan.draggable")}
           className={cn(
             "group relative flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-accent",
             card
@@ -350,12 +356,12 @@ function PlanRow({ item, index, status, block, onEdit, card = false }: PlanRowPr
           {item.isActive ? (
             <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded px-2 text-sm font-medium text-live">
               <LiveDot />
-              <span className={cn(card && "sr-only")}>En marcha</span>
+              <span className={cn(card && "sr-only")}>{t("focus.running")}</span>
             </span>
           ) : available ? (
-            <Tooltip content="Empezar">
+            <Tooltip content={t("focus.start")}>
               <IconButton
-                label={`Empezar ${item.title}`}
+                label={t("plan.startNamed", { title: item.title })}
                 size="sm"
                 onClick={() => startInstance(item.instance.id)}
                 className="text-ink-2 hover:bg-accent/10 hover:text-accent-ink"
@@ -398,22 +404,22 @@ function RowMenu({ item, onEdit }: { item: PlanItem; onEdit: (id: UUID) => void 
   return (
     <Menu>
       <MenuTrigger asChild>
-        <IconButton label={`Opciones de ${item.title}`} size="sm">
+        <IconButton label={t("plan.optionsNamed", { title: item.title })} size="sm">
           <MoreHorizontal />
         </IconButton>
       </MenuTrigger>
       <MenuContent>
         {!item.isActive && (
           <MenuItem icon={<Play />} onSelect={() => startInstance(item.instance.id)}>
-            Empezar ahora
+            {t("plan.startNow")}
           </MenuItem>
         )}
         <MenuItem icon={<Pencil />} onSelect={() => onEdit(item.instance.id)}>
-          Ajustar para hoy
+          {t("plan.adjustToday")}
         </MenuItem>
         {!item.isActive && (
           <MenuSub>
-            <MenuSubTrigger icon={<ArrowRightLeft />}>Mover a</MenuSubTrigger>
+            <MenuSubTrigger icon={<ArrowRightLeft />}>{t("plan.moveTo")}</MenuSubTrigger>
             <MenuSubContent>
               {blocks
                 .filter((block) => block.id !== item.instance.blockId)
@@ -421,7 +427,7 @@ function RowMenu({ item, onEdit }: { item: PlanItem; onEdit: (id: UUID) => void 
                   <MenuItem
                     key={block.id}
                     onSelect={() =>
-                      run("No se pudo mover", () =>
+                      run(t("error.move"), () =>
                         core.moveActivityInstance(item.instance.id, block.id)
                       )
                     }
@@ -442,16 +448,16 @@ function RowMenu({ item, onEdit }: { item: PlanItem; onEdit: (id: UUID) => void 
               icon={<Trash2 />}
               destructive
               onSelect={() =>
-                run("No se pudo quitar", () => {
+                run(t("error.remove"), () => {
                   core.deleteActivityInstance(item.instance.id);
                   toast({
-                    title: `«${item.title}» quitada del plan`,
-                    description: "Sigue en tu biblioteca.",
+                    title: t("plan.removed", { title: item.title }),
+                    description: t("plan.removedHint"),
                   });
                 })
               }
             >
-              Quitar del plan
+              {t("plan.remove")}
             </MenuItem>
           </>
         )}

@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AlertCircle, Check, X } from "lucide-react";
+import { t } from "../i18n";
 import { cn } from "../lib/cn";
 
 type Tone = "neutral" | "reward" | "error";
@@ -101,7 +102,7 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Cerrar aviso"
+        aria-label={t("toast.dismiss")}
         className="flex size-7 shrink-0 items-center justify-center rounded text-ink-3 transition-colors hover:bg-hover hover:text-ink"
       >
         <X className="size-4" />

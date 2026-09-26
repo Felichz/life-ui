@@ -6,6 +6,7 @@ import { SectionTitle } from "../../components/PageHeader";
 import { contractOf } from "../../lib/domain";
 import { cn } from "../../lib/cn";
 import { useDayActions } from "../../state/actions";
+import { t, tr } from "../../i18n";
 
 /** Actividades ancladas: empezar con un toque, sin configurar nada. */
 export function QuickStart({
@@ -23,11 +24,13 @@ export function QuickStart({
     if (!hasLibrary) return null;
     return (
       <p className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-ink-2">
-        Ancla tus actividades frecuentes en la{" "}
-        <Link to="/biblioteca" className="font-medium text-accent-ink hover:underline">
-          Biblioteca
-        </Link>{" "}
-        y aparecerán aquí para empezarlas con un toque.
+        {tr("quick.hint", {
+          library: (
+            <Link to="/library" className="font-medium text-accent-ink hover:underline">
+              {t("nav.library")}
+            </Link>
+          ),
+        })}
       </p>
     );
   }
@@ -35,7 +38,7 @@ export function QuickStart({
   return (
     <section aria-labelledby="quick-title">
       <SectionTitle>
-        <span id="quick-title">Accesos rápidos</span>
+        <span id="quick-title">{t("quick.title")}</span>
       </SectionTitle>
       <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
         {templates.map((template) => {

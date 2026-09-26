@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { UUID } from "../../types";
 import type { Settings } from "../lib/domain";
+import { t } from "../i18n";
 import { formatTime } from "../lib/format";
 import { useClosingFlow } from "./closing";
 import { errorMessage, useSystem } from "./system";
@@ -25,14 +26,15 @@ export function useDayActions() {
   const titleOfTemplate = useCallback(
     (templateId: UUID) =>
       core.getActivityTemplates().find((template) => template.id === templateId)?.title ??
-      "la actividad",
+      t("activity.fallbackName"),
     [core]
   );
 
   const runAfterClosing = useCallback(
     (nextTitle: string, run: () => void) => {
       const active = core.getState().currentDay?.activeActivityInstanceId;
-      if (active) requestClose({ then: run, nextLabel: `empezará «${nextTitle}»` });
+      if (active)
+        requestClose({ then: run, nextLabel: t("closing.next.start", { title: nextTitle }) });
       else run();
     },
     [core, requestClose]
@@ -49,7 +51,7 @@ export function useDayActions() {
         try {
           core.activateActivity(instanceId);
         } catch (caught) {
-          fail("No se pudo empezar", caught);
+          fail(t("error.start"), caught);
         }
       });
     },
@@ -69,11 +71,11 @@ export function useDayActions() {
       runAfterClosing(titleOfTemplate(templateId), () => {
         try {
           const blockId = options.blockId ?? blockForNow();
-          if (!blockId) throw new Error("No hay bloques disponibles");
+          if (!blockId) throw new Error(t("error.noBlocks"));
           const instance = core.createActivityInstance(templateId, blockId, options.settings);
           core.activateActivity(instance.id);
         } catch (caught) {
-          fail("No se pudo empezar", caught);
+          fail(t("error.start"), caught);
         }
       });
     },
@@ -85,11 +87,11 @@ export function useDayActions() {
       try {
         const event = core.createEventInstance(templateId);
         toast({
-          title: `${event.templateName} registrado`,
-          description: `A las ${formatTime(event.timestamp)}`,
+          title: t("event.logged", { name: event.templateName }),
+          description: t("event.loggedAt", { time: formatTime(event.timestamp) }),
         });
       } catch (caught) {
-        fail("No se pudo registrar el evento", caught);
+        fail(t("error.logEvent"), caught);
       }
     },
     [core, fail, toast]

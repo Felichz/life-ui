@@ -36,7 +36,7 @@ export { PersistenceManager } from "./persistenceManager";
 type StateChangeCallback = (newState: AppState) => void;
 
 /**
- * Implementación del núcleo central del sistema Qualia Control
+ * Implementación del núcleo central del sistema LifeUI
  * Actúa como orquestador principal y punto único de entrada para la manipulación del estado
  */
 export class SystemCore implements ISystemCore {

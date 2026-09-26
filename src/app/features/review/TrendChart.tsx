@@ -4,6 +4,7 @@ import { dayStart } from "../../lib/domain";
 import { cn } from "../../lib/cn";
 import { formatDayMonth, formatNumber } from "../../lib/format";
 import { useSystem } from "../../state/system";
+import { t } from "../../i18n";
 
 interface TrendChartProps {
   days: Day[];
@@ -34,7 +35,7 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
   if (points.length < 2) {
     return (
       <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-2">
-        Con un par de días más verás aquí cómo evolucionan tus tempos.
+        {t("trend.needMoreDays")}
       </p>
     );
   }
@@ -43,11 +44,11 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
     <div className="rounded-xl border border-line bg-panel p-4 shadow-xs sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div>
-          <p className="text-sm text-ink-2">Tempos por día</p>
+          <p className="text-sm text-ink-2">{t("trend.title")}</p>
           <p className="mt-0.5 text-base text-ink">
-            Media{" "}
+            {t("trend.average")}{" "}
             <span className="tabular font-semibold text-tempo-ink">{formatNumber(average)}</span>
-            <span className="text-ink-2"> · satisfacción media </span>
+            <span className="text-ink-2"> · {t("today.avgSatisfaction")} </span>
             <span className="tabular font-semibold">{formatNumber(averageSatisfaction, 1)}</span>
           </p>
         </div>
@@ -55,12 +56,12 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
           <p className="tabular text-sm text-ink-2" aria-live="polite">
             {formatDayMonth(dayStart(active.day))} ·{" "}
             <span className="font-semibold text-ink">
-              {formatNumber(active.summary.totalTempos)} tempos
+              {t("endDay.tempos", { count: formatNumber(active.summary.totalTempos) })}
             </span>{" "}
             · {active.summary.displayPercent}% ·{" "}
             {active.summary.completedActivities
               ? `${formatNumber(active.summary.averageSatisfaction, 1)}/10`
-              : "sin cierres"}
+              : t("trend.noCloses")}
           </p>
         )}
       </div>
@@ -101,7 +102,7 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
           style={{ bottom: `${(target / max) * 100}%` }}
         >
           <span className="tabular absolute -top-[22px] left-0 rounded bg-panel px-1 text-xs text-ink-2">
-            Referencia {formatNumber(target)}
+            {t("trend.reference", { target: formatNumber(target) })}
           </span>
         </div>
       </div>
@@ -120,13 +121,13 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
 
       <div className="sr-only">
         <table>
-          <caption>Tempos por día</caption>
+          <caption>{t("trend.title")}</caption>
           <thead>
             <tr>
-              <th scope="col">Día</th>
-              <th scope="col">Tempos</th>
-              <th scope="col">% de la referencia</th>
-              <th scope="col">Satisfacción media</th>
+              <th scope="col">{t("trend.col.day")}</th>
+              <th scope="col">{t("review.col.tempos")}</th>
+              <th scope="col">{t("trend.col.percent")}</th>
+              <th scope="col">{t("trend.col.satisfaction")}</th>
             </tr>
           </thead>
           <tbody>

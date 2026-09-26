@@ -3,7 +3,7 @@ import type { SystemCore } from "./index";
 import type { Day, UUID, ActivityInstance } from "../types";
 
 /**
- * Gestor del ciclo de vida de los días de actividad en Qualia Control
+ * Gestor del ciclo de vida de los días de actividad en LifeUI
  * Permite iniciar, finalizar y consultar información sobre los días
  */
 export class DayManager {

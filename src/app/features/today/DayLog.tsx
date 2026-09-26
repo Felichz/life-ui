@@ -4,6 +4,10 @@ import { TypeIcon } from "../../components/TypeIcon";
 import { recordContract } from "../../lib/domain";
 import { cn } from "../../lib/cn";
 import { formatMinutes, formatTime, minutesOfDay } from "../../lib/format";
+import { getLocale, t } from "../../i18n";
+
+/** Ancho fijo de la columna de hora: "9:40" en español, "11:15 AM" en inglés. */
+const timeColumn = () => (getLocale() === "en" ? "w-[62px]" : "w-11");
 
 type Entry =
   | { kind: "record"; at: string; record: CompletedActivityRecord }
@@ -67,7 +71,7 @@ export function DayLog({ state, dayId, now }: { state: AppState; dayId: UUID; no
       />
       {entries.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-4 py-6 text-center text-sm text-ink-2">
-          Aquí aparecerá lo que vayas cerrando y los eventos que registres.
+          {t("log.empty")}
         </p>
       ) : (
         <ol className="flex flex-col">
@@ -79,14 +83,19 @@ export function DayLog({ state, dayId, now }: { state: AppState; dayId: UUID; no
                 key={entry.event.id}
                 className="flex items-center gap-3 border-b border-line py-2 last:border-b-0"
               >
-                <span className="tabular w-11 shrink-0 text-sm text-ink-3">
+                <span
+                  className={cn(
+                    "tabular shrink-0 whitespace-nowrap text-sm text-ink-3",
+                    timeColumn()
+                  )}
+                >
                   {formatTime(entry.event.timestamp)}
                 </span>
                 <span aria-hidden className="ml-1.5 mr-1 size-2 shrink-0 rotate-45 bg-event" />
                 <span className="min-w-0 flex-1 truncate text-sm text-ink">
                   {entry.event.templateName}
                 </span>
-                <span className="text-xs text-ink-3">Evento</span>
+                <span className="text-xs text-ink-3">{t("log.event")}</span>
               </li>
             )
           )}
@@ -101,7 +110,9 @@ function RecordEntry({ record }: { record: CompletedActivityRecord }) {
   const contract = recordContract(record);
   return (
     <li className="flex items-start gap-3 border-b border-line py-2.5 last:border-b-0">
-      <span className="tabular w-11 shrink-0 pt-px text-sm text-ink-3">
+      <span
+        className={cn("tabular shrink-0 whitespace-nowrap pt-px text-sm text-ink-3", timeColumn())}
+      >
         {formatTime(record.startTime)}
       </span>
       <TypeIcon type={record.type} className="mt-0.5" />
@@ -118,7 +129,7 @@ function RecordEntry({ record }: { record: CompletedActivityRecord }) {
         </p>
       </div>
       {interrupted ? (
-        <span className="shrink-0 pt-px text-xs text-ink-3">Sin terminar</span>
+        <span className="shrink-0 pt-px text-xs text-ink-3">{t("log.notFinished")}</span>
       ) : (
         <span className="tabular shrink-0 rounded bg-tempo/15 px-1.5 py-0.5 text-xs font-semibold text-tempo-ink">
           +{record.temposAwarded ?? 0}

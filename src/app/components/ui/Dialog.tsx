@@ -1,3 +1,4 @@
+import { t } from "../../i18n";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
@@ -46,7 +47,7 @@ export function DialogContent({
         {children}
         {!hideClose && (
           <RadixDialog.Close
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
             className="absolute right-3 top-3 flex size-8 items-center justify-center rounded text-ink-3 transition-colors hover:bg-hover hover:text-ink coarse:size-10"
           >
             <X className="size-[18px]" />

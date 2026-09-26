@@ -13,6 +13,7 @@ import {
 import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
 import { TemplateForm, draftFrom, templatePayload, type TemplateDraft } from "./TemplateForm";
+import { t } from "../../i18n";
 
 interface TemplateSheetProps {
   open: boolean;
@@ -46,7 +47,7 @@ export function TemplateSheet({
       const saved = template
         ? core.updateActivityTemplate(template.id, payload)
         : core.createActivityTemplate({ ...payload, isSystemActivity: false });
-      toast({ title: template ? "Cambios guardados" : `«${saved.title}» está en tu biblioteca` });
+      toast({ title: template ? t("toast.saved") : t("template.created", { title: saved.title }) });
       setError(null);
       onSaved(saved);
     } catch (caught) {
@@ -58,7 +59,7 @@ export function TemplateSheet({
     if (!template) return;
     try {
       core.deleteActivityTemplate(template.id);
-      toast({ title: `«${template.title}» eliminada de la biblioteca` });
+      toast({ title: t("template.deleted", { title: template.title }) });
       onOpenChange(false);
     } catch (caught) {
       setError(errorMessage(caught));
@@ -78,7 +79,7 @@ export function TemplateSheet({
     >
       <DialogContent variant="sheet" aria-describedby={undefined}>
         <DialogHeader className="border-b border-line pb-4">
-          <DialogTitle>{template ? "Editar actividad" : "Nueva actividad"}</DialogTitle>
+          <DialogTitle>{template ? t("template.edit") : t("template.new")}</DialogTitle>
         </DialogHeader>
         <DialogBody className="py-5">
           {open && (
@@ -96,10 +97,10 @@ export function TemplateSheet({
             confirmDelete ? (
               <div className="flex items-center gap-2">
                 <Button variant="danger" size="sm" onClick={remove}>
-                  Sí, eliminar
+                  {t("template.confirmDelete")}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
-                  No
+                  {t("common.no")}
                 </Button>
               </div>
             ) : (
@@ -107,15 +108,11 @@ export function TemplateSheet({
                 variant="ghost"
                 className="text-danger hover:bg-danger/10 hover:text-danger sm:-ml-2"
                 disabled={inUseToday}
-                title={
-                  inUseToday
-                    ? "Está en el plan de hoy. Quítala del plan para poder eliminarla."
-                    : undefined
-                }
+                title={inUseToday ? t("template.inUseToday") : undefined}
                 onClick={() => setConfirmDelete(true)}
               >
                 <Trash2 />
-                Eliminar
+                {t("common.delete")}
               </Button>
             )
           ) : (
@@ -123,10 +120,10 @@ export function TemplateSheet({
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <Button variant="secondary" onClick={() => onOpenChange(false)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button variant="primary" type="submit" form="template-form">
-              {template ? "Guardar cambios" : "Crear actividad"}
+              {template ? t("template.saveChanges") : t("template.create")}
             </Button>
           </div>
         </DialogFooter>

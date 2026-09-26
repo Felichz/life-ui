@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type ThemePreference = "system" | "light" | "dark";
-const STORAGE_KEY = "qualia.theme";
+const STORAGE_KEY = "lifeui.theme";
+/** Clave del nombre anterior del producto: se lee una vez para no perder la preferencia. */
+const LEGACY_KEY = "qualia.theme";
 
 interface ThemeContextValue {
   preference: ThemePreference;
@@ -13,7 +15,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function readPreference(): ThemePreference {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (stored === "light" || stored === "dark" || stored === "system") return stored;
   } catch {
     // almacenamiento no disponible: seguimos al sistema

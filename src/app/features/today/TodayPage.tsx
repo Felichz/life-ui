@@ -19,6 +19,7 @@ import { FocusPanel } from "./FocusPanel";
 import { Plan, planGroups } from "./Plan";
 import { QuickStart } from "./QuickStart";
 import { StartDay } from "./StartDay";
+import { t, tp } from "../../i18n";
 
 export function TodayPage() {
   const { state } = useSystem();
@@ -59,14 +60,11 @@ function Today() {
   const pinned = state.global.activityTemplates.filter((template) => template.pinned);
 
   const tempo = (
-    <section aria-label="Tempos de hoy" className="flex flex-col gap-3">
+    <section aria-label={t("today.temposLabel")} className="flex flex-col gap-3">
       <TempoMeter summary={summary} />
       {summary.completedActivities > 0 && (
         <p className="text-sm text-ink-2">
-          {summary.completedActivities === 1
-            ? "1 completada"
-            : `${summary.completedActivities} completadas`}{" "}
-          · satisfacción media{" "}
+          {tp("start.completed", summary.completedActivities)} · {t("today.avgSatisfaction")}{" "}
           <span className="tabular font-medium text-ink">
             {formatNumber(summary.averageSatisfaction, 1)}
           </span>
@@ -78,7 +76,7 @@ function Today() {
   const log = (
     <section aria-labelledby="log-title">
       <SectionTitle>
-        <span id="log-title">Registro</span>
+        <span id="log-title">{t("today.log")}</span>
       </SectionTitle>
       <DayLog state={state} dayId={day.day.id} now={now} />
     </section>
@@ -87,19 +85,19 @@ function Today() {
   return (
     <Page>
       <PageHeader
-        title="Hoy"
+        title={t("nav.today")}
         subtitle={formatDateLong(now)}
         actions={
           <>
             <EventButton />
-            <Tooltip content="Añadir actividad" shortcut={["N"]}>
+            <Tooltip content={t("today.addActivity")} shortcut={["N"]}>
               <Button
                 variant="primary"
                 onClick={() => openAddActivity()}
                 data-testid="add-activity"
               >
                 <Plus />
-                <span className="hidden sm:inline">Añadir</span>
+                <span className="hidden sm:inline">{t("common.add")}</span>
                 <Kbd tone="inverse" className="ml-0.5 hidden bg-white/20 text-white lg:inline-flex">
                   N
                 </Kbd>
@@ -107,17 +105,17 @@ function Today() {
             </Tooltip>
             <Menu>
               <MenuTrigger asChild>
-                <IconButton label="Más opciones del día" variant="secondary">
+                <IconButton label={t("today.moreOptions")} variant="secondary">
                   <MoreHorizontal />
                 </IconButton>
               </MenuTrigger>
               <MenuContent>
-                <MenuItem icon={<Clock3 />} onSelect={() => navigate("/biblioteca?tab=bloques")}>
-                  Editar bloques horarios
+                <MenuItem icon={<Clock3 />} onSelect={() => navigate("/library?tab=blocks")}>
+                  {t("plan.editBlocks")}
                 </MenuItem>
                 <MenuSeparator />
                 <MenuItem icon={<MoonStar />} onSelect={() => setEndingDay(true)}>
-                  Terminar el día
+                  {t("endDay.confirm")}
                 </MenuItem>
               </MenuContent>
             </Menu>

@@ -13,6 +13,7 @@ import { useDayActions } from "../../state/actions";
 import { useSystem } from "../../state/system";
 import { useShell } from "../../shell/ShellContext";
 import { EditInstanceDialog } from "../activity/EditInstanceDialog";
+import { t } from "../../i18n";
 
 interface FocusPanelProps {
   active: PlanItem | null;
@@ -37,7 +38,7 @@ function Running({ item }: { item: PlanItem }) {
 
   return (
     <section
-      aria-label="En marcha"
+      aria-label={t("focus.running")}
       className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm"
     >
       <div className="px-5 pb-5 pt-4 sm:px-6 sm:pt-5">
@@ -51,7 +52,7 @@ function Running({ item }: { item: PlanItem }) {
               <span className="inline-flex items-center gap-2 font-medium text-live">
                 <LiveDot />
                 <span className="tabular">
-                  En marcha desde {formatTime(startedAt.toISOString())}
+                  {t("focus.runningSince", { time: formatTime(startedAt.toISOString()) })}
                 </span>
               </span>
               <span className="hidden text-ink-3 sm:inline">·</span>
@@ -66,7 +67,7 @@ function Running({ item }: { item: PlanItem }) {
           </div>
           <p
             className="tabular shrink-0 text-4xl font-semibold text-ink sm:text-clock"
-            aria-label="Tiempo transcurrido"
+            aria-label={t("focus.elapsed")}
           >
             {formatClock(elapsedMs)}
           </p>
@@ -79,9 +80,9 @@ function Running({ item }: { item: PlanItem }) {
       <div className="flex items-center justify-between gap-2 border-t border-line bg-subtle/60 px-3 py-2.5 sm:px-4">
         <Button variant="ghost" size="md" onClick={() => setEditing(true)}>
           <SlidersHorizontal />
-          Ajustar
+          {t("focus.adjust")}
         </Button>
-        <Tooltip content="Cerrar con el ritual" shortcut={["T"]}>
+        <Tooltip content={t("focus.finishTooltip")} shortcut={["T"]}>
           <Button
             variant="primary"
             size="lg"
@@ -89,7 +90,7 @@ function Running({ item }: { item: PlanItem }) {
             className="min-w-[132px]"
             data-testid="finish-active"
           >
-            Terminar
+            {t("focus.finish")}
             <Kbd tone="inverse" className="ml-0.5 hidden bg-white/20 text-white sm:inline-flex">
               T
             </Kbd>
@@ -106,34 +107,35 @@ function Running({ item }: { item: PlanItem }) {
 
 function statusMessage(item: PlanItem, elapsed: number): string {
   const contract = item.contract;
-  if (!contract) return "El tiempo se está registrando. Ciérrala cuando termines.";
+  if (!contract) return t("focus.status.noContract");
   const remaining = (limit: number) => Math.max(1, Math.ceil(limit - elapsed));
   if (contract.estimate !== undefined) {
     return elapsed < contract.estimate
-      ? `Quedan ~${remaining(contract.estimate)} min de tu estimado.`
-      : `Pasaste el estimado por ${Math.floor(elapsed - contract.estimate)} min. Sin problema: ciérrala cuando termines.`;
+      ? t("focus.status.estimateLeft", { n: remaining(contract.estimate) })
+      : t("focus.status.estimateOver", { n: Math.floor(elapsed - contract.estimate) });
   }
   if (
     item.type === "flexible-duration" &&
     contract.min !== undefined &&
     contract.max !== undefined
   ) {
-    if (elapsed < contract.min) return `Suele durar entre ${contract.min} y ${contract.max} min.`;
-    if (elapsed <= contract.max) return "Dentro de lo esperado.";
-    return "Más larga que de costumbre. Está bien.";
+    if (elapsed < contract.min)
+      return t("focus.status.rangeUsual", { min: contract.min, max: contract.max });
+    if (elapsed <= contract.max) return t("focus.status.rangeWithin");
+    return t("focus.status.rangeOver");
   }
   const parts: string[] = [];
   if (contract.min !== undefined) {
     parts.push(
       elapsed < contract.min
-        ? `Mínimo en ${remaining(contract.min)} min.`
-        : "Mínimo cumplido. Puedes seguir si hay flujo."
+        ? t("focus.status.minIn", { n: remaining(contract.min) })
+        : t("focus.status.minDone")
     );
   }
   if (contract.max !== undefined) {
-    if (elapsed >= contract.max) parts.push("Llegaste al máximo. Buen momento para cerrar.");
+    if (elapsed >= contract.max) parts.push(t("focus.status.maxDone"));
     else if (contract.min === undefined || elapsed >= contract.min)
-      parts.push(`Máximo en ${remaining(contract.max)} min.`);
+      parts.push(t("focus.status.maxIn", { n: remaining(contract.max) }));
   }
   return parts.join(" ");
 }
@@ -208,14 +210,12 @@ function Idle({ suggestions }: { suggestions: PlanItem[] }) {
 
   return (
     <section
-      aria-label="Foco"
+      aria-label={t("focus.label")}
       className="rounded-xl border border-line bg-panel px-5 py-5 shadow-xs sm:px-6"
     >
-      <h2 className="text-xl font-semibold text-ink">Nada en marcha</h2>
+      <h2 className="text-xl font-semibold text-ink">{t("focus.idle.title")}</h2>
       <p className="mt-1 text-base text-ink-2">
-        {suggestions.length > 0
-          ? "Tiempo libre es tiempo libre. Cuando quieras, elige una:"
-          : "Tiempo libre es tiempo libre. Cuando quieras, añade algo al plan."}
+        {suggestions.length > 0 ? t("focus.idle.pick") : t("focus.idle.add")}
       </p>
 
       {suggestions.length > 0 ? (
@@ -250,7 +250,7 @@ function Idle({ suggestions }: { suggestions: PlanItem[] }) {
                   )}
                 >
                   <Play className="size-3.5 fill-current" />
-                  Empezar
+                  {t("focus.start")}
                 </span>
               </button>
             </li>
@@ -259,7 +259,7 @@ function Idle({ suggestions }: { suggestions: PlanItem[] }) {
       ) : (
         <Button variant="primary" className="mt-4" onClick={() => openAddActivity()}>
           <Plus />
-          Añadir actividad
+          {t("palette.addActivity")}
         </Button>
       )}
     </section>

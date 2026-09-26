@@ -12,6 +12,7 @@ import { formatNumber } from "../../lib/format";
 import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
 import { useShell } from "../../shell/ShellContext";
+import { t, tp } from "../../i18n";
 
 type Filter = "all" | ActivityType;
 
@@ -55,18 +56,15 @@ export function ActivityTemplates() {
     try {
       core.updateActivityTemplate(id, { pinned });
     } catch (caught) {
-      toast({ tone: "error", title: "No se pudo actualizar", description: errorMessage(caught) });
+      toast({ tone: "error", title: t("error.update"), description: errorMessage(caught) });
     }
   };
 
   if (state.global.activityTemplates.length === 0) {
     return (
       <div className="rounded-xl border border-line bg-panel px-6 py-8 shadow-xs">
-        <h2 className="text-lg font-semibold text-ink">Crea tu primera actividad</h2>
-        <p className="mt-1 max-w-lg text-base text-ink-2">
-          Una actividad es algo que repites: escribir, leer, revisar el correo. Al crearla eliges
-          cómo es su duración:
-        </p>
+        <h2 className="text-lg font-semibold text-ink">{t("library.empty.title")}</h2>
+        <p className="mt-1 max-w-lg text-base text-ink-2">{t("library.empty.body")}</p>
         <ul className="mt-5 flex flex-col gap-3">
           {(Object.keys(TYPE_META) as ActivityType[]).map((type) => (
             <li key={type} className="flex gap-3">
@@ -80,7 +78,7 @@ export function ActivityTemplates() {
         </ul>
         <Button variant="primary" className="mt-6" onClick={() => openTemplateEditor()}>
           <Plus />
-          Nueva actividad
+          {t("template.new")}
         </Button>
       </div>
     );
@@ -94,35 +92,35 @@ export function ActivityTemplates() {
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar actividades"
-            aria-label="Buscar actividades"
+            placeholder={t("library.search")}
+            aria-label={t("library.search")}
             className="pl-8"
           />
         </div>
         <div className="flex items-center gap-2">
           <Segmented
-            label="Filtrar por tipo"
+            label={t("library.filter")}
             size="sm"
             value={filter}
             onChange={setFilter}
             className="flex-1 sm:flex-none"
             options={[
-              { value: "all", label: "Todas" },
-              { value: "clear-objective", label: "Objetivo" },
-              { value: "flexible-duration", label: "Flexible" },
-              { value: "timeboxing", label: "Timebox" },
+              { value: "all", label: t("library.filter.all") },
+              { value: "clear-objective", label: t("type.objective.short") },
+              { value: "flexible-duration", label: t("type.flexible.short") },
+              { value: "timeboxing", label: t("type.timebox.short") },
             ]}
           />
           <Button variant="primary" onClick={() => openTemplateEditor()}>
             <Plus />
-            <span className="hidden sm:inline">Nueva</span>
+            <span className="hidden sm:inline">{t("library.newShort")}</span>
           </Button>
         </div>
       </div>
 
       {templates.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-2">
-          Ninguna actividad coincide con la búsqueda.
+          {t("library.noResults")}
         </p>
       ) : (
         <ul className="overflow-hidden rounded-lg border border-line bg-panel shadow-xs">
@@ -151,21 +149,17 @@ export function ActivityTemplates() {
                     {stats && (
                       <span className="text-ink-3">
                         {" "}
-                        · {stats.count === 1 ? "1 vez" : `${stats.count} veces`} · media{" "}
-                        {formatNumber(stats.satisfaction / stats.count, 1)}
+                        ·{" "}
+                        {tp("library.usage", stats.count, {
+                          average: formatNumber(stats.satisfaction / stats.count, 1),
+                        })}
                       </span>
                     )}
                   </span>
                 </button>
-                <Tooltip
-                  content={
-                    template.pinned ? "Quitar de accesos rápidos" : "Anclar en accesos rápidos"
-                  }
-                >
+                <Tooltip content={template.pinned ? t("library.unpin") : t("library.pin")}>
                   <IconButton
-                    label={
-                      template.pinned ? "Quitar de accesos rápidos" : "Anclar en accesos rápidos"
-                    }
+                    label={template.pinned ? t("library.unpin") : t("library.pin")}
                     size="sm"
                     onClick={() => togglePin(template.id, !template.pinned)}
                     className={cn(template.pinned && "text-accent-ink")}
@@ -174,9 +168,9 @@ export function ActivityTemplates() {
                   </IconButton>
                 </Tooltip>
                 {dayActive && (
-                  <Tooltip content="Añadir al plan de hoy">
+                  <Tooltip content={t("library.addToToday")}>
                     <IconButton
-                      label={`Añadir ${template.title} a hoy`}
+                      label={t("library.addToTodayNamed", { title: template.title })}
                       size="sm"
                       onClick={() => openAddActivity({ templateId: template.id })}
                     >

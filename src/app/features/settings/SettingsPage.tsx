@@ -20,6 +20,7 @@ import { modKeyLabel } from "../../lib/useHotkey";
 import { errorMessage, useSystem } from "../../state/system";
 import { useTheme, type ThemePreference } from "../../state/theme";
 import { useToast } from "../../state/toast";
+import { LOCALES, LOCALE_NAMES, t, useLocale, type Locale } from "../../i18n";
 
 function Section({
   title,
@@ -44,19 +45,20 @@ function Section({
 export function SettingsPage() {
   return (
     <Page width="narrow">
-      <PageHeader title="Ajustes" />
+      <PageHeader title={t("nav.settings")} />
       <div className="mt-6">
         <TargetSection />
         <AppearanceSection />
-        <Section title="Atajos de teclado" description="Para moverte sin soltar el teclado.">
+        <LanguageSection />
+        <Section title={t("settings.shortcuts")} description={t("settings.shortcutsHint")}>
           <dl className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2.5 text-base">
             {[
-              [[modKeyLabel, "K"], "Buscar o ejecutar cualquier cosa"],
-              [["N"], "Añadir actividad al plan"],
-              [["E"], "Registrar un evento"],
-              [["T"], "Terminar la actividad en marcha"],
-              [["G", "H"], "Ir a Hoy (G + B, R, A para el resto)"],
-              [["0–9"], "Elegir satisfacción en el cierre"],
+              [[modKeyLabel, "K"], t("settings.shortcut.palette")],
+              [["N"], t("palette.addActivity")],
+              [["E"], t("settings.shortcut.event")],
+              [["T"], t("settings.shortcut.finish")],
+              [["G", "H"], t("settings.shortcut.goTo")],
+              [["0–9"], t("settings.shortcut.score")],
             ].map(([keys, label]) => (
               <div key={label as string} className="contents">
                 <dt className="flex gap-1">
@@ -87,26 +89,26 @@ function TargetSection() {
     event.preventDefault();
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed <= 0) {
-      setError("Tiene que ser un número entero mayor que 0.");
+      setError(t("settings.target.error"));
       return;
     }
     try {
       core.updateDailyTempoTarget(parsed);
       setError(null);
-      toast({ title: "Referencia actualizada", description: `${parsed} tempos al día.` });
+      toast({
+        title: t("settings.target.updated"),
+        description: t("settings.target.updatedDetail", { n: parsed }),
+      });
     } catch (caught) {
       setError(errorMessage(caught));
     }
   };
 
   return (
-    <Section
-      title="Referencia diaria"
-      description="Un ancla para orientarte, no una meta que debas. Súbela cuando la superes con naturalidad."
-    >
+    <Section title={t("settings.target.title")} description={t("settings.target.description")}>
       <form onSubmit={save} className="flex flex-col gap-2">
         <label htmlFor="target" className="text-sm font-medium text-ink">
-          Tempos por día
+          {t("settings.target.label")}
         </label>
         <div className="flex gap-2">
           <Input
@@ -128,20 +130,15 @@ function TargetSection() {
             disabled={value === String(current)}
             className="h-9 coarse:h-11"
           >
-            Guardar
+            {t("common.save")}
           </Button>
         </div>
         {error && <p className="text-sm text-danger">{error}</p>}
       </form>
       <div className="mt-5 rounded-lg bg-subtle px-4 py-3.5 text-sm text-ink-2">
-        <p className="font-medium text-ink">Cómo se calculan los tempos</p>
-        <p className="tabular mt-1.5">
-          minutos × satisfacción ÷ {divisor}, redondeado hacia arriba.
-        </p>
-        <p className="mt-1.5">
-          Los minutos son tu estimado si lo hay, o el tiempo real si no. Un {divisor}/10 equivale al
-          100%: una tarea de 30 minutos da 30 tempos. Un 0 no suma, y el tiempo libre nunca resta.
-        </p>
+        <p className="font-medium text-ink">{t("settings.formula.title")}</p>
+        <p className="tabular mt-1.5">{t("settings.formula.expression", { divisor })}</p>
+        <p className="mt-1.5">{t("settings.formula.explanation", { divisor })}</p>
       </div>
     </Section>
   );
@@ -150,16 +147,30 @@ function TargetSection() {
 function AppearanceSection() {
   const { preference, setPreference } = useTheme();
   return (
-    <Section title="Apariencia" description="Sigue a tu sistema o fija un tema.">
+    <Section title={t("palette.group.appearance")} description={t("settings.appearanceHint")}>
       <Segmented<ThemePreference>
-        label="Tema"
+        label={t("settings.theme")}
         value={preference}
         onChange={setPreference}
         options={[
-          { value: "system", label: "Sistema", icon: <Monitor /> },
-          { value: "light", label: "Claro", icon: <Sun /> },
-          { value: "dark", label: "Oscuro", icon: <Moon /> },
+          { value: "system", label: t("settings.theme.system"), icon: <Monitor /> },
+          { value: "light", label: t("settings.theme.light"), icon: <Sun /> },
+          { value: "dark", label: t("settings.theme.dark"), icon: <Moon /> },
         ]}
+      />
+    </Section>
+  );
+}
+
+function LanguageSection() {
+  const { locale, setLocale } = useLocale();
+  return (
+    <Section title={t("settings.language")} description={t("settings.languageHint")}>
+      <Segmented<Locale>
+        label={t("settings.language")}
+        value={locale}
+        onChange={setLocale}
+        options={LOCALES.map((option) => ({ value: option, label: LOCALE_NAMES[option] }))}
       />
     </Section>
   );
@@ -179,10 +190,10 @@ function DataSection() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `qualia-control-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `lifeui-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Copia descargada" });
+    toast({ title: t("settings.data.downloaded") });
   };
 
   const onFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -196,14 +207,14 @@ function DataSection() {
     if (!pendingImport) return;
     try {
       core.importData(pendingImport.json);
-      toast({ title: "Datos importados" });
+      toast({ title: t("settings.data.imported") });
       setPendingImport(null);
       navigate("/");
     } catch (caught) {
       toast({
         tone: "error",
-        title: "No se pudo importar",
-        description: errorMessage(caught, "El archivo no es una copia válida"),
+        title: t("error.import"),
+        description: errorMessage(caught, t("settings.data.invalidFile")),
       });
       setPendingImport(null);
     }
@@ -213,29 +224,29 @@ function DataSection() {
     core.clearState();
     setClearing(false);
     setConfirmText("");
-    toast({ title: "Datos borrados", description: "Empiezas de cero." });
+    toast({ title: t("settings.data.cleared"), description: t("settings.data.clearedHint") });
     navigate("/");
   };
 
   return (
-    <Section
-      title="Tus datos"
-      description="Todo vive en este navegador. Descarga una copia de vez en cuando."
-    >
+    <Section title={t("settings.data.title")} description={t("settings.data.description")}>
       <div className="flex flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-panel shadow-xs">
         <Row
-          title="Exportar"
-          body={`${state.global.days.length} días, ${state.global.completedActivityRecords.length} cierres y tu biblioteca, en un archivo JSON.`}
+          title={t("settings.data.export")}
+          body={t("settings.data.exportBody", {
+            days: state.global.days.length,
+            closes: state.global.completedActivityRecords.length,
+          })}
           action={
             <Button variant="secondary" onClick={exportData}>
               <Download />
-              Descargar
+              {t("settings.data.download")}
             </Button>
           }
         />
         <Row
-          title="Importar"
-          body="Reemplaza todo lo que hay aquí por una copia descargada antes."
+          title={t("settings.data.import")}
+          body={t("settings.data.importBody")}
           action={
             <>
               <input
@@ -247,14 +258,14 @@ function DataSection() {
               />
               <Button variant="secondary" onClick={() => fileRef.current?.click()}>
                 <Upload />
-                Elegir archivo
+                {t("settings.data.chooseFile")}
               </Button>
             </>
           }
         />
         <Row
-          title="Borrar todo"
-          body="Elimina días, cierres, biblioteca y bloques de este navegador. No se puede deshacer."
+          title={t("settings.data.clear")}
+          body={t("settings.data.clearBody")}
           action={
             <Button
               variant="ghost"
@@ -262,7 +273,7 @@ function DataSection() {
               onClick={() => setClearing(true)}
             >
               <Trash2 />
-              Borrar
+              {t("settings.data.clearShort")}
             </Button>
           }
         />
@@ -274,17 +285,17 @@ function DataSection() {
       >
         <DialogContent size="sm">
           <DialogHeader>
-            <DialogTitle>¿Importar «{pendingImport?.name}»?</DialogTitle>
-            <DialogDescription>
-              Reemplazará todos los datos actuales. Si dudas, exporta una copia antes.
-            </DialogDescription>
+            <DialogTitle>
+              {t("settings.data.importConfirm", { name: pendingImport?.name ?? "" })}
+            </DialogTitle>
+            <DialogDescription>{t("settings.data.importWarning")}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setPendingImport(null)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button variant="primary" onClick={confirmImport}>
-              Importar y reemplazar
+              {t("settings.data.importAndReplace")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -299,9 +310,9 @@ function DataSection() {
       >
         <DialogContent size="sm">
           <DialogHeader>
-            <DialogTitle>¿Borrar todos tus datos?</DialogTitle>
+            <DialogTitle>{t("settings.data.clearConfirm")}</DialogTitle>
             <DialogDescription>
-              No se puede deshacer. Escribe «borrar» para confirmar.
+              {t("settings.data.clearHint", { word: t("settings.data.clearWord") })}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="pb-4">
@@ -309,20 +320,20 @@ function DataSection() {
               autoFocus
               value={confirmText}
               onChange={(event) => setConfirmText(event.target.value)}
-              aria-label="Escribe borrar para confirmar"
-              placeholder="borrar"
+              aria-label={t("settings.data.clearTypeLabel", { word: t("settings.data.clearWord") })}
+              placeholder={t("settings.data.clearWord")}
             />
           </DialogBody>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setClearing(false)}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button
               variant="danger"
-              disabled={confirmText.trim().toLowerCase() !== "borrar"}
+              disabled={confirmText.trim().toLowerCase() !== t("settings.data.clearWord")}
               onClick={confirmClear}
             >
-              Borrar todo
+              {t("settings.data.clear")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@ import type { ActivityType, TimeboxingType } from "../../../types";
 import { Field, MinutesInput } from "../../components/ui/Field";
 import { Segmented } from "../../components/ui/Segmented";
 import type { Settings } from "../../lib/domain";
+import { t } from "../../i18n";
 
 export function defaultSettings(type: ActivityType): Settings {
   if (type === "clear-objective")
@@ -34,7 +35,7 @@ export function validateSettings(type: ActivityType, settings: Settings): string
   if (type === "clear-objective") {
     return positive(settings.clearObjectiveSettings?.estimatedDurationMinutes)
       ? null
-      : "Indica cuántos minutos estimas.";
+      : t("duration.error.estimate");
   }
   if (type === "flexible-duration") {
     const range = settings.flexibleDurationSettings;
@@ -43,23 +44,23 @@ export function validateSettings(type: ActivityType, settings: Settings): string
       !positive(range.minimumDurationMinutes) ||
       !positive(range.maximumDurationMinutes)
     ) {
-      return "Indica el mínimo y el máximo en minutos.";
+      return t("duration.error.range");
     }
     return range.maximumDurationMinutes >= range.minimumDurationMinutes
       ? null
-      : "El máximo no puede ser menor que el mínimo.";
+      : t("duration.error.maxBelowMin");
   }
   const box = settings.timeboxingSettings;
-  if (!box) return "Configura el timebox.";
+  if (!box) return t("duration.error.timebox");
   if (box.type !== "maximum-time" && !positive(box.minimumDurationMinutes))
-    return "Indica el mínimo en minutos.";
+    return t("duration.error.min");
   if (box.type !== "minimum-time" && !positive(box.maximumDurationMinutes))
-    return "Indica el máximo en minutos.";
+    return t("duration.error.max");
   if (
     box.type === "both" &&
     (box.maximumDurationMinutes ?? 0) <= (box.minimumDurationMinutes ?? 0)
   ) {
-    return "El máximo tiene que ser mayor que el mínimo.";
+    return t("duration.error.maxAboveMin");
   }
   return null;
 }
@@ -78,11 +79,7 @@ interface DurationFieldsProps {
 export function DurationFields({ type, value, onChange, error }: DurationFieldsProps) {
   if (type === "clear-objective") {
     return (
-      <Field
-        label="Estimado"
-        hint="Una aproximación basta. Lo comparamos con el tiempo real al cerrar."
-        error={error}
-      >
+      <Field label={t("closing.estimate")} hint={t("duration.estimateHint")} error={error}>
         {(id, describedBy) => (
           <div className="w-44">
             <MinutesInput
@@ -109,11 +106,11 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
     };
     return (
       <div className="flex flex-col gap-1.5">
-        <p className="text-sm font-medium text-ink">Suele durar entre</p>
+        <p className="text-sm font-medium text-ink">{t("duration.rangeLabel")}</p>
         <div className="flex items-center gap-2">
           <div className="w-40">
             <MinutesInput
-              aria-label="Mínimo"
+              aria-label={t("duration.minimum")}
               invalid={Boolean(error)}
               value={toValue(range.minimumDurationMinutes)}
               onChange={(minutes) =>
@@ -126,10 +123,10 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
               }
             />
           </div>
-          <span className="text-sm text-ink-2">y</span>
+          <span className="text-sm text-ink-2">{t("duration.and")}</span>
           <div className="w-40">
             <MinutesInput
-              aria-label="Máximo"
+              aria-label={t("duration.maximum")}
               invalid={Boolean(error)}
               value={toValue(range.maximumDurationMinutes)}
               onChange={(minutes) =>
@@ -144,7 +141,7 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
           </div>
         </div>
         <p className={error ? "text-sm text-danger" : "text-sm text-ink-2"}>
-          {error ?? "Es una expectativa, no un límite. Sin avisos mientras la haces."}
+          {error ?? t("duration.rangeHint")}
         </p>
       </div>
     );
@@ -157,9 +154,9 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <p className="text-sm font-medium text-ink">Tipo de timebox</p>
+        <p className="text-sm font-medium text-ink">{t("duration.timeboxType")}</p>
         <Segmented
-          label="Tipo de timebox"
+          label={t("duration.timeboxType")}
           value={box.type}
           onChange={(type) =>
             setBox({
@@ -175,9 +172,9 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
             })
           }
           options={[
-            { value: "minimum-time", label: "Mínimo" },
-            { value: "maximum-time", label: "Máximo" },
-            { value: "both", label: "Mín. y máx." },
+            { value: "minimum-time", label: t("duration.minimum") },
+            { value: "maximum-time", label: t("duration.maximum") },
+            { value: "both", label: t("duration.both") },
           ]}
           className="w-full sm:w-auto"
         />
@@ -185,9 +182,9 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
       <div className="flex flex-wrap items-end gap-3">
         {box.type !== "maximum-time" && (
           <div className="flex w-40 flex-col gap-1.5">
-            <span className="text-sm text-ink-2">Al menos</span>
+            <span className="text-sm text-ink-2">{t("duration.atLeast")}</span>
             <MinutesInput
-              aria-label="Mínimo"
+              aria-label={t("duration.minimum")}
               invalid={Boolean(error)}
               value={toValue(box.minimumDurationMinutes)}
               onChange={(minutes) => setBox({ minimumDurationMinutes: fromValue(minutes) })}
@@ -196,9 +193,9 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
         )}
         {box.type !== "minimum-time" && (
           <div className="flex w-40 flex-col gap-1.5">
-            <span className="text-sm text-ink-2">Como máximo</span>
+            <span className="text-sm text-ink-2">{t("duration.atMost")}</span>
             <MinutesInput
-              aria-label="Máximo"
+              aria-label={t("duration.maximum")}
               invalid={Boolean(error)}
               value={toValue(box.maximumDurationMinutes)}
               onChange={(minutes) => setBox({ maximumDurationMinutes: fromValue(minutes) })}
@@ -209,10 +206,10 @@ export function DurationFields({ type, value, onChange, error }: DurationFieldsP
       <p className={error ? "text-sm text-danger" : "text-sm text-ink-2"}>
         {error ??
           (box.type === "minimum-time"
-            ? "Para vencer la resistencia inicial: te avisamos al cumplir el mínimo y puedes seguir."
+            ? t("duration.hint.min")
             : box.type === "maximum-time"
-              ? "Para que no se expanda: te avisamos antes de llegar al máximo."
-              : "Un compromiso mínimo para arrancar y un límite para no pasarte.")}
+              ? t("duration.hint.max")
+              : t("duration.hint.both"))}
       </p>
     </div>
   );

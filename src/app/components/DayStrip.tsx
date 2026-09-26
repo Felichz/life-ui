@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { ActivityType, TimeBlock } from "../../types";
 import { TYPE_META, blockName } from "../lib/domain";
 import { cn } from "../lib/cn";
@@ -98,7 +99,7 @@ export function DayStrip({
           return (
             <div
               key={segment.id}
-              title={`${segment.title} · ${formatDayMinutes(segment.start)}–${formatDayMinutes(segment.end)} · ${formatMinutes(segment.end - segment.start)}${segment.interrupted ? " · sin terminar" : ""}`}
+              title={`${segment.title} · ${formatDayMinutes(segment.start)}–${formatDayMinutes(segment.end)} · ${formatMinutes(segment.end - segment.start)}${segment.interrupted ? ` · ${t("log.notFinished").toLowerCase()}` : ""}`}
               className={cn(
                 "absolute rounded-[3px]",
                 size === "large" ? "inset-y-3.5" : "inset-y-1.5",

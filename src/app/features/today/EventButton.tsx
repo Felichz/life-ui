@@ -7,6 +7,7 @@ import { useHotkey } from "../../lib/useHotkey";
 import { useDayActions } from "../../state/actions";
 import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
+import { t } from "../../i18n";
 
 /** Registrar un evento puntual ("Café", "Ibuprofeno") en dos toques. */
 export function EventButton() {
@@ -33,7 +34,7 @@ export function EventButton() {
     } catch (caught) {
       toast({
         tone: "error",
-        title: "No se pudo crear el evento",
+        title: t("error.createEvent"),
         description: errorMessage(caught),
       });
     }
@@ -41,11 +42,11 @@ export function EventButton() {
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Tooltip content="Registrar evento" shortcut={["E"]}>
+      <Tooltip content={t("palette.group.logEvent")} shortcut={["E"]}>
         <Popover.Trigger asChild>
           <Button variant="secondary">
             <Flag />
-            <span className="hidden sm:inline">Evento</span>
+            <span className="hidden sm:inline">{t("log.event")}</span>
           </Button>
         </Popover.Trigger>
       </Tooltip>
@@ -55,7 +56,7 @@ export function EventButton() {
           sideOffset={6}
           className="z-50 w-[min(300px,calc(100vw-24px))] rounded-lg border border-line bg-panel p-1.5 shadow-pop data-[state=open]:animate-pop-in"
         >
-          <p className="px-2 pb-1.5 pt-1 text-xs font-medium text-ink-3">Registrar ahora</p>
+          <p className="px-2 pb-1.5 pt-1 text-xs font-medium text-ink-3">{t("event.logNow")}</p>
           {templates.length > 0 && (
             <div className="flex max-h-60 flex-col overflow-y-auto">
               {templates.map((template) => (
@@ -81,8 +82,10 @@ export function EventButton() {
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder={templates.length ? "Otro evento…" : "Café, ibuprofeno, llamada…"}
-              aria-label="Nuevo evento"
+              placeholder={
+                templates.length ? t("event.otherPlaceholder") : t("event.firstPlaceholder")
+              }
+              aria-label={t("event.newLabel")}
               className="h-8 min-w-0 flex-1 rounded border border-line bg-panel px-2 text-sm outline-none placeholder:text-ink-3 focus:border-accent coarse:h-10"
             />
             <Button
@@ -93,7 +96,7 @@ export function EventButton() {
               className="h-8 coarse:h-10"
             >
               <Plus />
-              Registrar
+              {t("events.log")}
             </Button>
           </form>
         </Popover.Content>

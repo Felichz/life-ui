@@ -1,20 +1,29 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Qualia Control: una interfaz para tu día real." />
+    <meta
+      name="description"
+      content="LifeUI: a HUD for your real day. Plan, focus on one thing at a time and close it honestly."
+    />
     <meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0e0f12" media="(prefers-color-scheme: dark)" />
-    <title>Qualia Control</title>
+    <title>LifeUI</title>
     <script>
-      // Aplica el tema antes del primer pintado para evitar el destello.
+      // Tema e idioma antes del primer pintado (evita el destello).
       (function () {
         var pref = "system";
+        var locale = navigator.language.toLowerCase().indexOf("es") === 0 ? "es" : "en";
         try {
-          pref = localStorage.getItem("qualia.theme") || "system";
+          pref =
+            localStorage.getItem("lifeui.theme") ||
+            localStorage.getItem("qualia.theme") ||
+            "system";
+          locale = localStorage.getItem("lifeui.locale") || locale;
         } catch (e) {}
+        document.documentElement.lang = locale;
         var dark =
           pref === "dark" ||
           (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);

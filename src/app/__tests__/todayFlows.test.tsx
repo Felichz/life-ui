@@ -46,7 +46,7 @@ function setup() {
   const leerInstance = core.createActivityInstance(leer.id, todo.id);
 
   render(
-    <AppProviders core={core}>
+    <AppProviders core={core} locale="es">
       <MemoryRouter>
         <AppRoutes />
       </MemoryRouter>

@@ -12,13 +12,14 @@ import { modKeyLabel, useHotkey } from "../lib/useHotkey";
 import { useNow } from "../lib/useNow";
 import { useSystem } from "../state/system";
 import { useToast } from "../state/toast";
+import { APP_NAME, t, type MessageKey } from "../i18n";
 import { useShell } from "./ShellContext";
 
-const NAV = [
-  { to: "/", label: "Hoy", icon: CalendarCheck2, end: true, key: "h" },
-  { to: "/biblioteca", label: "Biblioteca", icon: Library, end: false, key: "b" },
-  { to: "/resumen", label: "Resumen", icon: BarChart3, end: false, key: "r" },
-  { to: "/ajustes", label: "Ajustes", icon: Settings, end: false, key: "a" },
+const NAV: { to: string; label: MessageKey; icon: typeof Library; end: boolean; key: string }[] = [
+  { to: "/", label: "nav.today", icon: CalendarCheck2, end: true, key: "h" },
+  { to: "/library", label: "nav.library", icon: Library, end: false, key: "b" },
+  { to: "/review", label: "nav.review", icon: BarChart3, end: false, key: "r" },
+  { to: "/settings", label: "nav.settings", icon: Settings, end: false, key: "a" },
 ];
 
 export function AppShell() {
@@ -95,7 +96,7 @@ function Sidebar() {
     <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col self-start border-r border-line bg-sidebar px-3 pb-3 pt-4 lg:flex">
       <div className="flex items-center gap-2.5 px-2">
         <Logo />
-        <span className="text-md font-semibold tracking-[-0.01em] text-ink">Qualia Control</span>
+        <span className="text-md font-semibold tracking-[-0.01em] text-ink">{APP_NAME}</span>
       </div>
 
       <button
@@ -104,14 +105,16 @@ function Sidebar() {
         className="mt-4 flex h-8 items-center gap-2 rounded-md border border-line bg-panel px-2.5 text-sm text-ink-3 shadow-xs transition-colors hover:border-line-strong hover:text-ink-2"
       >
         <Search className="size-4" />
-        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">Buscar…</span>
+        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">
+          {t("shell.search")}
+        </span>
         <span className="flex gap-0.5">
           <Kbd>{modKeyLabel}</Kbd>
           <Kbd>K</Kbd>
         </span>
       </button>
 
-      <nav aria-label="Principal" className="mt-4 flex flex-col gap-px">
+      <nav aria-label={t("nav.main")} className="mt-4 flex flex-col gap-px">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -125,7 +128,7 @@ function Sidebar() {
             }
           >
             <Icon className="size-4 shrink-0" strokeWidth={2} />
-            <span className="flex-1">{label}</span>
+            <span className="flex-1">{t(label)}</span>
             {to === "/" && running && <LiveDot />}
           </NavLink>
         ))}
@@ -136,8 +139,8 @@ function Sidebar() {
           <SidebarDay />
         ) : (
           <div className="rounded-lg border border-line bg-panel p-3">
-            <p className="text-sm font-medium text-ink">Sin día en curso</p>
-            <p className="mt-0.5 text-sm text-ink-2">Empieza cuando quieras.</p>
+            <p className="text-sm font-medium text-ink">{t("shell.noDay")}</p>
+            <p className="mt-0.5 text-sm text-ink-2">{t("shell.noDayHint")}</p>
             {pathname !== "/" && (
               <Button
                 variant="primary"
@@ -148,7 +151,7 @@ function Sidebar() {
                   navigate("/");
                 }}
               >
-                Empezar el día
+                {t("start.cta")}
               </Button>
             )}
           </div>
@@ -166,7 +169,9 @@ function SidebarDay() {
     <div className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-3">
       <div>
         <p className="text-xs text-ink-3">
-          Día en curso{day.day.startTime && ` · desde ${formatTime(day.day.startTime)}`}
+          {day.day.startTime
+            ? t("shell.dayRunningSince", { time: formatTime(day.day.startTime) })
+            : t("shell.dayRunning")}
         </p>
         <div className="mt-2">
           <TempoMeter summary={summary} variant="compact" />
@@ -192,7 +197,7 @@ function useRunning() {
 function RunningLink() {
   const running = useRunning();
   const now = useNow(1000);
-  if (!running) return <p className="text-sm text-ink-3">Nada en marcha.</p>;
+  if (!running) return <p className="text-sm text-ink-3">{t("shell.nothingRunning")}</p>;
   const elapsed = now.getTime() - new Date(running.instance.startTime ?? now).getTime();
   return (
     <NavLink
@@ -213,7 +218,7 @@ function MobileNav() {
   const running = Boolean(state.currentDay?.activeActivityInstanceId);
   return (
     <nav
-      aria-label="Principal"
+      aria-label={t("nav.main")}
       className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 backdrop-blur-md lg:hidden"
     >
       <div className="mx-auto grid h-16 max-w-md grid-cols-4">
@@ -233,7 +238,7 @@ function MobileNav() {
               <Icon className="size-[22px]" strokeWidth={1.9} />
               {to === "/" && running && <LiveDot className="absolute -right-1 -top-0.5" />}
             </span>
-            {label}
+            {t(label)}
           </NavLink>
         ))}
       </div>
@@ -280,9 +285,7 @@ function ActivityWatcher() {
   const elapsedMinutes = elapsedMs / 60000;
 
   useEffect(() => {
-    document.title = running
-      ? `${formatClock(elapsedMs)} · ${running.template.title}`
-      : "Qualia Control";
+    document.title = running ? `${formatClock(elapsedMs)} · ${running.template.title}` : APP_NAME;
   }, [running, elapsedMs]);
 
   useEffect(() => {
@@ -297,8 +300,8 @@ function ActivityWatcher() {
     if (contract.min !== undefined && !flags.min && elapsedMinutes >= contract.min) {
       flags.min = true;
       toast({
-        title: `Mínimo cumplido: ${running.template.title}`,
-        description: "Puedes seguir si hay flujo, o cerrarla cuando quieras.",
+        title: t("timebox.minReached", { title: running.template.title }),
+        description: t("timebox.minReachedHint"),
       });
     }
     if (
@@ -310,15 +313,15 @@ function ActivityWatcher() {
     ) {
       flags.warn = true;
       toast({
-        title: `Quedan 2 min de «${running.template.title}»`,
-        description: "Buen momento para ir cerrando.",
+        title: t("timebox.maxSoon", { title: running.template.title }),
+        description: t("timebox.maxSoonHint"),
       });
     }
     if (contract.max !== undefined && !flags.max && elapsedMinutes >= contract.max) {
       flags.max = true;
       toast({
-        title: `Llegaste al máximo de «${running.template.title}»`,
-        description: "Cuando puedas, ciérrala desde Hoy.",
+        title: t("timebox.maxReached", { title: running.template.title }),
+        description: t("timebox.maxReachedHint"),
         duration: 9000,
       });
     }
