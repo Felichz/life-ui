@@ -299,7 +299,7 @@ components:
 
 LifeUI is a heads-up display for a real day, built to the standard of a modern tool like Linear. It shows only what matters right now (what is running, for how long, and how many tempos the day has earned) and stays out of the way of everything else. The screen is mostly cool, near-white or near-black neutral surfaces separated by 1px lines. Color is scarce and every hue has one job, so a glance tells the user what kind of thing they are looking at: indigo is something you can do, green is something happening, amber is something earned.
 
-Density is moderate and deliberately calm. The user has ADHD, so each surface leads with one obvious next action, keeps running state always visible, and avoids piles of cards and metrics. The Today screen is a focus panel, not a dashboard: a large title and a tabular clock, one filled "Terminar" button, and supporting lists below. Numbers are set in Inter with tabular figures so running values never jitter.
+Density is moderate and deliberately calm. Each surface leads with one obvious next action, keeps running state always visible, and avoids piles of cards and metrics. The Today screen is a focus panel, not a dashboard: a large title and a tabular clock, one filled "Terminar" button, and supporting lists below. Numbers are set in Inter with tabular figures so running values never jitter.
 
 The system follows the operating system's light or dark preference (overridable in Ajustes) and both themes are first-class: the same token names resolve to different RGB channel values under `[data-theme="dark"]`. Nothing in the system reads as a report card; progress is shown as what was reached, never as what is missing.
 

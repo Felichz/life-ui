@@ -8,9 +8,9 @@ web
 
 ## Users
 
-Primary: the author, an adult with ADHD, using the app throughout the whole day to decide what to do next, run one thing at a time, and close each activity honestly. Used equally on desktop/laptop (a tab left open while working) and on the phone (starting and closing things away from the desk).
+Primary: the author, using the app throughout the whole day to decide what to do next, run one thing at a time, and close each activity honestly. Used equally on desktop/laptop (a tab left open while working) and on the phone (starting and closing things away from the desk).
 
-Later: other people with ADHD. The product is personal today but should be understandable to a stranger without the author explaining it — no private jargon left unexplained, no dead ends that only the author knows how to escape.
+Later: other people who want the same kind of support. The product is personal today but should be understandable to a stranger without the author explaining it — no private jargon left unexplained, no dead ends that only the author knows how to escape.
 
 ## Product Purpose
 
@@ -65,4 +65,4 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 
 ## Accessibility & Inclusion
 
-ADHD is the design constraint: minimize cognitive load and decision count per screen, make the single next action obvious, keep state (what is running, for how long) always visible, avoid overwhelming density and anxiety-inducing framing. Full keyboard operation on desktop and comfortable touch targets on mobile.
+Low cognitive load is the design constraint: keep the number of decisions per screen small, make the single next action obvious, keep state (what is running, for how long) always visible, avoid overwhelming density and anxiety-inducing framing. Full keyboard operation on desktop and comfortable touch targets on mobile.

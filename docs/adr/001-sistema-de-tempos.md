@@ -10,11 +10,11 @@
 
 ### El problema real del proyecto
 
-La app tiene un **modelo de datos sólido y completo**, pero le falta el **motor de dopamina** que justifique al usuario (persona con TDAH) mantener la disciplina de usarlo. Específicamente:
+La app tiene un **modelo de datos sólido y completo**, pero le falta el **motor de dopamina** que justifique al usuario mantener la disciplina de usarlo. Específicamente:
 
 1. **El sistema de tempos existió, era sofisticado, y fue eliminado** en un commit de "restart" (`ff29264`).
 2. **El código actual preserva la infraestructura de honestidad** (variables subjetivas, causas de interrupción, snapshots causales) **pero no tiene el motor de recompensa** que esa infraestructura estaba diseñada para servir.
-3. **El ratio de carga cognitiva actual es 80/0**: 80% invertido en configurar el contrato (variables, causas, tipos), 0% en recibir la recompensa visible. Para una persona con TDAH, este ratio es insostenible — la voluntad se agota sin retorno visible.
+3. **El ratio de carga cognitiva actual es 80/0**: 80% invertido en configurar el contrato (variables, causas, tipos), 0% en recibir la recompensa visible. Para quien la usa a diario, este ratio es insostenible — la voluntad se agota sin retorno visible.
 4. **El core actualmente completa actividades implícitamente** desde `activateActivity()` (auto-completa la anterior), desde `QuickBarContainer` (al cambiar), y desde `DayPage.handleEndDayConfirm` (al cerrar el día). Esto entra en conflicto con el ritual obligatorio de evaluación.
 
 ### Lo que el usuario ya sabía (y el sistema actual no refleja)
@@ -491,7 +491,7 @@ Migración v1 → v2:
 
 **Por qué se rechazó**:
 
-- "Disponible pero opcional" se convierte en "lo vi, me agobia, lo ignoro" para una persona con TDAH.
+- "Disponible pero opcional" se convierte en "lo vi, me agobia, lo ignoro".
 - Si el usuario quiere análisis a largo plazo, lo construimos como módulo separado después, con su propia justificación.
 
 ---
@@ -617,4 +617,4 @@ El sistema actual está **sobrediseñado en integridad y subdimensionado en dopa
 
 El resultado: una app donde el usuario abre la app y ve un contador que sube con cada cosa que completa honestamente. Donde su tiempo libre es suyo. Donde los trends semanales muestran si está mejorando. Y donde no hay ansiedad por no estar haciendo nada.
 
-**Es una app para que un cerebro con TDAH se quiera quedar.**
+**Es una app en la que dan ganas de quedarse.**
