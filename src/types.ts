@@ -58,6 +58,8 @@ export interface ActivityTemplate {
   description: string;
   type: ActivityType;
   isSystemActivity: boolean; // True para actividades del sistema (Piloto Auto, etc.)
+  /** Anclada en "Accesos rápidos": se puede empezar con un toque. */
+  pinned?: boolean;
 
   // Propiedades específicas según tipo (solo una se utilizará según el tipo)
   clearObjectiveSettings?: {

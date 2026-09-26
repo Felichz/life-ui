@@ -1,0 +1,165 @@
+@import "@fontsource-variable/inter";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens. Canales RGB para que Tailwind pueda aplicar opacidad (bg-accent/10).
+ * Neutros con un matiz frío muy leve; un acento índigo para acción y selección;
+ * ámbar exclusivo para tempos (la recompensa); verde exclusivo para "en marcha".
+ */
+:root {
+  color-scheme: light;
+  --canvas: 252 252 253;
+  --sidebar: 244 244 247;
+  --panel: 255 255 255;
+  --subtle: 247 247 249;
+  --hover: 239 239 243;
+  --line: 230 230 236;
+  --line-strong: 212 212 220;
+  --ink: 22 22 26;
+  --ink-2: 90 92 104;
+  --ink-3: 116 118 130;
+  --accent: 88 84 214;
+  --accent-hover: 76 72 199;
+  --accent-ink: 72 68 190;
+  /* Relleno de botones primarios: blanco encima ≥ 4.5:1 */
+  --accent-fill: 88 84 214;
+  --accent-fill-hover: 76 72 199;
+  --tempo: 245 158 11;
+  --tempo-ink: 168 94 0;
+  --live: 20 128 84;
+  --danger: 214 58 58;
+  /* Relleno de botones destructivos: blanco encima ≥ 4.5:1 */
+  --danger-fill: 200 50 50;
+  --success: 24 128 80;
+  --objective: 64 120 240;
+  --flexible: 18 158 142;
+  --timebox: 146 84 214;
+  --event: 214 110 48;
+  --shadow: 16 16 28;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: 14 15 18;
+  --sidebar: 10 11 13;
+  --panel: 21 22 26;
+  --subtle: 26 27 32;
+  --hover: 33 34 40;
+  --line: 38 39 46;
+  --line-strong: 52 53 62;
+  --ink: 237 237 240;
+  --ink-2: 165 167 178;
+  --ink-3: 132 134 146;
+  --accent: 124 120 242;
+  --accent-hover: 140 137 247;
+  --accent-ink: 164 161 255;
+  --accent-fill: 96 91 222;
+  --accent-fill-hover: 104 99 228;
+  --tempo: 245 181 68;
+  --tempo-ink: 245 188 88;
+  --live: 60 200 138;
+  --danger: 240 98 98;
+  --danger-fill: 200 50 50;
+  --success: 72 200 140;
+  --objective: 90 134 238;
+  --flexible: 31 168 152;
+  --timebox: 158 107 228;
+  --event: 240 140 80;
+  --shadow: 0 0 0;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas text-ink font-sans text-base antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    min-width: 320px;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.22);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Evita el zoom de iOS al enfocar campos: 16px en táctil */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 0.5;
+    cursor: pointer;
+  }
+  [data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "cv11";
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

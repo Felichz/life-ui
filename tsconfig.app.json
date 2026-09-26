@@ -6,9 +6,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@core": ["./src/core"],
-      "@core/*": ["./src/core/*"],
-      "@shadcn": ["./src/ui/components/shadcn"],
-      "@shadcn/*": ["./src/ui/components/shadcn/*"]
+      "@core/*": ["./src/core/*"]
     },
     "types": ["jest", "@testing-library/jest-dom", "node"],
     "jsx": "react-jsx",

@@ -1,9 +1,6 @@
 {
   "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
   "compilerOptions": {
     "baseUrl": ".",
     "target": "ES2020",
@@ -19,9 +16,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@core": ["./src/core"],
-      "@core/*": ["./src/core/*"],
-      "@shadcn": ["./src/ui/components/shadcn"],
-      "@shadcn/*": ["./src/ui/components/shadcn/*"]
+      "@core/*": ["./src/core/*"]
     },
     "jsx": "react-jsx",
     "esModuleInterop": true
