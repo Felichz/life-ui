@@ -5,8 +5,8 @@ A HUD for real life: plan the day in time blocks, run one activity at a time, an
 [Live app](https://life-ui-one.vercel.app) · [Case study](https://anderssonfelix.com/work/lifeui/) · Built by [Felix Andersson](https://anderssonfelix.com)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-main-dark.webp">
-  <img alt="Today screen: a running activity called Write report with a 23:07 timer and its progress against a 60-minute estimate, quick-start buttons for pinned activities, the day's plan grouped by time blocks, and a log of closed activities with the tempos each one earned." src="docs/screenshots/lifeui-main-light.webp">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-demo-dark.webp">
+  <img alt="Recording of the Today screen: Write report is running at 23 minutes; Finish opens the closing ritual, a 9 out of 10 rating previews +78 tempos, Save adds it to the log and raises the day to 157 tempos, and Read starts from a quick-start button." src="docs/screenshots/lifeui-demo-light.webp">
 </picture>
 
 <sub>Screenshots use synthetic demo data. They follow your GitHub theme (light or dark).</sub>
