@@ -1,10 +1,10 @@
 /**
- * Recorrido completo de la UI: biblioteca → bloques → empezar el día →
- * añadir al plan → foco → ritual de cierre con tempos → evento → cambio de
- * actividad → terminar el día → resumen.
+ * Full UI walkthrough: library → time blocks → start the day →
+ * add to the plan → focus → the closing ritual with tempos → event →
+ * activity switch → end the day → review.
  */
 describe("LifeUI", () => {
-  it("primer uso: muestra cómo funciona y permite empezar el día", () => {
+  it("first run: shows how it works and lets you start the day", () => {
     cy.visitFresh();
     cy.contains("h1", /Buen(os|as) (días|tardes|noches)/);
     cy.contains("Cierre honesto");
@@ -13,10 +13,10 @@ describe("LifeUI", () => {
     cy.contains("Nada en marcha");
   });
 
-  it("recorre el día completo con el ritual de cierre", () => {
+  it("walks through the full day with the closing ritual", () => {
     cy.visitFresh("/library");
 
-    // Biblioteca: crear una actividad con objetivo claro, anclada
+    // Library: create a clear-objective activity, pinned
     cy.contains("button", "Nueva actividad").click();
     cy.get("[role=dialog]").within(() => {
       cy.get("input").first().type("Escribir informe");
@@ -26,17 +26,17 @@ describe("LifeUI", () => {
     });
     cy.contains("«Escribir informe» está en tu biblioteca");
 
-    // Bloques: usar los predeterminados
+    // Time blocks: use the defaults
     cy.contains("[role=tab]", "Bloques horarios").click();
     cy.contains("button", "Usar estos bloques").click();
     cy.contains("Mañana");
     cy.contains("Noche");
 
-    // Empezar el día
+    // Start the day
     cy.contains("a", "Hoy").click();
     cy.get("[data-testid=start-day]").click();
 
-    // Añadir al plan con N, buscando en la biblioteca
+    // Add to the plan with N, searching the library
     cy.get("body").type("n");
     cy.get("[role=dialog]").within(() => {
       cy.get('input[aria-label="Buscar en la biblioteca"]').type("informe{enter}");
@@ -45,7 +45,7 @@ describe("LifeUI", () => {
     });
     cy.contains("«Escribir informe» añadida");
 
-    // Empezar desde el plan y cerrar con el ritual
+    // Start from the plan and close with the ritual
     cy.contains("button", "Empezar").first().click();
     cy.contains("En marcha");
     cy.title().should("contain", "Escribir informe");
@@ -59,19 +59,19 @@ describe("LifeUI", () => {
     cy.contains("Llevas 30 tempos · 30% de tu referencia diaria");
     cy.contains("section", "Registro").should("contain", "Escribir informe").and("contain", "+30");
 
-    // Evento puntual
+    // One-off event
     cy.contains("button", "Evento").click();
     cy.get('input[aria-label="Nuevo evento"]').type("Café{enter}");
     cy.contains("Café registrado");
 
-    // Acceso rápido y cambio de actividad a través del cierre
+    // Quick start and activity switch through the closing ritual
     cy.contains("section", "Accesos rápidos").contains("button", "Escribir informe").click();
     cy.contains("En marcha");
     cy.get("body").type("t");
     cy.get("[data-testid=closing-dialog]").contains("button", "No la terminé").click();
     cy.contains("Está bien. Mañana es otra oportunidad.");
 
-    // Terminar el día y ver el resumen
+    // End the day and see the review
     cy.get('button[aria-label="Más opciones del día"]').click();
     cy.contains("[role=menuitem]", "Terminar el día").click();
     cy.get("[role=dialog]").contains("button", "Terminar el día").click();
@@ -81,7 +81,7 @@ describe("LifeUI", () => {
     cy.contains("Sin terminar");
   });
 
-  it("en móvil navega con la barra inferior", () => {
+  it("on mobile, navigates with the bottom bar", () => {
     cy.viewport(375, 812);
     cy.visitFresh();
     cy.get("[data-testid=start-day]").click();
@@ -95,8 +95,8 @@ describe("LifeUI", () => {
   });
 });
 
-describe("Idioma", () => {
-  it("la primera visita es en inglés aunque el navegador esté en español", () => {
+describe("Language", () => {
+  it("first visit is English even with a Spanish browser", () => {
     cy.visit("/settings", {
       onBeforeLoad(win) {
         win.localStorage.clear();
@@ -115,7 +115,7 @@ describe("Idioma", () => {
     cy.get("html").should("have.attr", "lang", "es");
   });
 
-  it("se puede cambiar a inglés desde Ajustes y se recuerda", () => {
+  it("you can switch to English from Settings and it is remembered", () => {
     cy.visitFresh("/settings");
     cy.contains("h1", "Ajustes");
     cy.contains('[role="radio"]', "English").click();
@@ -126,7 +126,7 @@ describe("Idioma", () => {
     cy.get("html").should("have.attr", "lang", "en");
   });
 
-  it("las rutas antiguas en español redirigen", () => {
+  it("legacy Spanish routes redirect", () => {
     cy.visitFresh("/resumen");
     cy.location("pathname").should("eq", "/review");
   });

@@ -1,13 +1,13 @@
 /**
- * Genera las capturas del README (inglés, tema oscuro) con datos de demo.
- * No forma parte de la suite normal: se ejecuta a mano con
+ * Generates the README screenshots (English, dark theme) with demo data.
+ * Not part of the normal suite: run manually with
  *   npx cypress run --spec cypress/e2e/readme-screenshots.cy.ts --config-file cypress.screenshots.config.ts
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const seed = (win: any) => {
   const q = win.__lifeui;
-  // Usar el reloj de la app (fijado con cy.clock), no el del runner
+  // Use the app's clock (pinned with cy.clock), not the runner's
   const WinDate: DateConstructor = win.Date;
   q.clearState();
   const template = (title: string, type: string, settings: object, pinned = false) =>
@@ -183,7 +183,7 @@ const seed = (win: any) => {
 
 describe("README screenshots", () => {
   beforeEach(() => {
-    // Hora fija para que el día se vea igual en cada captura
+    // Fixed time so the day looks the same in every screenshot
     cy.clock(new Date(new Date().setHours(15, 24, 0, 0)).getTime(), ["Date"]);
   });
 
@@ -199,7 +199,7 @@ describe("README screenshots", () => {
     cy.window().its("__lifeui").should("exist");
     cy.window().then((win) => seed(win));
     cy.visit(path);
-    // Esperar a que la página (algunas se cargan en diferido) esté pintada
+    // Wait for the page (some sections load lazily) to be painted
     cy.get("main h1").should("be.visible");
     cy.wait(500);
     then?.();

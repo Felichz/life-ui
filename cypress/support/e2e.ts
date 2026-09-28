@@ -3,7 +3,7 @@
 declare global {
   namespace Cypress {
     interface Chainable {
-      /** Abre la app con el almacenamiento vacío (primer uso), en el idioma dado. */
+      /** Opens the app with empty storage (first run), in the given language. */
       visitFresh(path?: string, locale?: "es" | "en"): Chainable<void>;
     }
   }

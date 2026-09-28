@@ -1,6 +1,6 @@
 ---
 name: LifeUI
-description: Una interfaz para tu día real. A calm, Linear-grade HUD for one running activity, one honest close, and tempos that only go up.
+description: A calm, Linear-grade HUD for one running activity, one honest close, and tempos that only go up.
 colors:
   canvas: "#fcfcfd"
   sidebar: "#f4f4f7"
@@ -306,7 +306,7 @@ The system follows the operating system's light or dark preference (overridable 
 **Key Characteristics:**
 
 - Cool neutrals with a very slight blue-violet tint; one indigo accent for action and selection.
-- Reserved semantic hues: amber for tempos, green for "en marcha", three type colors, orange for events.
+- Reserved semantic hues: amber for tempos, green for "running", three type colors, orange for events.
 - Inter Variable with tabular numerals for every changing number; weights 400/500/600 only.
 - 1px borders first, soft small shadows second; radii from 7px (controls) to 14px (panels, dialogs).
 - Sidebar at 1024px and up, bottom tab bar below; right rail for tempos and log at 1280px and up.
@@ -325,7 +325,7 @@ A cool, almost colorless neutral field with one indigo voice and a handful of hu
 ### Secondary
 
 - **Tempo Amber** (`tempo`): fills that represent earned tempos: the tempo meter bar, the emphasized bar in the trend chart, and tinted backgrounds for reward badges (`tempo/15`) and the reward callout (`tempo/10` with a `tempo/25` inset ring).
-- **Tempo Ink** (`tempo-ink`): tempo numbers as text: "79 tempos hoy", "+60", the Tempos stat, the average in the trend chart.
+- **Tempo Ink** (`tempo-ink`): tempo numbers as text: "79 tempos today", "+60", the Tempos stat, the average in the trend chart.
 
 ### Tertiary
 
@@ -349,9 +349,9 @@ A cool, almost colorless neutral field with one indigo voice and a handful of hu
 
 **The Reserved Hues Rule.** Indigo means "you can act or this is selected". Amber means tempos and nothing else. Green means "running right now" and nothing else. Blue, teal and violet mean activity type. Orange means event. If a new element does not belong to one of those meanings, it is neutral.
 
-**The Anchor-Not-Debt Rule.** Progress toward the daily reference fills in amber and is labeled as a reached percentage ("79% de tu referencia diaria"). Going past 100% just shows a full amber bar. Nothing renders the missing part as a colored or labeled deficit.
+**The Anchor-Not-Debt Rule.** Progress toward the daily reference fills in amber and is labeled as a reached percentage ("79% of your daily reference"). Going past 100% just shows a full amber bar. Nothing renders the missing part as a colored or labeled deficit.
 
-**The No-Red-For-Time Rule.** `danger` is for errors and destructive actions only. Overtime renders as a lighter indigo extension (`accent/35`) of the progress bar. Interrupted activities render as hatched type color or a neutral "Sin terminar" pill. Low scores stay neutral.
+**The No-Red-For-Time Rule.** `danger` is for errors and destructive actions only. Overtime renders as a lighter indigo extension (`accent/35`) of the progress bar. Interrupted activities render as hatched type color or a neutral "Not finished" pill. Low scores stay neutral.
 
 **The Fill Contrast Rule.** White labels never sit on `accent` or `danger` directly: solid primary and destructive buttons (and the selected score step) use `accent-fill` / `accent-fill-hover` and `danger-fill`, tuned for at least 4.5:1 in both themes. `accent` and `danger` stay for text, rings, tints and dots. Light `live` and `success` are darkened enough to work as small text on `panel`.
 
@@ -367,9 +367,9 @@ A cool, almost colorless neutral field with one indigo voice and a handful of hu
 
 - **Clock** (600, 56px/56px, -0.035em, tabular): the elapsed time in the running focus panel from 640px up. On phones it drops to 40px/44px (-0.03em).
 - **Display** (600, 30px/36px, -0.025em): the running activity's title from 640px up, the tempo total in the tempo meter, and the "+N tempos" figure in the reward callout.
-- **Headline** (600, 24px/30px, -0.02em): page titles (Hoy, Biblioteca, Resumen, Ajustes), the running title on phones, and review stat values.
+- **Headline** (600, 24px/30px, -0.02em): page titles (Today, Library, Review, Settings), the running title on phones, and review stat values.
 - **Title** (600, 17px/24px, -0.01em): dialog and sheet titles, real/estimated values in the closing ritual. The idle focus panel heading uses 20px/28px (-0.015em).
-- **Section** (600, 15px/22px): section titles such as "Accesos rápidos", "Plan del día" and "Registro", with an optional 13px `ink-3` tabular count beside them.
+- **Section** (600, 15px/22px): section titles such as "Quick start", "Today's plan" and "Log", with an optional 13px `ink-3` tabular count beside them.
 - **Body** (400 or 500, 14px/20px): the base size for rows, list titles (500), nav items (500) and inputs. On coarse pointers, form fields render at 16px to prevent iOS zoom.
 - **Label** (500, 13px/18px): buttons, field labels, meta lines and descriptions (400 in `ink-2`).
 - **Caption** (400 or 500, 12px/16px): metadata, badges, tooltip text and menu group labels.
@@ -395,9 +395,9 @@ A cool, almost colorless neutral field with one indigo voice and a handful of hu
 
 ### Named Rules
 
-**The Always-Visible-Now Rule.** Whatever is running stays visible on every screen: the focus panel on Hoy; the sidebar's running link at 1024px and up; on phones outside Hoy, a floating running pill above the tab bar; a live dot on the Hoy nav item; and the clock in the browser tab title.
+**The Always-Visible-Now Rule.** Whatever is running stays visible on every screen: the focus panel on Today; the sidebar's running link at 1024px and up; on phones outside Today, a floating running pill above the tab bar; a live dot on the Today nav item; and the clock in the browser tab title.
 
-**The One Next Action Rule.** Each panel or dialog has at most one filled indigo button, and it is the obvious next step (Terminar, Guardar, Empezar on the first suggestion, Añadir). Everything else is secondary or ghost.
+**The One Next Action Rule.** Each panel or dialog has at most one filled indigo button, and it is the obvious next step (Finish, Save, Start on the first suggestion, Add). Everything else is secondary or ghost.
 
 ## Elevation & Depth
 
@@ -428,7 +428,7 @@ The primitives in `src/app/components/ui/` are refined and restrained: quiet at 
 
 - **Shape:** gently rounded (7px); 8px for the large size.
 - **Sizes:** sm 28px (36 on touch), md 32px (40 on touch), lg 40px (44 on touch). Horizontal padding is 10, 12 or 16px. 16px icons with an 8px gap. Label type is 13px/500 (15px for lg).
-- **Primary:** `accent` fill, white label, hairline-lift shadow. Hover and active use `accent-hover`. Disabled uses `accent/45` with 80% white text. An optional inline keyboard hint sits inside on a `white/20` chip (for example "Terminar T", "Añadir N").
+- **Primary:** `accent` fill, white label, hairline-lift shadow. Hover and active use `accent-hover`. Disabled uses `accent/45` with 80% white text. An optional inline keyboard hint sits inside on a `white/20` chip (for example "Finish T", "Add N").
 - **Secondary (default):** `panel` fill, 1px `line` border, `ink` label, hairline lift. On hover the border becomes `line-strong` and the fill `subtle`.
 - **Ghost:** no fill, `ink-2` label; `hover` fill and `ink` label on hover. Used for tertiary actions such as "Ajustar" and "No la terminé".
 - **Subtle:** `hover/70` fill with an `ink` label.
@@ -439,7 +439,7 @@ The primitives in `src/app/components/ui/` are refined and restrained: quiet at 
 ### Chips
 
 - **Quick-start chip:** a 40px (44 on touch) `panel` pill with a 10px radius, 1px `line` border and hairline lift. It holds the type icon, a 14px/500 title, the contract label in 13px `ink-3` tabular type, and a small play icon that turns `accent-ink` on hover. The running template's chip shows a live dot with a `live/40` border and `live/5` fill, and is disabled.
-- **Status pills:** 12px/500, 7px radius, 1-2px vertical and 6px horizontal padding. "Ahora" is `accent/10` fill with `accent-ink` text. "Sin terminar" is a neutral `hover` fill with `ink-2` text, or plain `ink-3` text in the log. "Antes de tiempo" is `success/10` fill with `success` text and a check icon. Tempo badges ("+14") are `tempo/15` fill with `tempo-ink` 12px/600 tabular text.
+- **Status pills:** 12px/500, 7px radius, 1-2px vertical and 6px horizontal padding. "Now" is `accent/10` fill with `accent-ink` text. "Not finished" is a neutral `hover` fill with `ink-2` text, or plain `ink-3` text in the log. "Ahead of time" is `success/10` fill with `success` text and a check icon. Tempo badges ("+14") are `tempo/15` fill with `tempo-ink` 12px/600 tabular text.
 - **Count pill:** tabular 12px `ink-2` on `hover`, next to tab labels.
 
 ### Cards / Containers
@@ -487,11 +487,11 @@ The heart of Hoy. **Running:** a 14px `panel` card with the `sm` shadow. The met
 
 ### Tempo Meter (signature)
 
-The full variant shows the total at display size in `tempo-ink` next to "tempos hoy", then "N% de tu referencia diaria · target" in 13px, over a 6px round amber bar on a `hover` track. The compact variant, used in the sidebar, is 13px over a 4px bar. The number plays a 520ms scale bump (1 to 1.12 to 1) only when the total rises, and the bar width eases over 700ms.
+The full variant shows the total at display size in `tempo-ink` next to "tempos today", then "N% of your daily reference · target" in 13px, over a 6px round amber bar on a `hover` track. The compact variant, used in the sidebar, is 13px over a 4px bar. The number plays a 520ms scale bump (1 to 1.12 to 1) only when the total rises, and the bar width eases over 700ms.
 
 ### Closing Ritual (signature)
 
-A center dialog. It shows the real/estimated fact pair, an 11-step 0-10 score scale (40px steps, 44 on touch, 8px radius), a one-line reading of the score ("7/10 — Lo hice. Eso es lo que cuenta."), and the amber reward callout with the formula in small tabular type. Score steps up to the selection fill `accent/10` with `accent-ink` text; the selected step is solid `accent` with the `sm` shadow; steps above it are neutral `hover/70`. Scale anchors read "no cuenta", "100%" (under 7) and "máximo". The footer holds a ghost "No la terminé", a secondary "Seguir con ella" and a primary "Guardar · +N tempos" with an Enter hint. Closing the dialog keeps the activity running.
+A center dialog. It shows the real/estimated fact pair, an 11-step 0-10 score scale (40px steps, 44 on touch, 8px radius), a one-line reading of the score ("7/10 — I did it. That's what counts."), and the amber reward callout with the formula in small tabular type. Score steps up to the selection fill `accent/10` with `accent-ink` text; the selected step is solid `accent` with the `sm` shadow; steps above it are neutral `hover/70`. Scale anchors read "doesn't count", "100%" (under 7) and "maximum". The footer holds a ghost "I didn't finish it", a secondary "Keep going" and a primary "Save · +N tempos" with an Enter hint. Closing the dialog keeps the activity running.
 
 ### Plan Rows and Day Strip
 
@@ -518,7 +518,7 @@ The UI ships in English and Spanish (`src/app/i18n`; Spanish is the reference di
 
 ### Don't:
 
-- **Don't** use amber for anything that is not tempos, or green for anything that is not "en marcha" (success confirmations use the separate `success` token).
+- **Don't** use amber for anything that is not tempos, or green for anything that is not "running" (success confirmations use the separate `success` token).
 - **Don't** render the daily reference as a deficit: no "remaining" bars, no red, no "te faltan".
 - **Don't** use `danger` for overtime, low satisfaction, or interrupted activities.
 - **Don't** put more than one filled indigo button in a single panel or dialog.

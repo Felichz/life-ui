@@ -2,9 +2,9 @@ import { defineConfig } from "cypress";
 import baseConfig from "./cypress.config";
 
 /**
- * Configuración para regenerar las capturas del README:
+ * Config to regenerate the README screenshots:
  *   npx cypress run --config-file cypress.screenshots.config.ts
- * Ventana grande y densidad 2x para imágenes nítidas.
+ * Large window and 2x density for crisp images.
  */
 export default defineConfig({
   ...baseConfig,

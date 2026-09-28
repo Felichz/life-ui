@@ -145,7 +145,7 @@ docs/adr/              architecture decision records
 
 ## Decisions
 
-- [ADR-001: the tempo system](docs/adr/001-sistema-de-tempos.md) (in Spanish): the reward formula and what was deliberately removed.
+- [ADR-001: the tempo system](docs/adr/001-tempo-system.md): the reward formula and what was deliberately removed.
 - [`PRODUCT.md`](PRODUCT.md): users, purpose and product principles.
 - [`DESIGN.md`](DESIGN.md): the visual system (tokens, type, components, rules).
 

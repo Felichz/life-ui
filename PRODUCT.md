@@ -28,7 +28,7 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 
 - Day lifecycle: start day → plan and execute → end day → overview. Unfinished activities carry over to the next day.
 - Activity library: reusable templates with one of three duration contracts — clear objective (point estimate, "~45 min"), flexible duration (expected range), timeboxing (declared minimum, maximum, or both).
-- Time blocks: user-defined, non-overlapping hour ranges (e.g. Mañana 06:00–12:00) plus the permanent "Por hacer" block. Only activities in "Por hacer" or in the block that is current right now can be activated; future/past blocks are visible but locked.
+- Time blocks: user-defined, non-overlapping hour ranges (e.g. Morning 06:00–12:00) plus the permanent "To do" block. Only activities in "To do" or in the block that is current right now can be activated; future/past blocks are visible but locked.
 - Exactly one active activity at a time. Switching, completing, ending the day or interrupting all route through the closing ritual (requestCompletion → modal → completeActivity / interruptActivity). Closing the modal without choosing leaves the activity running.
 - Events: one-tap point-in-time markers ("Tomé ibuprofeno", "Café") from reusable event templates.
 - Timeline of the day: completed and interrupted activities, the running one, events.
@@ -47,13 +47,13 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 ## Brand Commitments
 
 - Name: LifeUI (formerly Qualia Control; the old name survives only in the localStorage key so existing data keeps loading).
-- Voice: always kind to the user. Positive tone, rounding in their favor, optimistic defaults. The daily target is an anchor, never a debt: "42% de tu referencia diaria", never "te faltan 58". Interruptions carry no moral judgment ("Está bien. Mañana es otra oportunidad.").
+- Voice: always kind to the user. Positive tone, rounding in their favor, optimistic defaults. The daily target is an anchor, never a debt: "42% of your daily reference", never "58 tempos to go". Interruptions carry no moral judgment ("That's fine. Tomorrow is another chance.").
 - Honest dopamine only: no fake streaks, no rewards for looking at the screen, no punitive drains.
 
 ## Evidence on Hand
 
 - No real user data, testimonials, or metrics exist. Anything shown as sample data must be clearly synthetic.
-- Product docs: `docs/adr/001-sistema-de-tempos.md` (tempo system decision record) and the original vision and flows in `docs/archive/`.
+- Product docs: `docs/adr/001-tempo-system.md` (tempo system decision record) and the original vision and flows in `docs/archive/`.
 
 ## Product Principles
 
