@@ -4,7 +4,7 @@ import { SystemCore } from "../../system";
 import { AppProviders, AppRoutes } from "../App";
 import { en } from "../i18n/en";
 import { es, type MessageKey } from "../i18n/es";
-import { setLocale, t, tp } from "../i18n";
+import { DEFAULT_LOCALE, detectLocale, setLocale, t, tp } from "../i18n";
 
 const placeholders = (text: string) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
@@ -21,6 +21,34 @@ describe("diccionarios", () => {
       (key) => !es[key].trim() || !en[key].trim()
     );
     expect(empty).toEqual([]);
+  });
+});
+
+describe("idioma inicial", () => {
+  const original = Object.getOwnPropertyDescriptor(window.navigator, "language");
+  beforeEach(() => {
+    localStorage.clear();
+    Object.defineProperty(window.navigator, "language", { value: "es-ES", configurable: true });
+  });
+  afterEach(() => {
+    localStorage.clear();
+    if (original) Object.defineProperty(window.navigator, "language", original);
+    else delete (window.navigator as { language?: string }).language;
+  });
+
+  it("la primera visita es en inglés aunque el navegador esté en español", () => {
+    expect(DEFAULT_LOCALE).toBe("en");
+    expect(detectLocale()).toBe("en");
+  });
+
+  it("la elección guardada gana", () => {
+    localStorage.setItem("lifeui.locale", "es");
+    expect(detectLocale()).toBe("es");
+  });
+
+  it("ignora valores guardados desconocidos", () => {
+    localStorage.setItem("lifeui.locale", "fr");
+    expect(detectLocale()).toBe("en");
   });
 });
 

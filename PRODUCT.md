@@ -35,7 +35,7 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 - Overview: day metrics (tempos, % of reference, completed count, average satisfaction) and multi-day trends.
 - Settings: daily tempo reference (default 100), export / import JSON, clear data.
 - Offline-first; localStorage is the only source of truth.
-- Bilingual UI: English and Spanish, switchable at any time; the first launch follows the browser language. Spanish is the reference copy; English must stay equivalent in tone (kind, never judging).
+- Bilingual UI: English and Spanish, switchable at any time; the first launch is in English and a saved choice wins after that. Spanish is the reference copy; English must stay equivalent in tone (kind, never judging).
 
 ## Capabilities and Constraints
 

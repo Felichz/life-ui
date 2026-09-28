@@ -15,13 +15,14 @@
       // Tema e idioma antes del primer pintado (evita el destello).
       (function () {
         var pref = "system";
-        var locale = navigator.language.toLowerCase().indexOf("es") === 0 ? "es" : "en";
+        var locale = "en";
         try {
           pref =
             localStorage.getItem("lifeui.theme") ||
             localStorage.getItem("qualia.theme") ||
             "system";
-          locale = localStorage.getItem("lifeui.locale") || locale;
+          var saved = localStorage.getItem("lifeui.locale");
+          if (saved === "es" || saved === "en") locale = saved;
         } catch (e) {}
         document.documentElement.lang = locale;
         var dark =

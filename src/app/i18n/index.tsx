@@ -23,15 +23,19 @@ import { es, type MessageKey } from "./es";
 export const APP_NAME = "LifeUI";
 
 export type Locale = "es" | "en";
-export const LOCALES: Locale[] = ["es", "en"];
+export const LOCALES: Locale[] = ["en", "es"];
 export const LOCALE_NAMES: Record<Locale, string> = { es: "Español", en: "English" };
 
 const DICTIONARIES: Record<Locale, Record<MessageKey, string>> = { es, en };
 const INTL_LOCALE: Record<Locale, string> = { es: "es-ES", en: "en-US" };
 const STORAGE_KEY = "lifeui.locale";
 
+/** Idioma de la primera visita, sea cual sea el idioma del navegador. */
+export const DEFAULT_LOCALE: Locale = "en";
+
 let current: Locale = detectLocale();
 
+/** Idioma inicial: la elección guardada gana; si no hay, inglés. */
 export function detectLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -39,8 +43,7 @@ export function detectLocale(): Locale {
   } catch {
     // almacenamiento no disponible
   }
-  const language = typeof navigator !== "undefined" ? navigator.language : "es";
-  return language.toLowerCase().startsWith("es") ? "es" : "en";
+  return DEFAULT_LOCALE;
 }
 
 export function getLocale(): Locale {

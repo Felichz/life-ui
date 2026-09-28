@@ -52,7 +52,7 @@ Every ending (finishing, switching to something else, ending the day) goes throu
   </tr>
 </table>
 
-The interface is available in English and Spanish. It follows the browser language on first launch and can be switched in Settings or from the command palette.
+The interface is available in English and Spanish. It opens in English on first launch and can be switched to Spanish in Settings or from the command palette.
 
 ## How it's built
 

@@ -96,6 +96,25 @@ describe("LifeUI", () => {
 });
 
 describe("Idioma", () => {
+  it("la primera visita es en inglés aunque el navegador esté en español", () => {
+    cy.visit("/settings", {
+      onBeforeLoad(win) {
+        win.localStorage.clear();
+        win.localStorage.setItem("lifeui.theme", "light");
+        Object.defineProperty(win.navigator, "language", { value: "es-ES" });
+        Object.defineProperty(win.navigator, "languages", { value: ["es-ES", "es"] });
+      },
+    });
+    cy.contains("h1", "Settings");
+    cy.get("html").should("have.attr", "lang", "en");
+    cy.contains('[role="radio"]', "Español").click();
+    cy.contains("h1", "Ajustes");
+    cy.get("html").should("have.attr", "lang", "es");
+    cy.reload();
+    cy.contains("h1", "Ajustes");
+    cy.get("html").should("have.attr", "lang", "es");
+  });
+
   it("se puede cambiar a inglés desde Ajustes y se recuerda", () => {
     cy.visitFresh("/settings");
     cy.contains("h1", "Ajustes");
