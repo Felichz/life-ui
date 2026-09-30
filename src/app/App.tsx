@@ -83,7 +83,8 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProviders>
-        <BrowserRouter>
+        {/* The base path comes from the build (`vite build --base`), so the app also runs under a subpath */}
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <AppRoutes />
         </BrowserRouter>
       </AppProviders>
