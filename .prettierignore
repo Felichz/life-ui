@@ -3,3 +3,9 @@ node_modules
 coverage
 package-lock.json
 docs/archive
+video/capture
+video/compositions
+video/assets/app.css
+video/assets/rects.js
+video/renders
+video/snapshots

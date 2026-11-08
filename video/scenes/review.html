@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="review" data-composition-id="review" data-width="1920" data-height="1200">
+        <div class="f-win">
+          <div id="review-cam" class="f-cam">
+            <!-- snap:10-review tall -->
+          </div>
+        </div>
+        <p id="review-cap1" class="f-cap">
+          <span>9:30 PM. Look back <em>on the day</em></span>
+        </p>
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const $ = (s) => document.querySelector(s);
+          const tl = gsap.timeline({ paused: true });
+          const cam = $("#review-cam");
+          const snap = $("#review-cam .snap");
+          const height = RECTS["10-review"].height;
+          const top = F.r("10-review", "top");
+          const trend = F.r("10-review", "trend");
+          const bars = [
+            ...snap.querySelectorAll('section[aria-labelledby="trend-title"] button > span'),
+          ];
+          tl.set(cam, F.view({ x: top.x, y: 0, w: 800, h: 10 }, 1.6, 0.5, 0, height), 0);
+          F.cap(tl, "#review-cap1", 0.2);
+          tl.to(
+            cam,
+            { ...F.view(trend, 1.6, 0.5, 0.45, height), duration: 1.6, ease: "expo.inOut" },
+            1.0
+          );
+          tl.fromTo(
+            bars,
+            { scaleY: 0, transformOrigin: "50% 100%" },
+            { scaleY: 1, duration: 0.6, ease: "expo.out", stagger: 0.05 },
+            1.9
+          );
+          window.__timelines["review"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

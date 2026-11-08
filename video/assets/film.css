@@ -1,0 +1,104 @@
+/* The film's own layer over the app's CSS (assets/app.css). */
+html,
+body {
+  margin: 0;
+  width: 1920px;
+  height: 1200px;
+  overflow: hidden;
+  background: rgb(var(--canvas));
+}
+
+/* The app fills the frame; the camera moves it */
+.f-win {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: rgb(var(--canvas));
+}
+.f-cam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1440px;
+  height: 1200px;
+  transform-origin: 0 0;
+}
+
+/* A short caption, in a pill at the bottom centre (the KnowGraph film's form) */
+.f-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1030px;
+  z-index: 30;
+  margin: 0;
+  text-align: center;
+  opacity: 0;
+}
+.f-cap span {
+  display: inline-block;
+  padding: 16px 32px;
+  border-radius: 999px;
+  background: rgb(var(--panel) / 0.96);
+  border: 1px solid rgb(var(--line-strong));
+  box-shadow:
+    0 1px 2px rgb(var(--shadow) / 0.08),
+    0 8px 24px -6px rgb(var(--shadow) / 0.22);
+  font-family: "Inter Variable", Inter, sans-serif;
+  font-size: 32px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: rgb(var(--ink));
+}
+.f-cap em {
+  font-style: normal;
+  color: rgb(var(--accent-ink));
+}
+
+/* The ring a click opens */
+.f-click {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 39;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  border: 3px solid rgb(var(--accent));
+  opacity: 0;
+}
+
+/* A captured screen: 1440 x 1200, its fixed layers (dialogs, toasts) kept inside it */
+.snap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1440px;
+  height: 1200px;
+  overflow: hidden;
+  contain: paint;
+  background: rgb(var(--canvas));
+}
+.snap.tall {
+  height: auto;
+  min-height: 1200px;
+  overflow: visible;
+}
+.snap *,
+.snap *::before,
+.snap *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* A 56 px arrow cursor */
+.f-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 56px;
+  height: 56px;
+  z-index: 40;
+  transform-origin: 8px 6px;
+}

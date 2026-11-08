@@ -16,6 +16,8 @@ export default tseslint.config(
       "coverage/**",
       "cypress/screenshots/**",
       "cypress/videos/**",
+      // The product film: its own toolchain and browser runtime (video/README.md)
+      "video/**",
       "*.config.js",
     ],
   },
