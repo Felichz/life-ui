@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="end" data-composition-id="end" data-width="1920" data-height="1200">
+        <div
+          id="end-lockup"
+          style="
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+          "
+        >
+          <svg id="end-mark" viewBox="0 0 32 32" width="168" height="168" aria-hidden="true">
+            <rect id="end-tile" width="32" height="32" rx="8" fill="rgb(var(--accent))" />
+            <circle
+              id="end-ring"
+              cx="15.5"
+              cy="15.5"
+              r="7.5"
+              fill="none"
+              stroke="#fff"
+              stroke-width="3"
+              pathLength="1"
+              stroke-dasharray="1"
+            />
+            <path id="end-slice" d="M15.5 8a7.5 7.5 0 0 1 7.5 7.5h-7.5z" fill="#fff" />
+            <path
+              id="end-stroke"
+              d="M20 20l4.5 4.5"
+              stroke="rgb(var(--tempo))"
+              stroke-width="3"
+              stroke-linecap="round"
+              pathLength="1"
+              stroke-dasharray="1"
+            />
+          </svg>
+          <span
+            id="end-word"
+            style="
+              font-family: &quot;Inter Variable&quot;, Inter, sans-serif;
+              font-size: 150px;
+              line-height: 1.15;
+              font-weight: 680;
+              letter-spacing: -0.045em;
+              color: rgb(var(--ink));
+            "
+            >LifeUI</span
+          >
+        </div>
+        <p
+          id="end-tag"
+          style="
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 650px;
+            margin: 0;
+            text-align: center;
+            font-family: &quot;Inter Variable&quot;, Inter, sans-serif;
+            font-size: 48px;
+            line-height: 1.15;
+            font-weight: 500;
+            letter-spacing: -0.02em;
+            color: rgb(var(--ink-2));
+          "
+        >
+          A HUD for real life
+        </p>
+        <p
+          id="end-url"
+          style="
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 760px;
+            margin: 0;
+            text-align: center;
+            font-family: &quot;Inter Variable&quot;, Inter, sans-serif;
+            font-size: 38px;
+            line-height: 1.15;
+            font-weight: 560;
+            color: rgb(var(--accent-ink));
+          "
+        >
+          life-ui-one.vercel.app
+        </p>
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const $ = (s) => document.querySelector(s);
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo(
+            "#end-tile",
+            { scale: 0, transformOrigin: "50% 50%" },
+            { scale: 1, duration: 0.55, ease: "back.out(1.7)" },
+            0.15
+          );
+          tl.fromTo(
+            "#end-ring",
+            { strokeDashoffset: 1 },
+            { strokeDashoffset: 0, duration: 0.5, ease: "power2.inOut" },
+            0.45
+          );
+          tl.set("#end-ring", { strokeDasharray: "none" }, 0.96);
+          tl.fromTo(
+            "#end-slice",
+            { scale: 0, transformOrigin: "15.5px 15.5px" },
+            { scale: 1, duration: 0.35, ease: "back.out(2)" },
+            0.8
+          );
+          tl.fromTo(
+            "#end-stroke",
+            { strokeDashoffset: 1 },
+            { strokeDashoffset: 0, duration: 0.3, ease: "power2.out" },
+            1.0
+          );
+          F.wipe(tl, "#end-word", 0.6, 0.6);
+          F.wipe(tl, "#end-tag", 1.2);
+          F.wipe(tl, "#end-url", 1.6);
+          window.__timelines["end"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

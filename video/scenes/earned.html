@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="earned" data-composition-id="earned" data-width="1920" data-height="1200">
+        <div class="f-win">
+          <div id="earned-cam" class="f-cam">
+            <!-- snap:08-earned -->
+          </div>
+        </div>
+        <p id="earned-cap1" class="f-cap">
+          <span>Tempos <em>only go up</em></span>
+        </p>
+        <p id="earned-cap2" class="f-cap">
+          <span>No streaks, <em>no penalties</em></span>
+        </p>
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const $ = (s) => document.querySelector(s);
+          const tl = gsap.timeline({ paused: true });
+          const cam = $("#earned-cam");
+          const snap = $("#earned-cam .snap");
+          const meter = F.r("08-earned", "meter");
+          const log = F.r("08-earned", "log");
+          const meters = [...snap.querySelectorAll('section[aria-label="Today’s tempos"]')];
+          const total = meters.flatMap((m) => F.withText(m, "span", "105"));
+          const percent = meters.flatMap((m) => F.withText(m, "span", "105%"));
+          const fill = meters.map((m) => m.querySelector('[role="progressbar"] > div'));
+          tl.set(cam, F.view(meter, 2.4, 0.5, 0.36), 0);
+          F.cap(tl, "#earned-cap1", 0.15, 2.9);
+          F.count(tl, total, 27, 105, 0.35, 1.4);
+          F.count(tl, percent, 27, 105, 0.35, 1.4, (n) => `${Math.round(n)}%`);
+          tl.fromTo(
+            fill,
+            { scaleX: 0.27, transformOrigin: "0% 50%" },
+            { scaleX: 1, duration: 1.4, ease: "power2.out" },
+            0.35
+          );
+          F.move(
+            tl,
+            cam,
+            F.view(
+              { x: meter.x, y: meter.y, w: meter.w, h: log.y + log.h - meter.y },
+              1.9,
+              0.5,
+              0.4
+            ),
+            3.0,
+            0.7
+          );
+          F.cap(tl, "#earned-cap2", 3.3);
+          window.__timelines["earned"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

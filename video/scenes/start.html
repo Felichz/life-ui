@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="start" data-composition-id="start" data-width="1920" data-height="1200">
+        <div class="f-win">
+          <div id="start-cam" class="f-cam">
+            <!-- snap:01-start -->
+          </div>
+        </div>
+        <p id="start-cap1" class="f-cap">
+          <span>8:12 AM. <em>Start the day</em></span>
+        </p>
+        <div id="start-click" class="f-click"></div>
+        <div id="start-cursor" class="f-cursor">
+          <svg viewBox="0 0 28 28" width="56" height="56" aria-hidden="true">
+            <path
+              d="M4 3l17 9.5-7.4 1.6L10 21.6z"
+              fill="#fff"
+              stroke="#16161a"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const $ = (s) => document.querySelector(s);
+          const tl = gsap.timeline({ paused: true });
+          const cam = $("#start-cam");
+          const snap = $("#start-cam .snap");
+          const button = F.r("01-start", "start");
+          const buttonEl = snap.querySelector("[data-testid=start-day]");
+          const view = F.view(button, 1.9, 0.5, 0.42);
+          tl.set(cam, F.home, 0);
+          F.cap(tl, "#start-cap1", 0.15);
+          F.move(tl, cam, view, 0.2, 0.7);
+          const target = F.aim(view, button, 0.4, 0.55);
+          tl.fromTo(
+            "#start-cursor",
+            { x: 1960, y: 1240 },
+            { x: target.x, y: target.y, duration: 0.8, ease: "power2.inOut" },
+            0.7
+          );
+          F.click(tl, "#start-cursor", "#start-click", target, 1.9);
+          tl.to(buttonEl, { scale: 0.97, duration: 0.08 }, 1.9);
+          window.__timelines["start"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

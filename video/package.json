@@ -1,0 +1,11 @@
+{
+  "name": "lifeui-film",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "check": "node tools/build.mjs && npx --yes hyperframes@0.8.139 check",
+    "render:light": "node tools/build.mjs && npx --yes hyperframes@0.8.139 render -o renders/lifeui-film-light.mp4 --quality looks --fps 30 --variables \"{\\\"theme\\\":\\\"light\\\"}\"",
+    "render:dark": "node tools/build.mjs && npx --yes hyperframes@0.8.139 render -o renders/lifeui-film-dark.mp4 --quality looks --fps 30 --variables \"{\\\"theme\\\":\\\"dark\\\"}\""
+  }
+}
