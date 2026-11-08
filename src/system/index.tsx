@@ -32,19 +32,20 @@ import { UserPreferencesManager } from "./userPreferencesManager";
 import { UtilityService } from "./utilityService";
 
 export { PersistenceManager } from "./persistenceManager";
+export { CoreError, isCoreError, type CoreErrorCode } from "./errors";
 
 type StateChangeCallback = (newState: AppState) => void;
 
 /**
- * Implementación del núcleo central del sistema LifeUI
- * Actúa como orquestador principal y punto único de entrada para la manipulación del estado
+ * Implementation of the LifeUI system core
+ * Acts as the main orchestrator and single entry point for state manipulation
  */
 export class SystemCore implements ISystemCore {
   private state: AppState;
   private stateChangeCallbacks: StateChangeCallback[] = [];
   private persistenceManager: PersistenceManager;
 
-  // Módulos del sistema
+  // System modules
   private dayManager: DayManager;
   private activityManager: ActivityManager;
   private timeBlockManager: TimeBlockManager;
@@ -53,17 +54,17 @@ export class SystemCore implements ISystemCore {
   private userPreferencesManager: UserPreferencesManager;
 
   /**
-   * Constructor de SystemCore
+   * SystemCore constructor
    */
   constructor() {
-    // Inicializar persistencia primero
+    // Initialize persistence first
     this.persistenceManager = new PersistenceManager();
 
-    // Cargar estado o crear uno por defecto
+    // Load state or create a default one
     const savedState = this.loadStateFromStorage();
     this.state = savedState || this.createDefaultState();
 
-    // Inicializar módulos con referencia a this
+    // Initialize modules with a reference to this
     this.dayManager = new DayManager(this);
     this.activityManager = new ActivityManager(this);
     this.timeBlockManager = new TimeBlockManager(this);
@@ -75,95 +76,95 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Inicializa el sistema, actualizando estado si es necesario
+   * Initializes the system, updating state if needed
    */
   private initialize(): void {
-    // Puede extenderse con lógica adicional de inicialización si es necesario
+    // Can be extended with additional initialization logic if needed
   }
 
   /**
-   * Obtiene el estado actual de la aplicación
+   * Returns the current application state
    */
   public getState(): AppState {
     return this.state;
   }
 
   /**
-   * Actualiza el estado de la aplicación utilizando una función actualizadora
-   * @param updater Función que recibe el estado actual y devuelve el nuevo estado
+   * Updates the application state using an updater function
+   * @param updater Function that receives the current state and returns the new state
    */
   public updateState(updater: StateUpdater): void {
-    // Crear copia profunda para evitar mutaciones directas
+    // Create a deep copy to avoid direct mutations
     const currentState = JSON.parse(JSON.stringify(this.state)) as AppState;
 
-    // Aplicar función actualizadora
+    // Apply the updater function
     const newState = updater(currentState);
 
-    // Actualizar estado
+    // Update state
     this.state = newState;
 
-    // Persistir el estado
+    // Persist the state
     this.saveState();
 
-    // Notificar a los observadores
+    // Notify observers
     this.notifyStateChanged();
   }
 
   /**
-   * Registra una función callback para recibir notificaciones de cambios de estado
-   * @param callback Función a invocar cuando cambie el estado
-   * @returns Función para cancelar la suscripción
+   * Registers a callback to be notified of state changes
+   * @param callback Function to invoke when the state changes
+   * @returns Function that cancels the subscription
    */
   public onStateChange(callback: StateChangeCallback): () => void {
     this.stateChangeCallbacks.push(callback);
 
-    // Devolver función para eliminar el callback
+    // Return a function that removes the callback
     return () => {
       this.stateChangeCallbacks = this.stateChangeCallbacks.filter((cb) => cb !== callback);
     };
   }
 
   // ===============================================
-  // Métodos de DayManager
+  // DayManager methods
   // ===============================================
 
   /**
-   * Inicia un nuevo día de actividad
+   * Starts a new activity day
    */
   public startDay(): Day {
     const newDay = this.dayManager.startDay();
-    // Asegurar que el bloque por defecto "Por Hacer" exista
+    // Ensure the default "Por Hacer" block exists
     this.timeBlockManager.ensureDefaultBlockExists();
     return newDay;
   }
 
   /**
-   * Finaliza el día activo
+   * Ends the active day
    */
   public endDay(): Day {
     return this.dayManager.endDay();
   }
 
   /**
-   * Obtiene el día activo
+   * Returns the active day
    */
   public getCurrentDay(): Day | null {
     return this.dayManager.getCurrentDay();
   }
 
   /**
-   * Verifica si hay un día activo
+   * Checks whether there is an active day
    */
   public isDayActive(): boolean {
     return this.dayManager.isDayActive();
   }
 
   // ===============================================
-  // Métodos de ActivityManager
+  // ActivityManager methods
   // ===============================================
 
   /**
-   * Crea una nueva plantilla de actividad
+   * Creates a new activity template
    */
   public createActivityTemplate(
     data: Omit<ActivityTemplate, "id" | "createdAt" | "updatedAt">
@@ -172,28 +173,28 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Actualiza una plantilla de actividad existente
+   * Updates an existing activity template
    */
   public updateActivityTemplate(id: UUID, data: Partial<ActivityTemplate>): ActivityTemplate {
     return this.activityManager.updateActivityTemplate(id, data);
   }
 
   /**
-   * Elimina una plantilla de actividad
+   * Deletes an activity template
    */
   public deleteActivityTemplate(id: UUID): void {
     this.activityManager.deleteActivityTemplate(id);
   }
 
   /**
-   * Obtiene todas las plantillas de actividad
+   * Returns all activity templates
    */
   public getActivityTemplates(): ActivityTemplate[] {
     return this.activityManager.getActivityTemplates();
   }
 
   /**
-   * Crea una nueva instancia de actividad
+   * Creates a new activity instance
    */
   public createActivityInstance(
     templateId: UUID,
@@ -207,43 +208,43 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Actualiza una instancia de actividad existente
+   * Updates an existing activity instance
    */
   public updateActivityInstance(id: UUID, data: Partial<ActivityInstance>): ActivityInstance {
     return this.activityManager.updateActivityInstance(id, data);
   }
 
   /**
-   * Mueve una instancia de actividad a otro bloque
+   * Moves an activity instance to another block
    */
   public moveActivityInstance(id: UUID, targetBlockId: UUID, newOrder?: number): ActivityInstance {
     return this.activityManager.moveActivityInstance(id, targetBlockId, newOrder);
   }
 
   /**
-   * Elimina una instancia de actividad
+   * Deletes an activity instance
    */
   public deleteActivityInstance(id: UUID): void {
     this.activityManager.deleteActivityInstance(id);
   }
 
   /**
-   * Activa una actividad
+   * Activates an activity
    */
   public activateActivity(id: UUID): ActivityInstance {
     return this.activityManager.activateActivity(id);
   }
 
   /**
-   * Solicita el cierre de una actividad: la UI usa esto para abrir el CompletionModal.
+   * Requests closing an activity: the UI uses this to open the CompletionModal.
    */
   public requestCompletion(activityId: UUID): CompletionRequest {
     return this.activityManager.requestCompletion(activityId);
   }
 
   /**
-   * Completa una actividad con auto-evaluación del usuario.
-   * Calcula tempos en el core (la UI nunca recalcula la fórmula).
+   * Completes an activity with the user's self-assessment.
+   * Computes tempos in the core (the UI never recomputes the formula).
    */
   public completeActivity(
     activityId: UUID,
@@ -253,107 +254,107 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Interrumpe una actividad. Schema v2+: sin pregunta evitable/causa.
+   * Interrupts an activity. Schema v2+: no avoidable/cause question.
    */
   public interruptActivity(activityId: UUID): CompletedActivityRecord {
     return this.activityManager.interruptActivity(activityId);
   }
 
   /**
-   * Obtiene la actividad activa actualmente
+   * Returns the currently active activity
    */
   public getActiveActivity(): ActivityInstance | null {
     return this.activityManager.getActiveActivity();
   }
 
   // ===============================================
-  // Métodos de TimeBlockManager
+  // TimeBlockManager methods
   // ===============================================
 
   /**
-   * Crea un nuevo bloque de tiempo
+   * Creates a new time block
    */
   public createTimeBlock(name: string, startMinute: DayMinutes, endMinute: DayMinutes): TimeBlock {
     return this.timeBlockManager.createTimeBlock(name, startMinute, endMinute);
   }
 
   /**
-   * Actualiza un bloque de tiempo existente
+   * Updates an existing time block
    */
   public updateTimeBlock(id: UUID, data: Partial<TimeBlock>): TimeBlock {
     return this.timeBlockManager.updateTimeBlock(id, data);
   }
 
   /**
-   * Elimina un bloque de tiempo
+   * Deletes a time block
    */
   public deleteTimeBlock(id: UUID, moveActivitiesToTodo: boolean = true): void {
     this.timeBlockManager.deleteTimeBlock(id, moveActivitiesToTodo);
   }
 
   /**
-   * Obtiene todos los bloques de tiempo
+   * Returns all time blocks
    */
   public getTimeBlocks(): TimeBlock[] {
     return this.timeBlockManager.getTimeBlocks();
   }
 
   /**
-   * Obtiene el bloque de tiempo actual según la hora del sistema
+   * Returns the current time block based on the system time
    */
   public getCurrentTimeBlock(): TimeBlock | null {
     return this.timeBlockManager.getCurrentTimeBlock();
   }
 
   /**
-   * Verifica si un bloque de tiempo está disponible para asignar actividades
+   * Checks whether a time block is available for assigning activities
    */
   public isTimeBlockAvailable(blockId: UUID): boolean {
     return this.timeBlockManager.isTimeBlockAvailable(blockId);
   }
 
   /**
-   * Verifica si un bloque de tiempo existe, ignorando restricciones horarias
-   * Esta función permite colocar actividades en bloques fuera de su horario
+   * Checks whether a time block exists, ignoring time-of-day restrictions
+   * This allows placing activities in blocks outside their scheduled hours
    */
   public isTimeBlockExisting(blockId: UUID): boolean {
     return this.timeBlockManager.isTimeBlockExisting(blockId);
   }
 
   // ===============================================
-  // Métodos de EventManager
+  // EventManager methods
   // ===============================================
 
   /**
-   * Crea una nueva plantilla de evento
+   * Creates a new event template
    */
   public createEventTemplate(name: string): EventTemplate {
     return this.eventManager.createEventTemplate(name);
   }
 
   /**
-   * Actualiza una plantilla de evento existente
+   * Updates an existing event template
    */
   public updateEventTemplate(id: UUID, data: Partial<EventTemplate>): EventTemplate {
     return this.eventManager.updateEventTemplate(id, data);
   }
 
   /**
-   * Elimina una plantilla de evento
+   * Deletes an event template
    */
   public deleteEventTemplate(id: UUID): void {
     this.eventManager.deleteEventTemplate(id);
   }
 
   /**
-   * Crea una nueva instancia de evento
+   * Creates a new event instance
    */
   public createEventInstance(templateId: UUID): EventInstance {
     return this.eventManager.createEventInstance(templateId);
   }
 
   /**
-   * Obtiene instancias de eventos con filtros opcionales
+   * Returns event instances with optional filters
    */
   public getEventInstances(filters?: {
     dayId?: UUID;
@@ -364,53 +365,53 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Obtiene eventos recientes dentro de una ventana de tiempo
+   * Returns recent events within a time window
    */
   public getRecentEvents(minutesWindow?: number): EventInstance[] {
     return this.eventManager.getRecentEvents(minutesWindow);
   }
 
   // ===============================================
-  // Métodos de AnalyticsManager
+  // AnalyticsManager methods
   // ===============================================
 
   /**
-   * Genera datos para la visualización de línea de tiempo
+   * Generates data for the timeline visualization
    */
   public getTimelineData(dayId?: UUID): TimelineData {
     return this.analyticsManager.getTimelineData(dayId);
   }
 
   /**
-   * Genera datos para gráficos de distribución de tiempo
+   * Generates data for time distribution charts
    */
   public getTimeDistributionData(dayId?: UUID): TimeDistributionData {
     return this.analyticsManager.getTimeDistributionData(dayId);
   }
 
   /**
-   * Obtiene estadísticas para un tipo de actividad específico
+   * Returns statistics for a specific activity type
    */
   public getActivityStats(templateId?: UUID): ActivityStatistics {
     return this.analyticsManager.getActivityStats(templateId);
   }
 
   /**
-   * Obtiene la tasa de completación de actividades
+   * Returns the activity completion rate
    */
   public getCompletionRate(): number {
     return this.analyticsManager.getCompletionRate();
   }
 
   /**
-   * Schema v2+: resumen de tempos de un día
+   * Schema v2+: tempo summary for a day
    */
   public getTempoSummary(dayId: UUID): TempoSummary {
     return this.analyticsManager.getTempoSummary(dayId);
   }
 
   /**
-   * Schema v2+: tendencias de tempos en un rango
+   * Schema v2+: tempo trends over a range
    */
   public getTempoTrends(range: {
     from: ISODateTimeString;
@@ -420,55 +421,55 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Obtiene la precisión de estimación de tiempos
+   * Returns the time estimation accuracy
    */
   public getEstimationAccuracy(): number {
     return this.analyticsManager.getEstimationAccuracy();
   }
 
   // ===============================================
-  // Métodos de UserPreferencesManager
+  // UserPreferencesManager methods
   // ===============================================
 
   /**
-   * Actualiza las preferencias de usuario
+   * Updates the user preferences
    */
   public updateUserPreferences(preferences: Partial<UserPreferences>): UserPreferences {
     return this.userPreferencesManager.updateUserPreferences(preferences);
   }
 
   /**
-   * Obtiene las preferencias de usuario actuales
+   * Returns the current user preferences
    */
   public getUserPreferences(): UserPreferences {
     return this.userPreferencesManager.getUserPreferences();
   }
 
   /**
-   * Schema v2+: actualiza el target diario de tempos
+   * Schema v2+: updates the daily tempo target
    */
   public updateDailyTempoTarget(target: number): UserPreferences {
     return this.userPreferencesManager.updateDailyTempoTarget(target);
   }
 
   // ===============================================
-  // Métodos de PersistenceManager
+  // PersistenceManager methods
   // ===============================================
 
   /**
-   * Exporta todos los datos del sistema como JSON.
-   * Pasa por el pipeline central de persistencia (sanitiza legacy fields +
-   * schemaVersion actual), idéntico al formato que va a localStorage.
+   * Exports all system data as JSON.
+   * Goes through the central persistence pipeline (sanitizes legacy fields +
+   * current schemaVersion), identical to the format written to localStorage.
    */
   public exportData(): string {
     return this.persistenceManager.serialize(this.state);
   }
 
   /**
-   * Importa datos del sistema desde JSON.
-   * Pasa por el pipeline central (parse + validate + migrate + sanitize).
-   * Si el JSON es v1/v2 con campos legacy, los archiva en `legacyArchive`
-   * y elimina del shape principal.
+   * Imports system data from JSON.
+   * Goes through the central pipeline (parse + validate + migrate + sanitize).
+   * If the JSON is v1/v2 with legacy fields, archives them in `legacyArchive`
+   * and removes them from the main shape.
    */
   public importData(jsonData: string): AppState {
     const migrated = this.persistenceManager.deserialize(jsonData);
@@ -477,7 +478,7 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Limpia el estado de la aplicación
+   * Clears the application state
    */
   public clearState(): void {
     this.persistenceManager.clearState();
@@ -486,7 +487,7 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Notifica a todos los observadores registrados sobre un cambio de estado
+   * Notifies all registered observers of a state change
    */
   private notifyStateChanged(): void {
     for (const callback of this.stateChangeCallbacks) {
@@ -495,7 +496,7 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Crea un estado predeterminado con valores iniciales
+   * Creates a default state with initial values
    */
   private createDefaultState(): AppState {
     const timestamp = UtilityService.getCurrentISODateTime();
@@ -521,14 +522,14 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Carga el estado desde localStorage
+   * Loads the state from localStorage
    */
   private loadStateFromStorage(): AppState | null {
     return this.persistenceManager.loadState();
   }
 
   /**
-   * Guarda el estado en localStorage
+   * Saves the state to localStorage
    */
   private saveState(): void {
     this.persistenceManager.saveState(this.state);

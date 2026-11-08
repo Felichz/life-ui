@@ -3,7 +3,7 @@ import path from "path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// Vendors en chunks propios: cambian poco y el navegador los mantiene en caché
+// Vendors in their own chunks: they rarely change and the browser keeps them cached
 const VENDOR_CHUNKS: Record<string, string[]> = {
   react: ["react", "react-dom", "scheduler", "react-router", "react-router-dom"],
   ui: ["@radix-ui", "@floating-ui", "lucide-react", "react-remove-scroll", "aria-hidden"],
@@ -13,7 +13,7 @@ const VENDOR_CHUNKS: Record<string, string[]> = {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // Puerto fijo: Cypress apunta aquí (npm run dev + npm run test:e2e)
+  // Fixed port: Cypress points here (npm run dev + npm run test:e2e)
   server: { port: 5174 },
   preview: { port: 5174 },
   resolve: {

@@ -17,7 +17,7 @@ interface SegmentedProps<T extends string> {
   className?: string;
 }
 
-/** Grupo de opciones exclusivas con navegación por flechas (radiogroup). */
+/** Group of mutually exclusive options with arrow-key navigation (radiogroup). */
 export function Segmented<T extends string>({
   value,
   onChange,

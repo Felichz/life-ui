@@ -13,7 +13,7 @@ export function defaultSettings(type: ActivityType): Settings {
   return { timeboxingSettings: { type: "minimum-time", minimumDurationMinutes: 20 } };
 }
 
-/** Deja solo los ajustes del tipo elegido (el core guarda el que venga). */
+/** Keeps only the settings of the chosen type (the core stores whatever it gets). */
 export function settingsForType(type: ActivityType, settings: Settings): Settings {
   if (type === "clear-objective")
     return { clearObjectiveSettings: settings.clearObjectiveSettings };

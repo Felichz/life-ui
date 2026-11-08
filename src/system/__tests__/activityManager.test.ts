@@ -3,10 +3,10 @@ import { SystemCore } from "../index";
 import { UtilityService } from "../utilityService";
 import type { AppState, ActivityTemplate, TimeBlock } from "../../types";
 
-// Mock para SystemCore
+// Mock for SystemCore
 jest.mock("../index");
 
-// Mock para UtilityService
+// Mock for UtilityService
 jest.mock("../utilityService");
 
 describe("ActivityManager", () => {
@@ -19,7 +19,7 @@ describe("ActivityManager", () => {
   let mockBlockId: string;
   let mockDayId: string;
 
-  // Función auxiliar para configurar un día activo
+  // Helper to set up an active day
   const setupActiveDay = () => {
     mockDayId = "day-id-123";
     mockAppState.currentDay = {
@@ -35,7 +35,7 @@ describe("ActivityManager", () => {
     };
   };
 
-  // Función auxiliar para configurar una plantilla de actividad
+  // Helper to set up an activity template
   const setupActivityTemplate = (
     type: "clear-objective" | "flexible-duration" | "timeboxing" = "clear-objective"
   ): ActivityTemplate => {
@@ -50,7 +50,7 @@ describe("ActivityManager", () => {
       updatedAt: mockTimestamp,
     };
 
-    // Configurar settings según el tipo
+    // Set up settings based on the type
     if (type === "clear-objective") {
       template.clearObjectiveSettings = {
         estimatedDurationMinutes: 30,
@@ -72,7 +72,7 @@ describe("ActivityManager", () => {
     return template;
   };
 
-  // Función auxiliar para configurar un bloque de tiempo
+  // Helper to set up a time block
   const setupTimeBlock = (): TimeBlock => {
     mockBlockId = "block-id-123";
     const timeBlock: TimeBlock = {
@@ -91,7 +91,7 @@ describe("ActivityManager", () => {
   };
 
   beforeEach(() => {
-    // Configurar estado inicial de la aplicación
+    // Set up the initial application state
     mockAppState = {
       global: {
         days: [],
@@ -108,15 +108,15 @@ describe("ActivityManager", () => {
       currentDay: null,
     };
 
-    // Configurar mocks
+    // Set up mocks
     mockUUID = "test-uuid-123";
     mockTimestamp = "2023-01-01T12:00:00.000Z";
 
     (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
     (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
 
-    // Usar implementaciones reales para las funciones de cálculo de tempos
-    // (auto-mock las habría dejado como undefined)
+    // Use the real implementations for the tempo calculation functions
+    // (auto-mock would have left them as undefined)
     const actualUtilityService = jest.requireActual("../utilityService")
       .UtilityService as typeof UtilityService;
     (UtilityService.calculateBeatEstimate as jest.Mock).mockImplementation(
@@ -129,19 +129,19 @@ describe("ActivityManager", () => {
     systemCore = new SystemCore() as jest.Mocked<SystemCore>;
     systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-    // Este es el problema: la implementación del mock no está usando el mismo objeto para actualizar
+    // This is the problem: the mock implementation is not using the same object to update
     systemCore.updateState = jest.fn().mockImplementation((updater) => {
-      // Creamos una copia profunda del estado para evitar mutaciones inesperadas
+      // Make a deep copy of the state to avoid unexpected mutations
       const stateCopy = JSON.parse(JSON.stringify(mockAppState));
 
-      // Actualizar el estado mockAppState que se usa en todas las pruebas
+      // Update the mockAppState used across all tests
       mockAppState = updater(stateCopy);
 
-      // También retornar el objeto mockAppState que se usa en systemCore.getState
+      // Also return the mockAppState object used by systemCore.getState
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
     });
 
-    // Crear instancia de ActivityManager
+    // Create the ActivityManager instance
     activityManager = new ActivityManager(systemCore);
   });
 
@@ -150,12 +150,12 @@ describe("ActivityManager", () => {
   });
 
   // ===============================================
-  // Pruebas de Gestión de Plantillas
+  // Template management tests
   // ===============================================
 
-  describe("Gestión de plantillas", () => {
+  describe("Template management", () => {
     describe("createActivityTemplate", () => {
-      it("debe crear una nueva plantilla de actividad", () => {
+      it("should create a new activity template", () => {
         const templateData = {
           title: "Nueva Actividad",
           description: "Descripción de prueba",
@@ -168,7 +168,7 @@ describe("ActivityManager", () => {
 
         const result = activityManager.createActivityTemplate(templateData);
 
-        // Verificar que se creó la plantilla correctamente
+        // Check that the template was created correctly
         expect(result).toEqual({
           ...templateData,
           id: mockUUID,
@@ -176,7 +176,7 @@ describe("ActivityManager", () => {
           updatedAt: mockTimestamp,
         });
 
-        // Verificar que se actualizó el estado global
+        // Check that the global state was updated
         expect(systemCore.updateState).toHaveBeenCalled();
         expect(mockAppState.global.activityTemplates.length).toBe(1);
         expect(mockAppState.global.activityTemplates[0]).toEqual(result);
@@ -184,11 +184,11 @@ describe("ActivityManager", () => {
     });
 
     describe("updateActivityTemplate", () => {
-      it("debe actualizar una plantilla existente", () => {
-        // Crear una plantilla primero
+      it("should update an existing template", () => {
+        // Create a template first
         const template = setupActivityTemplate();
 
-        // Datos para actualizar
+        // Data to update
         const updateData = {
           title: "Título Actualizado",
           description: "Descripción actualizada",
@@ -196,46 +196,46 @@ describe("ActivityManager", () => {
 
         const result = activityManager.updateActivityTemplate(template.id, updateData);
 
-        // Verificar que se actualizó correctamente
+        // Check that it was updated correctly
         expect(result).toEqual({
           ...template,
           ...updateData,
           updatedAt: mockTimestamp,
         });
 
-        // Verificar que se actualizó en el estado global
+        // Check that it was updated in the global state
         expect(mockAppState.global.activityTemplates[0]).toEqual(result);
       });
 
-      it("debe lanzar un error si la plantilla no existe", () => {
+      it("should throw if the template does not exist", () => {
         expect(() => {
           activityManager.updateActivityTemplate("non-existent-id", { title: "Test" });
-        }).toThrow("Plantilla de actividad con ID non-existent-id no encontrada");
+        }).toThrowCoreError("activity-template-not-found");
       });
     });
 
     describe("deleteActivityTemplate", () => {
-      it("debe eliminar una plantilla existente", () => {
-        // Crear una plantilla primero
+      it("should delete an existing template", () => {
+        // Create a template first
         const template = setupActivityTemplate();
 
         activityManager.deleteActivityTemplate(template.id);
 
-        // Verificar que se eliminó la plantilla
+        // Check that the template was deleted
         expect(mockAppState.global.activityTemplates.length).toBe(0);
       });
 
-      it("debe lanzar un error si la plantilla no existe", () => {
+      it("should throw if the template does not exist", () => {
         expect(() => {
           activityManager.deleteActivityTemplate("non-existent-id");
-        }).toThrow("Plantilla de actividad con ID non-existent-id no encontrada");
+        }).toThrowCoreError("activity-template-not-found");
       });
 
-      it("debe lanzar un error si la plantilla tiene instancias activas", () => {
-        // Crear una plantilla
+      it("should throw if the template has active instances", () => {
+        // Create a template
         const template = setupActivityTemplate();
 
-        // Configurar día activo y crear una instancia
+        // Set up an active day and create an instance
         setupActiveDay();
         mockAppState.currentDay!.activityInstances.push({
           id: "instance-id-123",
@@ -249,18 +249,16 @@ describe("ActivityManager", () => {
 
         expect(() => {
           activityManager.deleteActivityTemplate(template.id);
-        }).toThrow(
-          `No se puede eliminar la plantilla ${template.id} porque tiene instancias activas`
-        );
+        }).toThrowCoreError("activity-template-in-use");
       });
     });
 
     describe("getActivityTemplates", () => {
-      it("debe devolver todas las plantillas", () => {
-        // Crear varias plantillas
+      it("should return all templates", () => {
+        // Create several templates
         const template1 = setupActivityTemplate("clear-objective");
 
-        // Resetear el mockUUID para crear un ID diferente
+        // Reset mockUUID to create a different ID
         mockUUID = "template-id-456";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
@@ -273,8 +271,8 @@ describe("ActivityManager", () => {
     });
 
     describe("getActivityTemplate", () => {
-      it("debe devolver una plantilla específica", () => {
-        // Crear una plantilla
+      it("should return a specific template", () => {
+        // Create a template
         const template = setupActivityTemplate();
 
         const result = activityManager.getActivityTemplate(template.id);
@@ -282,7 +280,7 @@ describe("ActivityManager", () => {
         expect(result).toEqual(template);
       });
 
-      it("debe devolver undefined si la plantilla no existe", () => {
+      it("should return undefined if the template does not exist", () => {
         const result = activityManager.getActivityTemplate("non-existent-id");
 
         expect(result).toBeUndefined();
@@ -291,22 +289,22 @@ describe("ActivityManager", () => {
   });
 
   // ===============================================
-  // Pruebas de Gestión de Instancias
+  // Instance management tests
   // ===============================================
 
-  describe("Gestión de instancias", () => {
+  describe("Instance management", () => {
     beforeEach(() => {
-      // Configurar plantilla, bloque y día activo para todas las pruebas
+      // Set up template, block and active day for all tests
       setupActivityTemplate();
       setupTimeBlock();
       setupActiveDay();
     });
 
     describe("createActivityInstance", () => {
-      it("debe crear una instancia a partir de una plantilla", () => {
+      it("should create an instance from a template", () => {
         const result = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Verificar que se creó la instancia correctamente
+        // Check that the instance was created correctly
         expect(result).toEqual({
           id: mockUUID,
           templateId: mockTemplateId,
@@ -320,15 +318,15 @@ describe("ActivityManager", () => {
           updatedAt: mockTimestamp,
         });
 
-        // Verificar que se actualizó el estado
+        // Check that the state was updated
         expect(mockAppState.currentDay?.activityInstances.length).toBe(1);
         expect(mockAppState.currentDay?.activityInstances[0]).toEqual(result);
       });
 
-      it("debe aplicar configuraciones dinámicas", () => {
+      it("should apply dynamic settings", () => {
         const dynamicSettings = {
           clearObjectiveSettings: {
-            estimatedDurationMinutes: 45, // Valor diferente al de la plantilla
+            estimatedDurationMinutes: 45, // Value different from the template's
           },
         };
 
@@ -338,32 +336,32 @@ describe("ActivityManager", () => {
           dynamicSettings
         );
 
-        // Verificar que se aplicaron las configuraciones dinámicas
+        // Check that the dynamic settings were applied
         expect(result.clearObjectiveSettings?.estimatedDurationMinutes).toBe(45);
       });
 
-      it("debe lanzar un error si no hay día activo", () => {
-        // Quitar el día activo
+      it("should throw if there is no active day", () => {
+        // Remove the active day
         mockAppState.currentDay = null;
 
         expect(() => {
           activityManager.createActivityInstance(mockTemplateId, mockBlockId);
-        }).toThrow("No hay un día activo para crear instancias");
+        }).toThrowCoreError("no-active-day");
       });
 
-      it("debe lanzar un error si la plantilla no existe", () => {
+      it("should throw if the template does not exist", () => {
         expect(() => {
           activityManager.createActivityInstance("non-existent-template", mockBlockId);
-        }).toThrow("Plantilla con ID non-existent-template no encontrada");
+        }).toThrowCoreError("activity-template-not-found");
       });
     });
 
     describe("updateActivityInstance", () => {
-      it("debe actualizar una instancia existente", () => {
-        // Crear una instancia primero
+      it("should update an existing instance", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Datos para actualizar
+        // Data to update
         const updateData = {
           clearObjectiveSettings: {
             estimatedDurationMinutes: 60,
@@ -372,28 +370,28 @@ describe("ActivityManager", () => {
 
         const result = activityManager.updateActivityInstance(instance.id, updateData);
 
-        // Verificar que se actualizó correctamente
+        // Check that it was updated correctly
         expect(result.clearObjectiveSettings?.estimatedDurationMinutes).toBe(60);
         expect(result.updatedAt).toBe(mockTimestamp);
       });
 
-      it("debe lanzar un error si se intenta cambiar el estado directamente", () => {
-        // Crear una instancia primero
+      it("should throw when trying to change the state directly", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Intentar cambiar el estado directamente
+        // Try to change the state directly
         expect(() => {
           activityManager.updateActivityInstance(instance.id, { state: "active" });
-        }).toThrow("No se puede cambiar el estado directamente. Use los métodos específicos.");
+        }).toThrowCoreError("invalid-state-change");
       });
     });
 
     describe("moveActivityInstance", () => {
-      it("debe mover una instancia a otro bloque", () => {
-        // Crear una instancia primero
+      it("should move an instance to another block", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Crear otro bloque
+        // Create another block
         mockUUID = "new-block-id";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
         const newBlockId = mockUUID;
@@ -408,15 +406,15 @@ describe("ActivityManager", () => {
           updatedAt: mockTimestamp,
         });
 
-        // Mover la instancia
+        // Move the instance
         const result = activityManager.moveActivityInstance(instance.id, newBlockId);
 
-        // Verificar que se movió correctamente
+        // Check that it was moved correctly
         expect(result.blockId).toBe(newBlockId);
-        expect(result.order).toBe(0); // Primer elemento en el nuevo bloque
+        expect(result.order).toBe(0); // First item in the new block
       });
 
-      it("debe insertar en la posición indicada y renumerar el bloque", () => {
+      it("should insert at the given position and renumber the block", () => {
         (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("a");
         const a = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
         (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("b");
@@ -424,7 +422,7 @@ describe("ActivityManager", () => {
         (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("c");
         const c = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Mover la última al principio
+        // Move the last one to the start
         const result = activityManager.moveActivityInstance(c.id, mockBlockId, 0);
         expect(result.order).toBe(0);
 
@@ -435,57 +433,57 @@ describe("ActivityManager", () => {
         expect(ordered).toEqual([c.id, a.id, b.id]);
       });
 
-      it("debe acotar una posición fuera de rango al final del bloque", () => {
+      it("should clamp an out-of-range position to the end of the block", () => {
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
         const result = activityManager.moveActivityInstance(instance.id, mockBlockId, 5);
         expect(result.order).toBe(0);
       });
 
-      it("debe lanzar un error si se intenta mover una actividad activa", () => {
-        // Crear una instancia primero
+      it("should throw when trying to move an active activity", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Activar la instancia
+        // Activate the instance
         activityManager.activateActivity(instance.id);
 
-        // Intentar mover la actividad activa
+        // Try to move the active activity
         expect(() => {
           activityManager.moveActivityInstance(instance.id, "new-block-id");
-        }).toThrow("No se puede mover una actividad activa");
+        }).toThrowCoreError("activity-is-active");
       });
     });
 
     describe("deleteActivityInstance", () => {
-      it("debe eliminar una instancia", () => {
-        // Crear una instancia primero
+      it("should delete an instance", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         activityManager.deleteActivityInstance(instance.id);
 
-        // Verificar que se eliminó la instancia
+        // Check that the instance was deleted
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
       });
 
-      it("debe lanzar un error si se intenta eliminar una actividad activa", () => {
-        // Crear una instancia primero
+      it("should throw when trying to delete an active activity", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Activar la instancia
+        // Activate the instance
         activityManager.activateActivity(instance.id);
 
-        // Intentar eliminar la actividad activa
+        // Try to delete the active activity
         expect(() => {
           activityManager.deleteActivityInstance(instance.id);
-        }).toThrow("No se puede eliminar una actividad activa");
+        }).toThrowCoreError("activity-is-active");
       });
     });
 
     describe("getActivityInstances", () => {
-      it("debe devolver todas las instancias", () => {
-        // Crear varias instancias
+      it("should return all instances", () => {
+        // Create several instances
         const instance1 = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Cambiar el mockUUID para crear un ID diferente
+        // Change mockUUID to create a different ID
         mockUUID = "instance-id-456";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
@@ -496,19 +494,19 @@ describe("ActivityManager", () => {
         expect(result).toEqual([instance1, instance2]);
       });
 
-      it("debe lanzar un error si no hay día activo", () => {
-        // Quitar el día activo
+      it("should throw if there is no active day", () => {
+        // Remove the active day
         mockAppState.currentDay = null;
 
         expect(() => {
           activityManager.getActivityInstances();
-        }).toThrow("No hay un día activo");
+        }).toThrowCoreError("no-active-day");
       });
     });
 
     describe("getActivityInstance", () => {
-      it("debe devolver una instancia específica", () => {
-        // Crear una instancia
+      it("should return a specific instance", () => {
+        // Create an instance
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         const result = activityManager.getActivityInstance(instance.id);
@@ -516,7 +514,7 @@ describe("ActivityManager", () => {
         expect(result).toEqual(instance);
       });
 
-      it("debe devolver undefined si la instancia no existe", () => {
+      it("should return undefined if the instance does not exist", () => {
         const result = activityManager.getActivityInstance("non-existent-id");
 
         expect(result).toBeUndefined();
@@ -525,34 +523,34 @@ describe("ActivityManager", () => {
   });
 
   // ===============================================
-  // Pruebas de Control de Estado
+  // State control tests
   // ===============================================
 
-  describe("Control de estado", () => {
+  describe("State control", () => {
     beforeEach(() => {
-      // Configurar plantilla, bloque y día activo para todas las pruebas
+      // Set up template, block and active day for all tests
       setupActivityTemplate();
       setupTimeBlock();
       setupActiveDay();
     });
 
     describe("activateActivity", () => {
-      it("debe activar una instancia de actividad", () => {
-        // Crear una instancia primero
+      it("should activate an activity instance", () => {
+        // Create an instance first
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         const result = activityManager.activateActivity(instance.id);
 
-        // Verificar que se activó correctamente
+        // Check that it was activated correctly
         expect(result.state).toBe("active");
         expect(result.startTime).toBe(mockTimestamp);
 
-        // Verificar que se actualizó el ID de la actividad activa
+        // Check that the active activity ID was updated
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBe(instance.id);
       });
 
-      it("lanza error si ya hay una actividad activa (la UI debe cerrarla antes)", () => {
-        // Crear dos instancias
+      it("throws if an activity is already active (the UI must close it first)", () => {
+        // Create two instances
         const instance1 = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         mockUUID = "instance-id-456";
@@ -560,16 +558,16 @@ describe("ActivityManager", () => {
 
         const instance2 = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
-        // Activar la primera instancia
+        // Activate the first instance
         activityManager.activateActivity(instance1.id);
 
-        // Intentar activar la segunda instancia con la primera aún activa: debe lanzar error
-        // (la UI debe cerrar la primera vía completeActivity/interruptActivity antes)
+        // Try to activate the second instance while the first is still active: must throw
+        // (the UI must close the first one via completeActivity/interruptActivity first)
         expect(() => {
           activityManager.activateActivity(instance2.id);
-        }).toThrow(/Hay una actividad activa/);
+        }).toThrowCoreError("activity-already-running");
 
-        // Verificar que la primera sigue activa (no se cerró automáticamente)
+        // Check that the first is still active (it was not closed automatically)
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBe(instance1.id);
         expect(mockAppState.currentDay?.activityInstances.length).toBe(2);
       });
@@ -577,14 +575,14 @@ describe("ActivityManager", () => {
 
     describe("completeActivity", () => {
       beforeEach(() => {
-        // Configurar plantilla, bloque y día activo
+        // Set up template, block and active day
         setupActivityTemplate();
         setupTimeBlock();
         setupActiveDay();
       });
 
-      it("debe completar la actividad activa y crear un registro", () => {
-        // Crear una instancia
+      it("should complete the active activity and create a record", () => {
+        // Create an instance
         const instanceId = "instance-id-123";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -592,19 +590,19 @@ describe("ActivityManager", () => {
           blockId: mockBlockId,
           order: 0,
           state: "active",
-          startTime: "2023-01-01T11:30:00.000Z", // 30 minutos antes de mockTimestamp
+          startTime: "2023-01-01T11:30:00.000Z", // 30 minutes before mockTimestamp
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
           clearObjectiveSettings: { estimatedDurationMinutes: 30 },
         });
 
-        // Marcar como actividad activa
+        // Mark as the active activity
         mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
-        // Completar la actividad
+        // Complete the activity
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 8 });
 
-        // Verificar que se creó el registro de actividad completada
+        // Check that the completed activity record was created
         expect(result).toBeDefined();
         expect(result.record.state).toBe("completed");
         expect(result.record.templateId).toBe(mockTemplateId);
@@ -612,22 +610,22 @@ describe("ActivityManager", () => {
         expect(result.record.satisfactionScore).toBe(8);
         expect(result.temposAwarded).toBeGreaterThan(0);
 
-        // Verificar que la instancia se eliminó del día actual
+        // Check that the instance was removed from the current day
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBeUndefined();
 
-        // Verificar que el registro se agregó a completedActivityRecords
+        // Check that the record was added to completedActivityRecords
         expect(mockAppState.global.completedActivityRecords.length).toBe(1);
         expect(mockAppState.global.completedActivityRecords[0]).toEqual(result.record);
       });
 
-      it("debe completar solo la actividad activa sin afectar a otras actividades", () => {
-        // Crear varias instancias de actividad en diferentes bloques
+      it("should complete only the active activity without affecting others", () => {
+        // Create several activity instances in different blocks
         const activeInstanceId = "active-instance-id";
         const otherInstanceId1 = "other-instance-id-1";
         const otherInstanceId2 = "other-instance-id-2";
 
-        // Crear un segundo bloque
+        // Create a second block
         const otherBlockId = "other-block-id";
         mockAppState.global.timeBlocks.push({
           id: otherBlockId,
@@ -640,7 +638,7 @@ describe("ActivityManager", () => {
           updatedAt: mockTimestamp,
         });
 
-        // Crear tres instancias: una activa y dos inactivas
+        // Create three instances: one active and two inactive
         mockAppState.currentDay!.activityInstances = [
           {
             id: activeInstanceId,
@@ -672,38 +670,38 @@ describe("ActivityManager", () => {
           },
         ];
 
-        // Marcar la actividad activa
+        // Mark the active activity
         mockAppState.currentDay!.activeActivityInstanceId = activeInstanceId;
 
-        // Completar la actividad activa
+        // Complete the active activity
         activityManager.completeActivity(activeInstanceId, { satisfactionScore: 7 });
 
-        // Verificar que solo la actividad activa se eliminó
+        // Check that only the active activity was removed
         expect(mockAppState.currentDay?.activityInstances.length).toBe(2);
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBeUndefined();
 
-        // Verificar que las otras actividades siguen existiendo
+        // Check that the other activities still exist
         const remainingIds = mockAppState.currentDay!.activityInstances.map((i) => i.id);
         expect(remainingIds).toContain(otherInstanceId1);
         expect(remainingIds).toContain(otherInstanceId2);
         expect(remainingIds).not.toContain(activeInstanceId);
 
-        // Verificar que se agregó exactamente un registro a completedActivityRecords
+        // Check that exactly one record was added to completedActivityRecords
         expect(mockAppState.global.completedActivityRecords.length).toBe(1);
         expect(mockAppState.global.completedActivityRecords[0].templateId).toBe(mockTemplateId);
       });
 
-      it("debe lanzar un error si se intenta completar una actividad no activa", () => {
-        // Crear una instancia sin activarla
+      it("should throw when trying to complete a non-active activity", () => {
+        // Create an instance without activating it
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         expect(() => {
           activityManager.completeActivity(instance.id, { satisfactionScore: 8 });
-        }).toThrow("Solo se puede completar la actividad activa actual");
+        }).toThrowCoreError("not-the-active-activity");
       });
 
-      it("debe calcular tempos correctamente: clear-objective score 10 (MVP v3.1)", () => {
-        // 30 min estimado, 30 min real → ceil(30 × 10 / 7) = 43
+      it("should compute tempos correctly: clear-objective score 10 (MVP v3.1)", () => {
+        // 30 min estimated, 30 min actual -> ceil(30 × 10 / 7) = 43
         const instanceId = "instance-no-bonus";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -721,15 +719,15 @@ describe("ActivityManager", () => {
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
 
         expect(result.beatEstimate).toBe(false);
-        // Fórmula MVP v3.1: ceil(30 × 10 / 7) = ceil(42.86) = 43
+        // MVP v3.1 formula: ceil(30 × 10 / 7) = ceil(42.86) = 43
         expect(result.temposAwarded).toBe(43);
         expect(result.record.beatEstimate).toBe(false);
         expect(result.record.temposAwarded).toBe(43);
       });
 
-      it("debe usar el estimado (no la duración) cuando hay beat (MVP v3.1)", () => {
-        // 30 min estimado, 20 min real (66%) → beat
-        // ceil(30 × 10 / 7) = 43 (usa estimado, no duración real)
+      it("should use the estimate (not the duration) on a beat (MVP v3.1)", () => {
+        // 30 min estimated, 20 min actual (66%) -> beat
+        // ceil(30 × 10 / 7) = 43 (uses the estimate, not the actual duration)
         const instanceId = "instance-bonus";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -737,7 +735,7 @@ describe("ActivityManager", () => {
           blockId: mockBlockId,
           order: 0,
           state: "active",
-          startTime: "2023-01-01T11:40:00.000Z", // 20 min antes de mockTimestamp
+          startTime: "2023-01-01T11:40:00.000Z", // 20 min before mockTimestamp
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
           clearObjectiveSettings: { estimatedDurationMinutes: 30 },
@@ -747,13 +745,13 @@ describe("ActivityManager", () => {
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
 
         expect(result.beatEstimate).toBe(true);
-        // Fórmula MVP v3.1: ceil(30 × 10 / 7) = 43
+        // MVP v3.1 formula: ceil(30 × 10 / 7) = 43
         expect(result.temposAwarded).toBe(43);
         expect(result.record.beatEstimate).toBe(true);
       });
 
-      it("debe NO dar bonus para timeboxing aunque batiera el estimado (MVP v3.1)", () => {
-        // Cambiar plantilla a timeboxing
+      it("should NOT give a bonus for timeboxing even if it beat the estimate (MVP v3.1)", () => {
+        // Switch the template to timeboxing
         mockAppState.global.activityTemplates[0].type = "timeboxing";
         mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
         mockAppState.global.activityTemplates[0].timeboxingSettings = {
@@ -768,7 +766,7 @@ describe("ActivityManager", () => {
           blockId: mockBlockId,
           order: 0,
           state: "active",
-          startTime: "2023-01-01T11:45:00.000Z", // 15 min antes
+          startTime: "2023-01-01T11:45:00.000Z", // 15 min before
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
         });
@@ -776,14 +774,14 @@ describe("ActivityManager", () => {
 
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
 
-        // timeboxing NUNCA tiene beatEstimate (no hay estimado en el mismo sentido)
+        // timeboxing NEVER has beatEstimate (there is no estimate in the same sense)
         expect(result.beatEstimate).toBe(false);
-        // Fórmula MVP v3.1: ceil(15 × 10 / 7) = ceil(21.43) = 22
+        // MVP v3.1 formula: ceil(15 × 10 / 7) = ceil(21.43) = 22
         expect(result.temposAwarded).toBe(22);
       });
 
-      it("score 0 → 0 tempos totales, aunque haya beat (MVP v3.1)", () => {
-        // 30 min estimado, 20 min real (66%) → beat disponible, pero score 0
+      it("score 0 -> 0 total tempos, even with a beat (MVP v3.1)", () => {
+        // 30 min estimated, 20 min actual (66%) -> beat available, but score 0
         const instanceId = "instance-zero";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -800,15 +798,15 @@ describe("ActivityManager", () => {
 
         const result = activityManager.completeActivity(instanceId, { satisfactionScore: 0 });
 
-        // Fórmula MVP v3.1: score 0 → 0 tempos
+        // MVP v3.1 formula: score 0 -> 0 tempos
         expect(result.temposAwarded).toBe(0);
       });
 
-      it("usa endTime congelado: la duración no cambia entre request y confirm", () => {
-        // Bloqueante 6 de Codex: endTime debe preservarse desde requestCompletion.
-        // Setup: actividad activa con startTime hace 20 min.
+      it("uses a frozen endTime: the duration does not change between request and confirm", () => {
+        // Codex blocker 6: endTime must be preserved from requestCompletion.
+        // Setup: active activity with startTime 20 min ago.
         const instanceId = "instance-frozen";
-        const startTime = "2023-01-01T11:40:00.000Z"; // 20 min antes de mockTimestamp (12:00)
+        const startTime = "2023-01-01T11:40:00.000Z"; // 20 min before mockTimestamp (12:00)
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
           templateId: mockTemplateId,
@@ -822,23 +820,23 @@ describe("ActivityManager", () => {
         });
         mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
-        // requestCompletion congela requestedAt = mockTimestamp (= 20 min)
+        // requestCompletion freezes requestedAt = mockTimestamp (= 20 min)
         const request = activityManager.requestCompletion(instanceId);
         expect(request.durationMinutes).toBe(20);
 
-        // El usuario permanece 5 minutos en el modal (cambiamos Date.now virtualmente)
-        // Después completeActivity con endTime congelado: debe usar el endTime del request
+        // The user stays 5 minutes in the modal (we change Date.now virtually)
+        // Then completeActivity with the frozen endTime: must use the request's endTime
         const result = activityManager.completeActivity(instanceId, {
           satisfactionScore: 10,
-          endTime: request.requestedAt, // congelado
+          endTime: request.requestedAt, // frozen
         });
 
-        // La duración debe ser la del request (20), no la del "ahora" (25)
+        // The duration must be the request's (20), not the "now" one (25)
         expect(result.record.durationMinutes).toBe(20);
-        expect(result.record.endTime).toBe(mockTimestamp); // respeta endTime pasado
+        expect(result.record.endTime).toBe(mockTimestamp); // respects the passed endTime
       });
 
-      it("lanza error con score inválido (< 0)", () => {
+      it("throws on an invalid score (< 0)", () => {
         const instanceId = "instance-invalid";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -854,10 +852,10 @@ describe("ActivityManager", () => {
 
         expect(() => {
           activityManager.completeActivity(instanceId, { satisfactionScore: -1 });
-        }).toThrow("satisfactionScore debe ser un entero entre 0 y 10");
+        }).toThrowCoreError("invalid-satisfaction-score");
       });
 
-      it("lanza error con score fraccionario (no entero)", () => {
+      it("throws on a fractional (non-integer) score", () => {
         const instanceId = "instance-fractional";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -873,7 +871,7 @@ describe("ActivityManager", () => {
 
         expect(() => {
           activityManager.completeActivity(instanceId, { satisfactionScore: 7.5 });
-        }).toThrow("satisfactionScore debe ser un entero entre 0 y 10");
+        }).toThrowCoreError("invalid-satisfaction-score");
       });
     });
 
@@ -884,7 +882,7 @@ describe("ActivityManager", () => {
         setupActiveDay();
       });
 
-      it("devuelve datos correctos para clear-objective", () => {
+      it("returns correct data for clear-objective", () => {
         const instanceId = "req-1";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -892,7 +890,7 @@ describe("ActivityManager", () => {
           blockId: mockBlockId,
           order: 0,
           state: "active",
-          startTime: "2023-01-01T11:30:00.000Z", // 30 min antes
+          startTime: "2023-01-01T11:30:00.000Z", // 30 min before
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
         });
@@ -903,12 +901,12 @@ describe("ActivityManager", () => {
         expect(req.activityTitle).toBe("Test Activity");
         expect(req.durationMinutes).toBe(30);
         expect(req.estimatedMinutes).toBe(30);
-        // 30 min real, 30 estimado → 100% → no bonus
+        // 30 min actual, 30 estimated -> 100% -> no bonus
         expect(req.beatEstimate).toBe(false);
         expect(req.requestedAt).toBeDefined();
       });
 
-      it("marca beatEstimate=true cuando se bate el estimado", () => {
+      it("sets beatEstimate=true when the estimate is beaten", () => {
         const instanceId = "req-2";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -916,7 +914,7 @@ describe("ActivityManager", () => {
           blockId: mockBlockId,
           order: 0,
           state: "active",
-          startTime: "2023-01-01T11:45:00.000Z", // 15 min antes, 50% del estimado
+          startTime: "2023-01-01T11:45:00.000Z", // 15 min before, 50% of the estimate
           createdAt: mockTimestamp,
           updatedAt: mockTimestamp,
         });
@@ -928,7 +926,7 @@ describe("ActivityManager", () => {
         expect(req.beatEstimate).toBe(true);
       });
 
-      it("beatEstimate=false para timeboxing aunque bata el estimado", () => {
+      it("beatEstimate=false for timeboxing even if it beats the estimate", () => {
         mockAppState.global.activityTemplates[0].type = "timeboxing";
         mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
         mockAppState.global.activityTemplates[0].timeboxingSettings = {
@@ -954,47 +952,47 @@ describe("ActivityManager", () => {
         expect(req.beatEstimate).toBe(false);
       });
 
-      it("lanza error si no hay actividad activa", () => {
+      it("throws if there is no active activity", () => {
         expect(() => activityManager.requestCompletion("non-existent")).toThrow();
       });
     });
 
     describe("interruptActivity", () => {
-      it("debe interrumpir la actividad activa (sin pregunta evitable)", () => {
-        // Crear y activar una instancia
+      it("should interrupt the active activity (no avoidable question)", () => {
+        // Create and activate an instance
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
         activityManager.activateActivity(instance.id);
 
-        // Cambiar el mockUUID para el registro interrumpido
+        // Change mockUUID for the interrupted record
         mockUUID = "interrupted-id-123";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
         const result = activityManager.interruptActivity(instance.id);
 
-        // Schema v2+: ya no hay interruptionData. Tempos=0 siempre.
+        // Schema v2+: there is no interruptionData anymore. Tempos=0 always.
         expect(result.state).toBe("interrupted");
         expect(result.templateId).toBe(mockTemplateId);
         expect(result.temposAwarded).toBe(0);
         expect(result.satisfactionScore).toBe(0);
         expect(result.beatEstimate).toBe(false);
 
-        // Verificar que se eliminó la instancia
+        // Check that the instance was deleted
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
         expect(mockAppState.currentDay?.activeActivityInstanceId).toBeUndefined();
       });
 
-      it("debe lanzar error si la actividad no está activa", () => {
+      it("should throw if the activity is not active", () => {
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         expect(() => {
           activityManager.interruptActivity(instance.id);
-        }).toThrow("Solo se puede interrumpir la actividad activa actual");
+        }).toThrowCoreError("not-the-active-activity");
       });
     });
 
     describe("getActiveActivity", () => {
-      it("debe devolver la actividad activa", () => {
-        // Crear y activar una instancia
+      it("should return the active activity", () => {
+        // Create and activate an instance
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
         const activatedInstance = activityManager.activateActivity(instance.id);
 
@@ -1003,7 +1001,7 @@ describe("ActivityManager", () => {
         expect(result).toEqual(activatedInstance);
       });
 
-      it("debe devolver null si no hay actividad activa", () => {
+      it("should return null if there is no active activity", () => {
         const result = activityManager.getActiveActivity();
 
         expect(result).toBeNull();
@@ -1012,37 +1010,37 @@ describe("ActivityManager", () => {
   });
 
   // ===============================================
-  // Pruebas de Actividades del Sistema
+  // System activity tests
   // ===============================================
 
-  describe("Actividades del sistema", () => {
+  describe("System activities", () => {
     beforeEach(() => {
-      // Configurar bloque y día activo
+      // Set up block and active day
       setupTimeBlock();
       setupActiveDay();
     });
 
     describe("createPilotAutomaticActivity", () => {
-      it("debe crear una actividad de Piloto Automático", () => {
-        // Preparar mockUUID para la plantilla
+      it("should create a Piloto Automático (autopilot) activity", () => {
+        // Prepare mockUUID for the template
         mockUUID = "pilot-template-id";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
-        // Crear la actividad de Piloto Automático
+        // Create the autopilot activity
         const result = activityManager.createPilotAutomaticActivity(mockBlockId);
 
-        // Verificar que se creó la plantilla del sistema
+        // Check that the system template was created
         const template = mockAppState.global.activityTemplates[0];
         expect(template.title).toBe("Piloto Automático");
         expect(template.isSystemActivity).toBe(true);
         expect(template.type).toBe("flexible-duration");
 
-        // Verificar que se creó la instancia correctamente
+        // Check that the instance was created correctly
         expect(result.templateId).toBe(template.id);
       });
 
-      it("debe reutilizar la plantilla existente si ya existe", () => {
-        // Crear una plantilla de Piloto Automático
+      it("should reuse the existing template if it already exists", () => {
+        // Create an autopilot template
         const pilotTemplate = activityManager.createActivityTemplate({
           title: "Piloto Automático",
           description: "Actividad de sistema para registrar tiempo en piloto automático",
@@ -1054,17 +1052,17 @@ describe("ActivityManager", () => {
           },
         });
 
-        // Cambiar mockUUID para la instancia
+        // Change mockUUID for the instance
         mockUUID = "pilot-instance-id";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
-        // Crear la actividad de Piloto Automático
+        // Create the autopilot activity
         const result = activityManager.createPilotAutomaticActivity(mockBlockId);
 
-        // Verificar que se reutilizó la plantilla existente
+        // Check that the existing template was reused
         expect(result.templateId).toBe(pilotTemplate.id);
 
-        // Verificar que no se creó una nueva plantilla
+        // Check that no new template was created
         expect(mockAppState.global.activityTemplates.length).toBe(1);
       });
     });

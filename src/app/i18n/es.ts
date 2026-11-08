@@ -1,4 +1,4 @@
-/** Textos en español (idioma de referencia: define las claves). */
+/** Spanish copy (the reference language: it defines the keys). */
 export const es = {
   "app.description": "Una interfaz para tu día real.",
   "greeting.morning": "Buenos días",
@@ -327,6 +327,7 @@ export const es = {
   "plan.moveToTodo": "Mover a Por hacer",
   "plan.movedToTodo": "Movidas a Por hacer ({count})",
   "plan.emptyBlock": "Nada aquí todavía. Arrastra algo o añade con +.",
+  "plan.emptyPast": "No había nada planeado.",
   "plan.availableFrom": "Disponible de {start} a {end}",
   "plan.pastLocked": "Este bloque ya pasó. Muévela para empezarla.",
   "plan.draggable": "actividad arrastrable",
@@ -444,6 +445,34 @@ export const es = {
   "settings.data.clearWord": "borrar",
   "settings.data.cleared": "Datos borrados",
   "settings.data.clearedHint": "Empiezas de cero.",
+
+  // Core errors, by code (see src/system/errors.ts)
+  "coreError.no-active-day": "No hay un día en marcha. Empieza el día primero.",
+  "coreError.day-already-active": "Ya hay un día en marcha.",
+  "coreError.activity-template-not-found": "Esa actividad ya no está en tu biblioteca.",
+  "coreError.activity-template-in-use":
+    "Esta actividad está en el plan de hoy. Quítala del plan primero.",
+  "coreError.activity-instance-not-found": "Esa actividad ya no está en el plan de hoy.",
+  "coreError.activity-is-active":
+    "La actividad en marcha no se puede mover ni quitar. Termínala primero.",
+  "coreError.activity-already-running": "Ya hay algo en marcha. Termínalo primero.",
+  "coreError.not-the-active-activity": "Solo se puede cerrar la actividad en marcha.",
+  "coreError.invalid-state-change": "Ese cambio no se puede hacer desde aquí.",
+  "coreError.invalid-satisfaction-score": "Elige una satisfacción del 0 al 10.",
+  "coreError.event-template-not-found": "Ese evento ya no está en tu biblioteca.",
+  "coreError.event-template-in-use": "Este evento ya está registrado, así que no se puede borrar.",
+  "coreError.block-name-empty": "Ponle un nombre al bloque.",
+  "coreError.minutes-out-of-range": "Las horas deben estar dentro del día (00:00–23:59).",
+  "coreError.block-start-after-end": "La hora de inicio tiene que ser anterior a la de fin.",
+  "coreError.block-overlap": "Se cruza con otro bloque. Ajusta las horas para que no se solapen.",
+  "coreError.block-not-found": "Ese bloque ya no existe.",
+  "coreError.default-block-protected": "“Por hacer” siempre está: no se puede borrar ni cambiar.",
+  "coreError.invalid-daily-target": "La referencia diaria debe ser un número entero mayor que 0.",
+  "coreError.invalid-minutes": "Los minutos deben ser un número positivo.",
+  "coreError.invalid-time-format": "Usa el formato HH:MM.",
+  "coreError.invalid-state-json": "El archivo no es una copia válida de LifeUI.",
+  "coreError.invalid-state-shape": "El archivo no es una copia válida de LifeUI.",
+  "coreError.internal": "Algo salió mal. Tus datos están a salvo; vuelve a intentarlo.",
 } as const;
 
 export type MessageKey = keyof typeof es;

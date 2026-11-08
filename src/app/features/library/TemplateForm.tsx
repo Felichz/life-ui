@@ -40,7 +40,7 @@ export function draftFrom(template?: ActivityTemplate, initialTitle = ""): Templ
   };
 }
 
-/** Datos listos para createActivityTemplate / updateActivityTemplate. */
+/** Data ready for createActivityTemplate / updateActivityTemplate. */
 export function templatePayload(draft: TemplateDraft) {
   return {
     title: draft.title.trim(),
@@ -61,7 +61,7 @@ interface TemplateFormProps {
   initial: TemplateDraft;
   onSubmit: (draft: TemplateDraft) => void;
   error?: string | null;
-  /** Controles extra al final del formulario */
+  /** Extra controls at the end of the form */
   children?: ReactNode;
 }
 

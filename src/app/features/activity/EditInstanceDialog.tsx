@@ -22,7 +22,7 @@ import {
 } from "./DurationFields";
 import { t } from "../../i18n";
 
-/** Ajusta bloque y duración de una actividad del plan de hoy. */
+/** Adjusts block and duration of an activity in today's plan. */
 export function EditInstanceDialog({
   instanceId,
   onClose,
@@ -50,7 +50,7 @@ export function EditInstanceDialog({
       });
       setTouched(false);
     }
-    // Solo al abrir otra instancia
+    // Only when opening a different instance
   }, [instanceId]);
 
   const open = Boolean(instance && template);

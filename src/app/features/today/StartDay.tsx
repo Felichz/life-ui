@@ -10,7 +10,7 @@ import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
 import { APP_NAME, t, tp } from "../../i18n";
 
-/** Pantalla sin día en curso: una sola decisión, empezar. */
+/** Screen with no day in progress: a single decision, start. */
 export function StartDay() {
   const { state, core } = useSystem();
   const toast = useToast();

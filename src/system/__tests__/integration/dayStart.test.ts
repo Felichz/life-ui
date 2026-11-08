@@ -2,36 +2,36 @@ import { SystemCore } from "../../index";
 import type { ActivityType } from "../../../types";
 
 /**
- * Tests de integración para el Flujo 1: Inicio del día
+ * Integration tests for Flow 1: Day start
  *
- * Estos tests verifican que el flujo completo de inicio de día
- * funcione correctamente, desde diferentes puntos de partida.
+ * These tests verify that the complete day start flow
+ * works correctly, from different starting points.
  */
-describe("Flujo 1: Inicio del día", () => {
+describe("Flow 1: Day start", () => {
   let system: SystemCore;
 
   beforeEach(() => {
-    // Inicializar el sistema (equivalente a abrir la aplicación)
+    // Initialize the system (equivalent to opening the app)
     system = new SystemCore();
 
-    // Limpiar estado para asegurar que no hay día activo
+    // Clear state to ensure there is no active day
     system.clearState();
   });
 
-  test("Inicio del día - primer uso (sin datos previos)", () => {
-    // Verificar precondiciones
+  test("Day start - first use (no previous data)", () => {
+    // Check preconditions
     expect(system.isDayActive()).toBe(false);
     expect(system.getState().global.days.length).toBe(0);
 
-    // Iniciar el día (equivalente a hacer clic en "Comenzar día")
+    // Start the day (equivalent to clicking "Comenzar día")
     system.startDay();
 
-    // Verificar que el día se haya iniciado correctamente
+    // Verify the day started correctly
     expect(system.isDayActive()).toBe(true);
     expect(system.getCurrentDay()).not.toBeNull();
     expect(system.getCurrentDay()?.state).toBe("active");
 
-    // Crear actividad de sistema "Piloto Automático"
+    // Create the "Piloto Automático" system activity
     const pilotoAutoTemplate = system.createActivityTemplate({
       title: "Piloto Automático",
       description: "Estado por defecto cuando no hay otra actividad específica activa",
@@ -39,34 +39,34 @@ describe("Flujo 1: Inicio del día", () => {
       isSystemActivity: true,
       flexibleDurationSettings: {
         minimumDurationMinutes: 1,
-        maximumDurationMinutes: 1440, // 24 horas
+        maximumDurationMinutes: 1440, // 24 hours
       },
     });
 
-    // Crear bloque "Por Hacer" para todo el día (0-1439 minutos)
+    // Create the "Por Hacer" block for the whole day (0-1439 minutes)
     const porHacerBlock = system.createTimeBlock("Por Hacer", 0, 1439);
 
-    // Marcarlo como bloque por defecto
+    // Mark it as the default block
     system.updateTimeBlock(porHacerBlock.id, { isDefault: true });
 
-    // Crear instancia de "Piloto Automático" en el bloque "Por Hacer"
+    // Create a "Piloto Automático" instance in the "Por Hacer" block
     const pilotoAutoInstance = system.createActivityInstance(
       pilotoAutoTemplate.id,
       porHacerBlock.id
     );
 
-    // Activar "Piloto Automático" como actividad inicial
+    // Activate "Piloto Automático" as the initial activity
     const activePilotoAuto = system.activateActivity(pilotoAutoInstance.id);
 
-    // Verificar que "Piloto Automático" está activo
+    // Verify "Piloto Automático" is active
     const actividadActiva = system.getActiveActivity();
     expect(actividadActiva).not.toBeNull();
     expect(actividadActiva?.id).toBe(activePilotoAuto.id);
 
-    // Verificar que el timeline se ha inicializado con la actividad
+    // Verify the timeline has been initialized with the activity
     const timelineData = system.getTimelineData();
     expect(timelineData.activities.length).toBeGreaterThan(0);
-    // Nota: Puede ser necesario ajustar esta verificación según la implementación específica
+    // Note: this check may need adjusting depending on the specific implementation
     expect(
       timelineData.activities.some(
         (a) => a.title.includes("Piloto") || a.id === activePilotoAuto.id
@@ -74,12 +74,12 @@ describe("Flujo 1: Inicio del día", () => {
     ).toBe(true);
   });
 
-  test("Inicio del día - con datos de días anteriores", () => {
-    // Preparar datos de un día anterior
-    // Crear un día previo finalizado
+  test("Day start - with data from previous days", () => {
+    // Prepare data from a previous day
+    // Create a finished previous day
     const diaAnterior = system.startDay();
 
-    // Crear configuración básica para el día anterior
+    // Create basic setup for the previous day
     const pilotoAutoTemplate = system.createActivityTemplate({
       title: "Piloto Automático",
       description: "Estado por defecto",
@@ -94,7 +94,7 @@ describe("Flujo 1: Inicio del día", () => {
     const porHacerBlock = system.createTimeBlock("Por Hacer", 0, 1439);
     system.updateTimeBlock(porHacerBlock.id, { isDefault: true });
 
-    // Crear alguna actividad completada para tener datos históricos
+    // Create a completed activity to have historical data
     const actividadMeditacion = system.createActivityTemplate({
       title: "Meditación",
       description: "Actividad de meditación",
@@ -106,7 +106,7 @@ describe("Flujo 1: Inicio del día", () => {
       },
     });
 
-    // Crear instancia y activarla
+    // Create an instance and activate it
     const meditacionInstance = system.createActivityInstance(
       actividadMeditacion.id,
       porHacerBlock.id
@@ -114,47 +114,47 @@ describe("Flujo 1: Inicio del día", () => {
 
     const activeMeditacion = system.activateActivity(meditacionInstance.id);
 
-    // Completar la actividad para tener un registro
+    // Complete the activity to have a record
     system.completeActivity(activeMeditacion.id, { satisfactionScore: 5 });
 
-    // Finalizar el día anterior
+    // End the previous day
     system.endDay();
 
-    // Verificar que no hay día activo pero existen datos previos
+    // Verify there is no active day but previous data exists
     expect(system.isDayActive()).toBe(false);
     expect(system.getState().global.days.length).toBe(1);
     expect(system.getState().global.completedActivityRecords.length).toBeGreaterThan(0);
 
-    // Iniciar nuevo día
+    // Start a new day
     system.startDay();
 
-    // Verificar que el día se ha iniciado correctamente
+    // Verify the day started correctly
     expect(system.isDayActive()).toBe(true);
     expect(system.getCurrentDay()?.id).not.toBe(diaAnterior.id);
 
-    // Crear instancia de Piloto Automático para el nuevo día
+    // Create a Piloto Automático instance for the new day
     const pilotoAutoInstance = system.createActivityInstance(
       pilotoAutoTemplate.id,
       porHacerBlock.id
     );
 
-    // Activar Piloto Automático
+    // Activate Piloto Automático
     const activePilotoAuto = system.activateActivity(pilotoAutoInstance.id);
 
-    // Verificaciones finales
+    // Final checks
     expect(system.getActiveActivity()?.id).toBe(activePilotoAuto.id);
 
-    // Verificar que podemos acceder a los datos analíticos del día anterior
+    // Verify we can access the previous day's analytics data
     const timeDistribution = system.getTimeDistributionData(diaAnterior.id);
     expect(timeDistribution.categories.length).toBeGreaterThan(0);
   });
 
-  test("Flujo alternativo: Gestionar biblioteca sin iniciar día", () => {
-    // Verificar que no hay día activo
+  test("Alternative flow: Manage library without starting the day", () => {
+    // Verify there is no active day
     expect(system.isDayActive()).toBe(false);
 
-    // Simular que el usuario navega a la biblioteca de actividades
-    // Crear una actividad en la biblioteca
+    // Simulate the user navigating to the activity library
+    // Create an activity in the library
     const nuevaActividad = system.createActivityTemplate({
       title: "Nueva Actividad de Test",
       description: "Actividad creada sin iniciar el día",
@@ -165,14 +165,14 @@ describe("Flujo 1: Inicio del día", () => {
       },
     });
 
-    // Verificar que la actividad se creó correctamente
+    // Verify the activity was created correctly
     const actividades = system.getActivityTemplates();
     expect(actividades.some((a) => a.id === nuevaActividad.id)).toBe(true);
 
-    // Verificar que el día sigue sin estar activo
+    // Verify the day is still not active
     expect(system.isDayActive()).toBe(false);
 
-    // Verificar que podemos editar la actividad
+    // Verify we can edit the activity
     const actividadActualizada = system.updateActivityTemplate(nuevaActividad.id, {
       title: "Actividad Actualizada",
       description: "Descripción actualizada",

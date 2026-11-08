@@ -4,9 +4,9 @@ import { SystemCore } from "../../system";
 import { AppProviders, AppRoutes } from "../App";
 
 /**
- * Flujos críticos de Hoy contra el core real: el ritual de cierre otorga los
- * tempos que promete la vista previa, cambiar de actividad pasa por el cierre
- * y "No la terminé" registra una interrupción sin tempos.
+ * Critical Today flows against the real core: the closing ritual awards the
+ * tempos the preview promises, switching activity goes through the close,
+ * and "No la terminé" (I didn't finish it) logs an interruption with no tempos.
  */
 
 class ResizeObserverStub {
@@ -57,8 +57,8 @@ function setup() {
 
 const dayId = (core: SystemCore) => core.getCurrentDay()!.id;
 
-describe("Hoy", () => {
-  it("cierra la actividad en marcha con la recompensa de la vista previa", () => {
+describe("Today", () => {
+  it("closes the running activity with the reward shown in the preview", () => {
     const { core, informeInstance } = setup();
     act(() => {
       core.activateActivity(informeInstance.id);
@@ -68,7 +68,7 @@ describe("Hoy", () => {
     const dialog = screen.getByTestId("closing-dialog");
     expect(within(dialog).getByText("¿Cómo fue «Escribir informe»?")).toBeInTheDocument();
 
-    // 30 min estimados × 9/7 → ceil(38,57) = 39
+    // 30 estimated min × 9/7 → ceil(38.57) = 39
     fireEvent.keyDown(dialog, { key: "9" });
     expect(within(dialog).getByText("+39")).toBeInTheDocument();
     fireEvent.click(within(dialog).getByTestId("closing-confirm"));
@@ -81,7 +81,7 @@ describe("Hoy", () => {
     expect(screen.queryByTestId("closing-dialog")).not.toBeInTheDocument();
   });
 
-  it("al cambiar de actividad, cierra primero la actual y luego empieza la nueva", () => {
+  it("when switching activity, closes the current one first and then starts the new one", () => {
     const { core, informeInstance, leerInstance } = setup();
     act(() => {
       core.activateActivity(informeInstance.id);
@@ -96,7 +96,7 @@ describe("Hoy", () => {
     expect(core.getState().global.completedActivityRecords).toHaveLength(1);
   });
 
-  it("cancelar el cierre deja la actividad en marcha y no registra nada", () => {
+  it("cancelling the close keeps the activity running and logs nothing", () => {
     const { core, informeInstance } = setup();
     act(() => {
       core.activateActivity(informeInstance.id);
@@ -109,7 +109,7 @@ describe("Hoy", () => {
     expect(core.getState().global.completedActivityRecords).toHaveLength(0);
   });
 
-  it("«No la terminé» registra una interrupción sin tempos", () => {
+  it('"No la terminé" (I didn\'t finish it) logs an interruption with no tempos', () => {
     const { core, informeInstance } = setup();
     act(() => {
       core.activateActivity(informeInstance.id);
@@ -125,7 +125,7 @@ describe("Hoy", () => {
     expect(screen.getByText("Está bien. Mañana es otra oportunidad.")).toBeInTheDocument();
   });
 
-  it("los accesos rápidos empiezan una actividad anclada con un toque", () => {
+  it("quick starts begin a pinned activity with one tap", () => {
     const { core } = setup();
     const quick = screen.getByRole("region", { name: "Accesos rápidos" });
     fireEvent.click(within(quick).getByRole("button", { name: /Leer/ }));

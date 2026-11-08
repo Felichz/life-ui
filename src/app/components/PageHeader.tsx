@@ -11,7 +11,7 @@ export function PageHeader({
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
-  /** Permite que las acciones bajen de línea en pantallas estrechas */
+  /** Lets the actions wrap to a new line on narrow screens */
   wrap?: boolean;
   className?: string;
 }) {

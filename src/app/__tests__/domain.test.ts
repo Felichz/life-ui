@@ -18,7 +18,7 @@ const block = (overrides: Partial<TimeBlock>): TimeBlock => ({
 beforeAll(() => setLocale("es"));
 
 describe("contractOf", () => {
-  it("describe cada tipo de contrato de duración", () => {
+  it("describes each kind of duration contract", () => {
     expect(
       contractOf("clear-objective", { clearObjectiveSettings: { estimatedDurationMinutes: 45 } })
         ?.label
@@ -40,7 +40,7 @@ describe("contractOf", () => {
     ).toBe("máx 15 min");
   });
 
-  it("usa los ajustes de la instancia y cae a la plantilla si faltan", () => {
+  it("uses the instance settings and falls back to the template if missing", () => {
     const template = { clearObjectiveSettings: { estimatedDurationMinutes: 30 } };
     expect(
       contractOf(
@@ -55,14 +55,14 @@ describe("contractOf", () => {
 
 describe("blockStatus", () => {
   const morning = block({ startMinute: 360, endMinute: 720 });
-  it("distingue ahora, más tarde y pasado", () => {
+  it("distinguishes now, later and past", () => {
     expect(blockStatus(morning, 300)).toBe("later");
     expect(blockStatus(morning, 400)).toBe("now");
     expect(blockStatus(morning, 720)).toBe("past");
     expect(blockStatus(block({ isDefault: true }), 5)).toBe("always");
   });
 
-  it("ordena Por hacer primero y luego por hora", () => {
+  it("sorts To do first, then by time", () => {
     const sorted = sortBlocks([
       block({ id: "tarde", startMinute: 720, order: 1 }),
       block({ id: "todo", isDefault: true, order: 5 }),
@@ -73,7 +73,7 @@ describe("blockStatus", () => {
 });
 
 describe("withinContract", () => {
-  it("compara el tiempo real con estimado o rango", () => {
+  it("compares actual time against estimate or range", () => {
     expect(withinContract(40, { label: "", estimate: 45 })).toBe(true);
     expect(withinContract(50, { label: "", estimate: 45 })).toBe(false);
     expect(withinContract(12, { label: "", min: 5, max: 10 })).toBe(false);
@@ -82,7 +82,7 @@ describe("withinContract", () => {
 });
 
 describe("format", () => {
-  it("formatea minutos y cronómetro", () => {
+  it("formats minutes and stopwatch", () => {
     expect(formatMinutes(45)).toBe("45 min");
     expect(formatMinutes(60)).toBe("1 h");
     expect(formatMinutes(75)).toBe("1 h 15 min");
@@ -90,7 +90,7 @@ describe("format", () => {
     expect(formatClock(3_723_000)).toBe("1:02:03");
   });
 
-  it("interpreta horas HH:MM", () => {
+  it("parses HH:MM times", () => {
     expect(parseDayMinutes("14:30")).toBe(870);
     expect(parseDayMinutes("24:00")).toBeNull();
     expect(parseDayMinutes("nope")).toBeNull();

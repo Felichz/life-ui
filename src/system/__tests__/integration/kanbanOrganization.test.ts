@@ -2,26 +2,26 @@ import { SystemCore } from "../../index";
 import { UtilityService } from "../../utilityService";
 
 /**
- * Tests de integración para el Flujo 3: Organización de actividades en el tablero Kanban
+ * Integration tests for Flow 3: Organizing activities on the Kanban board
  *
- * Estos tests verifican que el flujo completo de organización de actividades en el tablero Kanban
- * funcione correctamente, incluyendo la creación de bloques de tiempo personalizados
- * y la asignación de actividades a estos bloques.
+ * These tests verify that the complete flow of organizing activities on the Kanban board
+ * works correctly, including creating custom time blocks
+ * and assigning activities to those blocks.
  */
-describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
+describe("Flow 3: Organizing activities on the Kanban board", () => {
   let system: SystemCore;
 
   beforeEach(() => {
-    // Inicializar el sistema (equivalente a abrir la aplicación)
+    // Initialize the system (equivalent to opening the app)
     system = new SystemCore();
 
-    // Limpiar estado para partir de cero
+    // Clear state to start from scratch
     system.clearState();
 
-    // Comenzar un día (precondición para el flujo)
+    // Start a day (precondition for the flow)
     system.startDay();
 
-    // Crear actividades de ejemplo en la biblioteca
+    // Create sample activities in the library
     system.createActivityTemplate({
       title: "Redactar informe de trabajo",
       description: "Escribir informe semanal para el jefe",
@@ -55,44 +55,44 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
     });
   });
 
-  test("Flujo principal: Creación de bloques de tiempo y asignación de actividades", () => {
-    // Verificar precondiciones
+  test("Main flow: Creating time blocks and assigning activities", () => {
+    // Check preconditions
     expect(system.isDayActive()).toBe(true);
 
-    // Verificar que existe un bloque por defecto
+    // Verify a default block exists
     const blocksInicio = system.getTimeBlocks();
 
     const porHacerBlock = blocksInicio.find((block) => block.isDefault);
 
     expect(porHacerBlock).toBeDefined();
 
-    // 1. Crear bloques de tiempo personalizados
-    // Equivalente a: Usuario hace clic en "Gestionar bloques de tiempo"
+    // 1. Create custom time blocks
+    // Equivalent to: user clicks "Gestionar bloques de tiempo"
 
-    // Crear bloque "Mañana" (06:00-12:00)
+    // Create the "Mañana" block (06:00-12:00)
     const mañanaBlock = system.createTimeBlock(
       "Mañana",
       UtilityService.parseTime("06:00"),
       UtilityService.parseTime("12:00")
     );
 
-    // Crear bloque "Mediodía" (12:00-15:00)
+    // Create the "Mediodía" block (12:00-15:00)
     const mediodiaBlock = system.createTimeBlock(
       "Mediodía",
       UtilityService.parseTime("12:00"),
       UtilityService.parseTime("15:00")
     );
 
-    // Crear bloque "Tarde" (15:00-19:00)
+    // Create the "Tarde" block (15:00-19:00)
     const tardeBlock = system.createTimeBlock(
       "Tarde",
       UtilityService.parseTime("15:00"),
       UtilityService.parseTime("19:00")
     );
 
-    // Verificar que los bloques se crearon correctamente
+    // Verify the blocks were created correctly
     const blocks = system.getTimeBlocks();
-    expect(blocks.length).toBe(4); // 3 nuevos + 1 por defecto
+    expect(blocks.length).toBe(4); // 3 new + 1 default
 
     const blockNames = blocks.map((block) => block.name);
     expect(blockNames).toContain("Mañana");
@@ -100,41 +100,41 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
     expect(blockNames).toContain("Tarde");
     expect(blockNames).toContain("Por Hacer");
 
-    // 2. Asignar actividades a los bloques (arrastrar actividades desde la biblioteca al Kanban)
-    // Obtener las plantillas de actividades
+    // 2. Assign activities to the blocks (drag activities from the library to the Kanban)
+    // Get the activity templates
     const templates = system.getActivityTemplates();
     expect(templates.length).toBe(3);
 
-    // Arrastrar "Redactar informe" a bloque "Mañana"
+    // Drag "Redactar informe" to the "Mañana" block
     const informeTemplate = templates.find((t) => t.title === "Redactar informe de trabajo");
     expect(informeTemplate).toBeDefined();
 
-    // Crear instancia con configuración personalizada (equivalente a ajustar en el modal)
+    // Create an instance with custom settings (equivalent to adjusting in the modal)
     const informeInstance = system.createActivityInstance(informeTemplate!.id, mañanaBlock.id, {
-      // Ajustar estimación de 45 min a 60 min
+      // Adjust estimate from 45 min to 60 min
       clearObjectiveSettings: {
         estimatedDurationMinutes: 60,
       },
     });
 
-    // Verificar que se creó la instancia correctamente
+    // Verify the instance was created correctly
     expect(informeInstance.templateId).toBe(informeTemplate!.id);
     expect(informeInstance.blockId).toBe(mañanaBlock.id);
     expect(informeInstance.clearObjectiveSettings?.estimatedDurationMinutes).toBe(60);
 
-    // Arrastrar "Revisar correo" a bloque "Mediodía"
+    // Drag "Revisar correo" to the "Mediodía" block
     const correoTemplate = templates.find((t) => t.title === "Revisar correo electrónico");
     system.createActivityInstance(correoTemplate!.id, mediodiaBlock.id);
 
-    // Arrastrar "Ejercicio físico" a bloque "Tarde"
+    // Drag "Ejercicio físico" to the "Tarde" block
     const ejercicioTemplate = templates.find((t) => t.title === "Ejercicio físico");
     system.createActivityInstance(ejercicioTemplate!.id, tardeBlock.id);
 
-    // Verificar que todas las instancias se crearon correctamente
+    // Verify all instances were created correctly
     const instances = system.getState().currentDay!.activityInstances;
     expect(instances.length).toBe(3);
 
-    // Verificar que cada instancia está en el bloque correcto
+    // Verify each instance is in the correct block
     const bloqueInstancias = instances.reduce(
       (acc, instance) => {
         const blockId = instance.blockId;
@@ -152,192 +152,192 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
     expect(bloqueInstancias[tardeBlock.id]).toBe(1);
   });
 
-  test("Punto de decisión PD1: Habilitar/deshabilitar actividades según hora actual", () => {
-    // Mock para simular diferentes horas del día
+  test("Decision point DP1: Enable/disable activities based on the current time", () => {
+    // Mock to simulate different times of day
     const mockGetMinutes = jest.spyOn(UtilityService, "getCurrentDayMinutes");
 
-    // Crear bloques de tiempo
+    // Create time blocks
     const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00
     const tardeBlock = system.createTimeBlock("Tarde", 900, 1140); // 15:00-19:00
 
-    // Obtener templates
+    // Get templates
     const templates = system.getActivityTemplates();
     const informeTemplate = templates.find((t) => t.title === "Redactar informe de trabajo")!;
     const ejercicioTemplate = templates.find((t) => t.title === "Ejercicio físico")!;
 
-    // Crear instancias en diferentes bloques
+    // Create instances in different blocks
     const informeInstance = system.createActivityInstance(informeTemplate.id, mañanaBlock.id);
     const ejercicioInstance = system.createActivityInstance(ejercicioTemplate.id, tardeBlock.id);
 
-    // Simular que son las 10:00 (dentro del bloque "Mañana")
+    // Simulate that it is 10:00 (inside the "Mañana" block)
     mockGetMinutes.mockReturnValue(600); // 10:00
 
-    // Verificar disponibilidad de bloques
+    // Check block availability
     expect(system.isTimeBlockAvailable(mañanaBlock.id)).toBe(true);
     expect(system.isTimeBlockAvailable(tardeBlock.id)).toBe(false);
 
-    // Intentar activar actividad en bloque disponible (debería funcionar)
+    // Try to activate an activity in an available block (should work)
     system.activateActivity(informeInstance.id);
     expect(system.getActiveActivity()?.id).toBe(informeInstance.id);
 
-    // Completar la actividad para poder activar otra
+    // Complete the activity so another can be activated
     system.completeActivity(informeInstance.id, { satisfactionScore: 5 });
 
-    // Después de completar la actividad, ya no debería existir en la lista de instancias
-    // Por lo que intentar activarla de nuevo no debería encontrarla
+    // After completing the activity, it should no longer exist in the instance list
+    // So trying to activate it again should not find it
     expect(() => system.activateActivity(informeInstance.id)).toThrow();
 
-    // Verificar que el ejercicioInstance todavía existe (no se eliminó al completar la otra actividad)
+    // Verify ejercicioInstance still exists (not removed when completing the other activity)
     const instancesAfterComplete = system.getState().currentDay!.activityInstances;
     const ejercicioExists = instancesAfterComplete.some((i) => i.id === ejercicioInstance.id);
     expect(ejercicioExists).toBe(true);
 
-    // Cambiar la hora a 16:00 (dentro del bloque "Tarde")
+    // Change the time to 16:00 (inside the "Tarde" block)
     mockGetMinutes.mockReturnValue(960); // 16:00
 
-    // Verificar que ahora el bloque "Tarde" está disponible y el "Mañana" no
+    // Verify the "Tarde" block is now available and "Mañana" is not
     expect(system.isTimeBlockAvailable(mañanaBlock.id)).toBe(false);
     expect(system.isTimeBlockAvailable(tardeBlock.id)).toBe(true);
 
-    // Ahora debería poder activar la actividad en el bloque "Tarde"
+    // Now the activity in the "Tarde" block should be activatable
     system.activateActivity(ejercicioInstance.id);
     expect(system.getActiveActivity()?.id).toBe(ejercicioInstance.id);
   });
 
-  test("Flujo alternativo A1: Reordenamiento de actividades dentro de una columna", () => {
-    // Crear un bloque de tiempo
+  test("Alternative flow A1: Reordering activities within a column", () => {
+    // Create a time block
     const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00
 
-    // Obtener templates y crear varias instancias en el mismo bloque
+    // Get templates and create several instances in the same block
     const templates = system.getActivityTemplates();
 
     const instancia1 = system.createActivityInstance(templates[0].id, mañanaBlock.id);
     const instancia2 = system.createActivityInstance(templates[1].id, mañanaBlock.id);
     const instancia3 = system.createActivityInstance(templates[2].id, mañanaBlock.id);
 
-    // Verificar el orden inicial
+    // Check the initial order
     expect(instancia1.order).toBe(0);
     expect(instancia2.order).toBe(1);
     expect(instancia3.order).toBe(2);
 
-    // Reordenar las actividades (mover la última al principio)
+    // Reorder the activities (move the last one to the start)
     const instancia3Actualizada = system.updateActivityInstance(instancia3.id, { order: 0 });
 
-    // Al cambiar el orden de una instancia, las demás no se actualizan automáticamente,
-    // pero el orden real se respetará al obtener las instancias ordenadas
+    // Changing one instance's order does not update the others automatically,
+    // but the real order is respected when fetching the sorted instances
     expect(instancia3Actualizada.order).toBe(0);
 
-    // En un escenario real, la UI se encargaría de actualizar visualmente todas las instancias
-    // Esta prueba verifica que podemos cambiar el orden de una instancia
+    // In a real scenario, the UI would handle visually updating all instances
+    // This test verifies we can change an instance's order
   });
 
-  test("Flujo alternativo A2: Movimiento de actividades entre columnas", () => {
-    // Crear bloques de tiempo
+  test("Alternative flow A2: Moving activities between columns", () => {
+    // Create time blocks
     const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00
     const tardeBlock = system.createTimeBlock("Tarde", 900, 1140); // 15:00-19:00
 
-    // Obtener templates y crear instancias
+    // Get templates and create instances
     const templates = system.getActivityTemplates();
     const instancia = system.createActivityInstance(templates[0].id, mañanaBlock.id);
 
-    // Verificar ubicación inicial
+    // Check the initial location
     expect(instancia.blockId).toBe(mañanaBlock.id);
 
-    // Mover la actividad a otro bloque
+    // Move the activity to another block
     const instanciaMovida = system.moveActivityInstance(instancia.id, tardeBlock.id);
 
-    // Verificar que se movió correctamente
+    // Verify it moved correctly
     expect(instanciaMovida.blockId).toBe(tardeBlock.id);
 
-    // Verificar que el estado global refleja el cambio
+    // Verify the global state reflects the change
     const instanciasActualizadas = system.getState().currentDay!.activityInstances;
     const instanciaEnEstado = instanciasActualizadas.find((i) => i.id === instancia.id);
     expect(instanciaEnEstado?.blockId).toBe(tardeBlock.id);
   });
 
-  test("Persistencia de actividades entre días consecutivos", () => {
-    // Crear bloques de tiempo
+  test("Activities persist across consecutive days", () => {
+    // Create time blocks
     const porHacerBlock = system.getTimeBlocks().find((b) => b.isDefault);
     const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00
 
-    // Obtener templates
+    // Get templates
     const templates = system.getActivityTemplates();
 
-    // Crear una actividad que no se activará ni completará
+    // Create an activity that will be neither activated nor completed
     const tareaInformeTemplate = templates.find((t) => t.title === "Redactar informe de trabajo");
     const tareaInformeInstance = system.createActivityInstance(
       tareaInformeTemplate!.id,
       mañanaBlock.id
     );
 
-    // Guardar el ID para verificar persistencia
+    // Save the ID to verify persistence
     const tareaInformeId = tareaInformeInstance.id;
 
-    // Crear una actividad que sí se activará y completará para comparar
+    // Create an activity that will be activated and completed, for comparison
     const tareaCorreoTemplate = templates.find((t) => t.title === "Revisar correo electrónico");
     const tareaCorreoInstance = system.createActivityInstance(
       tareaCorreoTemplate!.id,
       porHacerBlock!.id
     );
 
-    // Activar y completar esta tarea
+    // Activate and complete this task
     const tareaCorreoActiva = system.activateActivity(tareaCorreoInstance.id);
     system.completeActivity(tareaCorreoActiva.id, { satisfactionScore: 5 });
 
-    // Verificar estado antes de finalizar el día
+    // Check state before ending the day
     const actividadesAntes = system.getState().currentDay!.activityInstances;
     expect(actividadesAntes.some((a) => a.id === tareaInformeId)).toBe(true);
     expect(actividadesAntes.some((a) => a.id === tareaCorreoInstance.id)).toBe(false);
 
-    // Finalizar el día
+    // End the day
     system.endDay();
 
-    // Iniciar un nuevo día
+    // Start a new day
     system.startDay();
 
-    // Verificar que la tarea pendiente sigue en el kanban
+    // Verify the pending task is still on the kanban
     const actividadesDespues = system.getState().currentDay!.activityInstances;
     expect(actividadesDespues.some((a) => a.id === tareaInformeId)).toBe(true);
 
-    // Obtener la instancia y verificar que mantiene sus propiedades
+    // Get the instance and verify it keeps its properties
     const tareaInformeNuevoDia = actividadesDespues.find((a) => a.id === tareaInformeId);
     expect(tareaInformeNuevoDia).toBeDefined();
     expect(tareaInformeNuevoDia?.blockId).toBe(mañanaBlock.id);
     expect(tareaInformeNuevoDia?.templateId).toBe(tareaInformeTemplate!.id);
   });
 
-  test("Punto de decisión PD2: Restricciones de movimiento por temporalidad", () => {
-    // Mock para simular diferentes horas del día
+  test("Decision point DP2: Movement restrictions based on time", () => {
+    // Mock to simulate different times of day
     const mockGetMinutes = jest.spyOn(UtilityService, "getCurrentDayMinutes");
 
-    // Simular que son las 13:00
+    // Simulate that it is 13:00
     mockGetMinutes.mockReturnValue(780); // 13:00
 
-    // Crear bloques de tiempo pasado, presente y futuro
-    const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00 (pasado)
-    const mediodiaBlock = system.createTimeBlock("Mediodía", 720, 900); // 12:00-15:00 (presente)
-    const tardeBlock = system.createTimeBlock("Tarde", 900, 1140); // 15:00-19:00 (futuro)
+    // Create past, present and future time blocks
+    const mañanaBlock = system.createTimeBlock("Mañana", 360, 720); // 6:00-12:00 (past)
+    const mediodiaBlock = system.createTimeBlock("Mediodía", 720, 900); // 12:00-15:00 (present)
+    const tardeBlock = system.createTimeBlock("Tarde", 900, 1140); // 15:00-19:00 (future)
 
-    // Obtener template y crear instancia en bloque actual
+    // Get a template and create an instance in the current block
     const templates = system.getActivityTemplates();
     const instancia = system.createActivityInstance(templates[0].id, mediodiaBlock.id);
 
-    // Verificar ubicación inicial
+    // Check the initial location
     expect(instancia.blockId).toBe(mediodiaBlock.id);
 
-    // Mover a bloque futuro (debería permitirse)
+    // Move to a future block (should be allowed)
     expect(() => {
       system.moveActivityInstance(instancia.id, tardeBlock.id);
     }).not.toThrow();
 
-    // Crear nueva instancia en bloque actual
+    // Create a new instance in the current block
     system.createActivityInstance(templates[1].id, mediodiaBlock.id);
 
-    // Intentar mover a bloque pasado (debería fallar - no implementado en SystemCore)
-    // En el sistema real, esta validación podría estar en la capa de UI o en SystemCore
+    // Try to move to a past block (should fail - not implemented in SystemCore)
+    // In the real system, this validation could live in the UI layer or in SystemCore
 
-    // Nota: La validación de no permitir mover a bloques pasados no está implementada en SystemCore,
-    // pero podríamos simular la lógica que existiría en la UI:
+    // Note: the validation preventing moves to past blocks is not implemented in SystemCore,
+    // but we can simulate the logic that would exist in the UI:
 
     const isBlockInPast = (blockId: string): boolean => {
       const block = system.getTimeBlocks().find((b) => b.id === blockId);
@@ -347,10 +347,10 @@ describe("Flujo 3: Organización de actividades en el tablero Kanban", () => {
       return block.endMinute <= currentMinutes;
     };
 
-    // Verificar que no se debería permitir mover a un bloque pasado
+    // Verify moving to a past block should not be allowed
     expect(isBlockInPast(mañanaBlock.id)).toBe(true);
 
-    // En un escenario real, la UI no permitiría este movimiento
-    // Para fines de test, verificamos que la función auxiliar detecta correctamente el bloque pasado
+    // In a real scenario, the UI would not allow this move
+    // For test purposes, we verify the helper correctly detects the past block
   });
 });

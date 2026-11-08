@@ -11,15 +11,15 @@ import { en } from "./en";
 import { es, type MessageKey } from "./es";
 
 /**
- * i18n mínima y tipada. Los diccionarios son planos (`es` es la referencia y
- * `en` debe tener exactamente las mismas claves, lo comprueba TypeScript).
+ * Minimal, typed i18n. The dictionaries are flat (`es` is the reference and
+ * `en` must have exactly the same keys; TypeScript checks this).
  *
- * `t()` es una función de módulo para poder usarla también fuera de React
- * (toasts de acciones, etiquetas de dominio). Al cambiar de idioma el
- * proveedor vuelve a montar el árbol, así que todo el texto se actualiza.
+ * `t()` is a module-level function so it can also be used outside React
+ * (action toasts, domain labels). When the language changes, the provider
+ * remounts the tree, so all text updates.
  */
 
-/** Nombre del producto (no se traduce). */
+/** Product name (not translated). */
 export const APP_NAME = "LifeUI";
 
 export type Locale = "es" | "en";
@@ -30,18 +30,18 @@ const DICTIONARIES: Record<Locale, Record<MessageKey, string>> = { es, en };
 const INTL_LOCALE: Record<Locale, string> = { es: "es-ES", en: "en-US" };
 const STORAGE_KEY = "lifeui.locale";
 
-/** Idioma de la primera visita, sea cual sea el idioma del navegador. */
+/** Language on first visit, whatever the browser language is. */
 export const DEFAULT_LOCALE: Locale = "en";
 
 let current: Locale = detectLocale();
 
-/** Idioma inicial: la elección guardada gana; si no hay, inglés. */
+/** Initial language: a saved choice wins; if there is none, English. */
 export function detectLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "es" || stored === "en") return stored;
   } catch {
-    // almacenamiento no disponible
+    // storage unavailable
   }
   return DEFAULT_LOCALE;
 }
@@ -50,12 +50,12 @@ export function getLocale(): Locale {
   return current;
 }
 
-/** Locale BCP 47 para Intl (fechas, números). */
+/** BCP 47 locale for Intl (dates, numbers). */
 export function intlLocale(): string {
   return INTL_LOCALE[current];
 }
 
-/** Cambia el idioma activo (sin persistir). Útil en tests. */
+/** Changes the active language (without persisting). Useful in tests. */
 export function setLocale(locale: Locale) {
   current = locale;
   if (typeof document !== "undefined") document.documentElement.lang = locale;
@@ -70,7 +70,7 @@ function interpolate(template: string, vars?: Vars): string {
   );
 }
 
-/** Traduce una clave. `{nombre}` se sustituye por `vars.nombre`. */
+/** Translates a key. `{name}` is replaced with `vars.name`. */
 export function t(key: MessageKey, vars?: Vars): string {
   return interpolate(DICTIONARIES[current][key] ?? es[key], vars);
 }
@@ -79,7 +79,7 @@ type PluralBase = {
   [K in MessageKey]: K extends `${infer Base}.one` ? Base : never;
 }[MessageKey];
 
-/** Plural: usa `${base}.one` o `${base}.other`; `{count}` queda disponible. */
+/** Plural: uses `${base}.one` or `${base}.other`; `{count}` is available. */
 export function tp(base: PluralBase, count: number, vars?: Vars): string {
   const form = new Intl.PluralRules(intlLocale()).select(count) === "one" ? "one" : "other";
   const formatted = count.toLocaleString(intlLocale());
@@ -87,8 +87,8 @@ export function tp(base: PluralBase, count: number, vars?: Vars): string {
 }
 
 /**
- * Traducción con nodos React dentro del texto: `{tempos}` puede ser un
- * `<span>`. Devuelve fragmentos listos para renderizar.
+ * Translation with React nodes inside the text: `{tempos}` can be a
+ * `<span>`. Returns fragments ready to render.
  */
 export function tr(key: MessageKey, vars: Record<string, ReactNode>): ReactNode {
   const template = DICTIONARIES[current][key] ?? es[key];
@@ -113,7 +113,7 @@ export function LocaleProvider({
   initial,
 }: {
   children: ReactNode;
-  /** Fija el idioma inicial (tests); si no, se detecta. */
+  /** Pins the initial language (tests); otherwise it is detected. */
   initial?: Locale;
 }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
@@ -127,7 +127,7 @@ export function LocaleProvider({
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
-      // sin persistencia: vale para esta sesión
+      // no persistence: applies to this session only
     }
     setLocaleState(next);
   }, []);
@@ -136,7 +136,7 @@ export function LocaleProvider({
 
   return (
     <LocaleContext.Provider value={value}>
-      {/* La key vuelve a montar la app para que todos los textos cambien */}
+      {/* The key remounts the app so that all text changes */}
       <Fragment key={locale}>{children}</Fragment>
     </LocaleContext.Provider>
   );

@@ -2,64 +2,64 @@ import { SystemCore } from "../../index";
 import { UtilityService } from "../../utilityService";
 
 /**
- * Tests de integración para el Flujo 2: Creación y gestión de actividades en la biblioteca
+ * Integration tests for Flow 2: Creating and managing activities in the library
  *
- * Estos tests verifican que el flujo completo de creación y gestión de actividades
- * en la biblioteca funcione correctamente, mapeando las acciones de usuario a la API de System.
+ * These tests verify that the complete flow of creating and managing activities
+ * in the library works correctly, mapping user actions to the System API.
  */
-describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => {
+describe("Flow 2: Creating and managing activities in the library", () => {
   let system: SystemCore;
 
   beforeEach(() => {
-    // Inicializar el sistema (equivalente a abrir la aplicación)
+    // Initialize the system (equivalent to opening the app)
     system = new SystemCore();
 
-    // Limpiar estado para partir de cero
+    // Clear state to start from scratch
     system.clearState();
   });
 
   afterEach(() => {
-    // Restaurar todos los mocks después de cada prueba
+    // Restore all mocks after each test
     jest.restoreAllMocks();
   });
 
-  test("Flujo principal: Creación de actividad con objetivo claro", () => {
-    // Verificar precondiciones
+  test("Main flow: Creating a clear-objective activity", () => {
+    // Check preconditions
     expect(system.getActivityTemplates().length).toBe(0);
 
-    // Simular la creación de una actividad con objetivo claro
-    // (Equivalente a completar el formulario y hacer clic en "Guardar actividad")
+    // Simulate creating a clear-objective activity
+    // (Equivalent to filling in the form and clicking "Guardar actividad")
     system.createActivityTemplate({
       title: "Redactar informe de trabajo",
       description: "Escribir informe semanal para el jefe",
       type: "clear-objective",
       isSystemActivity: false,
       clearObjectiveSettings: {
-        estimatedDurationMinutes: 45, // ~45 min de estimación
+        estimatedDurationMinutes: 45, // ~45 min estimate
       },
     });
 
-    // Verificar que la actividad se creó correctamente
+    // Verify the activity was created correctly
     const actividades = system.getActivityTemplates();
     expect(actividades.length).toBe(1);
 
-    // Verificar que los datos son correctos
+    // Verify the data is correct
     const actividadCreada = actividades[0];
     expect(actividadCreada.title).toBe("Redactar informe de trabajo");
     expect(actividadCreada.description).toBe("Escribir informe semanal para el jefe");
     expect(actividadCreada.type).toBe("clear-objective");
     expect(actividadCreada.clearObjectiveSettings?.estimatedDurationMinutes).toBe(45);
 
-    // Verificar que la actividad tiene timestamps
+    // Verify the activity has timestamps
     expect(actividadCreada.createdAt).toBeDefined();
     expect(actividadCreada.updatedAt).toBeDefined();
   });
 
-  test("Flujo alternativo A1: Creación de actividad con duración flexible", () => {
-    // Verificar precondiciones
+  test("Alternative flow A1: Creating a flexible-duration activity", () => {
+    // Check preconditions
     expect(system.getActivityTemplates().length).toBe(0);
 
-    // Simular la creación de una actividad con duración flexible
+    // Simulate creating a flexible-duration activity
     system.createActivityTemplate({
       title: "Revisar correo electrónico",
       description: "Revisar bandeja de entrada y responder mensajes importantes",
@@ -71,11 +71,11 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
       },
     });
 
-    // Verificar que la actividad se creó correctamente
+    // Verify the activity was created correctly
     const actividades = system.getActivityTemplates();
     expect(actividades.length).toBe(1);
 
-    // Verificar que los datos son correctos
+    // Verify the data is correct
     const actividadCreada = actividades[0];
     expect(actividadCreada.title).toBe("Revisar correo electrónico");
     expect(actividadCreada.type).toBe("flexible-duration");
@@ -83,11 +83,11 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
     expect(actividadCreada.flexibleDurationSettings?.maximumDurationMinutes).toBe(10);
   });
 
-  test("Flujo alternativo A2: Creación de actividad con timeboxing", () => {
-    // Verificar precondiciones
+  test("Alternative flow A2: Creating a timeboxing activity", () => {
+    // Check preconditions
     expect(system.getActivityTemplates().length).toBe(0);
 
-    // Simular la creación de una actividad con timeboxing (tiempo mínimo)
+    // Simulate creating a timeboxing activity (minimum time)
     system.createActivityTemplate({
       title: "Meditación diaria",
       description: "Sesión de meditación guiada",
@@ -99,11 +99,11 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
       },
     });
 
-    // Verificar que la actividad se creó correctamente
+    // Verify the activity was created correctly
     const actividades = system.getActivityTemplates();
     expect(actividades.length).toBe(1);
 
-    // Verificar que los datos son correctos
+    // Verify the data is correct
     const actividadCreada = actividades[0];
     expect(actividadCreada.title).toBe("Meditación diaria");
     expect(actividadCreada.type).toBe("timeboxing");
@@ -111,15 +111,15 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
     expect(actividadCreada.timeboxingSettings?.minimumDurationMinutes).toBe(20);
   });
 
-  test("Flujo alternativo A3: Edición de una actividad existente", () => {
-    // Mock para la función de tiempo para garantizar timestamps diferentes
+  test("Alternative flow A3: Editing an existing activity", () => {
+    // Mock the time function to guarantee different timestamps
     const mockGetTime = jest.spyOn(UtilityService, "getCurrentISODateTime");
 
-    // Configurar primer timestamp para la creación
+    // Set the first timestamp for creation
     const timestamp1 = "2023-04-02T10:00:00.000Z";
     mockGetTime.mockReturnValue(timestamp1);
 
-    // Crear primero una actividad para luego editarla
+    // First create an activity to edit afterwards
     const actividadOriginal = system.createActivityTemplate({
       title: "Leer documentación",
       description: "Leer documentación técnica sobre React",
@@ -131,18 +131,18 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
       },
     });
 
-    // Guardar el ID para verificaciones
+    // Save the ID for checks
     const actividadId = actividadOriginal.id;
 
-    // Verificar que la actividad se creó correctamente
+    // Verify the activity was created correctly
     expect(system.getActivityTemplates().length).toBe(1);
 
-    // Configurar segundo timestamp para la actualización
+    // Set the second timestamp for the update
     const timestamp2 = "2023-04-02T10:30:00.000Z";
     mockGetTime.mockReturnValue(timestamp2);
 
-    // Simular la edición de la actividad
-    // (Equivalente a modificar los campos en el formulario y hacer clic en "Guardar cambios")
+    // Simulate editing the activity
+    // (Equivalent to changing the form fields and clicking "Guardar cambios")
     system.updateActivityTemplate(actividadId, {
       title: "Leer documentación avanzada",
       description: "Leer documentación técnica sobre React Hooks",
@@ -152,11 +152,11 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
       },
     });
 
-    // Verificar que la actividad se actualizó correctamente
+    // Verify the activity was updated correctly
     const actividades = system.getActivityTemplates();
     expect(actividades.length).toBe(1);
 
-    // Verificar que los datos se actualizaron
+    // Verify the data was updated
     const actividadEditada = actividades[0];
     expect(actividadEditada.id).toBe(actividadId);
     expect(actividadEditada.title).toBe("Leer documentación avanzada");
@@ -164,19 +164,19 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
     expect(actividadEditada.flexibleDurationSettings?.minimumDurationMinutes).toBe(20);
     expect(actividadEditada.flexibleDurationSettings?.maximumDurationMinutes).toBe(45);
 
-    // Verificar que updatedAt se actualizó
+    // Verify updatedAt was updated
     expect(actividadEditada.updatedAt).toBe(timestamp2);
     expect(actividadEditada.updatedAt).not.toBe(actividadOriginal.updatedAt);
   });
 
-  test("Verificar funcionamiento con día activo", () => {
-    // Iniciar un día
+  test("Works with an active day", () => {
+    // Start a day
     system.startDay();
 
-    // Verificar que el día está activo
+    // Verify the day is active
     expect(system.isDayActive()).toBe(true);
 
-    // Intentar crear una actividad con día activo
+    // Try to create an activity with an active day
     const nuevaActividad = system.createActivityTemplate({
       title: "Planificar sprint",
       description: "Planificar tareas para el próximo sprint",
@@ -187,12 +187,12 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
       },
     });
 
-    // Verificar que la actividad se creó correctamente
+    // Verify the activity was created correctly
     const actividades = system.getActivityTemplates();
     expect(actividades.length).toBe(1);
     expect(actividades[0].title).toBe("Planificar sprint");
 
-    // Verificar que se puede editar también
+    // Verify it can be edited too
     const actividadActualizada = system.updateActivityTemplate(nuevaActividad.id, {
       title: "Planificar sprint semanal",
     });
@@ -200,8 +200,8 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
     expect(actividadActualizada.title).toBe("Planificar sprint semanal");
   });
 
-  test("Cambiar tipo de actividad durante edición", () => {
-    // Crear actividad inicial con tipo clear-objective
+  test("Change activity type while editing", () => {
+    // Create the initial activity with type clear-objective
     const actividadOriginal = system.createActivityTemplate({
       title: "Resolver problemas de matemáticas",
       description: "Ejercicios del capítulo 3",
@@ -212,25 +212,25 @@ describe("Flujo 2: Creación y gestión de actividades en la biblioteca", () => 
       },
     });
 
-    // Cambiar el tipo de actividad a timeboxing
+    // Change the activity type to timeboxing
     const actividadActualizada = system.updateActivityTemplate(actividadOriginal.id, {
       type: "timeboxing",
-      // Se eliminan las configuraciones anteriores
+      // The previous settings are removed
       clearObjectiveSettings: undefined,
-      // Se añaden las nuevas configuraciones
+      // The new settings are added
       timeboxingSettings: {
         type: "maximum-time",
         maximumDurationMinutes: 25,
       },
     });
 
-    // Verificar que el tipo se actualizó correctamente
+    // Verify the type was updated correctly
     expect(actividadActualizada.type).toBe("timeboxing");
     expect(actividadActualizada.clearObjectiveSettings).toBeUndefined();
     expect(actividadActualizada.timeboxingSettings?.type).toBe("maximum-time");
     expect(actividadActualizada.timeboxingSettings?.maximumDurationMinutes).toBe(25);
 
-    // Verificar en el estado global
+    // Verify in the global state
     const actividadEnEstado = system.getActivityTemplates()[0];
     expect(actividadEnEstado.type).toBe("timeboxing");
   });

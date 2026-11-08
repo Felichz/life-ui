@@ -1,30 +1,31 @@
 import type { AppState, IPersistenceManager } from "../types";
+import { CoreError } from "./errors";
 
 /**
- * Clave utilizada para almacenar el estado de la aplicación en localStorage
+ * Key used to store the application state in localStorage
  */
-// Clave histórica (del nombre anterior del producto): se mantiene para no perder
-// los datos que ya están guardados en el navegador.
+// Historical key (from the product's previous name): kept so the data already
+// saved in the browser is not lost.
 export const STORAGE_KEY = "qualia_control_app_state";
 
 /**
- * Versión actual del esquema de estado persistido.
- * Incrementar cuando se hagan cambios incompatibles con estados antiguos.
+ * Current version of the persisted state schema.
+ * Increment when making changes incompatible with older states.
  *
- * Historial:
- * - v1: estado original (sin tempos, con variables subjetivas y causas de interrupción).
- * - v2: introduce `dailyTempoTarget` en `userPreferences` y backfill de `temposAwarded=0`
- *       en `completedActivityRecords`. Mantiene las variables/causas pero el runtime ya
- *       no las usa.
- * - v3: limpia los campos legacy (subjectiveVariables, interruptionCauses,
- *       subjectiveVariableSnapshots, hiddenSubjectiveVariableIds). Se archivan en
- *       `legacyArchive` para posible exportación/auditoría. El runtime ya no los usa
- *       ni los persiste en el shape principal.
+ * History:
+ * - v1: original state (no tempos, with subjective variables and interruption causes).
+ * - v2: introduces `dailyTempoTarget` in `userPreferences` and backfills `temposAwarded=0`
+ *       in `completedActivityRecords`. Keeps the variables/causes but the runtime no
+ *       longer uses them.
+ * - v3: cleans up the legacy fields (subjectiveVariables, interruptionCauses,
+ *       subjectiveVariableSnapshots, hiddenSubjectiveVariableIds). They are archived in
+ *       `legacyArchive` for possible export/audit. The runtime no longer uses them
+ *       nor persists them in the main shape.
  */
 export const CURRENT_SCHEMA_VERSION = 3;
 
 /**
- * Resultado de una migración de estado
+ * Result of a state migration
  */
 export interface MigrationResult {
   state: AppState;
@@ -33,23 +34,23 @@ export interface MigrationResult {
 }
 
 /**
- * Implementación del gestor de persistencia basado en localStorage.
+ * localStorage-based implementation of the persistence manager.
  *
- * Centraliza el pipeline de serialización/deserialización para que
- * localStorage, export e import produzcan y consuman exactamente el mismo
- * formato con las mismas garantías:
+ * Centralizes the serialization/deserialization pipeline so that
+ * localStorage, export and import produce and consume exactly the same
+ * format with the same guarantees:
  *
  *   parse → validate → migrate v1→v2→v3 → sanitize → persist
  *
- * A partir del schema v3:
- * - los campos legacy (variables subjetivas, causas de interrupción, snapshots,
- *   hiddenSubjectiveVariableIds) se eliminan del shape persistido;
- * - se archivan en `legacyArchive` para auditoría o exportación.
+ * Starting with schema v3:
+ * - the legacy fields (subjective variables, interruption causes, snapshots,
+ *   hiddenSubjectiveVariableIds) are removed from the persisted shape;
+ * - they are archived in `legacyArchive` for audit or export.
  */
 export class PersistenceManager implements IPersistenceManager {
   /**
-   * Construye el JSON final a persistir: aplica `stripLegacyFields` y
-   * `schemaVersion: CURRENT_SCHEMA_VERSION`. Lo usan `saveState` y `serialize`.
+   * Builds the final JSON to persist: applies `stripLegacyFields` and
+   * `schemaVersion: CURRENT_SCHEMA_VERSION`. Used by `saveState` and `serialize`.
    */
   private buildSerializedState(state: AppState): string {
     const sanitized = this.stripLegacyFields(state);
@@ -58,69 +59,68 @@ export class PersistenceManager implements IPersistenceManager {
   }
 
   /**
-   * Serializa un AppState a JSON con la versión actual y los legacy fields
-   * saneados. Idéntico al formato que va a localStorage.
+   * Serializes an AppState to JSON with the current version and the legacy
+   * fields sanitized. Identical to the format that goes to localStorage.
    */
   public serialize(state: AppState): string {
     return this.buildSerializedState(state);
   }
 
   /**
-   * Parsea + valida + migra + normaliza un JSON a AppState.
-   * - Si es de una versión anterior, ejecuta la cadena de migraciones
-   *   (v1→v2→v3) y archiva los campos legacy en `legacyArchive`.
-   * - Aunque la versión sea la actual (v3+), aplica `stripLegacyFields`
-   *   como hardening contra payloads manipulados con campos legacy.
-   * Garantía: el AppState retornado nunca contiene legacy fields en su
-   * shape principal (salvo `legacyArchive` para auditoría).
-   * Lanza Error si el JSON es inválido o no parseable.
+   * Parses + validates + migrates + normalizes a JSON into an AppState.
+   * - If it is from an older version, runs the migration chain
+   *   (v1→v2→v3) and archives the legacy fields in `legacyArchive`.
+   * - Even if the version is current (v3+), applies `stripLegacyFields`
+   *   as hardening against tampered payloads with legacy fields.
+   * Guarantee: the returned AppState never contains legacy fields in its
+   * main shape (except `legacyArchive` for audit).
+   * Throws Error if the JSON is invalid or unparseable.
    */
   public deserialize(json: string): AppState {
     let parsedState: unknown;
     try {
       parsedState = JSON.parse(json);
     } catch (parseError) {
-      throw new Error(
-        `Error al parsear JSON del estado: ${
-          parseError instanceof Error ? parseError.message : String(parseError)
-        }`
+      throw new CoreError(
+        "invalid-state-json",
+        parseError instanceof Error ? parseError.message : String(parseError)
       );
     }
 
     if (!this.isValidAppState(parsedState)) {
-      throw new Error("Estructura de estado inválida");
+      throw new CoreError("invalid-state-shape");
     }
 
     const migration = this.migrateIfNeeded(parsedState as AppState & { schemaVersion?: number });
 
     if (migration.warnings.length > 0) {
-      console.warn("Migración de estado:", migration.warnings);
+      console.warn("State migration:", migration.warnings);
     }
 
-    // Hardening: aunque la versión sea la actual (v3+), puede llegar un
-    // payload manipulado con campos legacy (subjectiveVariables, etc.).
-    // El runtime NUNCA debe recibirlos, ni siquiera en memoria durante
-    // la sesión. stripLegacyFields los elimina idempotentemente.
+    // Hardening: even if the version is current (v3+), a tampered
+    // payload with legacy fields (subjectiveVariables, etc.) may arrive.
+    // The runtime must NEVER receive them, not even in memory during
+    // the session. stripLegacyFields removes them idempotently.
     return this.stripLegacyFields(migration.state);
   }
 
   /**
-   * Guarda el estado de la aplicación en localStorage.
-   * Pasa por el mismo pipeline que `serialize`.
+   * Saves the application state to localStorage.
+   * Goes through the same pipeline as `serialize`.
    */
   public saveState(state: AppState): void {
     try {
       const serializedState = this.buildSerializedState(state);
       localStorage.setItem(STORAGE_KEY, serializedState);
     } catch (error) {
-      console.error("Error al guardar el estado en localStorage:", error);
+      console.error("Error saving state to localStorage:", error);
     }
   }
 
   /**
-   * Carga el estado de la aplicación desde localStorage.
-   * Pasa por el mismo pipeline que `deserialize`.
-   * @returns Estado de la aplicación o null si no existe o no se pudo cargar
+   * Loads the application state from localStorage.
+   * Goes through the same pipeline as `deserialize`.
+   * @returns Application state, or null if it does not exist or could not be loaded
    */
   public loadState(): AppState | null {
     try {
@@ -133,46 +133,46 @@ export class PersistenceManager implements IPersistenceManager {
       try {
         return this.deserialize(serializedState);
       } catch (deserializeError) {
-        console.error("Error al deserializar el estado desde localStorage:", deserializeError);
+        console.error("Error deserializing state from localStorage:", deserializeError);
         return null;
       }
     } catch (error) {
-      console.error("Error al cargar el estado desde localStorage:", error);
+      console.error("Error loading state from localStorage:", error);
       return null;
     }
   }
 
   /**
-   * Elimina el estado de la aplicación de localStorage
+   * Removes the application state from localStorage
    */
   public clearState(): void {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
-      console.error("Error al limpiar el estado de localStorage:", error);
+      console.error("Error clearing state from localStorage:", error);
     }
   }
 
   /**
-   * Valida que el objeto tenga la estructura básica esperada para un AppState
-   * @param state Objeto a validar
-   * @returns true si la estructura es válida, false en caso contrario
+   * Validates that the object has the basic structure expected of an AppState
+   * @param state Object to validate
+   * @returns true if the structure is valid, false otherwise
    */
   private isValidAppState(state: unknown): boolean {
     if (!state || typeof state !== "object") {
-      console.error("Validación fallida: el estado no es un objeto");
+      console.error("Validation failed: the state is not an object");
       return false;
     }
 
     const stateObj = state as Record<string, unknown>;
 
     if (!("global" in stateObj)) {
-      console.error("Validación fallida: el estado no tiene la propiedad 'global'");
+      console.error("Validation failed: the state has no 'global' property");
       return false;
     }
 
     if (typeof stateObj.global !== "object" || stateObj.global === null) {
-      console.error("Validación fallida: la propiedad 'global' no es un objeto válido");
+      console.error("Validation failed: the 'global' property is not a valid object");
       return false;
     }
 
@@ -181,7 +181,7 @@ export class PersistenceManager implements IPersistenceManager {
       stateObj.currentDay !== null &&
       typeof stateObj.currentDay !== "object"
     ) {
-      console.error("Validación fallida: la propiedad 'currentDay' no es un objeto válido");
+      console.error("Validation failed: the 'currentDay' property is not a valid object");
       return false;
     }
 
@@ -189,7 +189,7 @@ export class PersistenceManager implements IPersistenceManager {
   }
 
   /**
-   * Ejecuta la migración si el estado es de una versión anterior a CURRENT_SCHEMA_VERSION
+   * Runs the migration if the state is from a version older than CURRENT_SCHEMA_VERSION
    */
   private migrateIfNeeded(state: AppState & { schemaVersion?: number }): MigrationResult {
     const warnings: string[] = [];
@@ -201,12 +201,12 @@ export class PersistenceManager implements IPersistenceManager {
 
     let migrated = state;
 
-    // v1 -> v2: agregar dailyTempoTarget, marcar records viejos con tempos=0
+    // v1 -> v2: add dailyTempoTarget, mark old records with tempos=0
     if (fromVersion < 2) {
       migrated = this.migrateV1ToV2(migrated, warnings);
     }
 
-    // v2 -> v3: archivar y eliminar campos legacy (variables subjetivas, causas, snapshots)
+    // v2 -> v3: archive and remove legacy fields (subjective variables, causes, snapshots)
     if (migrated.schemaVersion !== undefined && migrated.schemaVersion < 3) {
       migrated = this.migrateV2ToV3(migrated, warnings);
     }
@@ -215,9 +215,9 @@ export class PersistenceManager implements IPersistenceManager {
   }
 
   /**
-   * Migración de v1 a v2.
-   * Robusta ante estados parciales: si falta global, userPreferences o
-   * completedActivityRecords, reconstruye defaults sin perder lo que sí exista.
+   * Migration from v1 to v2.
+   * Robust against partial states: if global, userPreferences or
+   * completedActivityRecords is missing, rebuilds defaults without losing what exists.
    */
   private migrateV1ToV2(
     state: AppState & { schemaVersion?: number },
@@ -225,16 +225,16 @@ export class PersistenceManager implements IPersistenceManager {
   ): AppState & { schemaVersion?: number } {
     const fromVersion = typeof state.schemaVersion === "number" ? state.schemaVersion : 1;
 
-    // Reconstruir userPreferences si falta
+    // Rebuild userPreferences if missing
     const existingPrefs = state.global?.userPreferences;
     const userPreferences = {
       dailyTempoTarget:
         typeof existingPrefs?.dailyTempoTarget === "number" ? existingPrefs.dailyTempoTarget : 100,
       updatedAt: existingPrefs?.updatedAt ?? new Date().toISOString(),
     };
-    warnings.push("userPreferences reconstruido con defaults");
+    warnings.push("userPreferences rebuilt with defaults");
 
-    // Sanear completedActivityRecords: marcar los viejos con tempos=0 si faltan
+    // Sanitize completedActivityRecords: mark old ones with tempos=0 if missing
     const records = Array.isArray(state.global?.completedActivityRecords)
       ? state.global.completedActivityRecords
       : [];
@@ -259,8 +259,8 @@ export class PersistenceManager implements IPersistenceManager {
       return r;
     });
 
-    // Reconstruir global manteniendo lo que exista (incluyendo legacy fields por ahora;
-    // la migración v2->v3 se encarga de archivarlos).
+    // Rebuild global keeping whatever exists (including legacy fields for now;
+    // the v2->v3 migration takes care of archiving them).
     const migratedGlobal = {
       ...(state.global || {}),
       userPreferences,
@@ -273,15 +273,15 @@ export class PersistenceManager implements IPersistenceManager {
       schemaVersion: 2,
     } as unknown as AppState & { schemaVersion?: number };
 
-    warnings.push(`Migrado de v${fromVersion} a v2`);
+    warnings.push(`Migrated from v${fromVersion} to v2`);
     return migrated;
   }
 
   /**
-   * Migración de v2 a v3.
-   * Archiva los campos legacy (variables subjetivas, causas de interrupción,
-   * snapshots y hiddenSubjectiveVariableIds) en `legacyArchive` para auditoría,
-   * y los elimina del shape persistido principal. El runtime actual ya no los usa.
+   * Migration from v2 to v3.
+   * Archives the legacy fields (subjective variables, interruption causes,
+   * snapshots and hiddenSubjectiveVariableIds) in `legacyArchive` for audit,
+   * and removes them from the main persisted shape. The current runtime no longer uses them.
    */
   private migrateV2ToV3(
     state: AppState & { schemaVersion?: number },
@@ -303,7 +303,7 @@ export class PersistenceManager implements IPersistenceManager {
     let migratedGlobal: Record<string, unknown> = { ...legacyGlobal };
 
     if (hasLegacyData) {
-      // Archivar antes de eliminar
+      // Archive before removing
       const legacyArchive = {
         subjectiveVariables: legacyGlobal.subjectiveVariables ?? [],
         interruptionCauses: legacyGlobal.interruptionCauses ?? [],
@@ -314,7 +314,7 @@ export class PersistenceManager implements IPersistenceManager {
         fromSchemaVersion: 2,
       };
       warnings.push(
-        `Legacy archivado: ${JSON.stringify({
+        `Legacy archived: ${JSON.stringify({
           vars: legacyArchive.subjectiveVariables.length,
           causes: legacyArchive.interruptionCauses.length,
           snapshots: legacyArchive.subjectiveVariableSnapshots.length,
@@ -322,16 +322,16 @@ export class PersistenceManager implements IPersistenceManager {
         })}`
       );
 
-      // Adjuntar el archivo al estado para que pueda ser exportado si se desea.
+      // Attach the archive to the state so it can be exported if desired.
       migratedGlobal = {
         ...migratedGlobal,
         legacyArchive,
       };
     } else {
-      warnings.push("Sin datos legacy para archivar");
+      warnings.push("No legacy data to archive");
     }
 
-    // Eliminar definitivamente los campos legacy del shape persistido principal
+    // Permanently remove the legacy fields from the main persisted shape
     delete migratedGlobal.subjectiveVariables;
     delete migratedGlobal.interruptionCauses;
     delete migratedGlobal.subjectiveVariableSnapshots;
@@ -347,14 +347,14 @@ export class PersistenceManager implements IPersistenceManager {
       schemaVersion: CURRENT_SCHEMA_VERSION,
     } as unknown as AppState & { schemaVersion?: number };
 
-    warnings.push(`Migrado de v2 a v${CURRENT_SCHEMA_VERSION} (legacy eliminado)`);
+    warnings.push(`Migrated from v2 to v${CURRENT_SCHEMA_VERSION} (legacy removed)`);
     return migrated;
   }
 
   /**
-   * Defensa en profundidad: elimina los campos legacy conocidos del estado
-   * antes de persistirlo. Aunque la migración v2->v3 los limpia, un bug o un
-   * import externo podrían reintroducirlos.
+   * Defense in depth: removes the known legacy fields from the state
+   * before persisting it. Although the v2->v3 migration cleans them up, a bug
+   * or an external import could reintroduce them.
    */
   private stripLegacyFields(state: AppState): AppState {
     const global = state.global as unknown as Record<string, unknown>;

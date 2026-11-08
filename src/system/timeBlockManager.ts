@@ -1,18 +1,19 @@
 import type { TimeBlock, UUID, DayMinutes, StateUpdater } from "../types";
 import { UtilityService } from "./utilityService";
 import type { SystemCore } from "./index";
+import { CoreError } from "./errors";
 
 /**
- * Gestor de bloques de tiempo del sistema LifeUI
- * Responsable de la creación, actualización y gestión de bloques de tiempo
- * que representan franjas horarias para organizar actividades
+ * Time block manager for the LifeUI system
+ * Responsible for creating, updating and managing time blocks,
+ * which represent time slots for organizing activities
  */
 export class TimeBlockManager {
   private systemCore: SystemCore;
 
   /**
-   * Constructor de TimeBlockManager
-   * @param systemCore Instancia del núcleo del sistema
+   * TimeBlockManager constructor
+   * @param systemCore System core instance
    */
   constructor(systemCore: SystemCore) {
     this.systemCore = systemCore;
@@ -20,40 +21,40 @@ export class TimeBlockManager {
   }
 
   /**
-   * Crea un nuevo bloque de tiempo
-   * @param name Nombre del bloque
-   * @param startMinute Minuto de inicio (0-1439)
-   * @param endMinute Minuto de fin (0-1439)
-   * @returns Bloque de tiempo creado
-   * @throws Error si los parámetros son inválidos o si hay solapamiento con otros bloques
+   * Creates a new time block
+   * @param name Block name
+   * @param startMinute Start minute (0-1439)
+   * @param endMinute End minute (0-1439)
+   * @returns The created time block
+   * @throws Error if the parameters are invalid or the block overlaps other blocks
    */
   public createTimeBlock(name: string, startMinute: DayMinutes, endMinute: DayMinutes): TimeBlock {
     if (!name || name.trim() === "") {
-      throw new Error("El nombre del bloque no puede estar vacío");
+      throw new CoreError("block-name-empty");
     }
 
     if (startMinute < 0 || startMinute > 1439 || endMinute < 0 || endMinute > 1439) {
-      throw new Error("Los minutos deben estar entre 0 y 1439");
+      throw new CoreError("minutes-out-of-range");
     }
 
     if (startMinute >= endMinute) {
-      throw new Error("La hora de inicio debe ser anterior a la hora de fin");
+      throw new CoreError("block-start-after-end");
     }
 
-    // Verificar solapamiento con otros bloques
+    // Check for overlap with other blocks
     const allBlocks = this.getTimeBlocks();
     const existingBlocks = allBlocks.filter((block) => !block.isDefault);
 
-    // Detección de solapamiento con cualquier bloque existente
+    // Detect overlap with any existing block
     const hasOverlap = existingBlocks.some((block) => {
       return !(endMinute <= block.startMinute || startMinute >= block.endMinute);
     });
 
     if (hasOverlap) {
-      throw new Error("El nuevo bloque se solapa con bloques existentes");
+      throw new CoreError("block-overlap");
     }
 
-    // Determinar el orden del nuevo bloque
+    // Determine the order of the new block
     const existingOrder = allBlocks.map((block) => block.order);
     const nextOrder = existingOrder.length > 0 ? Math.max(...existingOrder) + 1 : 1;
 
@@ -69,93 +70,93 @@ export class TimeBlockManager {
       updatedAt: now,
     };
 
-    // Actualizar estado
+    // Update state
     this.systemCore.updateState(this.createAddTimeBlockUpdater(newBlock));
 
-    // Importante: para los tests, necesitamos devolver el objeto creado
+    // Important: the tests need the created object to be returned
     return newBlock;
   }
 
   /**
-   * Actualiza un bloque de tiempo existente
-   * @param id Identificador del bloque a actualizar
-   * @param data Datos a actualizar
-   * @returns Bloque actualizado
-   * @throws Error si el bloque no existe o si la actualización causa solapamiento
+   * Updates an existing time block
+   * @param id ID of the block to update
+   * @param data Data to update
+   * @returns The updated block
+   * @throws Error if the block does not exist or the update causes an overlap
    */
   public updateTimeBlock(id: UUID, data: Partial<TimeBlock>): TimeBlock {
     const block = this.getTimeBlock(id);
     if (!block) {
-      throw new Error(`No se encontró el bloque con ID: ${id}`);
+      throw new CoreError("block-not-found", `id ${id}`);
     }
 
-    // No permitir cambiar isDefault para el bloque por defecto
+    // Do not allow changing isDefault on the default block
     if (block.isDefault && data.isDefault === false) {
-      throw new Error("No se puede convertir el bloque por defecto en un bloque regular");
+      throw new CoreError("default-block-protected");
     }
 
-    // Validar cambios en rango de tiempo
+    // Validate time range changes
     const startMinute = data.startMinute !== undefined ? data.startMinute : block.startMinute;
     const endMinute = data.endMinute !== undefined ? data.endMinute : block.endMinute;
 
     if (startMinute < 0 || startMinute > 1439 || endMinute < 0 || endMinute > 1439) {
-      throw new Error("Los minutos deben estar entre 0 y 1439");
+      throw new CoreError("minutes-out-of-range");
     }
 
     if (startMinute >= endMinute) {
-      throw new Error("La hora de inicio debe ser anterior a la hora de fin");
+      throw new CoreError("block-start-after-end");
     }
 
-    // Si no es el bloque por defecto, verificar solapamiento
+    // If it is not the default block, check for overlap
     if (!block.isDefault) {
       const otherBlocks = this.getTimeBlocks().filter((b) => b.id !== id && !b.isDefault);
       const hasOverlap = otherBlocks.some((b) => {
-        // Usar la misma lógica de solapamiento mejorada
+        // Use the same improved overlap logic
         return !(endMinute <= b.startMinute || startMinute >= b.endMinute);
       });
 
       if (hasOverlap) {
-        throw new Error("La actualización causa solapamiento con otros bloques");
+        throw new CoreError("block-overlap");
       }
     }
 
-    // Crear el bloque actualizado
+    // Build the updated block
     const updatedBlock: TimeBlock = {
       ...block,
       ...data,
       updatedAt: UtilityService.getCurrentISODateTime(),
     };
 
-    // Actualizar estado
+    // Update state
     this.systemCore.updateState(this.createUpdateTimeBlockUpdater(id, updatedBlock));
 
-    // Devolver el bloque actualizado
+    // Return the updated block
     return updatedBlock;
   }
 
   /**
-   * Elimina un bloque de tiempo
-   * @param id Identificador del bloque a eliminar
-   * @param moveActivitiesToTodo Si es true, mueve las actividades al bloque por defecto; si es false, las elimina
-   * @throws Error si se intenta eliminar el bloque por defecto
+   * Deletes a time block
+   * @param id ID of the block to delete
+   * @param moveActivitiesToTodo If true, moves the activities to the default block; if false, deletes them
+   * @throws Error when trying to delete the default block
    */
   public deleteTimeBlock(id: UUID, moveActivitiesToTodo: boolean = true): void {
     const block = this.getTimeBlock(id);
     if (!block) {
-      throw new Error(`No se encontró el bloque con ID: ${id}`);
+      throw new CoreError("block-not-found", `id ${id}`);
     }
 
     if (block.isDefault) {
-      throw new Error("No se puede eliminar el bloque por defecto");
+      throw new CoreError("default-block-protected");
     }
 
-    // Mover o eliminar actividades asignadas a este bloque
+    // Move or delete activities assigned to this block
     const state = this.systemCore.getState();
     if (state.currentDay) {
       const activities = state.currentDay.activityInstances.filter((a) => a.blockId === id);
       if (activities.length > 0) {
         if (moveActivitiesToTodo) {
-          // Mover actividades al bloque por defecto
+          // Move activities to the default block
           const defaultBlock = this.getDefaultBlock();
           this.systemCore.updateState((prevState) => {
             if (!prevState.currentDay) return prevState;
@@ -170,7 +171,7 @@ export class TimeBlockManager {
             };
           });
         } else {
-          // Eliminar actividades de este bloque
+          // Delete this block's activities
           this.systemCore.updateState((prevState) => {
             if (!prevState.currentDay) return prevState;
             return {
@@ -187,13 +188,13 @@ export class TimeBlockManager {
       }
     }
 
-    // Finalmente, eliminar el bloque
+    // Finally, delete the block
     this.systemCore.updateState(this.createDeleteTimeBlockUpdater(id));
   }
 
   /**
-   * Obtiene todos los bloques de tiempo ordenados por su propiedad order
-   * @returns Lista de bloques de tiempo
+   * Gets all time blocks sorted by their order property
+   * @returns List of time blocks
    */
   public getTimeBlocks(): TimeBlock[] {
     const state = this.systemCore.getState();
@@ -202,9 +203,9 @@ export class TimeBlockManager {
   }
 
   /**
-   * Obtiene un bloque de tiempo por su ID
-   * @param id Identificador del bloque
-   * @returns Bloque de tiempo o undefined si no existe
+   * Gets a time block by its ID
+   * @param id Block ID
+   * @returns The time block, or undefined if it does not exist
    */
   public getTimeBlock(id: UUID): TimeBlock | undefined {
     const state = this.systemCore.getState();
@@ -212,8 +213,8 @@ export class TimeBlockManager {
   }
 
   /**
-   * Obtiene el bloque de tiempo actual según la hora del sistema
-   * @returns Bloque de tiempo actual o null si no hay ninguno activo
+   * Gets the current time block based on the system time
+   * @returns The current time block, or null if none is active
    */
   public getCurrentTimeBlock(): TimeBlock | null {
     const currentMinutes = UtilityService.getCurrentDayMinutes();
@@ -233,16 +234,16 @@ export class TimeBlockManager {
   }
 
   /**
-   * Obtiene el bloque por defecto ("Por Hacer")
-   * @returns Bloque por defecto
-   * @throws Error si no existe el bloque por defecto
+   * Gets the default block ("Por Hacer")
+   * @returns The default block
+   * @throws Error if the default block does not exist
    */
   public getDefaultBlock(): TimeBlock {
     const blocks = this.getTimeBlocks();
     const defaultBlock = blocks.find((block) => block.isDefault);
 
     if (!defaultBlock) {
-      // Si no existe, crearlo
+      // If it does not exist, create it
       return this.createDefaultBlock();
     }
 
@@ -250,36 +251,36 @@ export class TimeBlockManager {
   }
 
   /**
-   * Verifica si un bloque de tiempo está disponible para activar actividades
-   * @param blockId Identificador del bloque
-   * @returns true si el bloque está disponible, false en caso contrario
+   * Checks whether a time block is available for activating activities
+   * @param blockId Block ID
+   * @returns true if the block is available, false otherwise
    */
   public isTimeBlockAvailable(blockId: UUID): boolean {
     const block = this.getTimeBlock(blockId);
     if (!block) return false;
 
-    // El bloque por defecto siempre está disponible
+    // The default block is always available
     if (block.isDefault) return true;
 
-    // Para bloques regulares, verificar si estamos dentro de su rango horario
+    // For regular blocks, check whether we are within their time range
     const currentMinutes = UtilityService.getCurrentDayMinutes();
     return currentMinutes >= block.startMinute && currentMinutes < block.endMinute;
   }
 
   /**
-   * Verifica si un bloque de tiempo existe, ignorando restricciones horarias
-   * Esta función permite colocar actividades en bloques fuera de su horario
-   * @param blockId Identificador del bloque
-   * @returns true si el bloque existe, false en caso contrario
+   * Checks whether a time block exists, ignoring time restrictions
+   * This allows placing activities in blocks outside their time range
+   * @param blockId Block ID
+   * @returns true if the block exists, false otherwise
    */
   public isTimeBlockExisting(blockId: UUID): boolean {
     const block = this.getTimeBlock(blockId);
-    return !!block; // Devuelve true si el bloque existe, independientemente de su horario
+    return !!block; // Returns true if the block exists, regardless of its time range
   }
 
   /**
-   * Asegura que el bloque por defecto "Por Hacer" exista
-   * Crea el bloque si no existe
+   * Ensures the default "Por Hacer" block exists
+   * Creates the block if it does not exist
    */
   public ensureDefaultBlockExists(): void {
     const state = this.systemCore.getState();
@@ -291,8 +292,8 @@ export class TimeBlockManager {
   }
 
   /**
-   * Crea el bloque por defecto ("Por Hacer") si no existe
-   * @returns Bloque por defecto creado
+   * Creates the default block ("Por Hacer") if it does not exist
+   * @returns The created default block
    */
   public createDefaultBlock(): TimeBlock {
     const blocks = this.getTimeBlocks();
@@ -307,41 +308,41 @@ export class TimeBlockManager {
       id: UtilityService.generateUUID(),
       name: "Por Hacer",
       startMinute: 0,
-      endMinute: 1439, // Cambiar de 0 a 1439 (todo el día) para que isTimeBlockAvailable funcione correctamente
+      endMinute: 1439, // Changed from 0 to 1439 (whole day) so isTimeBlockAvailable works correctly
       isDefault: true,
-      order: 0, // Siempre primero
+      order: 0, // Always first
       createdAt: now,
       updatedAt: now,
     };
 
     this.systemCore.updateState(this.createAddTimeBlockUpdater(defaultBlock));
 
-    // Devolver el bloque creado directamente
+    // Return the created block directly
     return defaultBlock;
   }
 
   /**
-   * Convierte minutos a formato de hora "HH:MM"
-   * @param minutes Minutos desde las 00:00 (0-1439)
-   * @returns Cadena en formato "HH:MM"
+   * Converts minutes to "HH:MM" time format
+   * @param minutes Minutes since 00:00 (0-1439)
+   * @returns String in "HH:MM" format
    */
   public convertMinutesToTimeString(minutes: DayMinutes): string {
     return UtilityService.formatTime(minutes);
   }
 
   /**
-   * Convierte una cadena de hora "HH:MM" a minutos
-   * @param timeString Cadena en formato "HH:MM"
-   * @returns Minutos desde las 00:00 (0-1439)
+   * Converts an "HH:MM" time string to minutes
+   * @param timeString String in "HH:MM" format
+   * @returns Minutes since 00:00 (0-1439)
    */
   public convertTimeStringToMinutes(timeString: string): DayMinutes {
     return UtilityService.parseTime(timeString);
   }
 
   /**
-   * Crea un actualizador de estado para añadir un bloque de tiempo
-   * @param block Bloque a añadir
-   * @returns Función actualizadora de estado
+   * Creates a state updater that adds a time block
+   * @param block Block to add
+   * @returns State updater function
    */
   private createAddTimeBlockUpdater(block: TimeBlock): StateUpdater {
     return (state) => {
@@ -356,10 +357,10 @@ export class TimeBlockManager {
   }
 
   /**
-   * Crea un actualizador de estado para actualizar un bloque de tiempo
-   * @param id Identificador del bloque a actualizar
-   * @param updatedBlock Bloque actualizado completo
-   * @returns Función actualizadora de estado
+   * Creates a state updater that updates a time block
+   * @param id ID of the block to update
+   * @param updatedBlock The full updated block
+   * @returns State updater function
    */
   private createUpdateTimeBlockUpdater(id: UUID, updatedBlock: TimeBlock): StateUpdater {
     return (state) => {
@@ -381,9 +382,9 @@ export class TimeBlockManager {
   }
 
   /**
-   * Crea un actualizador de estado para eliminar un bloque de tiempo
-   * @param id Identificador del bloque a eliminar
-   * @returns Función actualizadora de estado
+   * Creates a state updater that deletes a time block
+   * @param id ID of the block to delete
+   * @returns State updater function
    */
   private createDeleteTimeBlockUpdater(id: UUID): StateUpdater {
     return (state) => {

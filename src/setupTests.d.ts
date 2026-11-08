@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import type { CoreErrorCode } from "./system/errors";
 
 declare global {
   namespace jest {
@@ -14,6 +15,8 @@ declare global {
       toHaveStyle(css: string): R;
       toHaveAttribute(attr: string, value?: string): R;
       toHaveFocus(): R;
+      /** The function throws a CoreError with this code. */
+      toThrowCoreError(code: CoreErrorCode): R;
     }
   }
 }

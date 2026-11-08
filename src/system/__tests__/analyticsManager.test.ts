@@ -11,7 +11,7 @@ import type {
   CurrentDayState,
 } from "../../types";
 
-// Mock del SystemCore: solo getState es necesario
+// SystemCore mock: only getState is needed
 const createMockSystemCore = (mockState: AppState): ISystemCore => {
   const mock = {
     getState: jest.fn().mockReturnValue(mockState),
@@ -26,8 +26,8 @@ const TODAY = new Date("2023-01-01T08:00:00Z");
 const YESTERDAY = new Date("2022-12-31T08:00:00Z");
 
 /**
- * Construye un AppState con datos de ejemplo para los analytics.
- * Schema v2+: sin variables subjetivas ni causas de interrupción.
+ * Builds an AppState with sample data for the analytics.
+ * Schema v2+: no subjective variables or interruption causes.
  */
 const createMockState = (includeActiveActivity: boolean = false): AppState => {
   const activityTemplates: ActivityTemplate[] = [
@@ -208,7 +208,7 @@ describe("AnalyticsManager", () => {
   });
 
   describe("getTimelineData", () => {
-    it("devuelve actividades, eventos e interrupciones cuando no se especifica dayId", () => {
+    it("returns activities, events and interruptions when no dayId is specified", () => {
       const timelineData = analyticsManager.getTimelineData();
 
       expect(timelineData.activities).toHaveLength(3);
@@ -216,40 +216,40 @@ describe("AnalyticsManager", () => {
       expect(timelineData.interruptions).toHaveLength(1);
     });
 
-    it("filtra por día cuando se especifica dayId", () => {
+    it("filters by day when dayId is specified", () => {
       const todayId = mockState.global.days[0].id;
       const timelineData = analyticsManager.getTimelineData(todayId);
 
       expect(timelineData.activities.every((a) => a.id !== undefined)).toBe(true);
-      // Solo actividades del día actual
+      // Only activities from the current day
       const dayRecords = mockState.global.completedActivityRecords.filter(
         (r) => r.dayId === todayId
       );
       expect(timelineData.activities).toHaveLength(dayRecords.length);
     });
 
-    it("calcula estimatedDuration e isWithinEstimation para actividades clear-objective", () => {
+    it("computes estimatedDuration and isWithinEstimation for clear-objective activities", () => {
       const timelineData = analyticsManager.getTimelineData();
 
       const clearObjective = timelineData.activities.find(
         (a) => a.type === "clear-objective" && a.state === "completed"
       );
       expect(clearObjective?.estimatedDuration).toBe(60);
-      // 60 min duración vs 60 min estimado => dentro de la estimación
+      // 60 min duration vs 60 min estimate => within the estimate
       expect(clearObjective?.isWithinEstimation).toBe(true);
     });
 
-    it("calcula isWithinEstimation=false para actividad flexible fuera de rango", () => {
+    it("computes isWithinEstimation=false for an out-of-range flexible activity", () => {
       const timelineData = analyticsManager.getTimelineData();
 
       const interruptedFlexible = timelineData.activities.find(
         (a) => a.state === "interrupted" && a.type === "flexible-duration"
       );
-      // 15 min contra rango [30,90] => fuera
+      // 15 min against range [30,90] => outside
       expect(interruptedFlexible?.isWithinEstimation).toBe(false);
     });
 
-    it("incluye la actividad activa en el timeline cuando hay día activo", () => {
+    it("includes the active activity in the timeline when there is an active day", () => {
       const stateWithActive = createMockState(true);
       const manager = new AnalyticsManager(createMockSystemCore(stateWithActive));
 
@@ -260,7 +260,7 @@ describe("AnalyticsManager", () => {
       expect(activeInTimeline).toBeDefined();
     });
 
-    it("schema v2+: las interrupciones NO incluyen isAvoidable ni cause", () => {
+    it("schema v2+: interruptions do NOT include isAvoidable or cause", () => {
       const timelineData = analyticsManager.getTimelineData();
 
       expect(timelineData.interruptions).toHaveLength(1);
@@ -276,7 +276,7 @@ describe("AnalyticsManager", () => {
   });
 
   describe("getTimeDistributionData", () => {
-    it("agrupa actividades por categoría (tipo de actividad)", () => {
+    it("groups activities by category (activity type)", () => {
       const distribution = analyticsManager.getTimeDistributionData();
 
       const names = distribution.categories.map((c) => c.name);
@@ -285,14 +285,14 @@ describe("AnalyticsManager", () => {
       expect(names).toContain("Timeboxing");
     });
 
-    it("calcula porcentajes que suman ~100%", () => {
+    it("computes percentages that add up to ~100%", () => {
       const distribution = analyticsManager.getTimeDistributionData();
 
       const totalPercentage = distribution.categories.reduce((sum, c) => sum + c.percentage, 0);
       expect(totalPercentage).toBeCloseTo(100, 1);
     });
 
-    it("filtra por día cuando se especifica dayId", () => {
+    it("filters by day when dayId is specified", () => {
       const todayId = mockState.global.days[0].id;
       const distribution = analyticsManager.getTimeDistributionData(todayId);
 
@@ -302,7 +302,7 @@ describe("AnalyticsManager", () => {
   });
 
   describe("getActivityStats", () => {
-    it("calcula total/completed/interrupted y completionRate", () => {
+    it("computes total/completed/interrupted and completionRate", () => {
       const stats = analyticsManager.getActivityStats();
 
       expect(stats.totalInstances).toBe(3);
@@ -311,7 +311,7 @@ describe("AnalyticsManager", () => {
       expect(stats.completionRate).toBeCloseTo(66.67, 1);
     });
 
-    it("calcula completionRate=100 cuando todas están completadas", () => {
+    it("computes completionRate=100 when all are completed", () => {
       const templateId = mockState.global.activityTemplates[0].id;
       const stats = analyticsManager.getActivityStats(templateId);
 
@@ -321,31 +321,31 @@ describe("AnalyticsManager", () => {
       expect(stats.completionRate).toBe(100);
     });
 
-    it("NO incluye frequentInterruptionCauses en el shape (schema v2+)", () => {
+    it("does NOT include frequentInterruptionCauses in the shape (schema v2+)", () => {
       const stats = analyticsManager.getActivityStats();
 
-      // schema v2+: campo eliminado
+      // schema v2+: field removed
       expect(stats).not.toHaveProperty("frequentInterruptionCauses");
     });
 
-    it("calcula estimationAccuracy solo para clear-objective", () => {
+    it("computes estimationAccuracy only for clear-objective", () => {
       const stats = analyticsManager.getActivityStats();
 
-      // 60/60 estimado => 100%; la otra clear-objective no hay en este mock
-      // Igual debe devolver un número definido
+      // 60/60 estimate => 100%; there is no other clear-objective in this mock
+      // It must still return a defined number
       expect(stats.estimationAccuracy).toBeDefined();
     });
   });
 
   describe("getCompletionRate", () => {
-    it("devuelve porcentaje entre 0 y 100", () => {
+    it("returns a percentage between 0 and 100", () => {
       const rate = analyticsManager.getCompletionRate();
 
       expect(rate).toBeGreaterThan(0);
       expect(rate).toBeLessThanOrEqual(100);
     });
 
-    it("devuelve 0 cuando no hay actividades", () => {
+    it("returns 0 when there are no activities", () => {
       const emptyState = createMockState();
       emptyState.global.completedActivityRecords = [];
       const manager = new AnalyticsManager(createMockSystemCore(emptyState));
@@ -355,7 +355,7 @@ describe("AnalyticsManager", () => {
   });
 
   describe("getEstimationAccuracy", () => {
-    it("devuelve 0 cuando no hay actividades con estimación", () => {
+    it("returns 0 when there are no activities with an estimate", () => {
       const noEstimation = createMockState();
       noEstimation.global.completedActivityRecords =
         noEstimation.global.completedActivityRecords.map((r) => ({
@@ -369,13 +369,13 @@ describe("AnalyticsManager", () => {
   });
 
   describe("getTempoSummary", () => {
-    it("suma tempos solo de records completed del día", () => {
+    it("sums tempos only from the day's completed records", () => {
       const state = createMockState(true);
-      // Override target para controlar el ratio
+      // Override target to control the ratio
       state.global.userPreferences.dailyTempoTarget = 100;
       const manager = new AnalyticsManager(createMockSystemCore(state));
 
-      // todayId es el día activo (mockState.global.days[0].id)
+      // todayId is the active day (mockState.global.days[0].id)
       const todayId = state.global.days[0].id;
       const summary = manager.getTempoSummary(todayId);
 
@@ -384,9 +384,9 @@ describe("AnalyticsManager", () => {
       expect(summary.completedActivities).toBe(2);
     });
 
-    it("calcula targetProgress sin capear", () => {
+    it("computes targetProgress uncapped", () => {
       const state = createMockState(true);
-      state.global.userPreferences.dailyTempoTarget = 50; // target bajo
+      state.global.userPreferences.dailyTempoTarget = 50; // low target
       const manager = new AnalyticsManager(createMockSystemCore(state));
       const todayId = state.global.days[0].id;
 
@@ -394,13 +394,13 @@ describe("AnalyticsManager", () => {
 
       // 113 / 50 = 2.26
       expect(summary.targetProgress).toBeCloseTo(2.26, 2);
-      // progressBarValue capeado a 100
+      // progressBarValue capped at 100
       expect(summary.progressBarValue).toBe(100);
-      // displayPercent: 226% (sin capear)
+      // displayPercent: 226% (uncapped)
       expect(summary.displayPercent).toBe(226);
     });
 
-    it("devuelve ceros y lastReward undefined sin actividades", () => {
+    it("returns zeros and undefined lastReward without activities", () => {
       const state = createMockState(true);
       state.global.completedActivityRecords = [];
       const manager = new AnalyticsManager(createMockSystemCore(state));
@@ -414,22 +414,22 @@ describe("AnalyticsManager", () => {
       expect(summary.lastReward).toBeUndefined();
     });
 
-    it("lastReward es el último record completed", () => {
+    it("lastReward is the last completed record", () => {
       const state = createMockState(true);
       const manager = new AnalyticsManager(createMockSystemCore(state));
       const todayId = state.global.days[0].id;
 
       const summary = manager.getTempoSummary(todayId);
 
-      // El último record completed en mockState es createMockUUID(403)
+      // The last completed record in mockState is createMockUUID(403)
       expect(summary.lastReward?.recordId).toBe(createMockUUID(403));
     });
   });
 
   describe("getTempoTrends", () => {
-    it("devuelve un punto por día con totalTempos, targetProgress y avg", () => {
+    it("returns one point per day with totalTempos, targetProgress and avg", () => {
       const state = createMockState();
-      // Mantener solo el primer día en el rango y mapear sus records a ese día
+      // Keep only the first day in the range and map its records to that day
       const todayId = state.global.days[0].id;
       state.global.days = [state.global.days[0]];
       state.global.completedActivityRecords = state.global.completedActivityRecords.map((r) => ({
@@ -453,7 +453,7 @@ describe("AnalyticsManager", () => {
       expect(trends[0].averageSatisfaction).toBeCloseTo(8.5, 1);
     });
 
-    it("filtra días fuera del rango", () => {
+    it("filters out days outside the range", () => {
       const state = createMockState(true);
       state.global.days = [
         {

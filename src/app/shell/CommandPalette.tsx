@@ -82,7 +82,7 @@ export function CommandPalette({
   const run = (command: Command | undefined) => {
     if (!command) return;
     onOpenChange(false);
-    // Deja que el diálogo se cierre antes de abrir otro
+    // Let the dialog close before opening another one
     requestAnimationFrame(() => command.run());
   };
 

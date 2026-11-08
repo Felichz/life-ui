@@ -1,26 +1,27 @@
 import { UtilityService } from "./utilityService";
 import type { SystemCore } from "./index";
 import type { EventTemplate, EventInstance, UUID, ISODateTimeString } from "../types";
+import { CoreError } from "./errors";
 
 /**
- * Gestor de eventos puntuales en LifeUI
- * Permite crear y gestionar plantillas de eventos y sus instancias
+ * Manager for one-off events in LifeUI
+ * Creates and manages event templates and their instances
  */
 export class EventManager {
   private systemCore: SystemCore;
 
   /**
-   * Constructor de EventManager
-   * @param systemCore Instancia del núcleo del sistema
+   * EventManager constructor
+   * @param systemCore System core instance
    */
   constructor(systemCore: SystemCore) {
     this.systemCore = systemCore;
   }
 
   /**
-   * Crea una nueva plantilla de evento
-   * @param name Nombre de la plantilla de evento
-   * @returns La plantilla de evento creada
+   * Creates a new event template
+   * @param name Name of the event template
+   * @returns The created event template
    */
   public createEventTemplate(name: string): EventTemplate {
     const id: UUID = UtilityService.generateUUID();
@@ -42,36 +43,36 @@ export class EventManager {
   }
 
   /**
-   * Actualiza una plantilla de evento existente
-   * @param id UUID de la plantilla a actualizar
-   * @param data Datos parciales para actualizar
-   * @returns La plantilla actualizada
-   * @throws Error si la plantilla no existe
+   * Updates an existing event template
+   * @param id UUID of the template to update
+   * @param data Partial data to update
+   * @returns The updated template
+   * @throws Error if the template does not exist
    */
   public updateEventTemplate(id: UUID, data: Partial<EventTemplate>): EventTemplate {
-    // Verificar que la plantilla existe
+    // Check that the template exists
     const template = this.getEventTemplateById(id);
     if (!template) {
-      throw new Error(`La plantilla de evento con id ${id} no existe`);
+      throw new CoreError("event-template-not-found", `id ${id}`);
     }
 
     const timestamp = UtilityService.getCurrentISODateTime();
     let updatedTemplate: EventTemplate | null = null;
 
-    // Actualizar el estado
+    // Update the state
     this.systemCore.updateState((state) => {
       const index = state.global.eventTemplates.findIndex((t) => t.id === id);
 
       if (index >= 0) {
-        // Crear versión actualizada manteniendo la inmutabilidad
+        // Build the updated version, preserving immutability
         updatedTemplate = {
           ...template,
           ...data,
-          id, // Asegurar que el ID no se modifique
+          id, // Make sure the ID is not modified
           updatedAt: timestamp,
         };
 
-        // Reemplazar en el array
+        // Replace it in the array
         state.global.eventTemplates[index] = updatedTemplate;
       }
 
@@ -79,33 +80,31 @@ export class EventManager {
     });
 
     if (!updatedTemplate) {
-      throw new Error(`Error al actualizar la plantilla de evento con id ${id}`);
+      throw new CoreError("internal", `updating event template ${id}`);
     }
 
     return updatedTemplate;
   }
 
   /**
-   * Elimina una plantilla de evento
-   * @param id UUID de la plantilla a eliminar
-   * @throws Error si la plantilla no existe o está en uso
+   * Deletes an event template
+   * @param id UUID of the template to delete
+   * @throws Error if the template does not exist or is in use
    */
   public deleteEventTemplate(id: UUID): void {
-    // Verificar que la plantilla existe
+    // Check that the template exists
     const template = this.getEventTemplateById(id);
     if (!template) {
-      throw new Error(`La plantilla de evento con id ${id} no existe`);
+      throw new CoreError("event-template-not-found", `id ${id}`);
     }
 
-    // Verificar que no existan instancias que usen esta plantilla
+    // Check that no instances use this template
     const instances = this.getEventInstances({ templateId: id });
     if (instances.length > 0) {
-      throw new Error(
-        `No se puede eliminar la plantilla de evento con id ${id} porque está en uso`
-      );
+      throw new CoreError("event-template-in-use", `id ${id}`);
     }
 
-    // Actualizar el estado
+    // Update the state
     this.systemCore.updateState((state) => {
       state.global.eventTemplates = state.global.eventTemplates.filter((t) => t.id !== id);
       return state;
@@ -113,8 +112,8 @@ export class EventManager {
   }
 
   /**
-   * Obtiene todas las plantillas de eventos
-   * @returns Lista de todas las plantillas de eventos
+   * Gets all event templates
+   * @returns List of all event templates
    */
   public getEventTemplates(): EventTemplate[] {
     const state = this.systemCore.getState();
@@ -122,9 +121,9 @@ export class EventManager {
   }
 
   /**
-   * Obtiene una plantilla de evento por su ID
-   * @param id UUID de la plantilla
-   * @returns La plantilla o null si no existe
+   * Gets an event template by its ID
+   * @param id UUID of the template
+   * @returns The template, or null if it does not exist
    */
   private getEventTemplateById(id: UUID): EventTemplate | null {
     const state = this.systemCore.getState();
@@ -132,22 +131,22 @@ export class EventManager {
   }
 
   /**
-   * Crea una nueva instancia de evento basada en una plantilla
-   * @param templateId UUID de la plantilla a utilizar
-   * @returns La instancia de evento creada
-   * @throws Error si la plantilla no existe o no hay un día activo
+   * Creates a new event instance from a template
+   * @param templateId UUID of the template to use
+   * @returns The created event instance
+   * @throws Error if the template does not exist or there is no active day
    */
   public createEventInstance(templateId: UUID): EventInstance {
-    // Verificar que la plantilla existe
+    // Check that the template exists
     const template = this.getEventTemplateById(templateId);
     if (!template) {
-      throw new Error(`La plantilla de evento con id ${templateId} no existe`);
+      throw new CoreError("event-template-not-found", `id ${templateId}`);
     }
 
-    // Verificar que hay un día activo
+    // Check that there is an active day
     const state = this.systemCore.getState();
     if (!state.currentDay) {
-      throw new Error("No se puede crear una instancia de evento sin un día activo");
+      throw new CoreError("no-active-day");
     }
 
     const id: UUID = UtilityService.generateUUID();
@@ -156,13 +155,13 @@ export class EventManager {
     const newInstance: EventInstance = {
       id,
       templateId,
-      templateName: template.name, // Copiar nombre para fácil referencia
+      templateName: template.name, // Copy the name for easy reference
       timestamp,
       dayId: state.currentDay.day.id,
       createdAt: timestamp,
     };
 
-    // Actualizar el estado
+    // Update the state
     this.systemCore.updateState((state) => {
       state.global.eventInstances.push(newInstance);
       return state;
@@ -172,9 +171,9 @@ export class EventManager {
   }
 
   /**
-   * Obtiene instancias de eventos según filtros opcionales
-   * @param filters Filtros opcionales: dayId, templateId, since, until
-   * @returns Lista de instancias de eventos que cumplen los filtros
+   * Gets event instances matching optional filters
+   * @param filters Optional filters: dayId, templateId, since, until
+   * @returns List of event instances matching the filters
    */
   public getEventInstances(filters?: {
     dayId?: UUID;
@@ -186,7 +185,7 @@ export class EventManager {
     let instances = state.global.eventInstances;
 
     if (filters) {
-      // Aplicar filtros
+      // Apply filters
       if (filters.dayId) {
         instances = instances.filter((i) => i.dayId === filters.dayId);
       }
@@ -204,22 +203,22 @@ export class EventManager {
       }
     }
 
-    // Ordenar cronológicamente
+    // Sort chronologically
     return [...instances].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
   /**
-   * Obtiene eventos recientes ocurridos en los últimos X minutos
-   * @param minutesWindow Ventana de tiempo en minutos (por defecto 30)
-   * @returns Lista de eventos recientes ordenados cronológicamente
+   * Gets recent events that occurred in the last X minutes
+   * @param minutesWindow Time window in minutes (default 30)
+   * @returns List of recent events sorted chronologically
    */
   public getRecentEvents(minutesWindow: number = 30): EventInstance[] {
-    // Calcular el timestamp límite (hace X minutos)
+    // Compute the cutoff timestamp (X minutes ago)
     const now = new Date();
     const limitTime = new Date(now.getTime() - minutesWindow * 60 * 1000);
     const limitTimestamp = limitTime.toISOString();
 
-    // Usar getEventInstances con filtro since
+    // Use getEventInstances with the since filter
     return this.getEventInstances({ since: limitTimestamp });
   }
 }

@@ -52,7 +52,7 @@ describe("LifeUI", () => {
     cy.get("[data-testid=finish-active]").click();
     cy.get("[data-testid=closing-dialog]").within(() => {
       cy.contains("¿Cómo fue «Escribir informe»?");
-      // 30 min estimados × 7/7 = 30
+      // 30 estimated min × 7/7 = 30
       cy.contains("+30");
       cy.get("[data-testid=closing-confirm]").click();
     });

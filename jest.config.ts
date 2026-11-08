@@ -18,7 +18,7 @@ const config: Config = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
     "^@core/(.*)$": "<rootDir>/src/core/$1",
-    // jsdom resuelve la build ESM de lucide; Jest necesita la CommonJS
+    // jsdom resolves lucide's ESM build; Jest needs the CommonJS one
     "^lucide-react$": "<rootDir>/node_modules/lucide-react/dist/cjs/lucide-react.js",
   },
 };

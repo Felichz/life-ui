@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * Reloj de la UI. Re-renderiza cada `intervalMs` alineado al segundo para
- * que varios cronómetros en pantalla cambien a la vez.
+ * UI clock. Re-renders every `intervalMs`, aligned to the second, so that
+ * several stopwatches on screen tick at the same time.
  */
 export function useNow(intervalMs = 1000): Date {
   const [now, setNow] = useState(() => new Date());

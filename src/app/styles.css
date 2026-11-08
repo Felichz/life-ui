@@ -5,9 +5,9 @@
 @tailwind utilities;
 
 /*
- * Tokens. Canales RGB para que Tailwind pueda aplicar opacidad (bg-accent/10).
- * Neutros con un matiz frío muy leve; un acento índigo para acción y selección;
- * ámbar exclusivo para tempos (la recompensa); verde exclusivo para "en marcha".
+ * Tokens. RGB channels so Tailwind can apply opacity (bg-accent/10).
+ * Neutrals with a very slight cool tint; an indigo accent for action and
+ * selection; amber only for tempos (the reward); green only for "running".
  */
 :root {
   color-scheme: light;
@@ -24,14 +24,14 @@
   --accent: 88 84 214;
   --accent-hover: 76 72 199;
   --accent-ink: 72 68 190;
-  /* Relleno de botones primarios: blanco encima ≥ 4.5:1 */
+  /* Fill for primary buttons: white on top is >= 4.5:1 */
   --accent-fill: 88 84 214;
   --accent-fill-hover: 76 72 199;
   --tempo: 245 158 11;
   --tempo-ink: 168 94 0;
   --live: 20 128 84;
   --danger: 214 58 58;
-  /* Relleno de botones destructivos: blanco encima ≥ 4.5:1 */
+  /* Fill for destructive buttons: white on top is >= 4.5:1 */
   --danger-fill: 200 50 50;
   --success: 24 128 80;
   --objective: 64 120 240;
@@ -105,7 +105,7 @@
     color: inherit;
   }
 
-  /* Evita el zoom de iOS al enfocar campos: 16px en táctil */
+  /* Avoid iOS zoom when focusing fields: 16px on touch */
   @media (pointer: coarse) {
     input,
     textarea,
