@@ -18,7 +18,7 @@ interface ShellContextValue {
 
 const ShellContext = createContext<ShellContextValue | null>(null);
 
-/** Diálogos que se pueden abrir desde cualquier pantalla (y desde la paleta ⌘K). */
+/** Dialogs that can be opened from any screen (and from the ⌘K palette). */
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [addState, setAddState] = useState<{ open: boolean; blockId?: UUID; templateId?: UUID }>({
     open: false,
@@ -66,6 +66,6 @@ export function ShellProvider({ children }: { children: ReactNode }) {
 
 export function useShell(): ShellContextValue {
   const context = useContext(ShellContext);
-  if (!context) throw new Error("useShell debe usarse dentro de <ShellProvider>");
+  if (!context) throw new Error("useShell must be used inside <ShellProvider>");
   return context;
 }

@@ -115,7 +115,7 @@ export default {
   },
   plugins: [
     ({ addVariant }) => {
-      // Pantallas táctiles: objetivos de toque más grandes
+      // Touch screens: larger tap targets
       addVariant("coarse", "@media (pointer: coarse)");
       addVariant("hover-hover", "@media (hover: hover)");
     },

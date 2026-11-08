@@ -278,7 +278,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
   );
 }
 
-/** Tiempo por tipo de actividad: una barra apilada con etiquetas directas. */
+/** Time per activity type: one stacked bar with direct labels. */
 function TypeSplit({ totals, total }: { totals: Record<ActivityType, number>; total: number }) {
   const entries = (Object.keys(totals) as ActivityType[]).filter((type) => totals[type] > 0);
   const sum = entries.reduce((acc, type) => acc + totals[type], 0);

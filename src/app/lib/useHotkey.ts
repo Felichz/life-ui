@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 
 interface HotkeyOptions {
-  /** Requiere ⌘ (Mac) o Ctrl (resto) */
+  /** Requires ⌘ (Mac) or Ctrl (everything else) */
   mod?: boolean;
   enabled?: boolean;
-  /** Permite dispararse aunque el foco esté en un campo de texto */
+  /** Allows firing even when focus is in a text field */
   allowInInputs?: boolean;
 }
 
@@ -14,7 +14,7 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
-/** Atajo de teclado global. `key` se compara sin distinguir mayúsculas. */
+/** Global keyboard shortcut. `key` is compared case-insensitively. */
 export function useHotkey(
   key: string,
   handler: (event: KeyboardEvent) => void,
@@ -32,7 +32,7 @@ export function useHotkey(
       if (mod !== hasMod) return;
       if (!mod && (event.altKey || event.metaKey || event.ctrlKey)) return;
       if (!allowInInputs && !mod && isTypingTarget(event.target)) return;
-      // No competir con diálogos abiertos salvo que el atajo sea global (mod)
+      // Don't compete with open dialogs unless the shortcut is global (mod)
       if (!mod && document.querySelector("[role='dialog'][data-state='open']")) return;
       event.preventDefault();
       handlerRef.current(event);

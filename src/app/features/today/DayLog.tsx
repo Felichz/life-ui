@@ -6,7 +6,7 @@ import { cn } from "../../lib/cn";
 import { formatMinutes, formatTime, minutesOfDay } from "../../lib/format";
 import { getLocale, t } from "../../i18n";
 
-/** Ancho fijo de la columna de hora: "9:40" en español, "11:15 AM" en inglés. */
+/** Fixed width of the time column: "9:40" in Spanish, "11:15 AM" in English. */
 const timeColumn = () => (getLocale() === "en" ? "w-[62px]" : "w-11");
 
 type Entry =
@@ -51,7 +51,7 @@ export function buildStrip(state: AppState, dayId: UUID, now?: Date) {
   return { segments, events, records };
 }
 
-/** Lo que ya pasó hoy: la tira del día y el registro, lo más reciente arriba. */
+/** What already happened today: the day strip and the log, most recent first. */
 export function DayLog({ state, dayId, now }: { state: AppState; dayId: UUID; now: Date }) {
   const { segments, events, records } = buildStrip(state, dayId, now);
   const entries: Entry[] = [

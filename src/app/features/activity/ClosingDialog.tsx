@@ -21,7 +21,7 @@ import { formatMinutes, formatNumber } from "../../lib/format";
 
 export const DEFAULT_SCORE = 7;
 
-/** Frase que acompaña a cada puntuación (0–10). */
+/** Phrase that accompanies each score (0-10). */
 export function scoreLabel(score: number): string {
   return t(`closing.score.${score}` as MessageKey);
 }
@@ -58,7 +58,7 @@ export function ClosingDialog({
 
   if (!request || !item) return null;
 
-  // Misma fuente que el core: la vista previa no puede divergir del resultado.
+  // Same source as the core: the preview cannot diverge from the result.
   const base = UtilityService.resolveBaseMinutes(request.estimatedMinutes, request.durationMinutes);
   const tempos = UtilityService.calculatePreviewTempos(score, base);
   const usesEstimate = typeof request.estimatedMinutes === "number" && request.estimatedMinutes > 0;

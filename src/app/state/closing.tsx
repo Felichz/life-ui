@@ -11,17 +11,18 @@ import type { CompletionRequest, UUID } from "../../types";
 import { t } from "../i18n";
 import { ClosingDialog } from "../features/activity/ClosingDialog";
 import { planItem, templateMap, type PlanItem } from "../lib/domain";
+import { CoreError } from "../../system";
 import { errorMessage, useSystem } from "./system";
 import { useToast } from "./toast";
 
 /**
- * Única vía de cierre (ADR-001): requestCompletion → diálogo → completeActivity
- * o interruptActivity. Completar, cambiar de actividad y terminar el día
- * pasan por aquí; `then` solo corre si el cierre se guardó.
+ * The only closing path (ADR-001): requestCompletion → dialog → completeActivity
+ * or interruptActivity. Completing, switching activity and ending the day
+ * all go through here; `then` only runs if the close was saved.
  */
 export interface CloseOptions {
   then?: () => void;
-  /** Qué ocurrirá después, para decírselo al usuario en el diálogo. */
+  /** What happens next, so the dialog can tell the user. */
   nextLabel?: string;
 }
 
@@ -59,7 +60,7 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
       try {
         const request = core.requestCompletion(activeId);
         const instance = state.currentDay.activityInstances.find((item) => item.id === activeId);
-        if (!instance) throw new Error(t("error.runningNotFound"));
+        if (!instance) throw new CoreError("activity-instance-not-found");
         setError(null);
         setPending({
           activityId: activeId,
@@ -171,6 +172,6 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
 
 export function useClosingFlow(): ClosingContextValue {
   const context = useContext(ClosingContext);
-  if (!context) throw new Error("useClosingFlow debe usarse dentro de <ClosingFlowProvider>");
+  if (!context) throw new Error("useClosingFlow must be used inside <ClosingFlowProvider>");
   return context;
 }

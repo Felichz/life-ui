@@ -43,14 +43,14 @@ type Step =
 interface AddActivityDialogProps {
   open: boolean;
   initialBlockId?: UUID;
-  /** Salta directo a configurar esta plantilla */
+  /** Jumps straight to configuring this template */
   initialTemplateId?: UUID;
   onOpenChange: (open: boolean) => void;
 }
 
 /**
- * Añadir al plan del día: elegir de la biblioteca (o crear en el momento),
- * ajustar bloque y duración para hoy, y añadir o empezar ya.
+ * Add to the day's plan: pick from the library (or create on the spot),
+ * adjust block and duration for today, and add it or start right away.
  */
 export function AddActivityDialog({
   open,

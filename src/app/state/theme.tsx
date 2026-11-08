@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 export type ThemePreference = "system" | "light" | "dark";
 const STORAGE_KEY = "lifeui.theme";
-/** Clave del nombre anterior del producto: se lee una vez para no perder la preferencia. */
+/** Key from the product's former name: read once so the preference isn't lost. */
 const LEGACY_KEY = "qualia.theme";
 
 interface ThemeContextValue {
@@ -18,7 +18,7 @@ function readPreference(): ThemePreference {
     const stored = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (stored === "light" || stored === "dark" || stored === "system") return stored;
   } catch {
-    // almacenamiento no disponible: seguimos al sistema
+    // storage unavailable: follow the system
   }
   return "system";
 }
@@ -51,7 +51,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
-      // sin persistencia: el cambio vale para esta sesión
+      // no persistence: the change applies to this session only
     }
   }, []);
 
@@ -64,6 +64,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
-  if (!context) throw new Error("useTheme debe usarse dentro de <ThemeProvider>");
+  if (!context) throw new Error("useTheme must be used inside <ThemeProvider>");
   return context;
 }

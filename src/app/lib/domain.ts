@@ -1,7 +1,7 @@
 /**
- * Lecturas de presentación sobre el estado del core. Nada aquí decide reglas
- * de negocio (tempos, validaciones): solo ordena, agrupa y nombra lo que el
- * core ya calculó o guardó.
+ * Presentation reads over the core state. Nothing here decides business
+ * rules (tempos, validations): it only sorts, groups and names what the
+ * core already computed or stored.
  */
 import type {
   ActivityInstance,
@@ -71,7 +71,7 @@ export type Settings = Pick<
 >;
 
 export interface Contract {
-  /** Texto corto: "~45 min", "5–10 min", "mín 20 min" */
+  /** Short text: "~45 min", "5-10 min", "min 20 min" */
   label: string;
   estimate?: number;
   min?: number;
@@ -86,7 +86,7 @@ export function settingsOf(source: Settings): Settings {
   };
 }
 
-/** Contrato de duración de una instancia (o plantilla, como respaldo). */
+/** Duration contract of an instance (or its template, as a fallback). */
 export function contractOf(
   type: ActivityType,
   source: Settings,
@@ -130,7 +130,7 @@ export function blockName(block: TimeBlock): string {
   return block.isDefault ? t("block.todo") : block.name;
 }
 
-/** "Por hacer" primero, luego cronológico. */
+/** "To do" first, then chronological. */
 export function sortBlocks(blocks: TimeBlock[]): TimeBlock[] {
   return [...blocks].sort((a, b) => {
     if (a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
@@ -186,7 +186,7 @@ export function eventsOfDay(state: AppState, dayId: UUID) {
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
-/** Días registrados, del más reciente al más antiguo. */
+/** Recorded days, newest to oldest. */
 export function daysNewestFirst(state: AppState): Day[] {
   return [...state.global.days].sort((a, b) =>
     (b.startTime ?? b.createdAt).localeCompare(a.startTime ?? a.createdAt)
@@ -197,7 +197,7 @@ export function dayStart(day: Day): string {
   return day.startTime ?? day.createdAt;
 }
 
-/** Records de un día cuyo contrato permite comparar real vs. esperado. */
+/** A record's contract, for comparing actual vs. expected time. */
 export function recordContract(record: CompletedActivityRecord): Contract | null {
   return contractOf(record.type, record);
 }

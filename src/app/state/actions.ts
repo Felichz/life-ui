@@ -8,9 +8,9 @@ import { errorMessage, useSystem } from "./system";
 import { useToast } from "./toast";
 
 /**
- * Acciones del día que combinan varias llamadas al core. Si hay algo en
- * marcha, empezar otra cosa pasa primero por el ritual de cierre y la
- * continuación solo corre si ese cierre se guardó.
+ * Day actions that combine several core calls. If something is running,
+ * starting something else goes through the closing ritual first, and the
+ * continuation only runs if that close was saved.
  */
 export function useDayActions() {
   const { core } = useSystem();
@@ -40,7 +40,7 @@ export function useDayActions() {
     [core, requestClose]
   );
 
-  /** Empieza una actividad que ya está en el plan. */
+  /** Starts an activity that is already in the plan. */
   const startInstance = useCallback(
     (instanceId: UUID) => {
       const state = core.getState();
@@ -58,20 +58,23 @@ export function useDayActions() {
     [core, fail, runAfterClosing, titleOfTemplate]
   );
 
-  /** Bloque donde cae algo que se empieza ahora: la franja actual o "Por hacer". */
+  /** Block for something started now: the current time block or "To do". */
   const blockForNow = useCallback((): UUID | null => {
     const current = core.getCurrentTimeBlock();
     if (current) return current.id;
     return core.getTimeBlocks().find((block) => block.isDefault)?.id ?? null;
   }, [core]);
 
-  /** Crea una instancia desde la biblioteca y la empieza (con los valores por defecto o los dados). */
+  /** Creates an instance from the library and starts it (with default or given values). */
   const startTemplate = useCallback(
     (templateId: UUID, options: { blockId?: UUID; settings?: Settings } = {}) => {
       runAfterClosing(titleOfTemplate(templateId), () => {
         try {
           const blockId = options.blockId ?? blockForNow();
-          if (!blockId) throw new Error(t("error.noBlocks"));
+          if (!blockId) {
+            toast({ tone: "error", title: t("error.start"), description: t("error.noBlocks") });
+            return;
+          }
           const instance = core.createActivityInstance(templateId, blockId, options.settings);
           core.activateActivity(instance.id);
         } catch (caught) {
@@ -79,7 +82,7 @@ export function useDayActions() {
         }
       });
     },
-    [blockForNow, core, fail, runAfterClosing, titleOfTemplate]
+    [blockForNow, core, fail, runAfterClosing, titleOfTemplate, toast]
   );
 
   const logEvent = useCallback(

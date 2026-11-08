@@ -30,9 +30,9 @@ interface DayStripProps {
 }
 
 /**
- * La tira del día: franjas horarias de fondo, lo que realmente ocurrió como
- * segmentos coloreados por tipo, eventos como marcas y la línea de "ahora".
- * Es una vista de apoyo (aria-hidden): la lista de registro lleva los datos.
+ * The day strip: time blocks in the background, what actually happened as
+ * segments colored by type, events as ticks, and the "now" line.
+ * It is a supporting view (aria-hidden): the log list carries the data.
  */
 export function DayStrip({
   segments,

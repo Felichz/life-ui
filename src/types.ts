@@ -1,33 +1,33 @@
 // ===============================================
-// Tipos Básicos
+// Basic Types
 // ===============================================
 export type UUID = string;
 export type ISODateTimeString = string;
 export type MinutesNumber = number;
-export type DayMinutes = number; // 0-1439 minutos dentro de un día
+export type DayMinutes = number; // 0-1439 minutes within a day
 
 // ===============================================
-// Tipos Fundamentales
+// Core Types
 // ===============================================
 
-// Tipos de Actividad
+// Activity types
 export type ActivityType = "clear-objective" | "flexible-duration" | "timeboxing";
 
-// Estados de Actividad
+// Activity states
 export type ActivityState = "in-library" | "instantiated" | "active" | "completed" | "interrupted";
 
-// Tipos de Timeboxing
+// Timeboxing types
 export type TimeboxingType = "minimum-time" | "maximum-time" | "both";
 
-// Estados del Día
+// Day states
 export type DayState = "active" | "inactive";
 
 // ===============================================
-// Tipos Dinámicos
+// Dynamic Types
 // ===============================================
 
 /**
- * Configuraciones dinámicas para instancias de actividades
+ * Dynamic settings for activity instances
  */
 export type DynamicSettings = {
   clearObjectiveSettings?: {
@@ -45,23 +45,23 @@ export type DynamicSettings = {
 };
 
 // ===============================================
-// Entidades Principales
+// Main Entities
 // ===============================================
 
 /**
- * Plantilla de actividad en la biblioteca
- * Contiene propiedades inmutables y valores predeterminados
+ * Activity template in the library
+ * Holds immutable properties and default values
  */
 export interface ActivityTemplate {
   id: UUID;
   title: string;
   description: string;
   type: ActivityType;
-  isSystemActivity: boolean; // True para actividades del sistema (Piloto Auto, etc.)
-  /** Anclada en "Accesos rápidos": se puede empezar con un toque. */
+  isSystemActivity: boolean; // True for system activities (Autopilot, etc.)
+  /** Pinned in "Quick access": can be started with one tap. */
   pinned?: boolean;
 
-  // Propiedades específicas según tipo (solo una se utilizará según el tipo)
+  // Type-specific properties (only the one matching the type is used)
   clearObjectiveSettings?: {
     estimatedDurationMinutes: MinutesNumber;
   };
@@ -82,17 +82,17 @@ export interface ActivityTemplate {
 }
 
 /**
- * Instancia de actividad en el tablero Kanban o activa
- * Contiene configuración específica para esta instancia del día
+ * Activity instance on the Kanban board or active
+ * Holds settings specific to this instance for the day
  */
 export interface ActivityInstance {
   id: UUID;
-  templateId: UUID; // Referencia a la plantilla en biblioteca
-  blockId: UUID; // Referencia al bloque de tiempo donde está colocada
-  order: number; // Orden dentro del bloque de tiempo
+  templateId: UUID; // Reference to the library template
+  blockId: UUID; // Reference to the time block it is placed in
+  order: number; // Order within the time block
   state: ActivityState;
 
-  // Configuraciones específicas para esta instancia
+  // Settings specific to this instance
   clearObjectiveSettings?: {
     estimatedDurationMinutes: MinutesNumber;
   };
@@ -108,7 +108,7 @@ export interface ActivityInstance {
     maximumDurationMinutes?: MinutesNumber;
   };
 
-  // Datos de tiempo (solo para actividad activa)
+  // Time data (only for the active activity)
   startTime?: ISODateTimeString;
 
   createdAt: ISODateTimeString;
@@ -116,8 +116,8 @@ export interface ActivityInstance {
 }
 
 /**
- * Actividad completada/interrumpida en el historial
- * Datos persistidos de una actividad finalizada
+ * Completed/interrupted activity in the history
+ * Persisted data of a finished activity
  */
 export interface CompletedActivityRecord {
   id: UUID;
@@ -127,7 +127,7 @@ export interface CompletedActivityRecord {
   state: "completed" | "interrupted";
   type: ActivityType;
 
-  // Configuraciones específicas usadas
+  // Specific settings used
   clearObjectiveSettings?: {
     estimatedDurationMinutes: MinutesNumber;
   };
@@ -143,43 +143,43 @@ export interface CompletedActivityRecord {
     maximumDurationMinutes?: MinutesNumber;
   };
 
-  // Datos de tiempo
+  // Time data
   startTime: ISODateTimeString;
   endTime: ISODateTimeString;
   durationMinutes: MinutesNumber;
 
-  // Sistema de tempos (schema v2+). El core siempre los setea;
-  // son opcionales en el tipo solo para tolerar fixtures de tests legacy
-  // y estados anteriores a la migración v1→v2.
+  // Tempo system (schema v2+). The core always sets them;
+  // they are optional in the type only to tolerate legacy test fixtures
+  // and states from before the v1->v2 migration.
   satisfactionScore?: number;
   temposAwarded?: number;
   beatEstimate?: boolean;
 
-  // Día al que pertenece
+  // Day it belongs to
   dayId: UUID;
 
   createdAt: ISODateTimeString;
 }
 
 /**
- * Bloque de tiempo en el tablero Kanban
- * Define un rango horario dentro del día
+ * Time block on the Kanban board
+ * Defines a time range within the day
  */
 export interface TimeBlock {
   id: UUID;
   name: string;
-  startMinute: DayMinutes; // Minutos desde 00:00 (0-1439)
-  endMinute: DayMinutes; // Minutos desde 00:00 (0-1439)
-  isDefault: boolean; // True para bloque "Por Hacer"
-  order: number; // Orden de visualización en Kanban
+  startMinute: DayMinutes; // Minutes since 00:00 (0-1439)
+  endMinute: DayMinutes; // Minutes since 00:00 (0-1439)
+  isDefault: boolean; // True for the "Por Hacer" block
+  order: number; // Display order on the Kanban
 
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
 }
 
 /**
- * Plantilla de Evento
- * Definición reutilizable de un tipo de evento
+ * Event Template
+ * Reusable definition of an event type
  */
 export interface EventTemplate {
   id: UUID;
@@ -190,22 +190,22 @@ export interface EventTemplate {
 }
 
 /**
- * Instancia de Evento
- * Registro de un evento ocurrido en un momento específico
+ * Event Instance
+ * Record of an event that occurred at a specific moment
  */
 export interface EventInstance {
   id: UUID;
   templateId: UUID;
-  templateName: string; // Para facilitar visualización
+  templateName: string; // To simplify display
   timestamp: ISODateTimeString;
-  dayId: UUID; // Día al que pertenece
+  dayId: UUID; // Day it belongs to
 
   createdAt: ISODateTimeString;
 }
 
 /**
- * Día
- * Representa un día dentro del sistema
+ * Day
+ * Represents a day within the system
  */
 export interface Day {
   id: UUID;
@@ -218,24 +218,24 @@ export interface Day {
 }
 
 /**
- * Preferencias de Usuario
- * Configuraciones personalizadas persistentes
+ * User Preferences
+ * Persistent personalized settings
  */
 export interface UserPreferences {
-  dailyTempoTarget?: number; // Schema v2+: default 1000, opcional para legacy
+  dailyTempoTarget?: number; // Schema v2+: default 1000, optional for legacy
 
   updatedAt: ISODateTimeString;
 }
 
 // ===============================================
-// Estados de la Aplicación
+// Application State
 // ===============================================
 
 /**
- * Archivo de datos legacy eliminados en la migración v2→v3.
- * Contiene las variables subjetivas, causas de interrupción, snapshots y
- * `hiddenSubjectiveVariableIds` que existían en estados previos. Se conserva
- * sólo para auditoría o exportación explícita; el runtime ya no lo usa.
+ * Archive of legacy data removed in the v2->v3 migration.
+ * Holds the subjective variables, interruption causes, snapshots and
+ * `hiddenSubjectiveVariableIds` that existed in earlier states. Kept
+ * only for auditing or explicit export; the runtime no longer uses it.
  */
 export interface LegacyArchive {
   subjectiveVariables: unknown[];
@@ -247,38 +247,38 @@ export interface LegacyArchive {
 }
 
 /**
- * Estado Global (persiste entre días)
- * Contiene datos históricos y configuraciones persistentes
+ * Global State (persists across days)
+ * Holds historical data and persistent settings
  */
 export interface GlobalState {
-  // Configuraciones persistentes
+  // Persistent settings
   days: Day[];
   activityTemplates: ActivityTemplate[];
   eventTemplates: EventTemplate[];
-  timeBlocks: TimeBlock[]; // Bloques de tiempo son persistentes
+  timeBlocks: TimeBlock[]; // Time blocks are persistent
   userPreferences: UserPreferences;
 
-  // Datos históricos
+  // Historical data
   completedActivityRecords: CompletedActivityRecord[];
   eventInstances: EventInstance[];
 
-  // Datos transitorios entre días
-  pendingActivityInstances?: ActivityInstance[]; // Actividades pendientes al pasar de un día a otro
+  // Transient data between days
+  pendingActivityInstances?: ActivityInstance[]; // Pending activities carried over from one day to the next
 
-  // Versión del esquema persistido (para migraciones). Default 3.
+  // Version of the persisted schema (for migrations). Default 3.
   schemaVersion?: number;
 
   /**
-   * Schema v3+: archivo de datos legacy (variables subjetivas + causas + snapshots
-   * + hiddenSubjectiveVariableIds) que fueron eliminados del shape principal.
-   * Solo presente si la migración v2→v3 archivó algo. No es leído por el runtime.
+   * Schema v3+: archive of legacy data (subjective variables + causes + snapshots
+   * + hiddenSubjectiveVariableIds) that were removed from the main shape.
+   * Only present if the v2->v3 migration archived something. Not read by the runtime.
    */
   legacyArchive?: LegacyArchive;
 }
 
 /**
- * Estado del Día Actual
- * Contiene datos específicos del día en curso
+ * Current Day State
+ * Holds data specific to the ongoing day
  */
 export interface CurrentDayState {
   day: Day;
@@ -287,8 +287,8 @@ export interface CurrentDayState {
 }
 
 /**
- * Estado Completo de la Aplicación
- * Combina el estado global y el del día actual
+ * Full Application State
+ * Combines the global state and the current day's state
  */
 export interface AppState {
   global: GlobalState;
@@ -296,11 +296,11 @@ export interface AppState {
 }
 
 // ===============================================
-// Tipos para Análisis y Visualizaciones
+// Types for Analytics and Visualizations
 // ===============================================
 
 /**
- * Datos para visualización de timeline
+ * Data for the timeline visualization
  */
 export interface TimelineData {
   activities: {
@@ -321,9 +321,9 @@ export interface TimelineData {
     position: DayMinutes;
   }[];
   /**
-   * Schema v2+: cada actividad interrumpida aparece como marca en el timeline.
-   * No hay clasificación evitable/innevitable ni causa: el sistema no pregunta,
-   * solo registra el momento.
+   * Schema v2+: each interrupted activity appears as a mark on the timeline.
+   * There is no avoidable/unavoidable classification or cause: the system does not ask,
+   * it only records the moment.
    */
   interruptions: {
     id: UUID;
@@ -334,7 +334,7 @@ export interface TimelineData {
 }
 
 /**
- * Datos para visualización de distribución de tiempo
+ * Data for the time distribution visualization
  */
 export interface TimeDistributionData {
   categories: {
@@ -351,7 +351,7 @@ export interface TimeDistributionData {
 }
 
 /**
- * Estadísticas de actividad para análisis
+ * Activity statistics for analytics
  */
 export interface ActivityStatistics {
   totalInstances: number;
@@ -363,20 +363,20 @@ export interface ActivityStatistics {
 }
 
 /**
- * Resumen de tempos de un día
- * Calculado derivado, no persistido
+ * Tempo summary for a day
+ * Derived calculation, not persisted
  */
 export interface TempoSummary {
   totalTempos: number;
   target: number;
   /**
-   * Ratio real sin cap (puede ser > 1 si superaste el target).
-   * Ej: 1847 / 1000 = 1.847
+   * Real ratio without a cap (can be > 1 if you exceeded the target).
+   * E.g.: 1847 / 1000 = 1.847
    */
   targetProgress: number;
   /**
-   * Valor para la barra de progreso (siempre 0..100).
-   * Para mostrar >100% se usa `displayPercent` que tampoco se capa.
+   * Value for the progress bar (always 0..100).
+   * To show >100%, `displayPercent` is used, which is not capped either.
    */
   progressBarValue: number;
   displayPercent: number;
@@ -390,7 +390,7 @@ export interface TempoSummary {
 }
 
 /**
- * Punto de tendencia de tempos en el tiempo
+ * Tempo trend point over time
  */
 export interface TempoTrendPoint {
   date: ISODateTimeString;
@@ -400,29 +400,29 @@ export interface TempoTrendPoint {
 }
 
 /**
- * Solicitud de cierre de actividad: lo que la UI necesita para mostrar el modal.
- * El timestamp se congela al pedir el cierre; completeActivity lo usa para que
- * la duración no cambie mientras el usuario decide.
+ * Activity completion request: what the UI needs to show the modal.
+ * The timestamp is frozen when completion is requested; completeActivity uses it
+ * so the duration does not change while the user decides.
  */
 export interface CompletionRequest {
   activityTitle: string;
   durationMinutes: number;
   estimatedMinutes?: number;
   /**
-   * Métrica informativa: indica si la actividad se completó antes del 80%
-   * del estimado (solo aplica a clear-objective con estimado puntual).
+   * Informational metric: indicates whether the activity was completed before 80%
+   * of the estimate (only applies to clear-objective with a single estimate).
    *
-   * En el MVP v3 NO afecta la fórmula de tempos: el usuario decide el
-   * bonus explícitamente moviendo el slider a 8/9/10. Este flag se
-   * conserva solo como información en el CompletionModal ("✓ batiste
-   * el estimado") y como dato del record para futuras analíticas.
+   * In MVP v3 it does NOT affect the tempo formula: the user decides the
+   * bonus explicitly by moving the slider to 8/9/10. This flag is
+   * kept only as info in the CompletionModal ("you beat the
+   * estimate") and as record data for future analytics.
    */
   beatEstimate: boolean;
   requestedAt: ISODateTimeString;
 }
 
 /**
- * Resultado de cerrar una actividad: lo que el core retorna a la UI
+ * Result of completing an activity: what the core returns to the UI
  */
 export interface CompletionResult {
   record: CompletedActivityRecord;
@@ -430,18 +430,18 @@ export interface CompletionResult {
   beatEstimate: boolean;
   dailyTempoTotal: number;
   /**
-   * Ratio real sin cap (puede ser > 1 si superaste el target).
-   * Consistente con `TempoSummary.targetProgress` y `TempoTrendPoint.targetProgress`.
+   * Real ratio without a cap (can be > 1 if you exceeded the target).
+   * Consistent with `TempoSummary.targetProgress` and `TempoTrendPoint.targetProgress`.
    */
   targetProgress: number;
 }
 
 // ===============================================
-// Interfaces para Módulos del Sistema
+// Interfaces for System Modules
 // ===============================================
 
 /**
- * Interfaz para el PersistenceManager
+ * Interface for the PersistenceManager
  */
 export interface IPersistenceManager {
   saveState(state: AppState): void;
@@ -450,22 +450,22 @@ export interface IPersistenceManager {
 }
 
 /**
- * Interfaz para SystemCore
+ * Interface for SystemCore
  */
 export interface ISystemCore {
   getState(): AppState;
   updateState(updater: (state: AppState) => AppState): void;
 
-  // Suscripción a cambios de estado
+  // Subscription to state changes
   onStateChange(callback: (newState: AppState) => void): () => void;
 
-  // Métodos de DayManager
+  // DayManager methods
   startDay(): Day;
   endDay(): Day;
   getCurrentDay(): Day | null;
   isDayActive(): boolean;
 
-  // Métodos de ActivityManager
+  // ActivityManager methods
   createActivityTemplate(
     data: Omit<ActivityTemplate, "id" | "createdAt" | "updatedAt">
   ): ActivityTemplate;
@@ -492,7 +492,7 @@ export interface ISystemCore {
   interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 
-  // Métodos de TimeBlockManager
+  // TimeBlockManager methods
   createTimeBlock(name: string, startMinute: DayMinutes, endMinute: DayMinutes): TimeBlock;
   updateTimeBlock(id: UUID, data: Partial<TimeBlock>): TimeBlock;
   deleteTimeBlock(id: UUID, moveActivitiesToTodo?: boolean): void;
@@ -501,7 +501,7 @@ export interface ISystemCore {
   isTimeBlockAvailable(blockId: UUID): boolean;
   isTimeBlockExisting(blockId: UUID): boolean;
 
-  // Métodos de EventManager
+  // EventManager methods
   createEventTemplate(name: string): EventTemplate;
   updateEventTemplate(id: UUID, data: Partial<EventTemplate>): EventTemplate;
   deleteEventTemplate(id: UUID): void;
@@ -509,7 +509,7 @@ export interface ISystemCore {
   getEventInstances(filters?: { dayId?: UUID; since?: string; until?: string }): EventInstance[];
   getRecentEvents(minutesWindow?: number): EventInstance[];
 
-  // Métodos de AnalyticsManager
+  // AnalyticsManager methods
   getTimelineData(dayId?: UUID): TimelineData;
   getTimeDistributionData(dayId?: UUID): TimeDistributionData;
   getActivityStats(templateId?: UUID): ActivityStatistics;
@@ -518,19 +518,19 @@ export interface ISystemCore {
   getTempoSummary(dayId: UUID): TempoSummary;
   getTempoTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): TempoTrendPoint[];
 
-  // Métodos de UserPreferencesManager
+  // UserPreferencesManager methods
   updateUserPreferences(preferences: Partial<UserPreferences>): UserPreferences;
   getUserPreferences(): UserPreferences;
   updateDailyTempoTarget(target: number): UserPreferences;
 
-  // Métodos de PersistenceManager
+  // PersistenceManager methods
   exportData(): string;
   importData(jsonData: string): AppState;
   clearState(): void;
 }
 
 /**
- * Tipo para funciones de actualización de estado
- * Utilizado para todas las actualizaciones de estado en el sistema
+ * Type for state update functions
+ * Used for all state updates in the system
  */
 export type StateUpdater = (state: AppState) => AppState;

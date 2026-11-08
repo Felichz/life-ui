@@ -9,7 +9,7 @@ export const DialogTrigger = RadixDialog.Trigger;
 export const DialogClose = RadixDialog.Close;
 
 interface DialogContentProps extends ComponentPropsWithoutRef<typeof RadixDialog.Content> {
-  /** center: modal centrado. sheet: panel lateral en escritorio, hoja inferior en móvil. */
+  /** center: centered modal. sheet: side panel on desktop, bottom sheet on mobile. */
   variant?: "center" | "sheet";
   size?: "sm" | "md" | "lg";
   hideClose?: boolean;

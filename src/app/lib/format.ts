@@ -9,7 +9,7 @@ export function formatMinutes(total: number): string {
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
-/** Compacto para tablas y chips: "45m", "1h 15m" */
+/** Compact, for tables and chips: "45m", "1h 15m" */
 export function formatMinutesShort(total: number): string {
   const minutes = Math.max(0, Math.round(total));
   if (minutes < 60) return `${minutes}m`;
@@ -18,7 +18,7 @@ export function formatMinutesShort(total: number): string {
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
 }
 
-/** Cronómetro: "04:07", "1:02:03" */
+/** Stopwatch: "04:07", "1:02:03" */
 export function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -29,12 +29,12 @@ export function formatClock(ms: number): string {
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-/** ISO → "14:30" en hora local */
+/** ISO → "14:30" in local time */
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(intlLocale(), { hour: "numeric", minute: "2-digit" });
 }
 
-/** Minutos del día → "14:00" */
+/** Minutes of the day → "14:00" */
 export function formatDayMinutes(dayMinutes: number): string {
   const clamped = Math.max(0, Math.min(1439, Math.round(dayMinutes)));
   const hours = Math.floor(clamped / 60);
@@ -62,7 +62,7 @@ export function formatDateLong(date: Date | string): string {
   );
 }
 
-/** "jue 26 sep" */
+/** "jue 26 sep" / "Thu Sep 26" */
 export function formatDateShort(date: Date | string): string {
   const value = typeof date === "string" ? new Date(date) : date;
   return value
@@ -71,7 +71,7 @@ export function formatDateShort(date: Date | string): string {
     .replace(",", "");
 }
 
-/** "26 sep" */
+/** "26 sep" / "Sep 26" */
 export function formatDayMonth(date: Date | string): string {
   const value = typeof date === "string" ? new Date(date) : date;
   return value

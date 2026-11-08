@@ -5,9 +5,9 @@
 import { PersistenceManager, STORAGE_KEY, CURRENT_SCHEMA_VERSION } from "../persistenceManager";
 import type { AppState } from "../../types";
 
-// Mock directo de localStorage
-// Usamos un objeto estable y mutamos sus keys en lugar de reasignar la referencia.
-// Esto evita problemas de closures que no ven la reasignación.
+// Direct localStorage mock
+// We use a stable object and mutate its keys instead of reassigning the reference.
+// This avoids issues with closures that do not see the reassignment.
 const mockLocalStorage: Record<string, string> = {};
 const clearMockStorage = () => {
   for (const k of Object.keys(mockLocalStorage)) {
@@ -31,14 +31,14 @@ beforeAll(() => {
   });
 });
 
-// Silenciamos console.error durante las pruebas
+// Silence console.error during the tests
 jest.spyOn(console, "error").mockImplementation();
 jest.spyOn(console, "warn").mockImplementation();
 
 describe("PersistenceManager", () => {
   let persistenceManager: PersistenceManager;
 
-  // Datos de prueba
+  // Test data
   const mockValidState: AppState = {
     global: {
       days: [],
@@ -55,7 +55,7 @@ describe("PersistenceManager", () => {
   };
 
   beforeEach(() => {
-    // Limpiar mocks y localStorage antes de cada prueba
+    // Clear mocks and localStorage before each test
     jest.clearAllMocks();
     window.localStorage.clear();
     clearMockStorage();
@@ -63,64 +63,64 @@ describe("PersistenceManager", () => {
   });
 
   afterAll(() => {
-    // Restaurar mocks
+    // Restore mocks
     jest.restoreAllMocks();
   });
 
-  // Test simple para verificar que nuestro mock funciona
-  it("verifica que el mock de localStorage funciona", () => {
+  // Simple test to verify our mock works
+  it("verifies the localStorage mock works", () => {
     localStorage.setItem("test-key", "test-value");
     expect(localStorage.getItem("test-key")).toBe("test-value");
   });
 
   describe("saveState", () => {
-    it("debe guardar el estado correctamente en localStorage", () => {
+    it("saves the state to localStorage correctly", () => {
       persistenceManager.saveState(mockValidState);
 
-      // Schema v3: saveState añade schemaVersion=3 al payload
+      // Schema v3: saveState adds schemaVersion=3 to the payload
       const expectedPayload = JSON.stringify({ ...mockValidState, schemaVersion: 3 });
 
-      // Verificar que setItem fue llamado con los parámetros correctos
+      // Verify setItem was called with the correct parameters
       expect(localStorage.setItem).toHaveBeenCalledWith(STORAGE_KEY, expectedPayload);
 
-      // Verificar que el valor se guardó en mockLocalStorage
+      // Verify the value was saved in mockLocalStorage
       expect(mockLocalStorage[STORAGE_KEY]).toBe(expectedPayload);
     });
 
-    it("debe manejar errores durante el guardado", () => {
-      // Simular un error
+    it("handles errors while saving", () => {
+      // Simulate an error
       localStorage.setItem = jest.fn().mockImplementationOnce(() => {
         throw new Error("Error de almacenamiento");
       });
 
-      // La llamada no debe lanzar excepción
+      // The call must not throw
       expect(() => {
         persistenceManager.saveState(mockValidState);
       }).not.toThrow();
 
-      // Verificar que se registró el error
+      // Verify the error was logged
       expect(console.error).toHaveBeenCalled();
     });
   });
 
   describe("loadState", () => {
-    it("debe retornar null si no hay datos en localStorage", () => {
+    it("returns null if there is no data in localStorage", () => {
       const result = persistenceManager.loadState();
       expect(result).toBeNull();
     });
 
-    it("debe cargar y deserializar correctamente el estado", () => {
-      // Schema v2+: el estado persistido lleva schemaVersion
+    it("loads and deserializes the state correctly", () => {
+      // Schema v2+: the persisted state carries schemaVersion
       const serializedState = JSON.stringify({ ...mockValidState, schemaVersion: 2 });
       mockLocalStorage[STORAGE_KEY] = serializedState;
 
-      // Verificar que nuestro mock funciona
+      // Verify our mock works
       expect(localStorage.getItem(STORAGE_KEY)).toBe(serializedState);
 
-      // Ejecutar el método para probar
+      // Run the method under test
       const result = persistenceManager.loadState();
 
-      // Verificar el resultado
+      // Verify the result
       expect(result).not.toBeNull();
       expect(localStorage.getItem).toHaveBeenCalledWith(STORAGE_KEY);
 
@@ -130,8 +130,8 @@ describe("PersistenceManager", () => {
       }
     });
 
-    it("debe retornar null si los datos no son un objeto válido", () => {
-      // Guardar un string que no es un objeto al deserializar
+    it("returns null if the data is not a valid object", () => {
+      // Store a string that is not an object when deserialized
       mockLocalStorage[STORAGE_KEY] = JSON.stringify("string no válido");
 
       jest.clearAllMocks();
@@ -142,8 +142,8 @@ describe("PersistenceManager", () => {
       expect(console.error).toHaveBeenCalled();
     });
 
-    it("debe retornar null si el objeto no tiene la estructura esperada", () => {
-      // Guardar un objeto con estructura incorrecta
+    it("returns null if the object does not have the expected structure", () => {
+      // Store an object with an incorrect structure
       mockLocalStorage[STORAGE_KEY] = JSON.stringify({ invalidKey: "value" });
 
       jest.clearAllMocks();
@@ -154,8 +154,8 @@ describe("PersistenceManager", () => {
       expect(console.error).toHaveBeenCalled();
     });
 
-    it("debe manejar errores durante la carga", () => {
-      // Simular un error en getItem
+    it("handles errors while loading", () => {
+      // Simulate an error in getItem
       localStorage.getItem = jest.fn().mockImplementationOnce(() => {
         throw new Error("Error de lectura");
       });
@@ -168,28 +168,28 @@ describe("PersistenceManager", () => {
   });
 
   describe("clearState", () => {
-    it("debe eliminar el estado de localStorage", () => {
-      // Guardar datos en localStorage
+    it("removes the state from localStorage", () => {
+      // Save data to localStorage
       mockLocalStorage[STORAGE_KEY] = JSON.stringify(mockValidState);
 
-      // Verificar que existe antes de eliminarlo
+      // Verify it exists before removing it
       expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
 
-      // Limpiar el estado
+      // Clear the state
       persistenceManager.clearState();
 
-      // Verificar que se llamó a removeItem y que se eliminó
+      // Verify removeItem was called and the data was removed
       expect(localStorage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
       expect(mockLocalStorage[STORAGE_KEY]).toBeUndefined();
     });
 
-    it("debe manejar errores durante la limpieza", () => {
-      // Simular un error en removeItem
+    it("handles errors while clearing", () => {
+      // Simulate an error in removeItem
       localStorage.removeItem = jest.fn().mockImplementationOnce(() => {
         throw new Error("Error al eliminar");
       });
 
-      // No debe lanzar la excepción
+      // Must not throw the exception
       expect(() => {
         persistenceManager.clearState();
       }).not.toThrow();
@@ -198,11 +198,11 @@ describe("PersistenceManager", () => {
     });
   });
 
-  // Schema v2: migración resiliente
+  // Schema v2: resilient migration
   describe("migrateV1ToV2 (schema upgrade)", () => {
-    // Restaurar TODOS los métodos de localStorage. Los tests previos
-    // ("debe manejar errores durante el guardado" y "debe manejar errores durante la carga")
-    // sobreescriben setItem/getItem con mocks que solo lanzan una vez.
+    // Restore ALL localStorage methods. The previous tests
+    // ("handles errors while saving" and "handles errors while loading")
+    // override setItem/getItem with mocks that only throw once.
     beforeEach(() => {
       localStorage.setItem = jest.fn((key: string, value: string) => {
         mockLocalStorage[key] = value;
@@ -214,8 +214,8 @@ describe("PersistenceManager", () => {
       localStorage.clear = jest.fn(() => clearMockStorage());
     });
 
-    it("estado sin schemaVersion (v1) se migra a v2 con dailyTempoTarget default 100", () => {
-      // Guardar un estado v1 (sin schemaVersion)
+    it("state without schemaVersion (v1) migrates to v2 with default dailyTempoTarget 100", () => {
+      // Save a v1 state (no schemaVersion)
       const v1State = {
         global: {
           days: [],
@@ -223,7 +223,7 @@ describe("PersistenceManager", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            // NO dailyTempoTarget (es v1)
+            // NO dailyTempoTarget (it is v1)
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -239,7 +239,7 @@ describe("PersistenceManager", () => {
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
     });
 
-    it("preserva dailyTempoTarget si ya existe (no sobrescribe)", () => {
+    it("preserves dailyTempoTarget if it already exists (does not overwrite)", () => {
       const v1StateWithTarget = {
         global: {
           days: [],
@@ -247,7 +247,7 @@ describe("PersistenceManager", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 500, // usuario lo había configurado
+            dailyTempoTarget: 500, // the user had configured it
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -261,7 +261,7 @@ describe("PersistenceManager", () => {
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(500);
     });
 
-    it("marca completedActivityRecords antiguos con tempos=0", () => {
+    it("marks old completedActivityRecords with tempos=0", () => {
       const v1StateWithRecords = {
         global: {
           days: [],
@@ -283,7 +283,7 @@ describe("PersistenceManager", () => {
               durationMinutes: 30,
               dayId: "d1",
               createdAt: "2023-01-01T00:00:00.000Z",
-              // NO satisfactionScore, NO temposAwarded, NO beatEstimate (es v1)
+              // NO satisfactionScore, NO temposAwarded, NO beatEstimate (it is v1)
             },
           ],
           eventInstances: [],
@@ -299,13 +299,13 @@ describe("PersistenceManager", () => {
       expect(result!.global.completedActivityRecords[0].beatEstimate).toBe(false);
     });
 
-    it("RECONSTRUYE userPreferences si falta global completo (estado corrupto parcial)", () => {
+    it("REBUILDS userPreferences if global is incomplete (partially corrupt state)", () => {
       const corruptState = {
-        // Falta global.currentDay
+        // global.currentDay is missing
         global: {
           days: [],
           activityTemplates: [],
-          // ...faltan varios campos
+          // ...several fields are missing
         },
         currentDay: null,
       };
@@ -313,12 +313,12 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      // Debe haber reconstruido userPreferences con dailyTempoTarget=100
+      // Must have rebuilt userPreferences with dailyTempoTarget=100
       expect(result!.global.userPreferences).toBeDefined();
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
     });
 
-    it("RECONSTRUYE userPreferences si el objeto global existe pero userPreferences falta", () => {
+    it("REBUILDS userPreferences if the global object exists but userPreferences is missing", () => {
       const stateWithoutPrefs = {
         global: {
           days: [],
@@ -339,7 +339,7 @@ describe("PersistenceManager", () => {
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
     });
 
-    it("RECONSTRUYE completedActivityRecords si falta el array", () => {
+    it("REBUILDS completedActivityRecords if the array is missing", () => {
       const stateWithoutRecords = {
         global: {
           days: [],
@@ -362,7 +362,7 @@ describe("PersistenceManager", () => {
       expect(result!.global.completedActivityRecords.length).toBe(0);
     });
 
-    it("estado v2 (schemaVersion=2) no se re-migra", () => {
+    it("v2 state (schemaVersion=2) is not re-migrated", () => {
       const v2State = {
         global: {
           days: [],
@@ -370,7 +370,7 @@ describe("PersistenceManager", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 750, // valor custom del usuario
+            dailyTempoTarget: 750, // user's custom value
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -382,11 +382,11 @@ describe("PersistenceManager", () => {
       mockLocalStorage[STORAGE_KEY] = JSON.stringify(v2State);
 
       const result = persistenceManager.loadState();
-      // Si fuera v1, se sobrescribiría a 1000. v2 respeta el 750.
+      // If it were v1, it would be overwritten to 1000. v2 keeps the 750.
       expect(result!.global.userPreferences.dailyTempoTarget).toBe(750);
     });
 
-    it("saveState incluye schemaVersion=3 al persistir", () => {
+    it("saveState includes schemaVersion=3 when persisting", () => {
       persistenceManager.saveState(mockValidState);
 
       const stored = mockLocalStorage[STORAGE_KEY];
@@ -395,8 +395,8 @@ describe("PersistenceManager", () => {
       expect(parsed.schemaVersion).toBe(3);
     });
 
-    // Schema v3: archivado y eliminación de campos legacy
-    it("estado v2 con campos legacy se migra a v3 archivando los campos en legacyArchive", () => {
+    // Schema v3: archiving and removal of legacy fields
+    it("v2 state with legacy fields migrates to v3, archiving the fields in legacyArchive", () => {
       const v2StateWithLegacy = {
         global: {
           days: [],
@@ -423,7 +423,7 @@ describe("PersistenceManager", () => {
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
 
-      // El shape persistido principal ya no tiene los campos legacy
+      // The main persisted shape no longer has the legacy fields
       const global = result!.global as unknown as Record<string, unknown>;
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
@@ -431,7 +431,7 @@ describe("PersistenceManager", () => {
       const prefs = global.userPreferences as Record<string, unknown>;
       expect(prefs.hiddenSubjectiveVariableIds).toBeUndefined();
 
-      // El archivo está disponible para auditoría
+      // The archive is available for audit
       expect(global.legacyArchive).toBeDefined();
       const archive = global.legacyArchive as {
         subjectiveVariables: unknown[];
@@ -445,7 +445,7 @@ describe("PersistenceManager", () => {
       expect(archive.hiddenSubjectiveVariableIds).toEqual(["var-1"]);
     });
 
-    it("estado v2 sin campos legacy migra a v3 sin legacyArchive", () => {
+    it("v2 state without legacy fields migrates to v3 without legacyArchive", () => {
       const v2CleanState = {
         global: {
           days: [],
@@ -473,8 +473,8 @@ describe("PersistenceManager", () => {
       expect(global.interruptionCauses).toBeUndefined();
     });
 
-    it("saveState defensivo: elimina campos legacy si se cuelan en el estado", () => {
-      // Forzamos un estado con campos legacy inyectados
+    it("defensive saveState: removes legacy fields if they sneak into the state", () => {
+      // Force a state with injected legacy fields
       const stateWithLegacyInjected = {
         global: {
           ...mockValidState.global,
@@ -498,7 +498,7 @@ describe("PersistenceManager", () => {
       expect(stored.global.userPreferences.hiddenSubjectiveVariableIds).toBeUndefined();
     });
 
-    it("estado v1 pasa por v2 y v3 en cadena (un solo loadState)", () => {
+    it("v1 state chains through v2 and v3 (a single loadState)", () => {
       const v1State = {
         global: {
           days: [],
@@ -524,10 +524,10 @@ describe("PersistenceManager", () => {
       expect(result).not.toBeNull();
       const global = result!.global as unknown as Record<string, unknown>;
 
-      // dailyTempoTarget creado por v1→v2
+      // dailyTempoTarget created by v1→v2
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
 
-      // Campos legacy archivados por v2→v3
+      // Legacy fields archived by v2→v3
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
@@ -538,9 +538,9 @@ describe("PersistenceManager", () => {
     });
   });
 
-  // Pipeline central: serialize/deserialize (lo que export/import y localStorage usan)
+  // Central pipeline: serialize/deserialize (what export/import and localStorage use)
   describe("serialize / deserialize", () => {
-    it("serialize incluye schemaVersion=3 y produce JSON parseable", () => {
+    it("serialize includes schemaVersion=3 and produces parseable JSON", () => {
       const json = persistenceManager.serialize(mockValidState);
       const parsed = JSON.parse(json);
 
@@ -548,7 +548,7 @@ describe("PersistenceManager", () => {
       expect(parsed.global).toEqual(mockValidState.global);
     });
 
-    it("serialize elimina campos legacy aunque estén en el estado", () => {
+    it("serialize removes legacy fields even if they are in the state", () => {
       const stateWithLegacy = {
         ...mockValidState,
         global: {
@@ -572,15 +572,15 @@ describe("PersistenceManager", () => {
       expect(parsed.global.userPreferences.hiddenSubjectiveVariableIds).toBeUndefined();
     });
 
-    it("deserialize de v3 retorna el estado tal cual sin migración", () => {
+    it("deserialize of v3 returns the state as is without migration", () => {
       const json = JSON.stringify({ ...mockValidState, schemaVersion: 3 });
       const result = persistenceManager.deserialize(json);
 
       expect(result.global).toEqual(mockValidState.global);
-      // Sin warnings porque no hay migración
+      // No warnings because there is no migration
     });
 
-    it("deserialize de v2 con campos legacy los archiva y limpia", () => {
+    it("deserialize of v2 with legacy fields archives and cleans them", () => {
       const v2State = {
         global: {
           days: [],
@@ -613,11 +613,11 @@ describe("PersistenceManager", () => {
         (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
       ).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
-      // dailyTempoTarget preservado por la migración
+      // dailyTempoTarget preserved by the migration
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(800);
     });
 
-    it("deserialize de v1 sin schemaVersion ejecuta v1→v2→v3", () => {
+    it("deserialize of v1 without schemaVersion runs v1→v2→v3", () => {
       const v1State = {
         global: {
           days: [],
@@ -640,22 +640,22 @@ describe("PersistenceManager", () => {
       const result = persistenceManager.deserialize(JSON.stringify(v1State));
       const global = result.global as unknown as Record<string, unknown>;
 
-      // dailyTempoTarget creado por v1→v2
+      // dailyTempoTarget created by v1→v2
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
-      // Legacy archivado por v2→v3
+      // Legacy archived by v2→v3
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
     });
 
-    it("deserialize lanza Error con JSON inválido", () => {
+    it("deserialize throws an Error on invalid JSON", () => {
       expect(() => persistenceManager.deserialize("invalid json")).toThrow();
     });
 
-    it("deserialize lanza Error con estructura inválida", () => {
+    it("deserialize throws an Error on invalid structure", () => {
       expect(() => persistenceManager.deserialize(JSON.stringify({}))).toThrow();
     });
 
-    it("roundtrip serialize → deserialize preserva el estado", () => {
+    it("serialize → deserialize roundtrip preserves the state", () => {
       const original = {
         ...mockValidState,
         global: {
@@ -678,8 +678,8 @@ describe("PersistenceManager", () => {
       expect(result.global.userPreferences).toEqual(original.global.userPreferences);
     });
 
-    // Hardening: payload v3 con legacy fields inyectados debe normalizarse
-    it("payload v3 con legacy fields inyectados se normaliza (stripLegacyFields)", () => {
+    // Hardening: a v3 payload with injected legacy fields must be normalized
+    it("v3 payload with injected legacy fields is normalized (stripLegacyFields)", () => {
       const v3WithLegacy = {
         global: {
           days: [],
@@ -693,7 +693,7 @@ describe("PersistenceManager", () => {
           },
           completedActivityRecords: [],
           eventInstances: [],
-          // Payload manipulado: declara v3 pero trae legacy fields
+          // Tampered payload: declares v3 but carries legacy fields
           subjectiveVariables: [{ id: "v1", name: "Energía" }],
           interruptionCauses: [{ id: "c1" }],
           subjectiveVariableSnapshots: [{ id: "s1" }],
@@ -705,7 +705,7 @@ describe("PersistenceManager", () => {
       const result = persistenceManager.deserialize(JSON.stringify(v3WithLegacy));
       const global = result.global as unknown as Record<string, unknown>;
 
-      // El runtime NO debe contener los legacy fields, ni siquiera en memoria
+      // The runtime must NOT contain the legacy fields, not even in memory
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
@@ -713,8 +713,8 @@ describe("PersistenceManager", () => {
         (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
       ).toBeUndefined();
 
-      // Sin migración (ya era v3) -> sin legacyArchive (no había datos para archivar
-      // porque stripLegacyFields los eliminó directamente)
+      // No migration (already v3) -> no legacyArchive (there was no data to archive
+      // because stripLegacyFields removed it directly)
       expect(global.legacyArchive).toBeUndefined();
     });
   });

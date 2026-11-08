@@ -9,30 +9,31 @@ import type {
   CompletionResult,
   ISODateTimeString,
 } from "../types";
+import { CoreError } from "./errors";
 
 /**
- * Gestor del ciclo de vida de actividades en LifeUI
- * Permite crear y gestionar plantillas de actividad, instancias y registros de actividades completadas
+ * Activity lifecycle manager in LifeUI
+ * Creates and manages activity templates, instances and completed activity records
  */
 export class ActivityManager {
   private systemCore: SystemCore;
 
   /**
-   * Constructor de ActivityManager
-   * @param systemCore Instancia del núcleo del sistema
+   * ActivityManager constructor
+   * @param systemCore System core instance
    */
   constructor(systemCore: SystemCore) {
     this.systemCore = systemCore;
   }
 
   // ===============================================
-  // Gestión de plantillas
+  // Template management
   // ===============================================
 
   /**
-   * Crea una nueva plantilla de actividad
-   * @param data Datos para la nueva plantilla
-   * @returns La plantilla creada
+   * Creates a new activity template
+   * @param data Data for the new template
+   * @returns The created template
    */
   public createActivityTemplate(
     data: Omit<ActivityTemplate, "id" | "createdAt" | "updatedAt">
@@ -61,11 +62,11 @@ export class ActivityManager {
   }
 
   /**
-   * Actualiza una plantilla de actividad existente
-   * @param id ID de la plantilla a actualizar
-   * @param data Datos a actualizar
-   * @returns La plantilla actualizada
-   * @throws Error si la plantilla no existe
+   * Updates an existing activity template
+   * @param id ID of the template to update
+   * @param data Data to update
+   * @returns The updated template
+   * @throws Error if the template does not exist
    */
   public updateActivityTemplate(id: UUID, data: Partial<ActivityTemplate>): ActivityTemplate {
     const timestamp = UtilityService.getCurrentISODateTime();
@@ -77,19 +78,19 @@ export class ActivityManager {
       );
 
       if (templateIndex === -1) {
-        throw new Error(`Plantilla de actividad con ID ${id} no encontrada`);
+        throw new CoreError("activity-template-not-found", `id ${id}`);
       }
 
-      // Actualizar la plantilla
+      // Update the template
       const template = state.global.activityTemplates[templateIndex];
       updatedTemplate = {
         ...template,
         ...data,
-        id, // Asegurar que el ID no cambie
+        id, // Make sure the ID does not change
         updatedAt: timestamp,
       };
 
-      // Crear nuevo array con la plantilla actualizada
+      // Build a new array with the updated template
       const updatedTemplates = [...state.global.activityTemplates];
       updatedTemplates[templateIndex] = updatedTemplate;
 
@@ -103,16 +104,16 @@ export class ActivityManager {
     });
 
     if (!updatedTemplate) {
-      throw new Error(`Error al actualizar la plantilla ${id}`);
+      throw new CoreError("internal", `updating template ${id}`);
     }
 
     return updatedTemplate;
   }
 
   /**
-   * Elimina una plantilla de actividad
-   * @param id ID de la plantilla a eliminar
-   * @throws Error si la plantilla no existe
+   * Deletes an activity template
+   * @param id ID of the template to delete
+   * @throws Error if the template does not exist
    */
   public deleteActivityTemplate(id: UUID): void {
     this.systemCore.updateState((state) => {
@@ -121,19 +122,19 @@ export class ActivityManager {
       );
 
       if (templateIndex === -1) {
-        throw new Error(`Plantilla de actividad con ID ${id} no encontrada`);
+        throw new CoreError("activity-template-not-found", `id ${id}`);
       }
 
-      // Verificar si hay instancias usando esta plantilla
+      // Check whether any instances use this template
       const hasInstances = state.currentDay?.activityInstances.some(
         (instance) => instance.templateId === id
       );
 
       if (hasInstances) {
-        throw new Error(`No se puede eliminar la plantilla ${id} porque tiene instancias activas`);
+        throw new CoreError("activity-template-in-use", `id ${id}`);
       }
 
-      // Crear nuevo array sin la plantilla eliminada
+      // Build a new array without the deleted template
       const updatedTemplates = state.global.activityTemplates.filter(
         (_, index) => index !== templateIndex
       );
@@ -149,17 +150,17 @@ export class ActivityManager {
   }
 
   /**
-   * Obtiene todas las plantillas de actividad
-   * @returns Lista de plantillas
+   * Gets all activity templates
+   * @returns List of templates
    */
   public getActivityTemplates(): ActivityTemplate[] {
     return this.systemCore.getState().global.activityTemplates;
   }
 
   /**
-   * Obtiene una plantilla de actividad específica
-   * @param id ID de la plantilla
-   * @returns La plantilla o undefined si no existe
+   * Gets a specific activity template
+   * @param id ID of the template
+   * @returns The template, or undefined if it does not exist
    */
   public getActivityTemplate(id: UUID): ActivityTemplate | undefined {
     return this.systemCore
@@ -168,16 +169,16 @@ export class ActivityManager {
   }
 
   // ===============================================
-  // Gestión de instancias
+  // Instance management
   // ===============================================
 
   /**
-   * Crea una nueva instancia de actividad a partir de una plantilla
-   * @param templateId ID de la plantilla
-   * @param blockId ID del bloque de tiempo
-   * @param dynamicSettings Configuraciones específicas para esta instancia (opcional)
-   * @returns La instancia creada
-   * @throws Error si la plantilla no existe o no hay día activo
+   * Creates a new activity instance from a template
+   * @param templateId ID of the template
+   * @param blockId ID of the time block
+   * @param dynamicSettings Settings specific to this instance (optional)
+   * @returns The created instance
+   * @throws Error if the template does not exist or there is no active day
    */
   public createActivityInstance(
     templateId: UUID,
@@ -189,21 +190,21 @@ export class ActivityManager {
   ): ActivityInstance {
     const state = this.systemCore.getState();
 
-    // Verificar que existe un día activo
+    // Check that there is an active day
     if (!state.currentDay) {
-      throw new Error("No hay un día activo para crear instancias");
+      throw new CoreError("no-active-day");
     }
 
-    // Buscar la plantilla
+    // Look up the template
     const template = this.getActivityTemplate(templateId);
     if (!template) {
-      throw new Error(`Plantilla con ID ${templateId} no encontrada`);
+      throw new CoreError("activity-template-not-found", `id ${templateId}`);
     }
 
     const id = UtilityService.generateUUID();
     const timestamp = UtilityService.getCurrentISODateTime();
 
-    // Determinar el orden dentro del bloque
+    // Determine the order within the block
     const blockInstances = state.currentDay.activityInstances.filter(
       (instance) => instance.blockId === blockId
     );
@@ -213,7 +214,7 @@ export class ActivityManager {
         ? Math.max(...blockInstances.map((instance) => instance.order)) + 1
         : 0;
 
-    // Crear la instancia base con propiedades de la plantilla
+    // Create the base instance with properties from the template
     const baseInstance: ActivityInstance = {
       id,
       templateId,
@@ -224,7 +225,7 @@ export class ActivityManager {
       updatedAt: timestamp,
     };
 
-    // Copiar configuraciones específicas según el tipo de actividad
+    // Copy type-specific settings based on the activity type
     if (template.type === "clear-objective" && template.clearObjectiveSettings) {
       baseInstance.clearObjectiveSettings = {
         ...template.clearObjectiveSettings,
@@ -239,17 +240,17 @@ export class ActivityManager {
       };
     }
 
-    // Aplicar configuraciones dinámicas si existen
+    // Apply dynamic settings if present
     const newInstance: ActivityInstance = dynamicSettings
       ? { ...baseInstance, ...dynamicSettings }
       : baseInstance;
 
-    // Actualizar el estado
+    // Update the state
     let createdInstance: ActivityInstance | null = null;
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo para crear instancias");
+        throw new CoreError("no-active-day");
       }
 
       createdInstance = newInstance;
@@ -264,18 +265,18 @@ export class ActivityManager {
     });
 
     if (!createdInstance) {
-      throw new Error("Error al crear la instancia de actividad");
+      throw new CoreError("internal", "creating activity instance");
     }
 
     return createdInstance;
   }
 
   /**
-   * Actualiza una instancia de actividad
-   * @param id ID de la instancia
-   * @param data Datos a actualizar
-   * @returns La instancia actualizada
-   * @throws Error si la instancia no existe o no hay día activo
+   * Updates an activity instance
+   * @param id ID of the instance
+   * @param data Data to update
+   * @returns The updated instance
+   * @throws Error if the instance does not exist or there is no active day
    */
   public updateActivityInstance(id: UUID, data: Partial<ActivityInstance>): ActivityInstance {
     const timestamp = UtilityService.getCurrentISODateTime();
@@ -283,7 +284,7 @@ export class ActivityManager {
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo");
+        throw new CoreError("no-active-day");
       }
 
       const instanceIndex = state.currentDay.activityInstances.findIndex(
@@ -291,26 +292,26 @@ export class ActivityManager {
       );
 
       if (instanceIndex === -1) {
-        throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
+        throw new CoreError("activity-instance-not-found", `id ${id}`);
       }
 
-      // Obtener la instancia actual
+      // Get the current instance
       const instance = state.currentDay.activityInstances[instanceIndex];
 
-      // No permitir cambios de estado a través de este método
+      // Do not allow state changes through this method
       if (data.state && data.state !== instance.state) {
-        throw new Error("No se puede cambiar el estado directamente. Use los métodos específicos.");
+        throw new CoreError("invalid-state-change");
       }
 
-      // Actualizar la instancia
+      // Update the instance
       updatedInstance = {
         ...instance,
         ...data,
-        id, // Asegurar que el ID no cambie
+        id, // Make sure the ID does not change
         updatedAt: timestamp,
       };
 
-      // Crear nuevo array con la instancia actualizada
+      // Build a new array with the updated instance
       const updatedInstances = [...state.currentDay.activityInstances];
       updatedInstances[instanceIndex] = updatedInstance;
 
@@ -324,45 +325,45 @@ export class ActivityManager {
     });
 
     if (!updatedInstance) {
-      throw new Error(`Error al actualizar la instancia ${id}`);
+      throw new CoreError("internal", `updating instance ${id}`);
     }
 
     return updatedInstance;
   }
 
   /**
-   * Mueve una instancia de actividad a otro bloque y/o cambia su orden
-   * @param id ID de la instancia
-   * @param targetBlockId ID del bloque destino
-   * @param newOrder Nuevo orden dentro del bloque (opcional)
-   * @returns La instancia actualizada
-   * @throws Error si la instancia no existe o no hay día activo
+   * Moves an activity instance to another block and/or changes its order
+   * @param id ID of the instance
+   * @param targetBlockId ID of the target block
+   * @param newOrder New order within the block (optional)
+   * @returns The updated instance
+   * @throws Error if the instance does not exist or there is no active day
    */
   public moveActivityInstance(id: UUID, targetBlockId: UUID, newOrder?: number): ActivityInstance {
     let updatedInstance: ActivityInstance | null = null;
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo");
+        throw new CoreError("no-active-day");
       }
 
-      // Buscar la instancia
+      // Find the instance
       const instanceIndex = state.currentDay.activityInstances.findIndex(
         (instance) => instance.id === id
       );
 
       if (instanceIndex === -1) {
-        throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
+        throw new CoreError("activity-instance-not-found", `id ${id}`);
       }
 
       const instance = state.currentDay.activityInstances[instanceIndex];
 
-      // Si es la actividad activa, no permitir moverla
+      // If it is the active activity, do not allow moving it
       if (
         state.currentDay.activeActivityInstanceId &&
         state.currentDay.activeActivityInstanceId === id
       ) {
-        throw new Error("No se puede mover una actividad activa");
+        throw new CoreError("activity-is-active");
       }
 
       const timestamp = UtilityService.getCurrentISODateTime();
@@ -373,9 +374,9 @@ export class ActivityManager {
       let updatedInstances: ActivityInstance[];
 
       if (newOrder !== undefined) {
-        // `newOrder` es la posición visible dentro del bloque destino.
-        // Se inserta ahí y se renumera el bloque 0..n para que el orden
-        // nunca quede ambiguo (dos instancias con el mismo `order`).
+        // `newOrder` is the visible position within the target block.
+        // Insert there and renumber the block 0..n so the order is
+        // never ambiguous (two instances with the same `order`).
         const position = Math.max(0, Math.min(newOrder, siblings.length));
         updatedInstance = {
           ...instance,
@@ -395,7 +396,7 @@ export class ActivityManager {
             : item;
         });
       } else {
-        // Sin posición explícita: al final del bloque destino
+        // No explicit position: at the end of the target block
         const order =
           siblings.length > 0 ? Math.max(...siblings.map((other) => other.order)) + 1 : 0;
         updatedInstance = {
@@ -418,26 +419,26 @@ export class ActivityManager {
     });
 
     if (!updatedInstance) {
-      throw new Error(`Error al mover la instancia ${id}`);
+      throw new CoreError("internal", `moving instance ${id}`);
     }
 
     return updatedInstance;
   }
 
   /**
-   * Elimina una instancia de actividad
-   * @param id ID de la instancia
-   * @throws Error si la instancia no existe, está activa o no hay día activo
+   * Deletes an activity instance
+   * @param id ID of the instance
+   * @throws Error if the instance does not exist, is active, or there is no active day
    */
   public deleteActivityInstance(id: UUID): void {
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo");
+        throw new CoreError("no-active-day");
       }
 
-      // Verificar si es la actividad activa
+      // Check whether it is the active activity
       if (state.currentDay.activeActivityInstanceId === id) {
-        throw new Error("No se puede eliminar una actividad activa");
+        throw new CoreError("activity-is-active");
       }
 
       const instanceIndex = state.currentDay.activityInstances.findIndex(
@@ -445,10 +446,10 @@ export class ActivityManager {
       );
 
       if (instanceIndex === -1) {
-        throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
+        throw new CoreError("activity-instance-not-found", `id ${id}`);
       }
 
-      // Crear nuevo array sin la instancia eliminada
+      // Build a new array without the deleted instance
       const updatedInstances = state.currentDay.activityInstances.filter(
         (_, index) => index !== instanceIndex
       );
@@ -464,51 +465,51 @@ export class ActivityManager {
   }
 
   /**
-   * Obtiene todas las instancias de actividad del día actual
-   * @returns Lista de instancias
-   * @throws Error si no hay día activo
+   * Gets all activity instances for the current day
+   * @returns List of instances
+   * @throws Error if there is no active day
    */
   public getActivityInstances(): ActivityInstance[] {
     const state = this.systemCore.getState();
 
     if (!state.currentDay) {
-      throw new Error("No hay un día activo");
+      throw new CoreError("no-active-day");
     }
 
-    // En el test, la función mockImplementation del updateState no está modificando el estado correctamente
-    // Devolvemos una copia del array para evitar modificaciones no deseadas
+    // In the test, the updateState mockImplementation does not update the state correctly
+    // Return a copy of the array to avoid unwanted mutations
     return [...state.currentDay.activityInstances];
   }
 
   /**
-   * Obtiene una instancia de actividad específica
-   * @param id ID de la instancia
-   * @returns La instancia o undefined si no existe
-   * @throws Error si no hay día activo
+   * Gets a specific activity instance
+   * @param id ID of the instance
+   * @returns The instance, or undefined if it does not exist
+   * @throws Error if there is no active day
    */
   public getActivityInstance(id: UUID): ActivityInstance | undefined {
     const state = this.systemCore.getState();
 
     if (!state.currentDay) {
-      throw new Error("No hay un día activo");
+      throw new CoreError("no-active-day");
     }
 
     return state.currentDay.activityInstances.find((instance) => instance.id === id);
   }
 
   // ===============================================
-  // Control de estado
+  // State control
   // ===============================================
 
   /**
-   * Activa una instancia de actividad.
+   * Activates an activity instance.
    *
-   * NO auto-completa la actividad anterior. Si hay una activa, lanza error —
-   * la UI debe cerrar la anterior vía `requestCompletion` + `completeActivity` antes.
+   * Does NOT auto-complete the previous activity. If one is active, it throws -
+   * the UI must close the previous one via `requestCompletion` + `completeActivity` first.
    *
-   * @param id ID de la instancia
-   * @returns La instancia activada
-   * @throws Error si ya hay una actividad activa, si la instancia no existe, o si no hay día activo
+   * @param id ID of the instance
+   * @returns The activated instance
+   * @throws Error if an activity is already active, the instance does not exist, or there is no active day
    */
   public activateActivity(id: UUID): ActivityInstance {
     const timestamp = UtilityService.getCurrentISODateTime();
@@ -516,25 +517,23 @@ export class ActivityManager {
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo");
+        throw new CoreError("no-active-day");
       }
 
       if (state.currentDay.activeActivityInstanceId) {
-        throw new Error(
-          "Hay una actividad activa. Ciérrala primero mediante completeActivity o interruptActivity."
-        );
+        throw new CoreError("activity-already-running");
       }
 
-      // Buscar la instancia a activar
+      // Find the instance to activate
       const instanceIndex = state.currentDay.activityInstances.findIndex(
         (instance) => instance.id === id
       );
 
       if (instanceIndex === -1) {
-        throw new Error(`Instancia de actividad con ID ${id} no encontrada`);
+        throw new CoreError("activity-instance-not-found", `id ${id}`);
       }
 
-      // Actualizar la instancia
+      // Update the instance
       const instance = state.currentDay.activityInstances[instanceIndex];
       activatedInstance = {
         ...instance,
@@ -543,7 +542,7 @@ export class ActivityManager {
         updatedAt: timestamp,
       };
 
-      // Crear nuevo array con la instancia activada
+      // Build a new array with the activated instance
       const finalInstances = [...state.currentDay.activityInstances];
       finalInstances[instanceIndex] = activatedInstance;
 
@@ -558,36 +557,36 @@ export class ActivityManager {
     });
 
     if (!activatedInstance) {
-      throw new Error(`Error al activar la instancia ${id}`);
+      throw new CoreError("internal", `activating instance ${id}`);
     }
 
     return activatedInstance;
   }
 
   /**
-   * Solicitud de cierre: la UI usa esto para obtener la info que necesita
-   * mostrar en el CompletionModal. NO completa la actividad; solo lee el estado.
+   * Completion request: the UI uses this to get the info it needs to
+   * show in the CompletionModal. Does NOT complete the activity; it only reads state.
    *
-   * @param activityId ID de la instancia activa que se quiere cerrar
-   * @returns Datos para mostrar el CompletionModal
+   * @param activityId ID of the active instance to close
+   * @returns Data to show in the CompletionModal
    */
   public requestCompletion(activityId: UUID): CompletionRequest {
     const state = this.systemCore.getState();
 
     if (!state.currentDay) {
-      throw new Error("No hay un día activo");
+      throw new CoreError("no-active-day");
     }
     if (state.currentDay.activeActivityInstanceId !== activityId) {
-      throw new Error("Solo se puede cerrar la actividad activa actual");
+      throw new CoreError("not-the-active-activity");
     }
 
     const instance = state.currentDay.activityInstances.find((i) => i.id === activityId);
     if (!instance) {
-      throw new Error(`Instancia con ID ${activityId} no encontrada`);
+      throw new CoreError("activity-instance-not-found", `id ${activityId}`);
     }
     const template = this.getActivityTemplate(instance.templateId);
     if (!template) {
-      throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
+      throw new CoreError("activity-template-not-found", `id ${instance.templateId}`);
     }
 
     const requestedAt = UtilityService.getCurrentISODateTime();
@@ -613,22 +612,22 @@ export class ActivityManager {
   }
 
   /**
-   * Completa la actividad activa actual con auto-evaluación honesta del usuario.
+   * Completes the current active activity with the user's honest self-assessment.
    *
-   * El core calcula los tempos. La UI nunca recalcula la fórmula.
-   * score === 0 → 0 tempos. Bonus solo si clear-objective + beat estimate.
+   * The core computes the tempos. The UI never recomputes the formula.
+   * score === 0 -> 0 tempos. Bonus only if clear-objective + beat estimate.
    *
-   * @param activityId ID de la instancia a completar
-   * @param assessment Auto-evaluación 0-10
-   * @returns Resultado con record creado, tempos y total del día
+   * @param activityId ID of the instance to complete
+   * @param assessment Self-assessment 0-10
+   * @returns Result with the created record, tempos and the day's total
    */
   public completeActivity(
     activityId: UUID,
     assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
   ): CompletionResult {
-    // Si la UI nos pasa endTime (timestamp congelado al pedir completion),
-    // lo usamos. Si no, caemos al "ahora". Esto evita que la duración cambie
-    // entre la preview del modal y el guardado final.
+    // If the UI passes endTime (timestamp frozen when completion was requested),
+    // use it. Otherwise fall back to "now". This keeps the duration from changing
+    // between the modal preview and the final save.
     const timestamp = assessment.endTime || UtilityService.getCurrentISODateTime();
     const { satisfactionScore } = assessment;
 
@@ -638,7 +637,7 @@ export class ActivityManager {
       satisfactionScore > 10 ||
       !Number.isInteger(satisfactionScore)
     ) {
-      throw new Error("satisfactionScore debe ser un entero entre 0 y 10");
+      throw new CoreError("invalid-satisfaction-score");
     }
 
     let resultRecord: CompletedActivityRecord | null = null;
@@ -649,23 +648,23 @@ export class ActivityManager {
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo");
+        throw new CoreError("no-active-day");
       }
       if (state.currentDay.activeActivityInstanceId !== activityId) {
-        throw new Error("Solo se puede completar la actividad activa actual");
+        throw new CoreError("not-the-active-activity");
       }
 
       const instanceIndex = state.currentDay.activityInstances.findIndex(
         (i) => i.id === activityId
       );
       if (instanceIndex === -1) {
-        throw new Error(`Instancia con ID ${activityId} no encontrada`);
+        throw new CoreError("activity-instance-not-found", `id ${activityId}`);
       }
 
       const instance = state.currentDay.activityInstances[instanceIndex];
       const template = this.getActivityTemplate(instance.templateId);
       if (!template) {
-        throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
+        throw new CoreError("activity-template-not-found", `id ${instance.templateId}`);
       }
 
       const durationMinutes = instance.startTime
@@ -738,7 +737,7 @@ export class ActivityManager {
     });
 
     if (!resultRecord) {
-      throw new Error(`Error al completar la actividad ${activityId}`);
+      throw new CoreError("internal", `completing activity ${activityId}`);
     }
 
     return {
@@ -746,19 +745,19 @@ export class ActivityManager {
       temposAwarded,
       beatEstimate,
       dailyTempoTotal: dailyTotal,
-      // Ratio real sin cap, consistente con TempoSummary.targetProgress.
+      // Real uncapped ratio, consistent with TempoSummary.targetProgress.
       targetProgress: dailyTotal / target,
     };
   }
 
   /**
-   * Interrumpe la actividad activa actual.
+   * Interrupts the current active activity.
    *
-   * Schema v2+: ya no pregunta evitable/causa. Solo registra la interrupción
-   * sin tempos. Sin penalización. Sin juicio moral.
+   * Schema v2+: no longer asks avoidable/cause. It only records the interruption
+   * with no tempos. No penalty. No moral judgment.
    *
-   * @param activityId ID de la instancia a interrumpir
-   * @returns Registro de la actividad interrumpida
+   * @param activityId ID of the instance to interrupt
+   * @returns Record of the interrupted activity
    */
   public interruptActivity(activityId: UUID): CompletedActivityRecord {
     const timestamp = UtilityService.getCurrentISODateTime();
@@ -766,23 +765,23 @@ export class ActivityManager {
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
-        throw new Error("No hay un día activo");
+        throw new CoreError("no-active-day");
       }
       if (state.currentDay.activeActivityInstanceId !== activityId) {
-        throw new Error("Solo se puede interrumpir la actividad activa actual");
+        throw new CoreError("not-the-active-activity");
       }
 
       const instanceIndex = state.currentDay.activityInstances.findIndex(
         (i) => i.id === activityId
       );
       if (instanceIndex === -1) {
-        throw new Error(`Instancia con ID ${activityId} no encontrada`);
+        throw new CoreError("activity-instance-not-found", `id ${activityId}`);
       }
 
       const instance = state.currentDay.activityInstances[instanceIndex];
       const template = this.getActivityTemplate(instance.templateId);
       if (!template) {
-        throw new Error(`Plantilla con ID ${instance.templateId} no encontrada`);
+        throw new CoreError("activity-template-not-found", `id ${instance.templateId}`);
       }
 
       const durationMinutes = instance.startTime
@@ -835,22 +834,22 @@ export class ActivityManager {
     });
 
     if (!interruptedRecord) {
-      throw new Error(`Error al interrumpir la actividad ${activityId}`);
+      throw new CoreError("internal", `interrupting activity ${activityId}`);
     }
 
     return interruptedRecord;
   }
 
   /**
-   * Obtiene la actividad activa actual
-   * @returns La instancia activa o null si no hay actividad activa
-   * @throws Error si no hay día activo
+   * Gets the current active activity
+   * @returns The active instance, or null if there is no active activity
+   * @throws Error if there is no active day
    */
   public getActiveActivity(): ActivityInstance | null {
     const state = this.systemCore.getState();
 
     if (!state.currentDay) {
-      throw new Error("No hay un día activo");
+      throw new CoreError("no-active-day");
     }
 
     if (!state.currentDay.activeActivityInstanceId) {
@@ -865,23 +864,23 @@ export class ActivityManager {
   }
 
   // ===============================================
-  // Actividades del sistema
+  // System activities
   // ===============================================
 
   /**
-   * Crea una instancia de la actividad "Piloto Automático"
-   * @param blockId ID del bloque donde colocar la actividad
-   * @returns La instancia creada
-   * @throws Error si no hay día activo
+   * Creates an instance of the "Piloto Automático" (autopilot) activity
+   * @param blockId ID of the block to place the activity in
+   * @returns The created instance
+   * @throws Error if there is no active day
    */
   public createPilotAutomaticActivity(blockId: UUID): ActivityInstance {
-    // Buscar la plantilla de Piloto Automático o crearla si no existe
+    // Find the autopilot template, or create it if it does not exist
     let pilotTemplate = this.getActivityTemplates().find(
       (template) => template.isSystemActivity && template.title === "Piloto Automático"
     );
 
     if (!pilotTemplate) {
-      // Crear la plantilla del sistema si no existe
+      // Create the system template if it does not exist
       pilotTemplate = this.createActivityTemplate({
         title: "Piloto Automático",
         description: "Actividad de sistema para registrar tiempo en piloto automático",
@@ -894,19 +893,19 @@ export class ActivityManager {
       });
     }
 
-    // Crear la instancia
+    // Create the instance
     return this.createActivityInstance(pilotTemplate.id, blockId);
   }
 
   // ===============================================
-  // Métodos de utilidad
+  // Utility methods
   // ===============================================
 
   /**
-   * Estimado puntual vigente de una instancia clear-objective: el de la
-   * instancia (ajustado para hoy) y, si no tiene, el de la plantilla.
-   * Fuente única para requestCompletion (preview) y completeActivity (final),
-   * así la vista previa del cierre nunca diverge de lo que se guarda.
+   * Current point estimate for a clear-objective instance: the instance's
+   * own (adjusted for today) or, if it has none, the template's.
+   * Single source for requestCompletion (preview) and completeActivity (final),
+   * so the completion preview never diverges from what is saved.
    */
   private resolveEstimatedMinutes(
     instance: ActivityInstance,
@@ -920,10 +919,10 @@ export class ActivityManager {
   }
 
   /**
-   * Calcula la duración en minutos entre dos timestamps ISO
-   * @param startTime Tiempo de inicio en formato ISO
-   * @param endTime Tiempo de fin en formato ISO
-   * @returns Duración en minutos
+   * Computes the duration in minutes between two ISO timestamps
+   * @param startTime Start time in ISO format
+   * @param endTime End time in ISO format
+   * @returns Duration in minutes
    */
   private calculateDuration(startTime: string, endTime: string): number {
     const start = new Date(startTime).getTime();

@@ -35,7 +35,7 @@ export function AppShell() {
     openAddActivity();
   });
 
-  // Navegación estilo Linear: G y luego H/B/R/A
+  // Linear-style navigation: G, then H/B/R/A
   useGoTo((key) => {
     const target = NAV.find((item) => item.key === key);
     if (target) navigate(target.to);
@@ -246,7 +246,7 @@ function MobileNav() {
   );
 }
 
-/** En móvil, fuera de Hoy: lo que está en marcha, siempre a la vista. */
+/** On mobile, outside Today: whatever is running, always in view. */
 function RunningPill() {
   const running = useRunning();
   const { pathname } = useLocation();
@@ -269,8 +269,8 @@ function RunningPill() {
 }
 
 /**
- * Título de la pestaña con el cronómetro (se ve desde otras pestañas) y
- * avisos de timebox al cruzar el mínimo o el máximo.
+ * Tab title with the stopwatch (visible from other tabs) and timebox
+ * alerts when crossing the minimum or the maximum.
  */
 function ActivityWatcher() {
   const running = useRunning();

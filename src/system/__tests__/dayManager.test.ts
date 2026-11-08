@@ -3,10 +3,10 @@ import { SystemCore } from "../index";
 import { UtilityService } from "../utilityService";
 import type { AppState } from "../../types";
 
-// Mock para SystemCore
+// Mock for SystemCore
 jest.mock("../index");
 
-// Mock para UtilityService
+// Mock for UtilityService
 jest.mock("../utilityService");
 
 describe("DayManager", () => {
@@ -17,7 +17,7 @@ describe("DayManager", () => {
   let mockTimestamp: string;
 
   beforeEach(() => {
-    // Configurar estado inicial de la aplicación
+    // Set up the initial app state
     mockAppState = {
       global: {
         days: [],
@@ -33,7 +33,7 @@ describe("DayManager", () => {
       currentDay: null,
     };
 
-    // Configurar mocks
+    // Set up mocks
     mockUUID = "test-uuid-123";
     mockTimestamp = "2023-01-01T12:00:00.000Z";
 
@@ -46,7 +46,7 @@ describe("DayManager", () => {
       mockAppState = updater(mockAppState);
     });
 
-    // Crear instancia de DayManager
+    // Create a DayManager instance
     dayManager = new DayManager(systemCore);
   });
 
@@ -55,10 +55,10 @@ describe("DayManager", () => {
   });
 
   describe("startDay", () => {
-    it("debe crear un nuevo día activo", () => {
+    it("creates a new active day", () => {
       const result = dayManager.startDay();
 
-      // Verificar que se haya generado el día correctamente
+      // Check that the day was generated correctly
       expect(result).toEqual({
         id: mockUUID,
         state: "active",
@@ -67,40 +67,38 @@ describe("DayManager", () => {
         updatedAt: mockTimestamp,
       });
 
-      // Verificar que se actualizó el estado global
+      // Check that the global state was updated
       expect(systemCore.updateState).toHaveBeenCalled();
       expect(mockAppState.global.days.length).toBe(1);
       expect(mockAppState.global.days[0]).toEqual(result);
 
-      // Verificar que se actualizó el día actual
+      // Check that the current day was updated
       expect(mockAppState.currentDay).not.toBeNull();
       expect(mockAppState.currentDay?.day).toEqual(result);
     });
 
-    it("debe lanzar un error si ya existe un día activo", () => {
-      // Crear un día activo primero
+    it("throws an error if a day is already active", () => {
+      // Create an active day first
       dayManager.startDay();
 
-      // Intentar crear otro día activo
-      expect(() => dayManager.startDay()).toThrow(
-        "No se puede iniciar un nuevo día mientras hay un día activo"
-      );
+      // Try to create another active day
+      expect(() => dayManager.startDay()).toThrowCoreError("day-already-active");
     });
   });
 
   describe("endDay", () => {
-    it("debe finalizar el día activo", () => {
-      // Crear un día activo
+    it("ends the active day", () => {
+      // Create an active day
       const day = dayManager.startDay();
 
-      // Mock para un timestamp diferente al finalizar
+      // Mock a different timestamp when ending
       const endTimestamp = "2023-01-01T18:00:00.000Z";
       (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(endTimestamp);
 
-      // Finalizar el día
+      // End the day
       const result = dayManager.endDay();
 
-      // Verificar que se actualizó el día correctamente
+      // Check that the day was updated correctly
       expect(result).toEqual({
         ...day,
         state: "inactive",
@@ -108,61 +106,61 @@ describe("DayManager", () => {
         updatedAt: endTimestamp,
       });
 
-      // Verificar que se actualizó el estado global
+      // Check that the global state was updated
       expect(systemCore.updateState).toHaveBeenCalled();
       expect(mockAppState.global.days.length).toBe(1);
       expect(mockAppState.global.days[0]).toEqual(result);
 
-      // Verificar que se limpió el día actual
+      // Check that the current day was cleared
       expect(mockAppState.currentDay).toBeNull();
     });
 
-    it("debe lanzar un error si no hay un día activo", () => {
-      expect(() => dayManager.endDay()).toThrow("No hay un día activo para finalizar");
+    it("throws an error if there is no active day", () => {
+      expect(() => dayManager.endDay()).toThrowCoreError("no-active-day");
     });
   });
 
   describe("getCurrentDay", () => {
-    it("debe devolver el día activo", () => {
-      // Crear un día activo
+    it("returns the active day", () => {
+      // Create an active day
       const day = dayManager.startDay();
 
-      // Obtener el día activo
+      // Get the active day
       const result = dayManager.getCurrentDay();
 
-      // Verificar que se devolvió el día correcto
+      // Check that the correct day was returned
       expect(result).toEqual(day);
     });
 
-    it("debe devolver null si no hay un día activo", () => {
+    it("returns null if there is no active day", () => {
       const result = dayManager.getCurrentDay();
       expect(result).toBeNull();
     });
   });
 
   describe("getDays", () => {
-    it("debe devolver todos los días registrados", () => {
-      // Crear un día activo
+    it("returns all recorded days", () => {
+      // Create an active day
       const day = dayManager.startDay();
 
-      // Obtener los días
+      // Get the days
       const result = dayManager.getDays();
 
-      // Verificar que se devolvieron todos los días
+      // Check that all days were returned
       expect(result).toEqual([day]);
     });
   });
 
   describe("isDayActive", () => {
-    it("debe devolver true si hay un día activo", () => {
-      // Crear un día activo
+    it("returns true if a day is active", () => {
+      // Create an active day
       dayManager.startDay();
 
-      // Verificar que isDayActive devuelve true
+      // Check that isDayActive returns true
       expect(dayManager.isDayActive()).toBe(true);
     });
 
-    it("debe devolver false si no hay un día activo", () => {
+    it("returns false if there is no active day", () => {
       expect(dayManager.isDayActive()).toBe(false);
     });
   });

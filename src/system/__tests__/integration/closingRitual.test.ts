@@ -1,11 +1,11 @@
 import { SystemCore } from "../../index";
 
 /**
- * Ritual de cierre: la vista previa (requestCompletion) y el cierre final
- * (completeActivity) deben usar la misma base, y el total diario solo cuenta
- * el día actual.
+ * Closing ritual: the preview (requestCompletion) and the final completion
+ * (completeActivity) must use the same base, and the daily total only counts
+ * the current day.
  */
-describe("Ritual de cierre", () => {
+describe("Closing ritual", () => {
   let system: SystemCore;
 
   beforeEach(() => {
@@ -30,7 +30,7 @@ describe("Ritual de cierre", () => {
 
   const todoBlockId = () => system.getTimeBlocks().find((b) => b.isDefault)!.id;
 
-  test("el estimado ajustado en la instancia manda en la vista previa y en el cierre", () => {
+  test("the estimate adjusted on the instance wins in both the preview and the completion", () => {
     system.startDay();
     const template = createObjective(30);
     const instance = system.createActivityInstance(template.id, todoBlockId(), {
@@ -46,12 +46,12 @@ describe("Ritual de cierre", () => {
       satisfactionScore: 7,
       endTime: request.requestedAt,
     });
-    // base = 60 (estimado de la instancia) × 7/7
+    // base = 60 (instance estimate) x 7/7
     expect(result.temposAwarded).toBe(60);
     expect(result.record.durationMinutes).toBe(40);
   });
 
-  test("dailyTempoTotal solo suma los tempos del día actual", () => {
+  test("dailyTempoTotal only sums the current day's tempos", () => {
     const template = createObjective(30);
 
     system.startDay();

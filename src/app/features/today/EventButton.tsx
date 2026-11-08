@@ -9,7 +9,7 @@ import { errorMessage, useSystem } from "../../state/system";
 import { useToast } from "../../state/toast";
 import { t } from "../../i18n";
 
-/** Registrar un evento puntual ("Café", "Ibuprofeno") en dos toques. */
+/** Log a one-off event ("Café", "Ibuprofeno") in two taps. */
 export function EventButton() {
   const { state, core } = useSystem();
   const { logEvent } = useDayActions();

@@ -3,10 +3,10 @@ import { PersistenceManager } from "../persistenceManager";
 import { UtilityService } from "../utilityService";
 import type { AppState, Day, TimeBlock } from "../../types";
 
-// Mock del PersistenceManager: devuelve SIEMPRE la misma instancia (singleton)
-// para que múltiples `new SystemCore()` en un mismo test compartan el mismo
-// mock configurado. Los tests que necesiten el pipeline real (exportData/importData
-// con migración v2→v3) reasignan el mockImplementation del método correspondiente.
+// PersistenceManager mock: ALWAYS returns the same instance (singleton)
+// so that multiple `new SystemCore()` calls in one test share the same
+// configured mock. Tests that need the real pipeline (exportData/importData
+// with v2→v3 migration) reassign the mockImplementation of the relevant method.
 const sharedPersistence: Record<string, jest.Mock> = {};
 jest.mock("../persistenceManager", () => {
   const actual = jest.requireActual("../persistenceManager");
@@ -43,23 +43,23 @@ describe("SystemCore", () => {
   let mockPersistence: Record<string, jest.Mock>;
 
   beforeEach(() => {
-    // Configurar mocks
+    // Set up mocks
     mockUUID = "test-uuid-123";
     mockTimestamp = "2023-01-01T12:00:00.000Z";
 
     (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
     (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
 
-    // Resetear el constructor mockeado y limpiar la instancia compartida
+    // Reset the mocked constructor and clear the shared instance
     (PersistenceManager as unknown as jest.Mock).mockClear();
     Object.keys(sharedPersistence).forEach((k) => delete sharedPersistence[k]);
 
     systemCore = new SystemCore();
 
-    // mockPersistence es ahora la instancia compartida singleton
+    // mockPersistence is now the shared singleton instance
     mockPersistence = sharedPersistence;
 
-    // Configurar el mock por defecto
+    // Set up the default mock
     mockPersistence.loadState.mockReturnValue(null);
     mockPersistence.saveState.mockImplementation(() => {});
     mockPersistence.clearState.mockImplementation(() => {});
@@ -68,7 +68,7 @@ describe("SystemCore", () => {
     );
     mockPersistence.deserialize.mockImplementation((json: string) => JSON.parse(json) as AppState);
 
-    // Obtener el estado inicial
+    // Get the initial state
     mockAppState = systemCore.getState();
   });
 
@@ -76,8 +76,8 @@ describe("SystemCore", () => {
     jest.clearAllMocks();
   });
 
-  describe("Inicialización", () => {
-    it("debe crear un estado por defecto al inicializar", () => {
+  describe("Initialization", () => {
+    it("creates a default state on initialization", () => {
       expect(mockAppState).toEqual({
         global: {
           days: [],
@@ -96,7 +96,7 @@ describe("SystemCore", () => {
       });
     });
 
-    it("debe cargar el estado desde persistencia si existe", () => {
+    it("loads the state from persistence if it exists", () => {
       const savedState: AppState = {
         global: {
           days: [
@@ -132,24 +132,24 @@ describe("SystemCore", () => {
         },
       };
 
-      // Configurar mock para devolver el estado guardado (compartido vía singleton)
+      // Configure the mock to return the saved state (shared via singleton)
       (mockPersistence.loadState as jest.Mock).mockReturnValue(savedState);
 
-      // Crear nueva instancia con el mock configurado
+      // Create a new instance with the configured mock
       const systemCoreWithSavedState = new SystemCore();
 
-      // Verificar que se cargó el estado
+      // Verify the state was loaded
       expect(systemCoreWithSavedState.getState()).toEqual(savedState);
     });
   });
 
   describe("updateState", () => {
-    it("debe actualizar el estado y notificar a los observadores", () => {
-      // Configurar un observador
+    it("updates the state and notifies observers", () => {
+      // Set up an observer
       const mockObserver = jest.fn();
       const unsubscribe = systemCore.onStateChange(mockObserver);
 
-      // Actualizar el estado
+      // Update the state
       systemCore.updateState((state) => {
         return {
           ...state,
@@ -169,30 +169,30 @@ describe("SystemCore", () => {
         };
       });
 
-      // Verificar que se actualizó el estado
+      // Verify the state was updated
       const updatedState = systemCore.getState();
       expect(updatedState.global.days.length).toBe(1);
       expect(updatedState.global.days[0].id).toBe(mockUUID);
 
-      // Verificar que se llamó al observador
+      // Verify the observer was called
       expect(mockObserver).toHaveBeenCalledWith(updatedState);
 
-      // Verificar que se guardó el estado
+      // Verify the state was saved
       expect(mockPersistence.saveState).toHaveBeenCalledWith(updatedState);
 
-      // Probar desuscripción
+      // Test unsubscribing
       unsubscribe();
-      systemCore.updateState((state) => state); // Otra actualización
-      expect(mockObserver).toHaveBeenCalledTimes(1); // No debería haberse llamado de nuevo
+      systemCore.updateState((state) => state); // Another update
+      expect(mockObserver).toHaveBeenCalledTimes(1); // Should not have been called again
     });
   });
 
-  describe("Métodos delegados", () => {
-    it("debe delegar correctamente los métodos de DayManager", () => {
-      // Restaurar los mocks originales para probar la delegación
+  describe("Delegated methods", () => {
+    it("delegates DayManager methods correctly", () => {
+      // Restore the original mocks to test delegation
       jest.restoreAllMocks();
 
-      // Crear spies para los métodos de DayManager
+      // Create spies for the DayManager methods
       const startDaySpy = jest
         .spyOn(systemCore["dayManager"], "startDay")
         .mockImplementation(() => {
@@ -219,7 +219,7 @@ describe("SystemCore", () => {
       const getCurrentDaySpy = jest.spyOn(systemCore["dayManager"], "getCurrentDay");
       const isDayActiveSpy = jest.spyOn(systemCore["dayManager"], "isDayActive");
 
-      // Probar las delegaciones
+      // Test the delegations
       systemCore.startDay();
       expect(startDaySpy).toHaveBeenCalled();
 
@@ -233,17 +233,17 @@ describe("SystemCore", () => {
       expect(isDayActiveSpy).toHaveBeenCalled();
     });
 
-    it("debe delegar correctamente los métodos de ActivityManager", () => {
-      // Restaurar los mocks originales para probar la delegación
+    it("delegates ActivityManager methods correctly", () => {
+      // Restore the original mocks to test delegation
       jest.restoreAllMocks();
 
-      // Crear spies para los métodos de ActivityManager
+      // Create spies for the ActivityManager methods
       const createTemplateSpy = jest.spyOn(systemCore["activityManager"], "createActivityTemplate");
       const updateTemplateSpy = jest.spyOn(systemCore["activityManager"], "updateActivityTemplate");
       const deleteTemplateSpy = jest.spyOn(systemCore["activityManager"], "deleteActivityTemplate");
       const getTemplatesSpy = jest.spyOn(systemCore["activityManager"], "getActivityTemplates");
 
-      // Datos de ejemplo
+      // Sample data
       const templateData = {
         title: "Test Activity",
         description: "Test Description",
@@ -254,7 +254,7 @@ describe("SystemCore", () => {
         },
       };
 
-      // Probar las delegaciones
+      // Test the delegations
       systemCore.createActivityTemplate(templateData);
       expect(createTemplateSpy).toHaveBeenCalledWith(templateData);
 
@@ -268,11 +268,11 @@ describe("SystemCore", () => {
       expect(getTemplatesSpy).toHaveBeenCalled();
     });
 
-    it("debe delegar correctamente los métodos de TimeBlockManager", () => {
-      // Restaurar los mocks originales para probar la delegación
+    it("delegates TimeBlockManager methods correctly", () => {
+      // Restore the original mocks to test delegation
       jest.restoreAllMocks();
 
-      // Crear spies para los métodos de TimeBlockManager
+      // Create spies for the TimeBlockManager methods
       const createBlockSpy = jest
         .spyOn(systemCore["timeBlockManager"], "createTimeBlock")
         .mockImplementation((name, startMinute, endMinute) => {
@@ -292,12 +292,12 @@ describe("SystemCore", () => {
       const deleteBlockSpy = jest.spyOn(systemCore["timeBlockManager"], "deleteTimeBlock");
       const getBlocksSpy = jest.spyOn(systemCore["timeBlockManager"], "getTimeBlocks");
 
-      // Datos de ejemplo
+      // Sample data
       const name = "Morning Block";
       const startMinute = 480; // 8:00 AM
       const endMinute = 600; // 10:00 AM
 
-      // Probar las delegaciones
+      // Test the delegations
       systemCore.createTimeBlock(name, startMinute, endMinute);
       expect(createBlockSpy).toHaveBeenCalledWith(name, startMinute, endMinute);
 
@@ -305,18 +305,18 @@ describe("SystemCore", () => {
       expect(updateBlockSpy).toHaveBeenCalledWith(mockUUID, { name: "Updated Block" });
 
       systemCore.deleteTimeBlock(mockUUID);
-      // deleteTimeBlock tiene un segundo argumento opcional (moveActivitiesToTodo=true por defecto)
+      // deleteTimeBlock has an optional second argument (moveActivitiesToTodo=true by default)
       expect(deleteBlockSpy).toHaveBeenCalledWith(mockUUID, true);
 
       systemCore.getTimeBlocks();
       expect(getBlocksSpy).toHaveBeenCalled();
     });
 
-    it("debe delegar correctamente los métodos de UserPreferencesManager", () => {
-      // Restaurar los mocks originales para probar la delegación
+    it("delegates UserPreferencesManager methods correctly", () => {
+      // Restore the original mocks to test delegation
       jest.restoreAllMocks();
 
-      // Crear spies para los métodos de UserPreferencesManager
+      // Create spies for the UserPreferencesManager methods
       const updatePreferencesSpy = jest.spyOn(
         systemCore["userPreferencesManager"],
         "updateUserPreferences"
@@ -330,7 +330,7 @@ describe("SystemCore", () => {
         "updateDailyTempoTarget"
       );
 
-      // Probar las delegaciones
+      // Test the delegations
       systemCore.updateUserPreferences({ dailyTempoTarget: 1500 });
       expect(updatePreferencesSpy).toHaveBeenCalledWith({ dailyTempoTarget: 1500 });
 
@@ -341,11 +341,11 @@ describe("SystemCore", () => {
       expect(updateDailyTempoTargetSpy).toHaveBeenCalledWith(2000);
     });
 
-    it("debe delegar correctamente los métodos de AnalyticsManager", () => {
-      // Restaurar los mocks originales para probar la delegación
+    it("delegates AnalyticsManager methods correctly", () => {
+      // Restore the original mocks to test delegation
       jest.restoreAllMocks();
 
-      // Crear spies para los métodos de AnalyticsManager
+      // Create spies for the AnalyticsManager methods
       const getTimelineSpy = jest.spyOn(systemCore["analyticsManager"], "getTimelineData");
       const getDistributionSpy = jest.spyOn(
         systemCore["analyticsManager"],
@@ -358,7 +358,7 @@ describe("SystemCore", () => {
         "getEstimationAccuracy"
       );
 
-      // Probar las delegaciones
+      // Test the delegations
       systemCore.getTimelineData(mockUUID);
       expect(getTimelineSpy).toHaveBeenCalledWith(mockUUID);
 
@@ -376,18 +376,18 @@ describe("SystemCore", () => {
     });
   });
 
-  describe("Métodos de persistencia", () => {
-    it("debe exportar correctamente el estado como JSON", () => {
+  describe("Persistence methods", () => {
+    it("exports the state as JSON correctly", () => {
       const exportedJson = systemCore.exportData();
       const exportedState = JSON.parse(exportedJson);
 
-      // El estado exportado contiene el global completo + schemaVersion top-level
-      // (añadido por el pipeline central)
+      // The exported state contains the full global + top-level schemaVersion
+      // (added by the central pipeline)
       expect(exportedState.global).toEqual(systemCore.getState().global);
       expect(exportedState.schemaVersion).toBe(3);
     });
 
-    it("debe importar correctamente el estado desde JSON (v3)", () => {
+    it("imports the state from JSON correctly (v3)", () => {
       const importedState: AppState = {
         global: {
           days: [
@@ -414,18 +414,18 @@ describe("SystemCore", () => {
         currentDay: null,
       };
 
-      // Importar desde JSON
+      // Import from JSON
       systemCore.importData(JSON.stringify(importedState));
 
-      // Verificar que se importó correctamente
+      // Verify it was imported correctly
       expect(systemCore.getState()).toEqual(importedState);
 
-      // Verificar que se guardó el estado importado
+      // Verify the imported state was saved
       expect(mockPersistence.saveState).toHaveBeenCalledWith(importedState);
     });
 
-    it("importData ejecuta el pipeline central: importar v2 con legacy archiva y limpia", () => {
-      // Usamos la implementación real de deserialize (incluye migración)
+    it("importData runs the central pipeline: importing v2 with legacy archives and cleans", () => {
+      // Use the real deserialize implementation (includes migration)
       const RealPersistenceManager = jest.requireActual("../persistenceManager")
         .PersistenceManager as new () => {
         deserialize: (json: string) => AppState;
@@ -435,7 +435,7 @@ describe("SystemCore", () => {
         realInstance.deserialize(json)
       );
 
-      // JSON v2 con campos legacy - simula un usuario que importa un backup antiguo
+      // v2 JSON with legacy fields - simulates a user importing an old backup
       const v2WithLegacy = {
         global: {
           days: [],
@@ -463,20 +463,20 @@ describe("SystemCore", () => {
       const state = systemCore.getState();
       const global = state.global as unknown as Record<string, unknown>;
 
-      // El runtime ya no contiene los legacy fields
+      // The runtime no longer contains the legacy fields
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.interruptionCauses).toBeUndefined();
       expect(global.subjectiveVariableSnapshots).toBeUndefined();
       expect(
         (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
       ).toBeUndefined();
-      // Pero el archivo está disponible
+      // But the archive is available
       expect(global.legacyArchive).toBeDefined();
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1500);
     });
 
-    it("importData de v1 sin schemaVersion ejecuta v1→v2→v3 en cadena", () => {
-      // Usamos la implementación real de deserialize
+    it("importData of v1 without schemaVersion chains v1→v2→v3", () => {
+      // Use the real deserialize implementation
       const RealPersistenceManager = jest.requireActual("../persistenceManager")
         .PersistenceManager as new () => {
         deserialize: (json: string) => AppState;
@@ -510,14 +510,14 @@ describe("SystemCore", () => {
       const state = systemCore.getState();
       const global = state.global as unknown as Record<string, unknown>;
 
-      // dailyTempoTarget creado por v1→v2
+      // dailyTempoTarget created by v1→v2
       expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
-      // Legacy archivado por v2→v3
+      // Legacy archived by v2→v3
       expect(global.legacyArchive).toBeDefined();
     });
 
-    it("exportData pasa por el pipeline central (incluye schemaVersion, no filtra)", () => {
-      // Mockeamos serialize para verificar que se llama
+    it("exportData goes through the central pipeline (includes schemaVersion, no filtering)", () => {
+      // Mock serialize to verify it is called
       mockPersistence.serialize.mockReturnValue("mock-json");
 
       const result = systemCore.exportData();
@@ -525,8 +525,8 @@ describe("SystemCore", () => {
       expect(mockPersistence.serialize).toHaveBeenCalled();
     });
 
-    it("exportData real: incluye schemaVersion=3 y no incluye legacy fields", () => {
-      // Usamos la implementación real de serialize (incluye strip legacy)
+    it("real exportData: includes schemaVersion=3 and no legacy fields", () => {
+      // Use the real serialize implementation (includes legacy strip)
       const RealPersistenceManager = jest.requireActual("../persistenceManager")
         .PersistenceManager as new () => {
         serialize: (state: AppState) => string;
@@ -536,7 +536,7 @@ describe("SystemCore", () => {
         realInstance.serialize(state)
       );
 
-      // Inyectar un estado con legacy para verificar el strip
+      // Inject a state with legacy fields to verify the strip
       systemCore.updateState((state) => {
         const global = state.global as unknown as Record<string, unknown>;
         global.subjectiveVariables = [{ id: "v1" }];
@@ -555,13 +555,13 @@ describe("SystemCore", () => {
       expect(parsed.global.interruptionCauses).toBeUndefined();
     });
 
-    it("debe manejar errores al importar JSON inválido", () => {
-      // Intentar importar JSON inválido
+    it("handles errors when importing invalid JSON", () => {
+      // Try to import invalid JSON
       expect(() => systemCore.importData("invalid json")).toThrow();
     });
 
-    it("debe limpiar correctamente el estado", () => {
-      // Establecer un estado con datos
+    it("clears the state correctly", () => {
+      // Set a state with data
       systemCore.updateState((state) => {
         return {
           ...state,
@@ -580,13 +580,13 @@ describe("SystemCore", () => {
         };
       });
 
-      // Verificar que tenemos datos
+      // Verify we have data
       expect(systemCore.getState().global.days.length).toBe(1);
 
-      // Limpiar el estado
+      // Clear the state
       systemCore.clearState();
 
-      // Verificar que se limpió correctamente
+      // Verify it was cleared correctly
       expect(systemCore.getState().global.days).toEqual([]);
       expect(mockPersistence.clearState).toHaveBeenCalled();
     });

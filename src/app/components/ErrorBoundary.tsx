@@ -3,8 +3,8 @@ import { STORAGE_KEY } from "../../system/persistenceManager";
 import { t } from "../i18n";
 
 /**
- * Si un render falla, en vez de una pantalla en blanco se ofrece recargar y
- * descargar los datos tal como están guardados (nunca se pierden por esto).
+ * If a render fails, instead of a blank screen we offer to reload and to
+ * download the data exactly as stored (it is never lost because of this).
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -22,7 +22,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
     try {
       data = localStorage.getItem(STORAGE_KEY) ?? "{}";
     } catch {
-      // sin acceso al almacenamiento
+      // no access to storage
     }
     const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
     const link = document.createElement("a");

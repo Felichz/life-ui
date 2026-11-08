@@ -38,7 +38,7 @@ interface FieldProps {
   children: (id: string, describedBy: string | undefined) => ReactNode;
 }
 
-/** Etiqueta + control + ayuda/error, con los ids enlazados para lectores de pantalla. */
+/** Label + control + hint/error, with ids linked for screen readers. */
 export function Field({ label, hint, error, className, children }: FieldProps) {
   const id = useId();
   const messageId = `${id}-message`;
@@ -74,7 +74,7 @@ interface MinutesInputProps {
   "aria-label"?: string;
 }
 
-/** Número de minutos con botones −/+ (cómodos en táctil) y sufijo "min". */
+/** Number of minutes with -/+ buttons (touch-friendly) and a "min" suffix. */
 export function MinutesInput({
   id,
   value,

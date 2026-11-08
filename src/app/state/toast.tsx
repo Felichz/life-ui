@@ -18,7 +18,7 @@ export interface ToastInput {
   title: string;
   description?: string;
   tone?: Tone;
-  /** Para avisos de recompensa: "+30" */
+  /** For reward notices: "+30" */
   tempos?: number;
   duration?: number;
 }
@@ -113,6 +113,6 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
 
 export function useToast() {
   const context = useContext(ToastContext);
-  if (!context) throw new Error("useToast debe usarse dentro de <ToastProvider>");
+  if (!context) throw new Error("useToast must be used inside <ToastProvider>");
   return context;
 }

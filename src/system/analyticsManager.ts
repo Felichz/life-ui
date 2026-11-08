@@ -12,38 +12,38 @@ import type {
 } from "../types";
 
 /**
- * Gestor de Analíticas
- * Responsable de procesar datos del sistema para generar visualizaciones y reportes
- * Transforma los datos existentes sin mantener estado propio
+ * Analytics Manager
+ * Responsible for processing system data to generate visualizations and reports
+ * Transforms existing data without keeping its own state
  */
 export class AnalyticsManager {
   private systemCore: ISystemCore;
 
   /**
-   * Constructor del AnalyticsManager
-   * @param systemCore Referencia al núcleo del sistema para acceder a los datos
+   * AnalyticsManager constructor
+   * @param systemCore Reference to the system core to access the data
    */
   constructor(systemCore: ISystemCore) {
     this.systemCore = systemCore;
   }
 
   /**
-   * Genera datos para la visualización de línea de tiempo
-   * @param dayId ID opcional del día específico a analizar (si no se proporciona, usa todos los días)
-   * @returns Datos formateados para la visualización de timeline
+   * Generates data for the timeline visualization
+   * @param dayId Optional ID of the specific day to analyze (if not provided, uses all days)
+   * @returns Data formatted for the timeline visualization
    */
   public getTimelineData(dayId?: UUID): TimelineData {
     const state = this.systemCore.getState();
 
-    // Filtrar actividades completadas por día si se especifica
+    // Filter completed activities by day if specified
     const completedActivities = state.global.completedActivityRecords.filter(
       (record) => !dayId || record.dayId === dayId
     );
 
-    // Filtrar eventos por día si se especifica
+    // Filter events by day if specified
     const events = state.global.eventInstances.filter((event) => !dayId || event.dayId === dayId);
 
-    // Array para almacenar todas las actividades (completadas y activas)
+    // Array to store all activities (completed and active)
     const timelineActivities = [
       ...completedActivities.map((activity) => {
         let isWithinEstimation: boolean | undefined;
@@ -101,10 +101,10 @@ export class AnalyticsManager {
       }),
     ];
 
-    // Añadir la actividad activa actual si existe y pertenece al día especificado (o si no se especificó día)
+    // Add the current active activity if it exists and belongs to the specified day (or if no day was specified)
     if (state.currentDay && state.currentDay.activeActivityInstanceId) {
       const currentDayId = state.currentDay.day.id;
-      // Solo incluir la actividad activa si no se especificó día o si pertenece al día especificado
+      // Only include the active activity if no day was specified or it belongs to the specified day
       if (!dayId || dayId === currentDayId) {
         const activeActivityId = state.currentDay.activeActivityInstanceId;
         const activeActivity = state.currentDay.activityInstances.find(
@@ -112,18 +112,18 @@ export class AnalyticsManager {
         );
 
         if (activeActivity) {
-          // Buscar la plantilla para obtener más información
+          // Look up the template to get more information
           const template = state.global.activityTemplates.find(
             (t) => t.id === activeActivity.templateId
           );
 
           if (template && activeActivity && activeActivity.startTime) {
-            // Calcular duración hasta el momento actual (en minutos)
+            // Compute the duration up to now (in minutes)
             const startTime = new Date(activeActivity.startTime);
             const now = new Date();
             const durationMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
 
-            // Determinar si está dentro de la estimación (si aplica)
+            // Determine whether it is within the estimate (if applicable)
             let isWithinEstimation: boolean | undefined;
             let estimatedDuration: number | undefined;
 
@@ -166,15 +166,15 @@ export class AnalyticsManager {
               }
             }
 
-            // Añadir actividad activa al timeline
+            // Add the active activity to the timeline
             timelineActivities.push({
               id: activeActivity.id,
               title: template.title,
               startTime: activeActivity.startTime,
-              endTime: now.toISOString(), // Hasta el momento actual
+              endTime: now.toISOString(), // Up to now
               durationMinutes,
               type: template.type,
-              state: "completed" as "completed" | "interrupted", // Aunque está activa, usamos "completed" para compatibilidad de tipos
+              state: "completed" as "completed" | "interrupted", // Although it is active, we use "completed" for type compatibility
               estimatedDuration,
               isWithinEstimation,
             });
@@ -186,7 +186,7 @@ export class AnalyticsManager {
     return {
       activities: timelineActivities,
       events: events.map((event) => {
-        // Calcular la posición del evento en minutos desde el inicio del día
+        // Compute the event's position in minutes from the start of the day
         const timestamp = new Date(event.timestamp);
         const position: DayMinutes = timestamp.getHours() * 60 + timestamp.getMinutes();
 
@@ -200,11 +200,11 @@ export class AnalyticsManager {
       interruptions: completedActivities
         .filter((activity) => activity.state === "interrupted")
         .map((activity) => {
-          // Calcular la posición de la interrupción en minutos desde el inicio del día
+          // Compute the interruption's position in minutes from the start of the day
           const timestamp = new Date(activity.endTime);
           const position: DayMinutes = timestamp.getHours() * 60 + timestamp.getMinutes();
 
-          // Schema v2+: sin clasificación evitable/innevitable ni causa.
+          // Schema v2+: no avoidable/unavoidable classification and no cause.
           return {
             id: activity.id,
             activityId: activity.id,
@@ -216,23 +216,23 @@ export class AnalyticsManager {
   }
 
   /**
-   * Genera datos para gráficos de distribución de tiempo
-   * @param dayId ID opcional del día específico a analizar (si no se proporciona, usa todos los días)
-   * @returns Datos formateados para visualizaciones de distribución de tiempo
+   * Generates data for time distribution charts
+   * @param dayId Optional ID of the specific day to analyze (if not provided, uses all days)
+   * @returns Data formatted for time distribution visualizations
    */
   public getTimeDistributionData(dayId?: UUID): TimeDistributionData {
     const state = this.systemCore.getState();
 
-    // Filtrar actividades por día si se especifica
+    // Filter activities by day if specified
     const activities = state.global.completedActivityRecords.filter(
       (record) => !dayId || record.dayId === dayId
     );
 
-    // Agrupar actividades por tipo
+    // Group activities by type
     const activitiesByCategory = new Map<string, CompletedActivityRecord[]>();
 
     activities.forEach((activity) => {
-      // Usar el tipo de actividad como categoría
+      // Use the activity type as the category
       const category = this.getActivityCategoryName(activity.type);
 
       if (!activitiesByCategory.has(category)) {
@@ -242,13 +242,13 @@ export class AnalyticsManager {
       activitiesByCategory.get(category)?.push(activity);
     });
 
-    // Calcular tiempo total para todas las actividades
+    // Compute total time for all activities
     const totalMinutes = activities.reduce((sum, activity) => sum + activity.durationMinutes, 0);
 
-    // Generar datos de categorías
+    // Generate category data
     const categories = Array.from(activitiesByCategory.entries()).map(
       ([name, categoryActivities]) => {
-        // Calcular tiempo total para esta categoría
+        // Compute total time for this category
         const categoryMinutes = categoryActivities.reduce(
           (sum, activity) => sum + activity.durationMinutes,
           0
@@ -278,14 +278,14 @@ export class AnalyticsManager {
   }
 
   /**
-   * Calcula estadísticas para una actividad específica o todas
-   * @param templateId ID opcional de la plantilla de actividad para filtrar (si no se proporciona, analiza todas)
-   * @returns Estadísticas de actividad
+   * Computes statistics for a specific activity or for all of them
+   * @param templateId Optional activity template ID to filter by (if not provided, analyzes all)
+   * @returns Activity statistics
    */
   public getActivityStats(templateId?: UUID): ActivityStatistics {
     const state = this.systemCore.getState();
 
-    // Filtrar actividades por plantilla si se especifica
+    // Filter activities by template if specified
     const activities = state.global.completedActivityRecords.filter(
       (record) => !templateId || record.templateId === templateId
     );
@@ -298,16 +298,16 @@ export class AnalyticsManager {
       (activity) => activity.state === "interrupted"
     ).length;
 
-    // Calcular tasa de completación
+    // Compute the completion rate
     const completionRate = totalInstances > 0 ? (completedInstances / totalInstances) * 100 : 0;
 
-    // Calcular duración promedio
+    // Compute the average duration
     const averageDuration =
       totalInstances > 0
         ? activities.reduce((sum, activity) => sum + activity.durationMinutes, 0) / totalInstances
         : 0;
 
-    // Calcular precisión de estimación (solo para actividades con estimación)
+    // Compute estimation accuracy (only for activities with an estimate)
     let estimationAccuracy: number | undefined;
 
     const activitiesWithEstimation = activities.filter(
@@ -319,7 +319,7 @@ export class AnalyticsManager {
         const estimatedDuration = activity.clearObjectiveSettings?.estimatedDurationMinutes;
         if (estimatedDuration) {
           const actualDuration = activity.durationMinutes;
-          // Calcular la precisión como porcentaje (1 - diferencia relativa)
+          // Compute the accuracy as a percentage (1 - relative difference)
           const accuracy = Math.max(
             0,
             100 - Math.abs(((actualDuration - estimatedDuration) / estimatedDuration) * 100)
@@ -344,8 +344,8 @@ export class AnalyticsManager {
   }
 
   /**
-   * Calcula la tasa de finalización de actividades
-   * @returns Porcentaje de actividades completadas sobre el total
+   * Computes the activity completion rate
+   * @returns Percentage of completed activities over the total
    */
   public getCompletionRate(): number {
     const stats = this.getActivityStats();
@@ -353,8 +353,8 @@ export class AnalyticsManager {
   }
 
   /**
-   * Calcula la precisión de las estimaciones de tiempo
-   * @returns Porcentaje promedio de precisión de estimación (0-100)
+   * Computes the accuracy of the time estimates
+   * @returns Average estimation accuracy percentage (0-100)
    */
   public getEstimationAccuracy(): number {
     const stats = this.getActivityStats();
@@ -362,9 +362,9 @@ export class AnalyticsManager {
   }
 
   /**
-   * Obtiene el nombre descriptivo para una categoría de actividad
-   * @param type Tipo de actividad
-   * @returns Nombre descriptivo para la categoría
+   * Gets the descriptive name for an activity category
+   * @param type Activity type
+   * @returns Descriptive name for the category
    */
   private getActivityCategoryName(type: string): string {
     switch (type) {
@@ -380,7 +380,7 @@ export class AnalyticsManager {
   }
 
   /**
-   * Resumen de tempos de un día específico
+   * Tempo summary for a specific day
    */
   public getTempoSummary(dayId: UUID): TempoSummary {
     const state = this.systemCore.getState();
@@ -418,7 +418,7 @@ export class AnalyticsManager {
   }
 
   /**
-   * Tendencias de tempos en un rango temporal
+   * Tempo trends over a time range
    */
   public getTempoTrends(range: {
     from: ISODateTimeString;

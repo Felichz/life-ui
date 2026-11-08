@@ -1,38 +1,39 @@
 import { UtilityService } from "./utilityService";
 import type { SystemCore } from "./index";
 import type { Day, UUID, ActivityInstance } from "../types";
+import { CoreError } from "./errors";
 
 /**
- * Gestor del ciclo de vida de los días de actividad en LifeUI
- * Permite iniciar, finalizar y consultar información sobre los días
+ * Lifecycle manager for activity days in LifeUI
+ * Lets you start, end and query information about days
  */
 export class DayManager {
   private systemCore: SystemCore;
 
   /**
-   * Constructor de DayManager
-   * @param systemCore Instancia del núcleo del sistema
+   * DayManager constructor
+   * @param systemCore System core instance
    */
   constructor(systemCore: SystemCore) {
     this.systemCore = systemCore;
   }
 
   /**
-   * Inicia un nuevo día de actividad
-   * @returns El día creado
-   * @throws Error si ya existe un día activo
+   * Starts a new activity day
+   * @returns The created day
+   * @throws Error if a day is already active
    */
   public startDay(): Day {
-    // Verificar que no exista ya un día activo
+    // Check that no day is already active
     if (this.isDayActive()) {
-      throw new Error("No se puede iniciar un nuevo día mientras hay un día activo");
+      throw new CoreError("day-already-active");
     }
 
-    // Generar datos para el nuevo día
+    // Generate data for the new day
     const id: UUID = UtilityService.generateUUID();
     const timestamp = UtilityService.getCurrentISODateTime();
 
-    // Crear objeto del día
+    // Build the day object
     const newDay: Day = {
       id,
       state: "active",
@@ -41,26 +42,26 @@ export class DayManager {
       updatedAt: timestamp,
     };
 
-    // Actualizar el estado global y el día actual
+    // Update the global state and the current day
     this.systemCore.updateState((state) => {
-      // Obtener actividades pendientes si existen en el estado global
+      // Get pending activities if they exist in the global state
       let pendingActivities: ActivityInstance[] = [];
 
-      // Verificar si hay actividades pendientes en el estado global
+      // Check whether there are pending activities in the global state
       if (
         state.global.pendingActivityInstances &&
         state.global.pendingActivityInstances.length > 0
       ) {
         pendingActivities = [...state.global.pendingActivityInstances];
 
-        // Limpiar las actividades pendientes después de recuperarlas
+        // Clear the pending activities after retrieving them
         state.global.pendingActivityInstances = [];
       }
 
-      // Añadir día a la lista de días en el estado global
+      // Add the day to the list of days in the global state
       state.global.days.push(newDay);
 
-      // Establecer el día actual con las instancias pendientes
+      // Set the current day with the pending instances
       state.currentDay = {
         day: newDay,
         activityInstances: pendingActivities,
@@ -74,19 +75,19 @@ export class DayManager {
   }
 
   /**
-   * Finaliza el día activo
-   * @returns El día finalizado
-   * @throws Error si no hay un día activo
+   * Ends the active day
+   * @returns The ended day
+   * @throws Error if there is no active day
    */
   public endDay(): Day {
-    // Verificar que exista un día activo
+    // Check that a day is active
     if (!this.isDayActive()) {
-      throw new Error("No hay un día activo para finalizar");
+      throw new CoreError("no-active-day");
     }
 
     const timestamp = UtilityService.getCurrentISODateTime();
 
-    // Actualizar el estado
+    // Update the state
     let completedDay: Day | null = null;
 
     this.systemCore.updateState((state) => {
@@ -94,24 +95,24 @@ export class DayManager {
         return state;
       }
 
-      // Obtener referencia al día actual
+      // Get a reference to the current day
       const currentDay = state.currentDay.day;
 
-      // Guardar las actividades pendientes antes de limpiar el día actual
-      // Nos aseguramos de que solo guardamos actividades que no están activas
+      // Save the pending activities before clearing the current day
+      // Make sure we only save activities that are not active
       const pendingActivities = state.currentDay.activityInstances.filter(
         (instance) => instance.state !== "active"
       );
 
-      // Inicializar el campo si no existe
+      // Initialize the field if it does not exist
       if (!state.global.pendingActivityInstances) {
         state.global.pendingActivityInstances = [];
       }
 
-      // Guardar actividades pendientes en el estado global
+      // Save pending activities in the global state
       state.global.pendingActivityInstances = pendingActivities;
 
-      // Actualizar el estado del día a inactivo y registrar hora de finalización
+      // Set the day's state to inactive and record the end time
       const updatedDay: Day = {
         ...currentDay,
         state: "inactive",
@@ -119,31 +120,31 @@ export class DayManager {
         updatedAt: timestamp,
       };
 
-      // Guardar referencia para retornar
+      // Keep a reference to return
       completedDay = updatedDay;
 
-      // Actualizar día en la lista global
+      // Update the day in the global list
       const dayIndex = state.global.days.findIndex((day) => day.id === currentDay.id);
       if (dayIndex >= 0) {
         state.global.days[dayIndex] = updatedDay;
       }
 
-      // Limpiar día actual
+      // Clear the current day
       state.currentDay = null;
 
       return state;
     });
 
     if (!completedDay) {
-      throw new Error("Error al finalizar el día");
+      throw new CoreError("internal", "ending the day");
     }
 
     return completedDay;
   }
 
   /**
-   * Obtiene el día activo
-   * @returns El día activo o null si no hay día activo
+   * Gets the active day
+   * @returns The active day, or null if there is no active day
    */
   public getCurrentDay(): Day | null {
     const state = this.systemCore.getState();
@@ -151,8 +152,8 @@ export class DayManager {
   }
 
   /**
-   * Obtiene todos los días registrados
-   * @returns Lista de todos los días
+   * Gets all recorded days
+   * @returns List of all days
    */
   public getDays(): Day[] {
     const state = this.systemCore.getState();
@@ -160,8 +161,8 @@ export class DayManager {
   }
 
   /**
-   * Verifica si hay un día activo
-   * @returns true si hay un día activo, false en caso contrario
+   * Checks whether a day is active
+   * @returns true if a day is active, false otherwise
    */
   public isDayActive(): boolean {
     const state = this.systemCore.getState();

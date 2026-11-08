@@ -17,7 +17,7 @@ export function LibraryPage() {
   const { state } = useSystem();
   const [params, setParams] = useSearchParams();
   const requested = params.get("tab");
-  // Acepta también los valores antiguos en español (?tab=bloques)
+  // Also accepts the old Spanish values (?tab=bloques)
   const legacy: Record<string, string> = {
     actividades: "activities",
     eventos: "events",

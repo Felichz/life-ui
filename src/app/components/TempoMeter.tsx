@@ -5,8 +5,8 @@ import { cn } from "../lib/cn";
 import { formatNumber } from "../lib/format";
 
 /**
- * Tempos del día frente a la referencia. La referencia es un ancla, no una
- * deuda: se muestra el porcentaje alcanzado, nunca lo que "falta".
+ * The day's tempos against the reference. The reference is an anchor, not a
+ * debt: we show the percentage reached, never what is "missing".
  */
 export function TempoMeter({
   summary,
@@ -101,7 +101,7 @@ function Bar({ value, over, thin = false }: { value: number; over: boolean; thin
   );
 }
 
-/** Devuelve un contador que cambia solo cuando el valor sube (para animar). */
+/** Returns a counter that changes only when the value goes up (for animation). */
 function useBump(value: number): number {
   const previous = useRef(value);
   const [bump, setBump] = useState(0);

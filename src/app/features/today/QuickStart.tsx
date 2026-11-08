@@ -8,7 +8,7 @@ import { cn } from "../../lib/cn";
 import { useDayActions } from "../../state/actions";
 import { t, tr } from "../../i18n";
 
-/** Actividades ancladas: empezar con un toque, sin configurar nada. */
+/** Pinned activities: start with one tap, nothing to configure. */
 export function QuickStart({
   templates,
   hasLibrary,

@@ -3,10 +3,10 @@ import { SystemCore } from "../index";
 import { UtilityService } from "../utilityService";
 import type { AppState } from "../../types";
 
-// Mock para SystemCore
+// Mock for SystemCore
 jest.mock("../index");
 
-// Mock para UtilityService
+// Mock for UtilityService
 jest.mock("../utilityService");
 
 describe("TimeBlockManager", () => {
@@ -21,7 +21,7 @@ describe("TimeBlockManager", () => {
   let mockCurrentMinutes: number;
 
   beforeEach(() => {
-    // Configurar estado inicial de la aplicación
+    // Set up the initial app state
     mockAppState = {
       global: {
         days: [],
@@ -37,7 +37,7 @@ describe("TimeBlockManager", () => {
       currentDay: null,
     };
 
-    // Configurar mocks
+    // Set up mocks
     mockDefaultUUID = "default-block-uuid";
     mockUUID = "test-uuid-123";
     mockUUID2 = "test-uuid-456";
@@ -45,10 +45,10 @@ describe("TimeBlockManager", () => {
     mockTimestamp = "2023-01-01T12:00:00.000Z";
     mockCurrentMinutes = 720; // 12:00 PM
 
-    // Configurar mocks para UtilityService
+    // Set up mocks for UtilityService
     jest.resetAllMocks();
     (UtilityService.generateUUID as jest.Mock).mockImplementation(() => {
-      // Simular cada llamada consecutiva devolviendo un valor diferente
+      // Simulate each consecutive call returning a different value
       if ((UtilityService.generateUUID as jest.Mock).mock.calls.length === 1) {
         return mockDefaultUUID;
       } else if ((UtilityService.generateUUID as jest.Mock).mock.calls.length === 2) {
@@ -78,7 +78,7 @@ describe("TimeBlockManager", () => {
       mockAppState = updater(mockAppState);
     });
 
-    // Crear instancia de TimeBlockManager
+    // Create a TimeBlockManager instance
     timeBlockManager = new TimeBlockManager(systemCore);
   });
 
@@ -87,19 +87,19 @@ describe("TimeBlockManager", () => {
   });
 
   describe("constructor", () => {
-    it("debe crear el bloque por defecto si no existe", () => {
-      // Al instanciar TimeBlockManager, se debe crear el bloque por defecto
+    it("creates the default block if it does not exist", () => {
+      // Instantiating TimeBlockManager must create the default block
       expect(mockAppState.global.timeBlocks.length).toBe(1);
       expect(mockAppState.global.timeBlocks[0].isDefault).toBe(true);
       expect(mockAppState.global.timeBlocks[0].name).toBe("Por Hacer");
       expect(mockAppState.global.timeBlocks[0].id).toBe(mockDefaultUUID);
     });
 
-    it("debe asegurar que el bloque por defecto exista al iniciar un nuevo día", () => {
-      // Limpiar los bloques para simular un estado inicial sin bloques
+    it("ensures the default block exists when starting a new day", () => {
+      // Clear the blocks to simulate an initial state with no blocks
       mockAppState.global.timeBlocks = [];
 
-      // Simular inicialización de SystemCore y día activo
+      // Simulate SystemCore initialization and an active day
       mockAppState.currentDay = {
         day: {
           id: "day-id-123",
@@ -112,41 +112,41 @@ describe("TimeBlockManager", () => {
         activeActivityInstanceId: undefined,
       };
 
-      // Preparar mock para isTimeBlockAvailable
-      // Necesitamos sobrescribir el comportamiento para este test específico
+      // Prepare a mock for isTimeBlockAvailable
+      // We need to override the behavior for this specific test
       const isTimeBlockAvailableSpy = jest.spyOn(
         TimeBlockManager.prototype,
         "isTimeBlockAvailable"
       );
       isTimeBlockAvailableSpy.mockReturnValue(true);
 
-      // Crear una nueva instancia de TimeBlockManager
+      // Create a new TimeBlockManager instance
       const newTimeBlockManager = new TimeBlockManager(systemCore);
 
-      // Verificar que se creó el bloque por defecto
+      // Check that the default block was created
       expect(mockAppState.global.timeBlocks.length).toBe(1);
       expect(mockAppState.global.timeBlocks[0].isDefault).toBe(true);
       expect(mockAppState.global.timeBlocks[0].name).toBe("Por Hacer");
 
-      // Verificar que el bloque por defecto está disponible
+      // Check that the default block is available
       const defaultBlock = newTimeBlockManager.getDefaultBlock();
       expect(defaultBlock).toBeDefined();
       expect(defaultBlock.isDefault).toBe(true);
 
-      // Verificar que el bloque por defecto siempre está disponible
+      // Check that the default block is always available
       expect(newTimeBlockManager.isTimeBlockAvailable(defaultBlock.id)).toBe(true);
 
-      // Limpiar el spy
+      // Clean up the spy
       isTimeBlockAvailableSpy.mockRestore();
     });
   });
 
   describe("createTimeBlock", () => {
     beforeEach(() => {
-      // Resetear mocks específicamente para estos tests
+      // Reset mocks specifically for these tests
       jest.restoreAllMocks();
 
-      // Configurar estado inicial solo con el bloque por defecto
+      // Set up the initial state with only the default block
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -166,7 +166,7 @@ describe("TimeBlockManager", () => {
         currentDay: null,
       };
 
-      // Configurar explícitamente el primer UUID que se generará
+      // Explicitly set the first UUID that will be generated
       (UtilityService.generateUUID as jest.Mock)
         .mockReturnValueOnce(mockUUID)
         .mockReturnValueOnce(mockUUID2)
@@ -176,73 +176,73 @@ describe("TimeBlockManager", () => {
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
     });
 
-    it("debe crear un nuevo bloque de tiempo", () => {
+    it("creates a new time block", () => {
       const result = timeBlockManager.createTimeBlock("Mañana", 360, 720);
 
-      // Verificar que se haya generado el bloque correctamente
+      // Check that the block was generated correctly
       expect(result).toEqual({
         id: mockUUID,
         name: "Mañana",
         startMinute: 360,
         endMinute: 720,
         isDefault: false,
-        order: 1, // Orden 1 ya que el bloque por defecto tiene orden 0
+        order: 1, // Order 1 since the default block has order 0
         createdAt: mockTimestamp,
         updatedAt: mockTimestamp,
       });
 
-      // Verificar que se actualizó el estado global
+      // Check that the global state was updated
       expect(systemCore.updateState).toHaveBeenCalled();
-      expect(mockAppState.global.timeBlocks.length).toBe(2); // 1 default + 1 nuevo
+      expect(mockAppState.global.timeBlocks.length).toBe(2); // 1 default + 1 new
       expect(mockAppState.global.timeBlocks[1]).toEqual(result);
     });
 
-    it("debe asignar un orden incremental a nuevos bloques", () => {
-      // Actualizar el mock de getState para que devuelva el estado actual,
-      // de modo que refleje los cambios realizados por systemCore.updateState
+    it("assigns an incremental order to new blocks", () => {
+      // Update the getState mock to return the current state,
+      // so it reflects the changes made by systemCore.updateState
       systemCore.getState.mockImplementation(() => mockAppState);
 
-      // Crear primer bloque
+      // Create the first block
       const block1 = timeBlockManager.createTimeBlock("Mañana", 360, 720);
 
-      // Crear segundo bloque (no se solapa con el primero)
+      // Create the second block (does not overlap the first)
       const block2 = timeBlockManager.createTimeBlock("Tarde", 720, 1080);
 
-      // Verificar que los órdenes son incrementales
-      expect(block1.order).toBe(1); // Orden 1 después del bloque por defecto (orden 0)
-      expect(block2.order).toBe(2); // Siguiente valor incremental
+      // Check that the orders are incremental
+      expect(block1.order).toBe(1); // Order 1 after the default block (order 0)
+      expect(block2.order).toBe(2); // Next incremental value
       expect(block1.id).toBe(mockUUID);
       expect(block2.id).toBe(mockUUID2);
     });
 
-    it("debe lanzar error si el nombre está vacío", () => {
-      expect(() => timeBlockManager.createTimeBlock("", 360, 720)).toThrow(
-        "El nombre del bloque no puede estar vacío"
+    it("throws an error if the name is empty", () => {
+      expect(() => timeBlockManager.createTimeBlock("", 360, 720)).toThrowCoreError(
+        "block-name-empty"
       );
     });
 
-    it("debe lanzar error si los minutos están fuera de rango", () => {
-      expect(() => timeBlockManager.createTimeBlock("Test", -10, 720)).toThrow(
-        "Los minutos deben estar entre 0 y 1439"
+    it("throws an error if the minutes are out of range", () => {
+      expect(() => timeBlockManager.createTimeBlock("Test", -10, 720)).toThrowCoreError(
+        "minutes-out-of-range"
       );
 
-      expect(() => timeBlockManager.createTimeBlock("Test", 360, 1500)).toThrow(
-        "Los minutos deben estar entre 0 y 1439"
-      );
-    });
-
-    it("debe lanzar error si el inicio es mayor o igual al fin", () => {
-      expect(() => timeBlockManager.createTimeBlock("Test", 720, 720)).toThrow(
-        "La hora de inicio debe ser anterior a la hora de fin"
-      );
-
-      expect(() => timeBlockManager.createTimeBlock("Test", 800, 720)).toThrow(
-        "La hora de inicio debe ser anterior a la hora de fin"
+      expect(() => timeBlockManager.createTimeBlock("Test", 360, 1500)).toThrowCoreError(
+        "minutes-out-of-range"
       );
     });
 
-    it("debe lanzar error si hay solapamiento con otros bloques", () => {
-      // Preparar el estado con un bloque "Mañana" ya existente
+    it("throws an error if the start is greater than or equal to the end", () => {
+      expect(() => timeBlockManager.createTimeBlock("Test", 720, 720)).toThrowCoreError(
+        "block-start-after-end"
+      );
+
+      expect(() => timeBlockManager.createTimeBlock("Test", 800, 720)).toThrowCoreError(
+        "block-start-after-end"
+      );
+    });
+
+    it("throws an error if it overlaps other blocks", () => {
+      // Prepare the state with an existing "Mañana" block
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -274,13 +274,13 @@ describe("TimeBlockManager", () => {
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // Verificar que está el bloque en el estado
+      // Check that the block is in the state
       expect(mockAppState.global.timeBlocks.length).toBe(2);
       expect(mockAppState.global.timeBlocks[1].name).toBe("Mañana");
 
-      // Intentar crear un bloque que se solape (10:00 - 15:00)
-      expect(() => timeBlockManager.createTimeBlock("Solapado", 600, 900)).toThrow(
-        "El nuevo bloque se solapa con bloques existentes"
+      // Try to create an overlapping block (10:00 - 15:00)
+      expect(() => timeBlockManager.createTimeBlock("Solapado", 600, 900)).toThrowCoreError(
+        "block-overlap"
       );
     });
   });
@@ -289,10 +289,10 @@ describe("TimeBlockManager", () => {
     let blockId: string;
 
     beforeEach(() => {
-      // Resetear mocks para que se comporten como esperamos
+      // Reset mocks so they behave as expected
       jest.restoreAllMocks();
 
-      // Configurar estado con un bloque existente para actualizar
+      // Set up state with an existing block to update
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -325,51 +325,51 @@ describe("TimeBlockManager", () => {
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
       blockId = mockUUID;
 
-      // Actualizar mockTimestamp para diferenciarlo
+      // Update mockTimestamp to tell it apart
       mockTimestamp = "2023-01-01T13:00:00.000Z";
       (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
     });
 
-    it("debe actualizar un bloque existente", () => {
+    it("updates an existing block", () => {
       const result = timeBlockManager.updateTimeBlock(blockId, { name: "Nueva Mañana" });
 
-      // Verificar que se actualizó correctamente
+      // Check that it was updated correctly
       expect(result.name).toBe("Nueva Mañana");
       expect(result.updatedAt).toBe(mockTimestamp);
 
-      // Verificar que no se modificaron otros campos
+      // Check that other fields were not modified
       expect(result.startMinute).toBe(360);
       expect(result.endMinute).toBe(720);
     });
 
-    it("debe actualizar múltiples propiedades", () => {
+    it("updates multiple properties", () => {
       const result = timeBlockManager.updateTimeBlock(blockId, {
         name: "Nueva Mañana",
         startMinute: 300,
         endMinute: 660,
       });
 
-      // Verificar que se actualizaron todas las propiedades
+      // Check that all properties were updated
       expect(result.name).toBe("Nueva Mañana");
       expect(result.startMinute).toBe(300);
       expect(result.endMinute).toBe(660);
       expect(result.updatedAt).toBe(mockTimestamp);
     });
 
-    it("debe lanzar error si el bloque no existe", () => {
-      expect(() => timeBlockManager.updateTimeBlock("id-inexistente", { name: "Test" })).toThrow(
-        "No se encontró el bloque con ID: id-inexistente"
-      );
+    it("throws an error if the block does not exist", () => {
+      expect(() =>
+        timeBlockManager.updateTimeBlock("id-inexistente", { name: "Test" })
+      ).toThrowCoreError("block-not-found");
     });
 
-    it("debe lanzar error si se intenta cambiar isDefault del bloque por defecto", () => {
-      expect(() => timeBlockManager.updateTimeBlock(mockDefaultUUID, { isDefault: false })).toThrow(
-        "No se puede convertir el bloque por defecto en un bloque regular"
-      );
+    it("throws an error when trying to change isDefault on the default block", () => {
+      expect(() =>
+        timeBlockManager.updateTimeBlock(mockDefaultUUID, { isDefault: false })
+      ).toThrowCoreError("default-block-protected");
     });
 
-    it("debe lanzar error si hay solapamiento con la actualización", () => {
-      // Agregar otro bloque al estado
+    it("throws an error if the update causes an overlap", () => {
+      // Add another block to the state
       mockAppState.global.timeBlocks.push({
         id: mockUUID2,
         name: "Tarde",
@@ -381,9 +381,9 @@ describe("TimeBlockManager", () => {
         updatedAt: mockTimestamp,
       });
 
-      // Intentar expandir el primer bloque para que se solape
-      expect(() => timeBlockManager.updateTimeBlock(blockId, { endMinute: 800 })).toThrow(
-        "La actualización causa solapamiento con otros bloques"
+      // Try to extend the first block so it overlaps
+      expect(() => timeBlockManager.updateTimeBlock(blockId, { endMinute: 800 })).toThrowCoreError(
+        "block-overlap"
       );
     });
   });
@@ -392,7 +392,7 @@ describe("TimeBlockManager", () => {
     let blockId: string;
 
     beforeEach(() => {
-      // Configurar estado con un bloque existente para eliminar
+      // Set up state with an existing block to delete
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -426,8 +426,8 @@ describe("TimeBlockManager", () => {
       blockId = mockUUID;
     });
 
-    it("debe eliminar un bloque existente y mover actividades a 'Por Hacer' si moveActivitiesToTodo es true", () => {
-      // Agregar actividades al bloque a eliminar
+    it("deletes an existing block and moves activities to 'Por Hacer' if moveActivitiesToTodo is true", () => {
+      // Add activities to the block being deleted
       mockAppState.currentDay = {
         day: {
           id: "day-id-123",
@@ -468,10 +468,10 @@ describe("TimeBlockManager", () => {
         activeActivityInstanceId: undefined,
       };
 
-      // Eliminar el bloque y mover actividades
+      // Delete the block and move activities
       timeBlockManager.deleteTimeBlock(blockId, true);
 
-      // Las actividades deben estar ahora en el bloque por defecto
+      // The activities should now be in the default block
       const moved = mockAppState.currentDay!.activityInstances.filter(
         (a) => a.blockId === mockDefaultUUID
       );
@@ -479,8 +479,8 @@ describe("TimeBlockManager", () => {
       expect(mockAppState.global.timeBlocks.find((b) => b.id === blockId)).toBeUndefined();
     });
 
-    it("debe eliminar un bloque existente y eliminar actividades si moveActivitiesToTodo es false", () => {
-      // Agregar actividades al bloque a eliminar
+    it("deletes an existing block and deletes its activities if moveActivitiesToTodo is false", () => {
+      // Add activities to the block being deleted
       mockAppState.currentDay = {
         day: {
           id: "day-id-123",
@@ -521,32 +521,32 @@ describe("TimeBlockManager", () => {
         activeActivityInstanceId: undefined,
       };
 
-      // Eliminar el bloque y eliminar actividades
+      // Delete the block and delete activities
       timeBlockManager.deleteTimeBlock(blockId, false);
 
-      // Solo debe quedar la actividad en el bloque por defecto
+      // Only the activity in the default block should remain
       const remaining = mockAppState.currentDay!.activityInstances;
       expect(remaining.length).toBe(1);
       expect(remaining[0].id).toBe("a3");
       expect(mockAppState.global.timeBlocks.find((b) => b.id === blockId)).toBeUndefined();
     });
 
-    it("debe lanzar error si el bloque no existe", () => {
-      expect(() => timeBlockManager.deleteTimeBlock("id-inexistente")).toThrow(
-        "No se encontró el bloque con ID: id-inexistente"
+    it("throws an error if the block does not exist", () => {
+      expect(() => timeBlockManager.deleteTimeBlock("id-inexistente")).toThrowCoreError(
+        "block-not-found"
       );
     });
 
-    it("debe lanzar error si se intenta eliminar el bloque por defecto", () => {
-      expect(() => timeBlockManager.deleteTimeBlock(mockDefaultUUID)).toThrow(
-        "No se puede eliminar el bloque por defecto"
+    it("throws an error when trying to delete the default block", () => {
+      expect(() => timeBlockManager.deleteTimeBlock(mockDefaultUUID)).toThrowCoreError(
+        "default-block-protected"
       );
     });
   });
 
   describe("getTimeBlocks", () => {
-    it("debe devolver todos los bloques ordenados por order", () => {
-      // Crear un estado con varios bloques en desorden
+    it("returns all blocks sorted by order", () => {
+      // Build a state with several blocks out of order
       const bloques = [
         {
           id: mockDefaultUUID,
@@ -590,7 +590,7 @@ describe("TimeBlockManager", () => {
         },
       ];
 
-      // Los bloques están deliberadamente en orden incorrecto
+      // The blocks are deliberately in the wrong order
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -601,12 +601,12 @@ describe("TimeBlockManager", () => {
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // Obtener los bloques ordenados
+      // Get the sorted blocks
       const result = timeBlockManager.getTimeBlocks();
 
-      // Verificar que están ordenados por order
+      // Check that they are sorted by order
       expect(result.length).toBe(4);
-      expect(result[0].isDefault).toBe(true); // El bloque por defecto siempre es el primero (order 0)
+      expect(result[0].isDefault).toBe(true); // The default block is always first (order 0)
       expect(result[1].name).toBe("Mañana");
       expect(result[2].name).toBe("Tarde");
       expect(result[3].name).toBe("Noche");
@@ -614,8 +614,8 @@ describe("TimeBlockManager", () => {
   });
 
   describe("getTimeBlock", () => {
-    it("debe devolver un bloque por su ID", () => {
-      // Configurar estado con un bloque específico
+    it("returns a block by its ID", () => {
+      // Set up state with a specific block
       const bloque = {
         id: mockUUID,
         name: "Mañana",
@@ -649,26 +649,26 @@ describe("TimeBlockManager", () => {
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // Obtener el bloque por ID
+      // Get the block by ID
       const result = timeBlockManager.getTimeBlock(mockUUID);
 
-      // Verificar que es el mismo bloque
+      // Check that it is the same block
       expect(result).toEqual(bloque);
     });
 
-    it("debe devolver undefined si el bloque no existe", () => {
+    it("returns undefined if the block does not exist", () => {
       const result = timeBlockManager.getTimeBlock("id-inexistente");
       expect(result).toBeUndefined();
     });
   });
 
   describe("getCurrentTimeBlock", () => {
-    it("debe devolver el bloque actual según la hora del sistema", () => {
-      // Configurar la hora actual como 14:30 (870 minutos)
+    it("returns the current block based on the system time", () => {
+      // Set the current time to 14:30 (870 minutes)
       mockCurrentMinutes = 870;
       (UtilityService.getCurrentDayMinutes as jest.Mock).mockReturnValue(mockCurrentMinutes);
 
-      // Configurar estado con bloques
+      // Set up state with blocks
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -710,18 +710,18 @@ describe("TimeBlockManager", () => {
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // Obtener el bloque actual (debería ser "Tarde")
+      // Get the current block (should be "Tarde")
       const result = timeBlockManager.getCurrentTimeBlock();
 
       expect(result?.name).toBe("Tarde");
     });
 
-    it("debe devolver null si no hay bloque para la hora actual", () => {
-      // Configurar la hora actual como 05:00 (300 minutos)
+    it("returns null if there is no block for the current time", () => {
+      // Set the current time to 05:00 (300 minutes)
       mockCurrentMinutes = 300;
       (UtilityService.getCurrentDayMinutes as jest.Mock).mockReturnValue(mockCurrentMinutes);
 
-      // Configurar estado con bloques que no cubren la hora actual
+      // Set up state with blocks that do not cover the current time
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -753,7 +753,7 @@ describe("TimeBlockManager", () => {
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // No hay bloque para las 5:00
+      // There is no block for 5:00
       const result = timeBlockManager.getCurrentTimeBlock();
 
       expect(result).toBe(null);
@@ -761,11 +761,11 @@ describe("TimeBlockManager", () => {
   });
 
   describe("getDefaultBlock", () => {
-    it("debe devolver el bloque por defecto", () => {
-      // Resetear mocks para probar getDefaultBlock
+    it("returns the default block", () => {
+      // Reset mocks to test getDefaultBlock
       jest.restoreAllMocks();
 
-      // Simular que el bloque por defecto ya existe
+      // Simulate that the default block already exists
       (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockDefaultUUID);
 
       const mockAppStateWithDefault = {
@@ -787,28 +787,28 @@ describe("TimeBlockManager", () => {
         },
       };
 
-      // Simular que el estado contiene el bloque por defecto
+      // Simulate that the state contains the default block
       systemCore.getState = jest.fn().mockReturnValue(mockAppStateWithDefault);
 
-      // Obtener bloque por defecto
+      // Get the default block
       const result = timeBlockManager.getDefaultBlock();
 
-      // Verificar que es el bloque por defecto
+      // Check that it is the default block
       expect(result.isDefault).toBe(true);
       expect(result.name).toBe("Por Hacer");
       expect(result.id).toBe(mockDefaultUUID);
     });
 
-    it("debe crear el bloque por defecto si no existe", () => {
-      // Restablecer estado vacío
+    it("creates the default block if it does not exist", () => {
+      // Reset to an empty state
       mockAppState.global.timeBlocks = [];
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // Configurar el mock de UUID para que devuelva el ID esperado
+      // Set up the UUID mock to return the expected ID
       jest.restoreAllMocks();
       (UtilityService.generateUUID as jest.Mock).mockReturnValue("default-block-id");
 
-      // Llamar a getDefaultBlock debería crear un bloque por defecto
+      // Calling getDefaultBlock should create a default block
       const result = timeBlockManager.getDefaultBlock();
 
       expect(result.id).toBe("default-block-id");
@@ -822,14 +822,14 @@ describe("TimeBlockManager", () => {
     let afternoonBlockId: string;
 
     beforeEach(() => {
-      // Configurar tests con valores específicos
+      // Set up tests with specific values
       jest.restoreAllMocks();
       (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce("default-block-id");
       (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce(mockUUID);
       (UtilityService.generateUUID as jest.Mock).mockReturnValueOnce(mockUUID2);
       (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
 
-      // Crear un estado limpio con bloques predefinidos
+      // Build a clean state with predefined blocks
       mockAppState = {
         global: {
           ...mockAppState.global,
@@ -873,52 +873,52 @@ describe("TimeBlockManager", () => {
       morningBlockId = mockUUID;
       afternoonBlockId = mockUUID2;
 
-      // Verificar que se crearon correctamente
+      // Check that they were created correctly
       expect(mockAppState.global.timeBlocks.length).toBe(3);
       expect(mockAppState.global.timeBlocks[1].id).toBe(mockUUID);
       expect(mockAppState.global.timeBlocks[2].id).toBe(mockUUID2);
     });
 
-    it("debe devolver true para el bloque por defecto", () => {
+    it("returns true for the default block", () => {
       const defaultBlock = timeBlockManager.getDefaultBlock();
 
       expect(timeBlockManager.isTimeBlockAvailable(defaultBlock.id)).toBe(true);
     });
 
-    it("debe devolver true para el bloque actual", () => {
-      // Afternoon comienza exactamente a las 12:00
+    it("returns true for the current block", () => {
+      // Afternoon starts exactly at 12:00
       expect(timeBlockManager.isTimeBlockAvailable(afternoonBlockId)).toBe(true);
     });
 
-    it("debe devolver false para un bloque no activo", () => {
-      // Morning ya terminó a las 12:00
+    it("returns false for an inactive block", () => {
+      // Morning already ended at 12:00
       expect(timeBlockManager.isTimeBlockAvailable(morningBlockId)).toBe(false);
     });
 
-    it("debe devolver false para un ID inexistente", () => {
+    it("returns false for a nonexistent ID", () => {
       expect(timeBlockManager.isTimeBlockAvailable("id-inexistente")).toBe(false);
     });
   });
 
   describe("createDefaultBlock", () => {
-    it("debe crear un nuevo bloque por defecto", () => {
-      // Restablecer estado vacío
+    it("creates a new default block", () => {
+      // Reset to an empty state
       mockAppState.global.timeBlocks = [];
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // Configurar el mock de UUID para que devuelva el ID esperado
+      // Set up the UUID mock to return the expected ID
       jest.restoreAllMocks();
       (UtilityService.generateUUID as jest.Mock).mockReturnValue("default-block-id");
       (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
 
-      // Crear bloque por defecto
+      // Create the default block
       const result = timeBlockManager.createDefaultBlock();
 
       expect(result).toEqual({
         id: "default-block-id",
         name: "Por Hacer",
         startMinute: 0,
-        endMinute: 1439, // Actualizado para reflejar el nuevo rango de "todo el día"
+        endMinute: 1439, // Updated to reflect the new "whole day" range
         isDefault: true,
         order: 0,
         createdAt: mockTimestamp,
@@ -926,8 +926,8 @@ describe("TimeBlockManager", () => {
       });
     });
 
-    it("debe devolver el bloque por defecto existente sin crear uno nuevo", () => {
-      // Crear un estado con un bloque por defecto
+    it("returns the existing default block without creating a new one", () => {
+      // Build a state with a default block
       const existingDefault = {
         id: mockDefaultUUID,
         name: "Por Hacer",
@@ -949,20 +949,20 @@ describe("TimeBlockManager", () => {
 
       systemCore.getState = jest.fn().mockReturnValue(mockAppState);
 
-      // El mock no debería usarse porque se devuelve el existente
+      // The mock should not be used because the existing one is returned
       jest.restoreAllMocks();
 
-      // Llamar a createDefaultBlock debería devolver el bloque existente
+      // Calling createDefaultBlock should return the existing block
       const result = timeBlockManager.createDefaultBlock();
 
-      // Debe devolver el existente, no crear uno nuevo
+      // It must return the existing one, not create a new one
       expect(result.id).toBe(existingDefault.id);
       expect(mockAppState.global.timeBlocks.length).toBe(1);
     });
   });
 
   describe("convertMinutesToTimeString", () => {
-    it("debe convertir minutos a formato de hora", () => {
+    it("converts minutes to time format", () => {
       (UtilityService.formatTime as jest.Mock).mockReturnValue("12:30");
 
       const result = timeBlockManager.convertMinutesToTimeString(750);
@@ -973,7 +973,7 @@ describe("TimeBlockManager", () => {
   });
 
   describe("convertTimeStringToMinutes", () => {
-    it("debe convertir formato de hora a minutos", () => {
+    it("converts time format to minutes", () => {
       (UtilityService.parseTime as jest.Mock).mockReturnValue(750);
 
       const result = timeBlockManager.convertTimeStringToMinutes("12:30");
