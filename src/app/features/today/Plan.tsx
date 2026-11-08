@@ -74,7 +74,7 @@ export function Plan({ groups, total }: { groups: PlanGroup[]; total: number }) 
     try {
       localStorage.setItem(VIEW_KEY, next);
     } catch {
-      // preferencia solo en memoria
+      // preference kept in memory only
     }
   };
 
@@ -167,14 +167,17 @@ function GroupHeader({ group, compact = false }: { group: PlanGroup; compact?: b
       {!block.isDefault && <span className="tabular text-sm text-ink-3">{blockRange(block)}</span>}
       <StatusTag status={status} />
       <span className="tabular text-sm text-ink-3">{items.length > 0 ? items.length : ""}</span>
-      <IconButton
-        label={t("plan.addTo", { block: blockName(block) })}
-        size="sm"
-        className="ml-auto"
-        onClick={() => openAddActivity({ blockId: block.id })}
-      >
-        <Plus />
-      </IconButton>
+      {/* Anything added to a past block could not be started */}
+      {status !== "past" && (
+        <IconButton
+          label={t("plan.addTo", { block: blockName(block) })}
+          size="sm"
+          className="ml-auto"
+          onClick={() => openAddActivity({ blockId: block.id })}
+        >
+          <Plus />
+        </IconButton>
+      )}
     </div>
   );
 }
@@ -206,6 +209,9 @@ function PastNotice({ group }: { group: PlanGroup }) {
 }
 
 function ListGroup({ group, onEdit }: { group: PlanGroup; onEdit: (id: UUID) => void }) {
+  const empty = group.items.length === 0;
+  // A past, empty block asks for nothing: a subtle line instead of a gap
+  const quiet = empty && group.status === "past";
   return (
     <div>
       <GroupHeader group={group} />
@@ -216,15 +222,21 @@ function ListGroup({ group, onEdit }: { group: PlanGroup; onEdit: (id: UUID) => 
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={cn(
-              "flex flex-col rounded-lg transition-colors",
-              group.items.length === 0 && "min-h-[44px] border border-dashed border-line",
-              group.items.length > 0 && "border border-line bg-panel shadow-xs",
-              snapshot.isDraggingOver && "border-accent/60 bg-accent/5"
+              "flex flex-col rounded-lg border transition-colors",
+              empty && !quiet && "min-h-[44px] border-dashed border-line",
+              quiet && "min-h-[32px] border-transparent",
+              !empty && "border-line bg-panel shadow-xs",
+              snapshot.isDraggingOver && "border-dashed border-accent/60 bg-accent/5"
             )}
           >
-            {group.items.length === 0 && !snapshot.isDraggingOver && (
-              <p className="flex h-[42px] items-center px-3 text-sm text-ink-3">
-                {t("plan.emptyBlock")}
+            {empty && !snapshot.isDraggingOver && (
+              <p
+                className={cn(
+                  "flex items-center text-sm text-ink-3",
+                  quiet ? "h-[30px] px-0" : "h-[42px] px-3"
+                )}
+              >
+                {quiet ? t("plan.emptyPast") : t("plan.emptyBlock")}
               </p>
             )}
             {group.items.map((item, index) => (

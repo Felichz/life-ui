@@ -13,8 +13,8 @@ interface TrendChartProps {
 }
 
 /**
- * Tempos por día frente a la referencia (línea discontinua). Una sola serie,
- * un solo eje; la satisfacción va en el tooltip y en la tabla, no en otro eje.
+ * Tempos per day against the reference (dashed line). A single series, a
+ * single axis; satisfaction goes in the tooltip and the table, not another axis.
  */
 export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
   const { core } = useSystem();
@@ -66,58 +66,88 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
         )}
       </div>
 
-      <div className="relative mt-6 h-44" aria-hidden>
-        <div className="absolute inset-x-0 bottom-0 border-t border-line" />
-        <div className="absolute inset-0 flex items-end gap-1 sm:gap-1.5">
-          {points.map(({ day, summary }) => {
-            const emphasized = day.id === (hovered ?? selectedId);
-            const height = (summary.totalTempos / max) * 100;
-            return (
-              <button
-                key={day.id}
-                type="button"
-                tabIndex={-1}
-                onClick={() => onSelect(day.id)}
-                onMouseEnter={() => setHovered(day.id)}
-                onMouseLeave={() => setHovered(null)}
-                className="flex h-full min-w-0 flex-1 cursor-pointer items-end"
-              >
+      <div className="mt-6 flex gap-2" aria-hidden>
+        <div className="min-w-0 flex-1">
+          <div className="relative h-40 sm:h-44">
+            <div className="absolute inset-x-0 bottom-0 border-t border-line" />
+            <div className="absolute inset-0 flex items-end gap-1 sm:gap-1.5">
+              {points.map(({ day, summary }) => {
+                const emphasized = day.id === (hovered ?? selectedId);
+                const height = (summary.totalTempos / max) * 100;
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => onSelect(day.id)}
+                    onMouseEnter={() => setHovered(day.id)}
+                    onMouseLeave={() => setHovered(null)}
+                    className="group flex h-full min-w-0 flex-1 cursor-pointer items-end justify-center"
+                  >
+                    <span
+                      className={cn(
+                        "w-full max-w-[40px] rounded-t-[4px] transition-[background-color,height] duration-300",
+                        emphasized ? "bg-tempo" : "bg-ink-3/30 group-hover:bg-ink-3/45",
+                        summary.totalTempos === 0 && "bg-line"
+                      )}
+                      style={{
+                        height: summary.totalTempos === 0 ? "2px" : `${Math.max(height, 1.5)}%`,
+                      }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            {/* The reference sits above the bars so it is never hidden */}
+            <div
+              className="pointer-events-none absolute inset-x-0 border-t-[1.5px] border-dashed border-ink-2/60"
+              style={{ bottom: `${(target / max) * 100}%` }}
+            />
+          </div>
+          <div className="relative mt-1.5 h-4">
+            {points.map(({ day }, index) => {
+              // Counting from the end: the most recent day always gets a label
+              const fromEnd = points.length - 1 - index;
+              const wide = fromEnd % Math.ceil(points.length / 7) === 0;
+              const narrow = fromEnd % Math.ceil(points.length / 4) === 0;
+              if (!wide && !narrow) return null;
+              const edge = index === 0 ? "left-0" : fromEnd === 0 ? "right-0" : "-translate-x-1/2";
+              return (
                 <span
+                  key={day.id}
                   className={cn(
-                    "w-full rounded-t-[4px] transition-[background-color,height] duration-300",
-                    emphasized ? "bg-tempo" : "bg-ink-3/30",
-                    summary.totalTempos === 0 && "bg-line"
+                    "tabular absolute whitespace-nowrap text-2xs",
+                    day.id === selectedId ? "font-medium text-ink-2" : "text-ink-3",
+                    edge,
+                    !narrow && "hidden sm:block"
                   )}
-                  style={{
-                    height: summary.totalTempos === 0 ? "2px" : `${Math.max(height, 1.5)}%`,
-                  }}
-                />
-              </button>
-            );
-          })}
+                  style={
+                    index === 0 || fromEnd === 0
+                      ? undefined
+                      : { left: `${((index + 0.5) / points.length) * 100}%` }
+                  }
+                >
+                  {formatDayMonth(dayStart(day))}
+                </span>
+              );
+            })}
+          </div>
         </div>
-        {/* La referencia va por encima de las barras para que nunca quede tapada */}
-        <div
-          className="pointer-events-none absolute inset-x-0 border-t-[1.5px] border-dashed border-ink-2/70"
-          style={{ bottom: `${(target / max) * 100}%` }}
-        >
-          <span className="tabular absolute -top-[22px] left-0 rounded bg-panel px-1 text-xs text-ink-2">
-            {t("trend.reference", { target: formatNumber(target) })}
-          </span>
-        </div>
-      </div>
-      <div className="mt-1.5 flex gap-1 sm:gap-1.5" aria-hidden>
-        {points.map(({ day }, index) => (
+        {/* Reference axis in its own margin: it covers no bar */}
+        <div className="relative h-40 w-7 shrink-0 sm:h-44">
           <span
-            key={day.id}
-            className="tabular min-w-0 flex-1 truncate text-center text-2xs text-ink-3"
+            className="tabular absolute left-0 translate-y-1/2 text-2xs font-medium text-ink-2"
+            style={{ bottom: `${(target / max) * 100}%` }}
+            title={t("trend.reference", { target: formatNumber(target) })}
           >
-            {index % Math.ceil(points.length / 7) === 0 || day.id === selectedId
-              ? formatDayMonth(dayStart(day))
-              : ""}
+            {formatNumber(target)}
           </span>
-        ))}
+        </div>
       </div>
+      <p className="mt-3 flex items-center gap-2 text-xs text-ink-3">
+        <span aria-hidden className="w-4 border-t-[1.5px] border-dashed border-ink-2/60" />
+        {t("trend.reference", { target: formatNumber(target) })}
+      </p>
 
       <div className="sr-only">
         <table>

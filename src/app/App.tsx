@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import type { ISystemCore } from "../types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -14,9 +14,8 @@ import { SystemProvider } from "./state/system";
 import { ThemeProvider } from "./state/theme";
 import { ToastProvider } from "./state/toast";
 
-const ReviewPage = lazy(() =>
-  import("./features/review/ReviewPage").then((module) => ({ default: module.ReviewPage }))
-);
+const loadReview = () => import("./features/review/ReviewPage");
+const ReviewPage = lazy(() => loadReview().then((module) => ({ default: module.ReviewPage })));
 
 export function AppProviders({
   children,
@@ -25,7 +24,7 @@ export function AppProviders({
 }: {
   children: ReactNode;
   core?: ISystemCore;
-  /** Fija el idioma (tests); si no, se detecta y se recuerda. */
+  /** Pins the language (tests); otherwise it is detected and remembered. */
   locale?: Locale;
 }) {
   return (
@@ -59,7 +58,7 @@ export function AppRoutes() {
             }
           />
           <Route path="settings" element={<SettingsPage />} />
-          {/* Rutas anteriores (en español y de la primera UI) */}
+          {/* Legacy routes (Spanish ones and from the first UI) */}
           <Route path="biblioteca" element={<Navigate to="/library" replace />} />
           <Route path="resumen" element={<LegacyReviewRedirect />} />
           <Route path="ajustes" element={<Navigate to="/settings" replace />} />
@@ -80,6 +79,12 @@ function LegacyReviewRedirect() {
 }
 
 export default function App() {
+  // Preload Review in the background so opening it doesn't show a blank gap
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadReview(), 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <ErrorBoundary>
       <AppProviders>

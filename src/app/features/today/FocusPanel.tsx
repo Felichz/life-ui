@@ -74,7 +74,9 @@ function Running({ item }: { item: PlanItem }) {
         </div>
 
         {item.contract && <ProgressTrack contract={item.contract} elapsed={elapsedMinutes} />}
-        <p className="mt-2.5 text-sm text-ink-2">{statusMessage(item, elapsedMinutes)}</p>
+        <p className={cn("text-sm text-ink-2", item.contract ? "mt-1" : "mt-3")}>
+          {statusMessage(item, elapsedMinutes)}
+        </p>
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-line bg-subtle/60 px-3 py-2.5 sm:px-4">
@@ -140,7 +142,8 @@ function statusMessage(item: PlanItem, elapsed: number): string {
   return parts.join(" ");
 }
 
-/** Barra de tiempo contra el contrato: estimado, rango o límites del timebox. */
+/** A round step so the ruler never carries more than ~24 ticks. */
+/** Time bar against the contract: estimate, range, or timebox limits. */
 function ProgressTrack({ contract, elapsed }: { contract: Contract; elapsed: number }) {
   const limit = contract.estimate ?? contract.max ?? contract.min ?? 0;
   const scale = Math.max(limit * 1.25, elapsed * 1.04, 1);
@@ -189,7 +192,6 @@ function ProgressTrack({ contract, elapsed }: { contract: Contract; elapsed: num
         ))}
       </div>
       <div className="relative mt-1.5 h-4 text-xs text-ink-3">
-        <span className="absolute left-0">0</span>
         {markers.map((marker) => (
           <span
             key={`${marker.label}-l`}
