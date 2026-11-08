@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { TimeBlock } from "../../../types";
 import { DayStrip } from "../../components/DayStrip";
@@ -33,10 +33,23 @@ function parseDraft(draft: Draft): { name: string; start: number; end: number } 
   return { name: draft.name.trim(), start, end };
 }
 
-/** El core rechaza solapamientos; lo traducimos a un mensaje que ayude. */
-function friendlyError(caught: unknown): string {
-  const message = errorMessage(caught);
-  return /solapa/i.test(message) ? t("blocks.error.overlap") : message;
+/**
+ * Suggests the longest free gap between 06:00 and the end of the day (up to
+ * three hours), so the form doesn't start out with "--:--".
+ */
+function suggestSlot(timed: TimeBlock[]): Pick<Draft, "start" | "end"> {
+  const DAY_END = 24 * 60;
+  let best = { start: 0, length: 0 };
+  let cursor = 6 * 60;
+  for (const block of [...timed].sort((a, b) => a.startMinute - b.startMinute)) {
+    if (block.startMinute - cursor > best.length)
+      best = { start: cursor, length: block.startMinute - cursor };
+    cursor = Math.max(cursor, block.endMinute);
+  }
+  if (DAY_END - cursor > best.length) best = { start: cursor, length: DAY_END - cursor };
+  if (best.length < 15) return { start: "", end: "" };
+  const end = Math.min(best.start + Math.min(best.length, 180), DAY_END - 1);
+  return { start: formatDayMinutes(best.start), end: formatDayMinutes(end) };
 }
 
 export function BlocksEditor() {
@@ -45,8 +58,15 @@ export function BlocksEditor() {
   const now = minutesOfDay(useNow(30_000));
   const blocks = sortBlocks(state.global.timeBlocks);
   const timed = blocks.filter((block) => !block.isDefault);
-  const [draft, setDraft] = useState<Draft>({ name: "", start: "", end: "" });
+  const [draft, setDraft] = useState<Draft>(() => ({ name: "", ...suggestSlot(timed) }));
   const [error, setError] = useState<string | null>(null);
+
+  // After adding (or deleting) a block, suggest a free gap again
+  useEffect(() => {
+    setDraft((current) =>
+      current.start || current.end ? current : { ...current, ...suggestSlot(timed) }
+    );
+  }, [timed.length]);
 
   const add = (event: FormEvent) => {
     event.preventDefault();
@@ -57,7 +77,7 @@ export function BlocksEditor() {
       setDraft({ name: "", start: "", end: "" });
       setError(null);
     } catch (caught) {
-      setError(friendlyError(caught));
+      setError(errorMessage(caught));
     }
   };
 
@@ -69,7 +89,7 @@ export function BlocksEditor() {
         description: t("blocks.presetsCreatedHint"),
       });
     } catch (caught) {
-      toast({ tone: "error", title: t("error.create"), description: friendlyError(caught) });
+      toast({ tone: "error", title: t("error.create"), description: errorMessage(caught) });
     }
   };
 
@@ -183,7 +203,7 @@ function BlockRow({ block, isNow }: { block: TimeBlock; isNow: boolean }) {
       setEditing(false);
       setError(null);
     } catch (caught) {
-      setError(friendlyError(caught));
+      setError(errorMessage(caught));
     }
   };
 
