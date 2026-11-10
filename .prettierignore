@@ -9,3 +9,5 @@ video/assets/app.css
 video/assets/rects.js
 video/renders
 video/snapshots
+src-tauri/target
+src-tauri/gen

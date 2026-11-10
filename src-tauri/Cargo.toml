@@ -1,0 +1,28 @@
+[package]
+name = "lifeui"
+version = "0.1.0"
+description = "LifeUI desktop: the day, run by a local agent"
+authors = ["Felix Andersson"]
+license = "MIT"
+repository = ""
+edition = "2024"
+rust-version = "1.90"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "lifeui_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.12.5" }
+tauri-plugin-log = "2"
+tauri-plugin-http = "2.9.0"
+sysinfo = "0.38.4"
+nvml-wrapper = "0.13.0"

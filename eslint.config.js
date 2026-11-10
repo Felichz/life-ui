@@ -18,6 +18,9 @@ export default tseslint.config(
       "cypress/videos/**",
       // The product film: its own toolchain and browser runtime (video/README.md)
       "video/**",
+      // The desktop shell's Rust build output
+      "src-tauri/target/**",
+      "src-tauri/gen/**",
       "*.config.js",
     ],
   },
