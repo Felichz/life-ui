@@ -1,5 +1,6 @@
 import type { AppState, IPersistenceManager } from "../types";
 import { CoreError } from "./errors";
+import { getStateStorage } from "./stateStorage";
 
 /**
  * Key used to store the application state in localStorage
@@ -111,7 +112,7 @@ export class PersistenceManager implements IPersistenceManager {
   public saveState(state: AppState): void {
     try {
       const serializedState = this.buildSerializedState(state);
-      localStorage.setItem(STORAGE_KEY, serializedState);
+      getStateStorage().setItem(STORAGE_KEY, serializedState);
     } catch (error) {
       console.error("Error saving state to localStorage:", error);
     }
@@ -124,7 +125,7 @@ export class PersistenceManager implements IPersistenceManager {
    */
   public loadState(): AppState | null {
     try {
-      const serializedState = localStorage.getItem(STORAGE_KEY);
+      const serializedState = getStateStorage().getItem(STORAGE_KEY);
 
       if (!serializedState) {
         return null;
@@ -147,7 +148,7 @@ export class PersistenceManager implements IPersistenceManager {
    */
   public clearState(): void {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      getStateStorage().removeItem(STORAGE_KEY);
     } catch (error) {
       console.error("Error clearing state from localStorage:", error);
     }

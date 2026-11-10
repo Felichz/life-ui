@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import type { ISystemCore } from "../types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ModelGate } from "./runtime/ModelGate";
 import { LocaleProvider, type Locale } from "./i18n";
 import { TooltipProvider } from "./components/ui/Tooltip";
 import { LibraryPage } from "./features/library/LibraryPage";
@@ -88,9 +89,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProviders>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <ModelGate>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </ModelGate>
       </AppProviders>
     </ErrorBoundary>
   );

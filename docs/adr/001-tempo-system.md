@@ -21,14 +21,14 @@ The app has a **solid and complete data model**, but it lacks the **dopamine eng
 
 The old system (commits `0e54bb5`, `30bf872`, `b784b29`, `7f2e41b`, `b6199c3`) implemented:
 
-| Concept                                                  | Meaning                                              |
-| -------------------------------------------------------- | ---------------------------------------------------- |
-| `totalTempoBalance` / `dayTempoBalance`                  | Double tracking: historical + daily                  |
-| `passiveTempoConsumptionRate`                            | Idle time drained tempos (problematic design)        |
-| `tempoGeneratingMinutes` with a per-activity cap         | You generated tempo only up to `totalTempoReward`    |
-| 3 economic types: `challenge` / `neutral` / `discount`   | Different generation/consumption rates               |
-| `expirationConstraints` with `penaltyAmount`             | Expirations applied penalties                        |
-| `tempoModificationHistory`                               | Auditable history of changes                         |
+| Concept                                                | Meaning                                           |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| `totalTempoBalance` / `dayTempoBalance`                | Double tracking: historical + daily               |
+| `passiveTempoConsumptionRate`                          | Idle time drained tempos (problematic design)     |
+| `tempoGeneratingMinutes` with a per-activity cap       | You generated tempo only up to `totalTempoReward` |
+| 3 economic types: `challenge` / `neutral` / `discount` | Different generation/consumption rates            |
+| `expirationConstraints` with `penaltyAmount`           | Expirations applied penalties                     |
+| `tempoModificationHistory`                             | Auditable history of changes                      |
 
 ---
 
@@ -320,16 +320,16 @@ interface ISystemCore {
 
 ### Explicit edge rules
 
-| Case                                                          | Behavior                                                                                                                                   |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `durationMinutes <= 0`                                        | `temposAwarded = 0` (no reward for null time)                                                                                              |
-| `satisfactionScore` outside `[0,10]`                          | Validation error, no completion                                                                                                            |
-| `satisfactionScore === 0`                                     | `temposAwarded = 0` (coherence)                                                                                                            |
-| Activity already completed (double click)                     | The second `completeActivity` throws; the UI must prevent it                                                                               |
-| User abandons the modal (closes without confirming)           | The activity stays active; nothing is recorded                                                                                             |
-| Interrupted activity                                          | A `CompletedActivityRecord` is created with `state: "interrupted"` and `satisfactionScore: 0` (no question, no score, no tempos)           |
-| Auto-completion from `activateActivity` or a QuickBar switch  | `activateActivity` now does **not** auto-complete. It marks "pending closure" and emits an event so the UI shows the modal                 |
-| Migration from old state                                      | `schemaVersion` is bumped; records without `satisfactionScore` keep a legacy `temposAwarded = 0`                                           |
+| Case                                                         | Behavior                                                                                                                         |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `durationMinutes <= 0`                                       | `temposAwarded = 0` (no reward for null time)                                                                                    |
+| `satisfactionScore` outside `[0,10]`                         | Validation error, no completion                                                                                                  |
+| `satisfactionScore === 0`                                    | `temposAwarded = 0` (coherence)                                                                                                  |
+| Activity already completed (double click)                    | The second `completeActivity` throws; the UI must prevent it                                                                     |
+| User abandons the modal (closes without confirming)          | The activity stays active; nothing is recorded                                                                                   |
+| Interrupted activity                                         | A `CompletedActivityRecord` is created with `state: "interrupted"` and `satisfactionScore: 0` (no question, no score, no tempos) |
+| Auto-completion from `activateActivity` or a QuickBar switch | `activateActivity` now does **not** auto-complete. It marks "pending closure" and emits an event so the UI shows the modal       |
+| Migration from old state                                     | `schemaVersion` is bumped; records without `satisfactionScore` keep a legacy `temposAwarded = 0`                                 |
 
 ---
 
@@ -337,23 +337,23 @@ interface ISystemCore {
 
 ### Fully removed
 
-| Feature                                                             | Reason for removal                                                                                        |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Subjective variables** (Energy, Mood, Focus, Stress)               | They do not contribute to tempo integrity. Keeping them (even behind a flag) preserves complexity without benefit. |
-| **Subjective variable snapshots**                                    | Retrospective analysis is not essential.                                                                  |
-| **Activity↔snapshot causal multiselect**                             | Same reason.                                                                                              |
-| **Custom interruption causes**                                       | The system only needs "interrupted or not".                                                               |
-| **`isAvoidable` in `CompletedActivityRecord.interruptionData`**      | Removed. No moral judgment in the hot moment.                                                             |
-| **5-minute time restriction between variable updates**               | No variables, so it does not apply.                                                                       |
-| **`canUpdateVariables`**                                             | Removed.                                                                                                  |
-| **`SubjectiveChart`** and the whole variable chart system            | Removed.                                                                                                  |
-| **`SubjectiveVariableManager`**                                      | Removed.                                                                                                  |
-| **`InterruptionManager`**                                            | Reduced to `interruptActivity(id)` without isAvoidable/causeId.                                           |
-| **"Was it avoidable?" question in `InterruptionModal`**              | Removed.                                                                                                  |
-| **Subjective variables section in `OverviewModal`**                  | Removed.                                                                                                  |
-| **"Variables" button in `ActionButtons`**                            | Removed.                                                                                                  |
-| **ChartsContainer subjective section**                               | Removed.                                                                                                  |
-| **Variable visibility toggle**                                       | Removed.                                                                                                  |
+| Feature                                                         | Reason for removal                                                                                                 |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Subjective variables** (Energy, Mood, Focus, Stress)          | They do not contribute to tempo integrity. Keeping them (even behind a flag) preserves complexity without benefit. |
+| **Subjective variable snapshots**                               | Retrospective analysis is not essential.                                                                           |
+| **Activity↔snapshot causal multiselect**                       | Same reason.                                                                                                       |
+| **Custom interruption causes**                                  | The system only needs "interrupted or not".                                                                        |
+| **`isAvoidable` in `CompletedActivityRecord.interruptionData`** | Removed. No moral judgment in the hot moment.                                                                      |
+| **5-minute time restriction between variable updates**          | No variables, so it does not apply.                                                                                |
+| **`canUpdateVariables`**                                        | Removed.                                                                                                           |
+| **`SubjectiveChart`** and the whole variable chart system       | Removed.                                                                                                           |
+| **`SubjectiveVariableManager`**                                 | Removed.                                                                                                           |
+| **`InterruptionManager`**                                       | Reduced to `interruptActivity(id)` without isAvoidable/causeId.                                                    |
+| **"Was it avoidable?" question in `InterruptionModal`**         | Removed.                                                                                                           |
+| **Subjective variables section in `OverviewModal`**             | Removed.                                                                                                           |
+| **"Variables" button in `ActionButtons`**                       | Removed.                                                                                                           |
+| **ChartsContainer subjective section**                          | Removed.                                                                                                           |
+| **Variable visibility toggle**                                  | Removed.                                                                                                           |
 
 ### What survives with changes
 
@@ -596,14 +596,14 @@ Migration v1 → v2:
 
 ## Identified risks
 
-| Risk                                                             | Mitigation                                                                                                                                                       |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The user always marks 10/10                                      | The system doesn't know, but the user does. The visible heuristics make each number mean something. Self-assessment is an act of personal integrity.             |
-| The target stays low and is always exceeded                      | It is configurable. Raise it once things stabilize.                                                                                                              |
-| A refactored `activateActivity` breaks existing flows            | Integration tests in Phase 3 cover this case. Phase 6 (wiring) validates end-to-end.                                                                             |
-| Old data with `interruptionData.isAvoidable` breaks the model    | Phase 1 migration marks them as legacy `temposAwarded: 0`. They are not deleted from localStorage.                                                               |
-| Auto-10 offends a user who legitimately deserves a 9             | The explicit message ("A 10 is fair here") makes the preselection transparent. The user can adjust.                                                              |
-| The user closes the modal without choosing                       | The activity stays active. No side effects. The UI must be clear about this.                                                                                     |
+| Risk                                                          | Mitigation                                                                                                                                           |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The user always marks 10/10                                   | The system doesn't know, but the user does. The visible heuristics make each number mean something. Self-assessment is an act of personal integrity. |
+| The target stays low and is always exceeded                   | It is configurable. Raise it once things stabilize.                                                                                                  |
+| A refactored `activateActivity` breaks existing flows         | Integration tests in Phase 3 cover this case. Phase 6 (wiring) validates end-to-end.                                                                 |
+| Old data with `interruptionData.isAvoidable` breaks the model | Phase 1 migration marks them as legacy `temposAwarded: 0`. They are not deleted from localStorage.                                                   |
+| Auto-10 offends a user who legitimately deserves a 9          | The explicit message ("A 10 is fair here") makes the preselection transparent. The user can adjust.                                                  |
+| The user closes the modal without choosing                    | The activity stays active. No side effects. The UI must be clear about this.                                                                         |
 
 ---
 

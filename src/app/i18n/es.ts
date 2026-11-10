@@ -473,6 +473,53 @@ export const es = {
   "coreError.invalid-state-json": "El archivo no es una copia válida de LifeUI.",
   "coreError.invalid-state-shape": "El archivo no es una copia válida de LifeUI.",
   "coreError.internal": "Algo salió mal. Tus datos están a salvo; vuelve a intentarlo.",
+
+  // Desktop: the local model (ADR-004)
+  "model.checking": "Buscando tu modelo…",
+  "model.setup.title": "Elige tu modelo",
+  "model.setup.body":
+    "LifeUI funciona con un modelo en esta PC. Estos son los que ya tienes descargados en LM Studio y Ollama.",
+  "model.runtime.missing": "No instalado",
+  "model.runtime.running": "En marcha en el puerto {port}",
+  "model.runtime.stopped": "Instalado, sin arrancar",
+  "model.runtime.start": "Arrancarlo",
+  "model.setup.none":
+    "No hay modelos descargados. Descarga uno en LM Studio u Ollama, o arranca Ollama para ver los suyos.",
+  "model.tools": "Usa herramientas",
+  "model.noTools": "Sin herramientas",
+  "model.skip": "Seguir sin modelo",
+  "model.verdict.fits": "Cabe entero en la GPU",
+  "model.verdict.fitsBody": "Se carga en la VRAM y sobra espacio.",
+  "model.verdict.offload": "Ahora mismo no cabe entero en la GPU",
+  "model.verdict.offloadBody":
+    "Unos {spill} irían a la RAM y funcionaría más lento. Cerrar programas que usan la GPU libera espacio.",
+  "model.verdict.tooBig": "No hay memoria suficiente para este modelo",
+  "model.verdict.tooBigBody":
+    "Unos {spill} tendrían que ir a la RAM, y allí solo quedan {room} libres después de lo que necesita el sistema. Cargarlo puede congelar la PC; cerrar programas que usan la GPU o la RAM libera espacio.",
+  "model.verdict.unknown": "No se puede leer la memoria de la GPU",
+  "model.verdict.unknownBody": "{note}. LifeUI no puede saber si cabe en la GPU.",
+  "model.load.title": "¿Cargar {name}?",
+  "model.load.body":
+    "No hay nada cargado en {runtime}. El agente usa un contexto de {context} tokens.",
+  "model.need": "Necesita",
+  "model.vramFree": "Libre en {gpu}",
+  "model.vram": "VRAM libre",
+  "model.ramFree": "RAM libre",
+  "model.confirm.offload": "¿Cargarlo igual, con una parte en la RAM?",
+  "model.confirm.tooBig": "¿Seguro? La PC se puede congelar mientras carga.",
+  "model.change": "Cambiar modelo",
+  "model.notNow": "Ahora no",
+  "model.loadButton": "Cargar",
+  "model.loadConfirm": "Sí, cargarlo",
+  "model.loadAnyway": "Cargar igual",
+  "model.bar.others": "Otros programas {size}",
+  "model.bar.model": "Este modelo {size}",
+  "model.loading": "Cargando {name}…",
+  "model.loadingBody": "La primera vez puede tardar un minuto.",
+  "model.loaded": "{name} está listo",
+  "model.placement.full": "100% en la GPU.",
+  "model.placement.partial": "{share}% en la GPU y el resto en la RAM: irá más lento.",
+  "model.continue": "Continuar",
 } as const;
 
 export type MessageKey = keyof typeof es;
