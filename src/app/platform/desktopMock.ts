@@ -133,6 +133,19 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     ],
     vram_note: null,
   }),
+  // Measured with gpu_processes on the author's PC, 2026-11-10
+  gpu_processes: () =>
+    loaded
+      ? []
+      : [
+          { pid: 39652, name: "python", bytes: 3477 * MIB, system: false },
+          { pid: 20680, name: "chrome", bytes: 177 * MIB, system: false },
+          { pid: 10100, name: "msedgewebview2", bytes: 103 * MIB, system: false },
+          { pid: 22020, name: "explorer", bytes: 95 * MIB, system: true },
+          { pid: 7800, name: "claude", bytes: 86 * MIB, system: false },
+          { pid: 24612, name: "explorer", bytes: 38 * MIB, system: true },
+          { pid: 19604, name: "csrss", bytes: 35 * MIB, system: true },
+        ],
   lmstudio_models: () => MODELS,
   lmstudio_loaded: () => (loaded ? [{ modelKey: loaded, identifier: loaded }] : []),
   lmstudio_estimate: ({ model }) => ({

@@ -39,6 +39,13 @@ When the app opens and the chosen model is not loaded, a dialog asks to load it.
 
 The prediction adapts to the selected model and to the resources at that moment (other programs may be using the GPU).
 
+When the model does not fit entirely, the dialog also lists **what is using the GPU now**, so the user knows what to close:
+
+- each program with its PID and its dedicated VRAM, biggest first, and Windows' own processes grouped as "Windows" (they cannot be closed);
+- how much has to be freed for the model to fit entirely, and a mark on any program whose closing alone would be enough.
+
+NVML reports no per-process memory under Windows' display driver model (`nvidia-smi` shows "N/A"), so these figures come from the counters Task Manager uses (`GPU Process Memory\Dedicated Usage`), on the adapter whose total matches NVML's. A process reporting more than the whole adapter (Windows' compositor sometimes does) is left out. The dialog never closes programs itself.
+
 ### 4. After loading, check where it landed
 
 The prediction is an estimate; the runtime's report is the truth. After loading, the dialog reads it (Ollama's `/api/ps` gives `size` and `size_vram`; for LM Studio, its loaded-model info or the change in VRAM use) and shows "100% on the GPU" or how much went to RAM.

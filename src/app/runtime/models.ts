@@ -51,6 +51,25 @@ export const AGENT_CONTEXT = 16384;
 const GIB = 1024 ** 3;
 const OLLAMA = "http://127.0.0.1:11434";
 
+export interface GpuProcess {
+  pid: number;
+  name: string;
+  bytes: number;
+  /** Part of Windows: it can't be closed. */
+  system: boolean;
+}
+
+/** Programs holding the GPU's memory now, biggest first (Windows only). */
+export const gpuProcesses = () => invoke<GpuProcess[]>("gpu_processes");
+
+/** Margin kept free on the GPU when deciding whether a model fits. */
+export const GPU_MARGIN = 0.25 * GIB;
+
+/** Would closing this process alone make the model fit entirely on the GPU? */
+export function closingIsEnough(needBytes: number, freeVram: number, process: GpuProcess): boolean {
+  return needBytes + GPU_MARGIN > freeVram && needBytes + GPU_MARGIN <= freeVram + process.bytes;
+}
+
 export const runtimeStatus = () => invoke<Runtimes>("runtime_status");
 export const systemResources = () => invoke<Resources>("system_resources");
 export const startRuntime = (runtime: RuntimeId) => invoke<void>("start_runtime", { runtime });
@@ -158,7 +177,7 @@ export type Verdict = "fits" | "offload" | "too-big" | "unknown";
 export function verdict(needBytes: number, resources: Resources): Verdict {
   const gpu = [...resources.gpus].sort((a, b) => b.vram_free - a.vram_free)[0];
   if (!gpu) return "unknown";
-  const margin = 0.25 * GIB;
+  const margin = GPU_MARGIN;
   if (needBytes + margin <= gpu.vram_free) return "fits";
   const spill = needBytes + margin - gpu.vram_free;
   if (spill <= ramRoom(resources)) return "offload";
@@ -174,7 +193,7 @@ export function ramRoom(resources: Resources): number {
 export function spillBytes(needBytes: number, resources: Resources): number {
   const gpu = [...resources.gpus].sort((a, b) => b.vram_free - a.vram_free)[0];
   if (!gpu) return 0;
-  return Math.max(0, needBytes + 0.25 * GIB - gpu.vram_free);
+  return Math.max(0, needBytes + GPU_MARGIN - gpu.vram_free);
 }
 
 /** Is it loaded right now? */

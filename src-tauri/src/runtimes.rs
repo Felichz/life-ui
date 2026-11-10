@@ -30,7 +30,11 @@ fn quiet(command: &mut Command) -> &mut Command {
 
 /// An executable on the PATH, or at one of the places its installer puts it.
 fn find(name: &str, defaults: &[PathBuf]) -> Option<PathBuf> {
-    let exe = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+    let exe = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
     if let Some(path) = std::env::var_os("PATH") {
         for dir in std::env::split_paths(&path) {
             let candidate = dir.join(&exe);
@@ -57,7 +61,12 @@ fn lms() -> Option<PathBuf> {
 fn ollama() -> Option<PathBuf> {
     let mut defaults = Vec::new();
     if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-        defaults.push(PathBuf::from(local).join("Programs").join("Ollama").join("ollama.exe"));
+        defaults.push(
+            PathBuf::from(local)
+                .join("Programs")
+                .join("Ollama")
+                .join("ollama.exe"),
+        );
     }
     defaults.push(PathBuf::from("/usr/local/bin/ollama"));
     find("ollama", &defaults)
@@ -84,8 +93,16 @@ pub struct Runtimes {
 #[tauri::command]
 pub fn runtime_status() -> Runtimes {
     Runtimes {
-        lmstudio: Runtime { installed: lms().is_some(), running: answers(LMSTUDIO_PORT), port: LMSTUDIO_PORT },
-        ollama: Runtime { installed: ollama().is_some(), running: answers(OLLAMA_PORT), port: OLLAMA_PORT },
+        lmstudio: Runtime {
+            installed: lms().is_some(),
+            running: answers(LMSTUDIO_PORT),
+            port: LMSTUDIO_PORT,
+        },
+        ollama: Runtime {
+            installed: ollama().is_some(),
+            running: answers(OLLAMA_PORT),
+            port: OLLAMA_PORT,
+        },
     }
 }
 
@@ -113,7 +130,13 @@ pub async fn lmstudio_models() -> Result<Value, String> {
     let all: Value = serde_json::from_str(text.trim()).map_err(|e| e.to_string())?;
     let llms: Vec<Value> = all
         .as_array()
-        .map(|items| items.iter().filter(|m| m["type"] == "llm").cloned().collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter(|m| m["type"] == "llm")
+                .cloned()
+                .collect()
+        })
         .unwrap_or_default();
     Ok(Value::Array(llms))
 }
@@ -152,7 +175,15 @@ fn gib_line(text: &str, label: &str) -> Option<u64> {
 #[tauri::command]
 pub async fn lmstudio_estimate(model: String, context: u32) -> Result<Estimate, String> {
     let raw = tauri::async_runtime::spawn_blocking(move || {
-        run_lms(&["load", &model, "--estimate-only", "--gpu", "max", "-c", &context.to_string()])
+        run_lms(&[
+            "load",
+            &model,
+            "--estimate-only",
+            "--gpu",
+            "max",
+            "-c",
+            &context.to_string(),
+        ])
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -169,7 +200,15 @@ pub async fn lmstudio_estimate(model: String, context: u32) -> Result<Estimate, 
 pub async fn lmstudio_load(model: String, context: u32, gpu: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let context = context.to_string();
-        let mut args = vec!["load", model.as_str(), "-c", context.as_str(), "-y", "--identifier", model.as_str()];
+        let mut args = vec![
+            "load",
+            model.as_str(),
+            "-c",
+            context.as_str(),
+            "-y",
+            "--identifier",
+            model.as_str(),
+        ];
         if gpu != "auto" {
             args.extend(["--gpu", gpu.as_str()]);
         }
@@ -206,7 +245,9 @@ pub async fn start_runtime(runtime: String) -> Result<(), String> {
             }
             std::thread::sleep(Duration::from_millis(250));
         }
-        Err(format!("The {runtime} server did not answer on port {port}"))
+        Err(format!(
+            "The {runtime} server did not answer on port {port}"
+        ))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -220,8 +261,14 @@ mod tests {
     fn reads_the_estimate_lines() {
         let raw = "Model: qwen/qwen3.5-9b\nContext Length: 16,384\nGPU Offload: 100%\nEstimated GPU Memory:   7.57 GiB\nEstimated Total Memory: 7.57 GiB\n";
         let gib = 1024.0_f64 * 1024.0 * 1024.0;
-        assert_eq!(gib_line(raw, "Estimated GPU Memory"), Some((7.57 * gib) as u64));
-        assert_eq!(gib_line(raw, "Estimated Total Memory"), Some((7.57 * gib) as u64));
+        assert_eq!(
+            gib_line(raw, "Estimated GPU Memory"),
+            Some((7.57 * gib) as u64)
+        );
+        assert_eq!(
+            gib_line(raw, "Estimated Total Memory"),
+            Some((7.57 * gib) as u64)
+        );
         assert_eq!(gib_line(raw, "Missing"), None);
     }
 }

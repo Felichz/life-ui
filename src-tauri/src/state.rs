@@ -19,7 +19,9 @@ pub fn read_state(app: AppHandle) -> Result<Option<String>, String> {
     if !path.exists() {
         return Ok(None);
     }
-    fs::read_to_string(path).map(Some).map_err(|e| e.to_string())
+    fs::read_to_string(path)
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
 
 /// Writes to a temporary file first and renames it, so a crash mid-write
