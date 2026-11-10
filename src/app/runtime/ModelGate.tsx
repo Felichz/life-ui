@@ -11,12 +11,16 @@ import {
   DialogTitle,
 } from "../components/ui/Dialog";
 import { cn } from "../lib/cn";
+import { formatNumber } from "../lib/format";
 import { isDesktop } from "../platform/desktop";
 import { t, type MessageKey } from "../i18n";
 import {
   AGENT_CONTEXT,
+  GPU_MARGIN,
+  closingIsEnough,
   estimate,
   formatGiB,
+  gpuProcesses,
   isLoaded,
   listModels,
   load,
@@ -28,6 +32,7 @@ import {
   startRuntime,
   systemResources,
   verdict,
+  type GpuProcess,
   type LocalModel,
   type Placement,
   type Resources,
@@ -306,7 +311,7 @@ function LoadDialog({
         <DialogDescription>
           {t("model.load.body", {
             runtime: RUNTIME_NAME[model.runtime],
-            context: AGENT_CONTEXT.toLocaleString(),
+            context: formatNumber(AGENT_CONTEXT),
           })}
         </DialogDescription>
       </DialogHeader>
@@ -350,6 +355,9 @@ function LoadDialog({
             </p>
           </div>
         )}
+        {gpu && need !== null && result !== "fits" && (
+          <GpuUsers need={need} freeVram={gpu.vram_free} />
+        )}
         {confirming && result !== "fits" && (
           <p className="text-sm font-medium text-ink">
             {result === "too-big" ? t("model.confirm.tooBig") : t("model.confirm.offload")}
@@ -382,6 +390,63 @@ function LoadDialog({
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+/** What holds the GPU's memory now, and which one is enough to close. */
+function GpuUsers({ need, freeVram }: { need: number; freeVram: number }) {
+  const [list, setList] = useState<GpuProcess[] | null | "error">(null);
+  useEffect(() => {
+    let live = true;
+    gpuProcesses()
+      .then((found) => live && setList(found))
+      .catch(() => live && setList("error"));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (list === "error") return <p className="text-sm text-ink-2">{t("model.gpu.unavailable")}</p>;
+  if (list === null) return <p className="text-sm text-ink-2">{t("model.gpu.loading")}</p>;
+
+  const MIN = 50 * 1024 ** 2;
+  const apps = list.filter((p) => !p.system && p.bytes >= MIN).slice(0, 5);
+  const windows = list.filter((p) => p.system).reduce((sum, p) => sum + p.bytes, 0);
+  return (
+    <section>
+      <h3 className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 text-sm font-medium text-ink">
+        {t("model.gpu.title")}
+        <span className="font-normal text-ink-2">
+          {t("model.gpu.missing", { size: formatGiB(Math.max(0, need + GPU_MARGIN - freeVram)) })}
+        </span>
+      </h3>
+      <ul className="overflow-hidden rounded-lg border border-line">
+        {apps.map((p) => (
+          <li
+            key={p.pid}
+            className="flex items-center gap-3 border-b border-line px-3 py-2 text-sm last:border-b-0"
+          >
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium text-ink">{p.name}</span>
+              <span className="tabular ml-2 text-xs text-ink-3">PID {p.pid}</span>
+            </span>
+            {closingIsEnough(need, freeVram, p) && (
+              <span className="inline-flex items-center gap-1 rounded bg-success/10 px-1.5 py-0.5 text-xs text-success">
+                <Check className="size-3" />
+                {t("model.gpu.enough")}
+              </span>
+            )}
+            <span className="tabular w-20 text-right text-ink-2">{formatGiB(p.bytes)}</span>
+          </li>
+        ))}
+        {windows > 0 && (
+          <li className="flex items-center gap-3 px-3 py-2 text-sm text-ink-2">
+            <span className="min-w-0 flex-1">{t("model.gpu.windows")}</span>
+            <span className="tabular w-20 text-right">{formatGiB(windows)}</span>
+          </li>
+        )}
+      </ul>
+    </section>
   );
 }
 

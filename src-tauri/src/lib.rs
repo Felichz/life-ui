@@ -2,6 +2,7 @@
 //! what a browser cannot do: the state file, the PC's resources and the
 //! local model runtimes.
 
+mod gpu_processes;
 mod resources;
 mod runtimes;
 mod state;
@@ -25,6 +26,7 @@ pub fn run() {
             state::write_state,
             state::clear_state,
             resources::system_resources,
+            gpu_processes::gpu_processes,
             runtimes::runtime_status,
             runtimes::lmstudio_models,
             runtimes::lmstudio_loaded,

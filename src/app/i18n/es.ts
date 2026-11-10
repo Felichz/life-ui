@@ -520,6 +520,12 @@ export const es = {
   "model.placement.full": "100% en la GPU.",
   "model.placement.partial": "{share}% en la GPU y el resto en la RAM: irá más lento.",
   "model.continue": "Continuar",
+  "model.gpu.title": "Usando la GPU ahora",
+  "model.gpu.windows": "Windows",
+  "model.gpu.enough": "Basta con cerrarlo",
+  "model.gpu.loading": "Viendo qué usa la GPU…",
+  "model.gpu.unavailable": "No se puede ver qué programas usan la GPU.",
+  "model.gpu.missing": "Para que quepa entero hay que liberar {size}",
 } as const;
 
 export type MessageKey = keyof typeof es;

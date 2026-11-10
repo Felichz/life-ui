@@ -525,4 +525,10 @@ export const en: Record<MessageKey, string> = {
   "model.placement.full": "100% on the GPU.",
   "model.placement.partial": "{share}% on the GPU, the rest in RAM: it will run slower.",
   "model.continue": "Continue",
+  "model.gpu.title": "Using the GPU now",
+  "model.gpu.windows": "Windows",
+  "model.gpu.enough": "Closing it is enough",
+  "model.gpu.loading": "Looking at what uses the GPU…",
+  "model.gpu.unavailable": "Can’t see which programs use the GPU.",
+  "model.gpu.missing": "Free {size} for it to fit entirely",
 };
