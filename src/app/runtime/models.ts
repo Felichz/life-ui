@@ -29,6 +29,8 @@ export interface LocalModel {
   maxContext?: number;
   /** Trained for tool calls: the agent depends on them. */
   toolUse: boolean;
+  /** Reads images. */
+  vision?: boolean;
 }
 
 export interface Gpu {
@@ -86,6 +88,7 @@ async function lmstudioModels(): Promise<LocalModel[]> {
     architecture: m.architecture ? String(m.architecture) : undefined,
     maxContext: m.maxContextLength ? Number(m.maxContextLength) : undefined,
     toolUse: Boolean(m.trainedForToolUse),
+    vision: Boolean(m.vision),
   }));
 }
 
@@ -123,6 +126,7 @@ async function ollamaModels(): Promise<LocalModel[]> {
         architecture: show.details?.family,
         maxContext: contextKey ? Number(info[contextKey]) : undefined,
         toolUse: Boolean(show.capabilities?.includes("tools")),
+        vision: Boolean(show.capabilities?.includes("vision")),
       };
     })
   );

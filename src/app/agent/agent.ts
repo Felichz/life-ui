@@ -3,19 +3,52 @@ import { isCoreError } from "../../system";
 import { daySnapshot } from "./snapshot";
 import { ToolError, TOOLS, toolByName, toolSchemas, type Tool } from "./tools";
 import { t } from "../i18n";
-import type { ChatMessage, ModelReply, ToolCall } from "./llm";
+import {
+  DEFAULT_CONTEXT,
+  REPLY_RESERVE,
+  estimateTokens,
+  historyTokens,
+  shrinkToolResults,
+  splitForCompaction,
+  summarize,
+  textOf,
+} from "./context";
+import type { ChatMessage, ContentPart, ModelReply, ToolCall } from "./llm";
 
 /**
  * The agent loop (ADR-002): the person writes, the model answers or calls
  * tools, mutations wait for the person's yes in confirm mode, and every
  * executed change can be undone. The UI only renders `entries`.
+ *
+ * It also keeps the conversations (ADR-007): several of them, each one within
+ * the loaded model's context, compacted with the model itself when it grows.
  */
 
 export type Mode = "confirm" | "auto";
 
+/** A file the person adds to a message. `data` is a data URL (image) or the text. */
+export interface Attachment {
+  kind: "image" | "text";
+  name: string;
+  data: string;
+}
+
 export type Entry =
-  | { id: string; kind: "user"; text: string }
-  | { id: string; kind: "assistant"; text: string }
+  | {
+      id: string;
+      kind: "user";
+      text: string;
+      attachments?: Array<{ kind: "image" | "text"; name: string; url?: string }>;
+      /** Where this message sits in the history, for editing it. */
+      h?: number;
+    }
+  | {
+      id: string;
+      kind: "assistant";
+      text: string;
+      /** The history length once this answer was given, for branching from it. */
+      h?: number;
+    }
   | {
       id: string;
       kind: "tool";
@@ -26,23 +59,61 @@ export type Entry =
       /** Tempos the change earns: the preview while it waits, the real ones once done. */
       tempos?: number;
     }
+  | {
+      id: string;
+      kind: "compact";
+      /** The summary that replaced the older messages: the person can read it. */
+      text: string;
+      chunks: number;
+      before: number;
+      after: number;
+    }
   | { id: string; kind: "error"; text: string };
 
 export type ChatFn = (
   messages: ChatMessage[],
   tools: unknown[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { maxTokens?: number }
 ) => Promise<ModelReply>;
 
-/** The conversation as it is kept between launches. */
+/** One conversation as it is kept between launches. */
 export interface SavedChat {
+  id: string;
+  title: string;
+  updatedAt: number;
   entries: Entry[];
   history: ChatMessage[];
+  /** What was said before the kept history, written by a compaction. */
+  summary?: string;
+  /** Messages a compaction removed from the start of the history. */
+  dropped?: number;
+}
+
+export interface SavedChats {
+  activeId: string;
+  chats: SavedChat[];
 }
 
 export interface ChatStore {
-  load: () => SavedChat | null;
-  save: (chat: SavedChat) => void;
+  load: () => SavedChats | null;
+  save: (all: SavedChats) => void;
+}
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  active: boolean;
+}
+
+export interface ContextUsage {
+  used: number;
+  context: number;
+  /** The conversation no longer fits: it has to be compacted before going on. */
+  overflow: boolean;
+  /** There is something older than the last turn to summarize. */
+  canCompact: boolean;
 }
 
 export interface AgentOptions {
@@ -54,35 +125,54 @@ export interface AgentOptions {
   maxSteps?: number;
   /** The interface's language, a hint for the reply's language. */
   language?: () => string;
-  /** Where the conversation is kept, so closing the app does not lose it. */
+  /** Where the conversations are kept, so closing the app does not lose them. */
   store?: ChatStore;
+  /** Tokens of context the loaded model has. */
+  context?: () => number;
 }
 
-const MAX_HISTORY = 24;
-/** Entries kept on screen and on disk; older ones fall off the top. */
-const MAX_ENTRIES = 200;
+/** Entries kept on screen and on disk per conversation; older ones fall off the top. */
+const MAX_ENTRIES = 400;
+/** Past this share of the context the conversation is compacted before the next call. */
+const AUTO_COMPACT_AT = 0.85;
 
 let counter = 0;
-const nextId = () => `e${Date.now().toString(36)}-${++counter}`;
+const nextId = (prefix = "e") => `${prefix}${Date.now().toString(36)}-${++counter}`;
 
-/**
- * The last messages sent to the model. A cut must not start in the middle of a
- * tool exchange (a tool result without its call is an API error), so it backs
- * up to the nearest message the person wrote.
- */
-export function recentHistory(history: ChatMessage[], max = MAX_HISTORY): ChatMessage[] {
-  if (history.length <= max) return history;
-  let start = history.length - max;
-  while (start < history.length && history[start].role !== "user") start++;
-  return start < history.length ? history.slice(start) : history.slice(-1);
+/** Chat templates such as Gemma's reject two messages in a row from the person. */
+export function mergeUserRuns(messages: ChatMessage[]): ChatMessage[] {
+  const merged: ChatMessage[] = [];
+  for (const message of messages) {
+    const last = merged[merged.length - 1];
+    if (message.role === "user" && last?.role === "user") {
+      const parts = (content: string | ContentPart[]): ContentPart[] =>
+        typeof content === "string" ? [{ type: "text", text: content }] : content;
+      merged[merged.length - 1] =
+        typeof last.content === "string" && typeof message.content === "string"
+          ? { role: "user", content: `${last.content}\n\n${message.content}` }
+          : { role: "user", content: [...parts(last.content), ...parts(message.content)] };
+    } else {
+      merged.push(message);
+    }
+  }
+  return merged;
 }
 
 export class Agent {
   entries: Entry[] = [];
   busy = false;
   mode: Mode = "confirm";
+  /** Progress of a compaction in course, for the UI. */
+  compacting: { done: number; total: number } | null = null;
 
+  private chatId = nextId("c");
+  private title = "";
+  private summary = "";
+  private dropped = 0;
   private history: ChatMessage[] = [];
+  /** The conversations that are not open. */
+  private others: SavedChat[] = [];
+
   private listeners = new Set<() => void>();
   private decisions = new Map<string, (yes: boolean) => void>();
   /** The state before the last executed change, for undo. */
@@ -90,37 +180,268 @@ export class Agent {
   private abort: AbortController | null = null;
   /** Entries that came back from a previous session: shown without their entrance. */
   private restored = new Set<string>();
+  /** Real tokens over estimated ones, from the model's own count. */
+  private tokenRatio = 1;
 
   constructor(private readonly options: AgentOptions) {
     const saved = options.store?.load();
     if (saved) {
-      this.entries = saved.entries;
-      this.history = saved.history;
-      this.restored = new Set(saved.entries.map((entry) => entry.id));
+      const active = saved.chats.find((chat) => chat.id === saved.activeId);
+      this.others = saved.chats.filter((chat) => chat !== active);
+      if (active) this.adopt(active);
+      for (const chat of saved.chats) for (const entry of chat.entries) this.restored.add(entry.id);
     }
   }
 
-  /** Added in this session (not restored from the last one). */
-  isFresh(entryId: string): boolean {
-    return !this.restored.has(entryId);
+  // ---------------------------------------------------------------- conversations
+
+  private adopt(chat: SavedChat) {
+    this.chatId = chat.id;
+    this.title = chat.title;
+    this.summary = chat.summary ?? "";
+    this.dropped = chat.dropped ?? 0;
+    this.entries = chat.entries;
+    this.history = chat.history;
+    this.lastUndo = null;
+  }
+
+  private blank() {
+    this.adopt({ id: nextId("c"), title: "", updatedAt: 0, entries: [], history: [] });
+  }
+
+  private current(): SavedChat {
+    return {
+      id: this.chatId,
+      title: this.title,
+      updatedAt: Date.now(),
+      entries: this.entries.slice(-MAX_ENTRIES),
+      history: this.history,
+      ...(this.summary ? { summary: this.summary } : {}),
+      ...(this.dropped ? { dropped: this.dropped } : {}),
+    };
+  }
+
+  /** Puts the open conversation with the others, unless nothing was said in it. */
+  private stash() {
+    if (this.entries.length > 0) this.others = [this.current(), ...this.others];
   }
 
   /** Written only between turns, so what is kept is always a whole exchange. */
   private persist() {
-    this.options.store?.save({
-      entries: this.entries.slice(-MAX_ENTRIES),
-      history: recentHistory(this.history),
-    });
+    const chats = this.entries.length > 0 ? [this.current(), ...this.others] : this.others;
+    this.options.store?.save({ activeId: this.chatId, chats });
   }
 
-  /** Starts a new conversation. The day itself is untouched. */
-  clear() {
+  /** Every conversation, the latest first. */
+  list(): ChatSummary[] {
+    const all = this.entries.length > 0 ? [this.current(), ...this.others] : this.others;
+    return all
+      .map((chat) => ({
+        id: chat.id,
+        title: chat.title,
+        updatedAt: chat.updatedAt,
+        active: chat.id === this.chatId,
+      }))
+      .sort((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt);
+  }
+
+  /** Starts a new conversation and keeps the open one. The day is untouched. */
+  newChat() {
     if (this.busy) return;
-    this.entries = [];
-    this.history = [];
-    this.lastUndo = null;
+    this.stash();
+    this.blank();
     this.persist();
     this.emit();
+  }
+
+  openChat(id: string) {
+    if (this.busy || id === this.chatId) return;
+    const target = this.others.find((chat) => chat.id === id);
+    if (!target) return;
+    this.others = this.others.filter((chat) => chat !== target);
+    this.stash();
+    this.adopt(target);
+    this.persist();
+    this.emit();
+  }
+
+  deleteChat(id: string) {
+    if (this.busy) return;
+    if (id === this.chatId) this.blank();
+    else this.others = this.others.filter((chat) => chat.id !== id);
+    this.persist();
+    this.emit();
+  }
+
+  /** Removes every conversation (clearing or importing data). */
+  clear() {
+    if (this.busy) return;
+    this.others = [];
+    this.blank();
+    this.persist();
+    this.emit();
+  }
+
+  /** A message can be branched from or edited while its history is still there. */
+  canRewind(entryId: string): boolean {
+    const entry = this.entries.find((e) => e.id === entryId);
+    return (
+      !this.busy &&
+      (entry?.kind === "user" || entry?.kind === "assistant") &&
+      entry.h !== undefined &&
+      entry.h >= this.dropped
+    );
+  }
+
+  /** A copy of the conversation up to a point becomes the open conversation. */
+  private fork(entries: Entry[], historyLength: number, title: string) {
+    const branch: SavedChat = {
+      id: nextId("c"),
+      title,
+      updatedAt: Date.now(),
+      entries,
+      history: this.history.slice(0, historyLength - this.dropped),
+      summary: this.summary,
+      dropped: this.dropped,
+    };
+    this.stash();
+    this.adopt(branch);
+    this.persist();
+    this.emit();
+  }
+
+  /** A new conversation that continues from this answer; the original stays as it is. */
+  branchFrom(entryId: string) {
+    const index = this.entries.findIndex((e) => e.id === entryId);
+    const entry = this.entries[index];
+    if (!this.canRewind(entryId) || entry?.kind !== "assistant" || entry.h === undefined) return;
+    this.fork(
+      this.entries.slice(0, index + 1),
+      entry.h,
+      t("agent.branchTitle", { title: this.title })
+    );
+  }
+
+  /**
+   * Goes back to a message to write it again: a new conversation that stops
+   * right before it, and the message's text to put back in the composer.
+   * Changes already made to the day stay made.
+   */
+  editFrom(entryId: string): string | null {
+    const index = this.entries.findIndex((e) => e.id === entryId);
+    const entry = this.entries[index];
+    if (!this.canRewind(entryId) || entry?.kind !== "user" || entry.h === undefined) return null;
+    this.fork(this.entries.slice(0, index), entry.h, this.title);
+    return entry.text;
+  }
+
+  // ---------------------------------------------------------------- context
+
+  private get context(): number {
+    return this.options.context?.() ?? DEFAULT_CONTEXT;
+  }
+
+  /** What every request carries before the conversation: the prompt, the day and the tools. */
+  private fixedTokens(): number {
+    return (
+      estimateTokens(this.system().content as string) +
+      estimateTokens(JSON.stringify(toolSchemas()))
+    );
+  }
+
+  private promptTokens(): number {
+    return Math.round((this.fixedTokens() + historyTokens(this.history)) * this.tokenRatio);
+  }
+
+  /** How full the model's context is with this conversation. */
+  usage(): ContextUsage {
+    const used = this.promptTokens();
+    const context = this.context;
+    return {
+      used,
+      context,
+      // Past the window itself. Short of that, the next message compacts on its own
+      overflow: used > context,
+      canCompact: this.history.findIndex((m, i) => i > 0 && m.role === "user") > 0,
+    };
+  }
+
+  /**
+   * Summarizes everything but the last turns with the loaded model and keeps
+   * the summary in their place. Returns false when there was nothing to
+   * summarize.
+   */
+  private async compactNow(signal: AbortSignal): Promise<boolean> {
+    const context = this.context;
+    const available = Math.max(1000, context - this.fixedTokens() - REPLY_RESERVE);
+    const { old, tail } = splitForCompaction(this.history, Math.floor(available * 0.25));
+    if (old.length === 0) {
+      // One huge turn: its tool results are the only thing that can shrink
+      this.history = shrinkToolResults(this.history);
+      return false;
+    }
+    const before = this.promptTokens();
+    this.compacting = { done: 0, total: 1 };
+    this.emit();
+    try {
+      const { summary, chunks } = await summarize(old, {
+        chat: this.options.chat,
+        context,
+        language: this.languageName(),
+        previous: this.summary || undefined,
+        signal,
+        onProgress: (done, total) => {
+          this.compacting = { done, total };
+          this.emit();
+        },
+      });
+      this.summary = summary;
+      this.dropped += old.length;
+      this.history = tail;
+      this.add({
+        id: nextId(),
+        kind: "compact",
+        text: summary,
+        chunks,
+        before,
+        after: this.promptTokens(),
+      });
+      return true;
+    } finally {
+      this.compacting = null;
+    }
+  }
+
+  /** Compacts on the person's request. */
+  async compact() {
+    if (this.busy) return;
+    this.busy = true;
+    const abort = new AbortController();
+    this.abort = abort;
+    this.emit();
+    try {
+      await this.compactNow(abort.signal);
+    } catch (caught) {
+      if (!abort.signal.aborted) {
+        this.add({
+          id: nextId(),
+          kind: "error",
+          text: caught instanceof Error ? caught.message : String(caught),
+        });
+      }
+    } finally {
+      this.busy = false;
+      this.abort = null;
+      this.persist();
+      this.emit();
+    }
+  }
+
+  // ---------------------------------------------------------------- plumbing
+
+  /** Added in this session (not restored from the last one). */
+  isFresh(entryId: string): boolean {
+    return !this.restored.has(entryId);
   }
 
   /** Stops the turn in progress: the model call is dropped, a pending question counts as a no. */
@@ -181,14 +502,19 @@ export class Agent {
     this.decisions.delete(entryId);
   }
 
-  private system(): ChatMessage {
+  private languageName(): string {
+    return this.options.language?.() === "es" ? "Spanish" : "English";
+  }
+
+  private system(): ChatMessage & { role: "system" } {
     const now = (this.options.now ?? (() => new Date()))();
     const day = daySnapshot(this.options.core, now);
+    const earlier = this.summary
+      ? `\n\n## Earlier in this conversation\n\nThe conversation was compacted. These notes replace its older messages:\n\n${this.summary}`
+      : "";
     return {
       role: "system",
-      content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${
-        this.options.language?.() === "es" ? "Spanish" : "English"
-      }. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}".\n\n${JSON.stringify(day)}`,
+      content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${this.languageName()}. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}".\n\n${JSON.stringify(day)}${earlier}`,
     };
   }
 
@@ -198,17 +524,23 @@ export class Agent {
    * the person wrote (a copy: it is not kept in the history).
    */
   private withLanguageReminder(messages: ChatMessage[]): ChatMessage[] {
-    const language = this.options.language?.() === "es" ? "Spanish" : "English";
     const index = messages.map((m) => m.role).lastIndexOf("user");
-    if (index < 0 || messages[index].role !== "user") return messages;
+    const message = messages[index];
+    if (!message || message.role !== "user") return messages;
+    const reminder = `\n\n[Reply in ${this.languageName()}.]`;
     const copy = [...messages];
     copy[index] = {
       role: "user",
-      content: `${(messages[index] as { content: string }).content}
-
-[Reply in ${language}.]`,
+      content:
+        typeof message.content === "string"
+          ? `${message.content}${reminder}`
+          : [...message.content, { type: "text", text: reminder }],
     };
     return copy;
+  }
+
+  private request(): ChatMessage[] {
+    return this.withLanguageReminder(mergeUserRuns([this.system(), ...this.history]));
   }
 
   /** What the person wrote lately, to check a change against their own words. */
@@ -216,7 +548,7 @@ export class Agent {
     return this.history
       .filter((message) => message.role === "user")
       .slice(-count)
-      .map((message) => message.content)
+      .map((message) => textOf(message.content))
       .join("\n");
   }
 
@@ -302,25 +634,62 @@ export class Agent {
   }
 
   /** The person writes; the agent answers, calling tools as needed. */
-  async send(text: string) {
+  async send(text: string, attachments: Attachment[] = []) {
     const message = text.trim();
-    if (!message || this.busy) return;
+    if ((!message && attachments.length === 0) || this.busy) return;
     this.busy = true;
     const abort = new AbortController();
     this.abort = abort;
-    this.add({ id: nextId(), kind: "user", text: message });
-    this.history.push({ role: "user", content: message });
+
+    // Text files travel inside the message; images as parts a vision model reads
+    const files = attachments
+      .filter((file) => file.kind === "text")
+      .map((file) => `\n\n[File: ${file.name}]\n${file.data}`)
+      .join("");
+    const images = attachments.filter((file) => file.kind === "image");
+    const content: string | ContentPart[] =
+      images.length === 0
+        ? `${message}${files}`
+        : [
+            { type: "text", text: `${message}${files}` },
+            ...images.map(
+              (image): ContentPart => ({ type: "image_url", image_url: { url: image.data } })
+            ),
+          ];
+
+    if (!this.title) this.title = (message || attachments[0]?.name || "").slice(0, 60);
+    this.add({
+      id: nextId(),
+      kind: "user",
+      text: message,
+      h: this.dropped + this.history.length,
+      ...(attachments.length > 0
+        ? {
+            attachments: attachments.map((file) => ({
+              kind: file.kind,
+              name: file.name,
+              ...(file.kind === "image" ? { url: file.data } : {}),
+            })),
+          }
+        : {}),
+    });
+    this.history.push({ role: "user", content });
 
     try {
       const maxSteps = this.options.maxSteps ?? 8;
       let corrected = false;
+      let compacted = false;
       for (let step = 0; step < maxSteps; step++) {
-        const reply = await this.options.chat(
-          this.withLanguageReminder([this.system(), ...recentHistory(this.history)]),
-          toolSchemas(),
-          abort.signal
-        );
+        // Before the model is asked, the conversation has to fit in its context
+        if (!compacted && this.promptTokens() > this.context * AUTO_COMPACT_AT) {
+          compacted = true;
+          await this.compactNow(abort.signal);
+          if (abort.signal.aborted) return;
+        }
+        const request = this.request();
+        const reply = await this.options.chat(request, toolSchemas(), abort.signal);
         if (abort.signal.aborted) return;
+        this.learnTokens(request, reply);
         if (reply.toolCalls.length === 0) {
           // A reply that names tools is the model reading its own notes aloud:
           // it is not shown, and the model gets one chance to answer the person
@@ -336,7 +705,12 @@ export class Agent {
           }
           const answer = reply.content || "…";
           this.history.push({ role: "assistant", content: answer });
-          this.add({ id: nextId(), kind: "assistant", text: answer });
+          this.add({
+            id: nextId(),
+            kind: "assistant",
+            text: answer,
+            h: this.dropped + this.history.length,
+          });
           return;
         }
         if (reply.content) this.add({ id: nextId(), kind: "assistant", text: reply.content });
@@ -374,6 +748,14 @@ export class Agent {
       this.persist();
       this.emit();
     }
+  }
+
+  /** The runtime's own token count corrects the estimate from then on. */
+  private learnTokens(request: ChatMessage[], reply: ModelReply) {
+    if (!reply.usage?.prompt) return;
+    const estimated = historyTokens(request) + estimateTokens(JSON.stringify(toolSchemas()));
+    if (estimated <= 0) return;
+    this.tokenRatio = Math.max(0.6, Math.min(1.8, reply.usage.prompt / estimated));
   }
 }
 
