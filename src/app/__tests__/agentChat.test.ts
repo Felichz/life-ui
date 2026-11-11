@@ -1,5 +1,5 @@
 import { SystemCore } from "../../system";
-import { Agent, recentHistory, type ChatFn, type SavedChat } from "../agent/agent";
+import { Agent, type ChatFn, type SavedChats } from "../agent/agent";
 import type { ChatMessage, ModelReply } from "../agent/llm";
 
 /**
@@ -15,12 +15,12 @@ const call = (name: string, args: object = {}): ModelReply => ({
   ],
 });
 
-function memoryStore(initial: SavedChat | null = null) {
+function memoryStore(initial: SavedChats | null = null) {
   let saved = initial;
   return {
     load: () => saved,
-    save: (chat: SavedChat) => {
-      saved = JSON.parse(JSON.stringify(chat)) as SavedChat;
+    save: (all: SavedChats) => {
+      saved = JSON.parse(JSON.stringify(all)) as SavedChats;
     },
     get saved() {
       return saved;
@@ -33,34 +33,6 @@ function newCore() {
   core.clearState();
   return core;
 }
-
-describe("recentHistory", () => {
-  const user = (content: string): ChatMessage => ({ role: "user", content });
-  const toolCall: ChatMessage = {
-    role: "assistant",
-    content: null,
-    tool_calls: [{ id: "c1", type: "function", function: { name: "get_day", arguments: "{}" } }],
-  };
-  const toolResult: ChatMessage = { role: "tool", tool_call_id: "c1", content: "{}" };
-
-  it("keeps a short history whole", () => {
-    const history = [user("a"), toolCall, toolResult];
-    expect(recentHistory(history, 24)).toBe(history);
-  });
-
-  it("never starts on a tool result whose call was cut off", () => {
-    const history = [
-      user("a"),
-      toolCall,
-      toolResult,
-      user("b"),
-      { role: "assistant", content: "ok" },
-    ];
-    const recent = recentHistory(history as ChatMessage[], 3);
-    expect(recent[0]).toEqual(user("b"));
-    expect(recent).toHaveLength(2);
-  });
-});
 
 describe("the conversation", () => {
   it("is kept between launches", async () => {
@@ -105,7 +77,7 @@ describe("the conversation", () => {
 
     agent.clear();
     expect(agent.entries).toEqual([]);
-    expect(store.saved).toEqual({ entries: [], history: [] });
+    expect(store.saved?.chats).toEqual([]);
     expect(core.getCurrentDay()).not.toBeNull();
   });
 
