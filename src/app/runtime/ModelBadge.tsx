@@ -8,7 +8,6 @@ import { formatNumber } from "../lib/format";
 import { isDesktop } from "../platform/desktop";
 import { t } from "../i18n";
 import { useModel } from "./ModelGate";
-import { AGENT_CONTEXT } from "./models";
 
 const RUNTIME_NAME = { lmstudio: "LM Studio", ollama: "Ollama" } as const;
 
@@ -17,7 +16,7 @@ const RUNTIME_NAME = { lmstudio: "LM Studio", ollama: "Ollama" } as const;
  * context and how much of it sits on the GPU, with a way to change it.
  */
 export function ModelBadge({ className }: { className?: string }) {
-  const { model, placement, openSetup, unloadModel } = useModel();
+  const { model, placement, context, speed, openSetup, unloadModel } = useModel();
   const toast = useToast();
   const [unloading, setUnloading] = useState(false);
   if (!isDesktop()) return null;
@@ -41,7 +40,8 @@ export function ModelBadge({ className }: { className?: string }) {
   const details = model
     ? [
         RUNTIME_NAME[model.runtime],
-        t("model.badge.context", { tokens: formatNumber(AGENT_CONTEXT / 1024) }),
+        t("model.badge.context", { tokens: formatNumber(context / 1024) }),
+        speed ? t("model.badge.speed", { speed: formatNumber(speed) }) : null,
         placement
           ? placement.onGpu >= 0.95
             ? t("model.badge.gpuFull")
