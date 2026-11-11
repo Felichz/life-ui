@@ -118,8 +118,31 @@ export interface ActivityInstance {
    */
   scheduledStart?: DayMinutes;
 
+  /**
+   * What to do in this activity, in the person's or the agent's words (a
+   * routine, a checklist). Free text, shown while it runs (ADR-008).
+   */
+  notes?: string;
+
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
+}
+
+/**
+ * A library activity planned for a day ahead (ADR-008). It becomes an
+ * ActivityInstance in the plan of the day when its date comes.
+ */
+export interface PlannedActivity {
+  id: UUID;
+  templateId: UUID;
+  /** Calendar day where the person is, "YYYY-MM-DD". */
+  date: string;
+  /** Planned start that day; a plan, not a gate (ADR-006). */
+  time?: DayMinutes;
+  notes?: string;
+  /** Items planned in one go (every Monday for two months) share it. */
+  seriesId?: UUID;
+  createdAt: ISODateTimeString;
 }
 
 /**
@@ -273,6 +296,9 @@ export interface GlobalState {
 
   // Transient data between days
   pendingActivityInstances?: ActivityInstance[]; // Pending activities carried over from one day to the next
+
+  /** Activities planned for days ahead, waiting for their date (ADR-008). */
+  plannedActivities?: PlannedActivity[];
 
   // Version of the persisted schema (for migrations). Default 3.
   schemaVersion?: number;
@@ -499,6 +525,17 @@ export interface ISystemCore {
     assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
   ): CompletionResult;
   scheduleActivityInstance(id: UUID, minute: DayMinutes | null): ActivityInstance;
+
+  // AgendaManager methods (ADR-008)
+  planActivity(
+    templateId: UUID,
+    dates: string[],
+    options?: { time?: DayMinutes; notes?: string }
+  ): PlannedActivity[];
+  getPlannedActivities(): PlannedActivity[];
+  cancelPlannedActivities(ids: UUID[]): number;
+  /** Moves what is due into the running day's plan; safe to call at any time. */
+  bringPlannedActivities(now?: Date): ActivityInstance[];
   interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 

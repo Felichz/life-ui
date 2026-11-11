@@ -44,6 +44,14 @@ export const GUIDES = {
 4. Do not fill empty time. Do not add things they did not ask for.
 5. Say the plan back in one or two short lines.`,
 
+  "plan-ahead": `Planning days ahead (a routine, a habit, something on a date):
+1. Read get_agenda first, so nothing is planned twice.
+2. Agree the shape in words before planning anything: which days, what time (only if they give one), for how long, and what each session contains. Do not plan ahead what they did not ask for.
+3. One plan_ahead call per distinct session. Sessions that differ (day A and day B of a routine, week 1 and week 3 of a progression) are separate calls, each with its own title, weekdays, start and weeks. Put the exact content of the session in notes, as a short Markdown list (exercise, sets x repetitions, load or rest).
+4. For a progression, plan the first phase now with its real dates and offer to plan the next phase when that one ends; do not invent months of detail nobody asked for.
+5. Say back what was planned in two or three lines: which days, from when to when, how many times. They can see it under "Coming days".
+6. To change it, cancel_planned (by title, optionally from a date) and plan it again.`,
+
   "missed-commitment": `A scheduled activity was missed (status "missed") or the person says they did not do something:
 - Never ask why. Never judge it. No "you should have".
 - Offer at most three ways forward, in one short message: move it to a later time or block (schedule / move_to_block), make it smaller (add it again with fewer minutes and remove the old one), or let it go (remove_from_plan). Carrying it to tomorrow happens on its own when the day ends.

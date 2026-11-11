@@ -9,6 +9,7 @@ import { DayLog } from "./DayLog";
 import { FocusPanel } from "./FocusPanel";
 import { Plan, planGroups } from "./Plan";
 import { StartDay } from "./StartDay";
+import { Upcoming } from "./Upcoming";
 import { t, tp } from "../../i18n";
 
 export function TodayPage() {
@@ -78,6 +79,7 @@ function Today() {
           <div className="2xl:hidden">{tempo}</div>
           <FocusPanel active={active} suggestions={suggestions} />
           <Plan groups={groups} total={total} nowMinutes={nowMinutes} />
+          <Upcoming />
           <div className="2xl:hidden">{log}</div>
         </div>
         <aside className="hidden flex-col gap-8 2xl:flex">

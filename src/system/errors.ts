@@ -28,6 +28,8 @@ export const CORE_ERROR_MESSAGES = {
   "invalid-daily-target": "dailyTempoTarget must be a positive integer",
   "invalid-minutes": "Minutes must be a positive number",
   "invalid-time-format": 'Invalid time format; expected "HH:MM"',
+  "invalid-date": 'Invalid date; expected "YYYY-MM-DD"',
+  "too-many-planned": "Too many activities planned ahead; cancel some first",
   "invalid-state-json": "The saved state is not valid JSON",
   "invalid-state-shape": "The saved state has an invalid structure",
   internal: "Unexpected internal error",

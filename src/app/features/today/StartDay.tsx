@@ -5,6 +5,7 @@ import { daysNewestFirst, planItem, templateMap } from "../../lib/domain";
 import { formatDateLong, formatDateShort, formatNumber, greeting } from "../../lib/format";
 import { useSystem } from "../../state/system";
 import { APP_NAME, t, tp } from "../../i18n";
+import { Upcoming } from "./Upcoming";
 
 /** Screen with no day in progress: the day starts from the chat. */
 export function StartDay() {
@@ -70,6 +71,8 @@ export function StartDay() {
           </Link>
         )}
       </div>
+
+      <Upcoming className="mt-10" />
 
       {lastDay && lastSummary && (
         <Link
