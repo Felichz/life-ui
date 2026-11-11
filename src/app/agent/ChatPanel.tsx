@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   ArrowUp,
   Check,
@@ -6,13 +6,18 @@ import {
   Loader2,
   RotateCcw,
   Sparkles,
+  Square,
+  SquarePen,
   TriangleAlert,
+  Undo2,
 } from "lucide-react";
-import { Button } from "../components/ui/Button";
+import { Button, IconButton } from "../components/ui/Button";
 import { Segmented } from "../components/ui/Segmented";
+import { Tooltip } from "../components/ui/Tooltip";
 import { cn } from "../lib/cn";
 import { isDesktop } from "../platform/desktop";
 import { useModel } from "../runtime/ModelGate";
+import { useSystem } from "../state/system";
 import { ModelBadge } from "../runtime/ModelBadge";
 import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
@@ -27,6 +32,7 @@ import type { Entry, Mode } from "./agent";
 export function ChatPanel({ className }: { className?: string }) {
   const { agent, entries, busy, mode, available } = useAgent();
   const { openSetup } = useModel();
+  const { state } = useSystem();
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -38,11 +44,14 @@ export function ChatPanel({ className }: { className?: string }) {
 
   const waiting = entries.some((e) => e.kind === "tool" && e.status === "pending");
 
-  const send = () => {
-    if (!draft.trim() || busy || !available) return;
-    void agent.send(draft);
+  const send = (text = draft) => {
+    if (!text.trim() || busy || !available) return;
+    void agent.send(text);
     setDraft("");
+    inputRef.current?.focus();
   };
+
+  const groups = useMemo(() => groupEntries(entries), [entries]);
 
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -61,16 +70,30 @@ export function ChatPanel({ className }: { className?: string }) {
           <Sparkles className="size-4 text-accent" />
           {t("agent.title")}
         </h2>
-        <Segmented<Mode>
-          label={t("agent.mode")}
-          size="sm"
-          value={mode}
-          onChange={(next) => agent.setMode(next)}
-          options={[
-            { value: "confirm", label: t("agent.mode.confirm") },
-            { value: "auto", label: t("agent.mode.auto") },
-          ]}
-        />
+        <div className="flex items-center gap-1.5">
+          {entries.length > 0 && (
+            <Tooltip content={t("agent.new")} side="bottom">
+              <IconButton
+                label={t("agent.new")}
+                size="sm"
+                disabled={busy}
+                onClick={() => agent.clear()}
+              >
+                <SquarePen />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Segmented<Mode>
+            label={t("agent.mode")}
+            size="sm"
+            value={mode}
+            onChange={(next) => agent.setMode(next)}
+            options={[
+              { value: "confirm", label: t("agent.mode.confirm") },
+              { value: "auto", label: t("agent.mode.auto") },
+            ]}
+          />
+        </div>
       </header>
       <ModelBadge className="border-b border-line px-4 py-2.5" />
       {mode === "auto" && (
@@ -87,12 +110,31 @@ export function ChatPanel({ className }: { className?: string }) {
         {!available ? (
           <NoModel onChoose={openSetup} />
         ) : entries.length === 0 ? (
-          <div className="m-auto max-w-[300px] text-center">
+          <div className="m-auto flex max-w-[320px] flex-col items-center text-center">
             <p className="text-md font-semibold text-ink">{t("agent.empty.title")}</p>
             <p className="mt-1 text-sm text-ink-2">{t("agent.empty.body")}</p>
+            <ul className="mt-4 flex flex-wrap justify-center gap-1.5">
+              {(state.currentDay ? DURING_DAY : BEFORE_DAY).map((key) => (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => send(t(key))}
+                    className="h-8 rounded-full border border-line bg-panel px-3 text-sm text-ink-2 transition-colors duration-150 hover:border-line-strong hover:bg-subtle hover:text-ink coarse:h-10"
+                  >
+                    {t(key)}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
-          entries.map((entry) => <EntryView key={entry.id} entry={entry} />)
+          groups.map((group) =>
+            Array.isArray(group) ? (
+              <ToolList key={group[0].id} entries={group} />
+            ) : (
+              <EntryView key={group.id} entry={group} />
+            )
+          )
         )}
         {busy && !waiting && (
           <p className="flex items-center gap-2 text-sm text-ink-3">
@@ -115,16 +157,30 @@ export function ChatPanel({ className }: { className?: string }) {
             aria-label={t("agent.placeholder")}
             className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-base text-ink outline-none placeholder:text-ink-3 [field-sizing:content] disabled:opacity-60"
           />
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={send}
-            disabled={!draft.trim() || busy || !available}
-            aria-label={t("agent.send")}
-            className="size-8 shrink-0 px-0"
-          >
-            <ArrowUp />
-          </Button>
+          {busy ? (
+            <Tooltip content={t("agent.stop")}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => agent.stop()}
+                aria-label={t("agent.stop")}
+                className="size-8 shrink-0 px-0 [&_svg]:size-3"
+              >
+                <Square fill="currentColor" />
+              </Button>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => send()}
+              disabled={!draft.trim() || !available}
+              aria-label={t("agent.send")}
+              className="size-8 shrink-0 px-0"
+            >
+              <ArrowUp />
+            </Button>
+          )}
         </div>
       </div>
     </section>
@@ -147,7 +203,34 @@ function NoModel({ onChoose }: { onChoose: () => void }) {
   );
 }
 
-const STATUS: Record<Extract<Entry, { kind: "tool" }>["status"], MessageKey> = {
+const BEFORE_DAY: MessageKey[] = [
+  "agent.suggest.start",
+  "agent.suggest.plan",
+  "agent.suggest.week",
+];
+const DURING_DAY: MessageKey[] = ["agent.suggest.plan", "agent.suggest.next", "agent.suggest.week"];
+
+type ToolEntry = Extract<Entry, { kind: "tool" }>;
+
+/**
+ * Changes already decided read as one quiet list; a change waiting for an
+ * answer stays a card of its own, so the question is never lost in the list.
+ */
+function groupEntries(entries: Entry[]): Array<Entry | ToolEntry[]> {
+  const groups: Array<Entry | ToolEntry[]> = [];
+  for (const entry of entries) {
+    const last = groups[groups.length - 1];
+    if (entry.kind === "tool" && entry.status !== "pending") {
+      if (Array.isArray(last)) last.push(entry);
+      else groups.push([entry]);
+    } else {
+      groups.push(entry);
+    }
+  }
+  return groups;
+}
+
+const STATUS: Record<ToolEntry["status"], MessageKey> = {
   pending: "agent.status.pending",
   running: "agent.status.running",
   done: "agent.status.done",
@@ -155,6 +238,57 @@ const STATUS: Record<Extract<Entry, { kind: "tool" }>["status"], MessageKey> = {
   error: "agent.status.error",
   undone: "agent.status.undone",
 };
+
+function StatusIcon({ status }: { status: ToolEntry["status"] }) {
+  const className = "mt-0.5 size-3.5 shrink-0";
+  if (status === "done") return <Check className={cn(className, "text-success")} />;
+  if (status === "running") return <Loader2 className={cn(className, "animate-spin text-ink-3")} />;
+  if (status === "error") return <TriangleAlert className={cn(className, "text-danger")} />;
+  if (status === "undone") return <Undo2 className={cn(className, "text-ink-3")} />;
+  return <CircleSlash className={cn(className, "text-ink-3")} />;
+}
+
+function ToolList({ entries }: { entries: ToolEntry[] }) {
+  const { agent } = useAgent();
+  return (
+    <ul className="flex flex-col gap-0.5 rounded-lg border border-line bg-subtle/60 px-3 py-2">
+      {entries.map((entry) => {
+        const quiet = entry.status === "rejected" || entry.status === "undone";
+        return (
+          <li key={entry.id} className="flex min-h-7 items-start gap-2 py-1">
+            <StatusIcon status={entry.status} />
+            <span className="min-w-0 flex-1 text-sm">
+              <span
+                className={cn(
+                  quiet ? "text-ink-3" : "text-ink",
+                  entry.status === "undone" && "line-through"
+                )}
+              >
+                {entry.summary}
+              </span>
+              {entry.status !== "done" && (
+                <span className={entry.status === "error" ? "text-danger" : "text-ink-3"}>
+                  {" · "}
+                  {t(STATUS[entry.status])}
+                </span>
+              )}
+            </span>
+            {entry.status === "done" && agent.canUndo(entry.id) && (
+              <button
+                type="button"
+                onClick={() => agent.undo(entry.id)}
+                className="-my-0.5 inline-flex h-6 shrink-0 items-center gap-1 rounded px-1.5 text-xs font-medium text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink coarse:h-9"
+              >
+                <RotateCcw className="size-3" />
+                {t("agent.undo")}
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 function EntryView({ entry }: { entry: Entry }) {
   const { agent } = useAgent();
@@ -183,48 +317,20 @@ function EntryView({ entry }: { entry: Entry }) {
     );
   }
 
-  const done = entry.status === "done";
+  // A change waiting for the person's answer
   return (
-    <div
-      className={cn(
-        "rounded-lg border px-3 py-2.5",
-        entry.status === "pending" ? "border-accent/50 bg-accent/5" : "border-line bg-subtle",
-        (entry.status === "rejected" || entry.status === "undone") && "opacity-70"
-      )}
-    >
-      <p
-        className={cn("text-sm font-medium text-ink", entry.status === "undone" && "line-through")}
-      >
-        {entry.summary}
-      </p>
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 text-xs",
-            done ? "text-success" : entry.status === "error" ? "text-danger" : "text-ink-3"
-          )}
-        >
-          {done && <Check className="size-3.5" />}
-          {entry.status === "running" && <Loader2 className="size-3.5 animate-spin" />}
-          {entry.status === "rejected" && <CircleSlash className="size-3.5" />}
-          {t(STATUS[entry.status])}
-        </span>
-        {entry.status === "pending" && (
-          <span className="flex gap-1.5">
-            <Button size="sm" variant="ghost" onClick={() => agent.decide(entry.id, false)}>
-              {t("agent.reject")}
-            </Button>
-            <Button size="sm" variant="primary" onClick={() => agent.decide(entry.id, true)}>
-              {t("agent.accept")}
-            </Button>
-          </span>
-        )}
-        {done && agent.canUndo(entry.id) && (
-          <Button size="sm" variant="ghost" onClick={() => agent.undo(entry.id)}>
-            <RotateCcw />
-            {t("agent.undo")}
+    <div className="rounded-lg border border-accent/50 bg-accent/5 px-3 py-2.5">
+      <p className="text-sm font-medium text-ink">{entry.summary}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="text-xs text-ink-2">{t(STATUS[entry.status])}</span>
+        <span className="flex gap-1.5">
+          <Button size="sm" variant="ghost" onClick={() => agent.decide(entry.id, false)}>
+            {t("agent.reject")}
           </Button>
-        )}
+          <Button size="sm" variant="primary" onClick={() => agent.decide(entry.id, true)}>
+            {t("agent.accept")}
+          </Button>
+        </span>
       </div>
     </div>
   );

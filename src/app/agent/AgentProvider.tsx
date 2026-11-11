@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useSystem } from "../state/system";
 import { useModel } from "../runtime/ModelGate";
-import { Agent, type ChatFn, type Mode } from "./agent";
+import { Agent, type ChatFn, type ChatStore, type Mode, type SavedChat } from "./agent";
 import { chat, type ModelEndpoint } from "./llm";
 import prompt from "./prompt";
 import { getLocale } from "../i18n";
@@ -30,6 +30,37 @@ function devEndpoint(): ModelEndpoint | null {
     return null;
   }
 }
+
+const CHAT_KEY = "lifeui.chat";
+
+/** The conversation survives a reload or closing the app; a pending question does not. */
+const chatStore: ChatStore = {
+  load() {
+    try {
+      const raw = localStorage.getItem(CHAT_KEY);
+      if (!raw) return null;
+      const saved = JSON.parse(raw) as SavedChat;
+      if (!Array.isArray(saved.entries) || !Array.isArray(saved.history)) return null;
+      return {
+        history: saved.history,
+        entries: saved.entries.map((entry) =>
+          entry.kind === "tool" && (entry.status === "pending" || entry.status === "running")
+            ? { ...entry, status: "rejected" }
+            : entry
+        ),
+      };
+    } catch {
+      return null;
+    }
+  },
+  save(chat) {
+    try {
+      localStorage.setItem(CHAT_KEY, JSON.stringify(chat));
+    } catch {
+      // the conversation is kept for this session only
+    }
+  },
+};
 
 const AgentContext = createContext<{ agent: Agent; available: boolean } | null>(null);
 
@@ -52,11 +83,13 @@ export function AgentProvider({
       core,
       prompt,
       language: getLocale,
-      chat: (messages, tools) => {
-        if (injected) return injected(messages, tools);
+      // Tests inject their own model and start from an empty conversation
+      store: injected ? undefined : chatStore,
+      chat: (messages, tools, signal) => {
+        if (injected) return injected(messages, tools, signal);
         const current = endpointRef.current;
         if (!current) throw new Error("no-model");
-        return chat(current, messages, tools);
+        return chat(current, messages, tools, signal);
       },
     });
     try {

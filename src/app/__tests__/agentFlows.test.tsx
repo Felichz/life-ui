@@ -159,7 +159,7 @@ describe("the day through the chat", () => {
       fireEvent.click(screen.getByRole("button", { name: "Deshacer" }));
     });
     expect(titles()).not.toContain("Leer");
-    expect(screen.getByText("Deshecho")).toBeInTheDocument();
+    expect(screen.getByText(/Deshecho/)).toBeInTheDocument();
   });
 
   it("still asks before ending the day in auto mode", async () => {

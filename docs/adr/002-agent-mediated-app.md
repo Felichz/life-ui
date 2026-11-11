@@ -76,6 +76,14 @@ Before the presentational interface replaces the current one, the agent is measu
 - Tests drive the agent with a scripted model: in Jest (`agentFlows.test.tsx`) and in Cypress, which answers the model's HTTP calls. Dev builds read a model endpoint from `localStorage` (`lifeui.devModel`) for that; production builds ignore it.
 - Not yet moved to the agent: editing the library, the time blocks and event names, which still have their own screens.
 
+### Addendum (2026-11-11): the conversation as a thing that lasts
+
+- **Kept between launches.** The entries on screen and the messages sent to the model are saved (`lifeui.chat`) between turns only, so what is kept is always a whole exchange. A change that was still waiting for an answer when the app closed comes back as "not done". "New conversation" starts over without touching the day; clearing or importing data clears it too.
+- **Stop.** While the agent works, the send button becomes a stop button: the model call is dropped, a change waiting for an answer counts as a no, and calls not yet run are answered as stopped. Stopping is not shown as an error.
+- **A failed change leaves nothing behind.** When a tool throws after it has already changed something (starting a new activity creates it, then the core refuses the start because another one is running), the state from before the tool is restored.
+- **History is cut on a whole exchange.** The last 24 messages are sent, backed up to the nearest message the person wrote, so a tool result never arrives without its call.
+- **Changes read as a list.** Decided changes are one compact list (a line each, with undo on the last one); only a change waiting for an answer is a card.
+
 ## Consequences
 
 - The UI built for editing (dialogs, editors, menus) is retired; the presentational parts (timeline, focus card, tempo meter, log, Review) are kept and rearranged around the timeline.

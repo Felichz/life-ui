@@ -43,17 +43,18 @@ export function AppShell() {
       <Sidebar />
       <main
         className={cn(
-          "min-w-0 flex-1 lg:pb-0",
+          // Room for the tab bar, the running pill and the chat button, so none covers the last row
+          "min-w-0 flex-1 lg:pb-20 xl:pb-0",
           pillVisible
-            ? "pb-[calc(128px+env(safe-area-inset-bottom))]"
-            : "pb-[calc(64px+env(safe-area-inset-bottom))]"
+            ? "pb-[calc(192px+env(safe-area-inset-bottom))]"
+            : "pb-[calc(140px+env(safe-area-inset-bottom))]"
         )}
       >
         <Outlet />
       </main>
       {/* The conversation is the way in (ADR-002): always beside the day from 1280 px */}
       <ChatPanel className="sticky top-0 hidden h-dvh w-[400px] shrink-0 self-start border-l border-line xl:flex" />
-      <MobileChat />
+      <MobileChat raised={pillVisible} />
       <MobileNav />
       <RunningPill />
       <ActivityWatcher />
@@ -62,7 +63,7 @@ export function AppShell() {
 }
 
 /** Below 1280 px the chat opens as a sheet from a floating button. */
-function MobileChat() {
+function MobileChat({ raised }: { raised: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -70,7 +71,13 @@ function MobileChat() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={t("agent.open")}
-        className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] right-4 z-30 flex size-12 items-center justify-center rounded-full bg-accent-fill text-white shadow-pop lg:bottom-6 xl:hidden"
+        className={cn(
+          "fixed right-4 z-30 flex size-12 items-center justify-center rounded-full bg-accent-fill text-white shadow-pop transition-[bottom,background-color] duration-200 hover:bg-accent-fill-hover lg:bottom-6 xl:hidden",
+          // Above the running pill when it shows, never on top of it
+          raised
+            ? "bottom-[calc(132px+env(safe-area-inset-bottom))]"
+            : "bottom-[calc(80px+env(safe-area-inset-bottom))]"
+        )}
       >
         <MessageSquare className="size-5" />
       </button>

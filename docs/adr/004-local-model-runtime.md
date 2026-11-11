@@ -62,6 +62,8 @@ An RTX 3070 Laptop GPU with 8 GiB. LM Studio estimates `qwen/qwen3.5-9b` (Q4, 6.
 
 The loaded model is always visible: a bar at the top of the chat and a "Model" section first in Settings show its name, runtime, context and, when the runtime reports it, how much of it is on the GPU, with a button to change it. Changing reopens the picker, which marks the current model and offers to keep it; choosing another one unloads the current one first (`lms unload`, or Ollama's `keep_alive: 0`), so the load dialog sees the memory that is really free.
 
+Next to "Change" there is an unload button (2026-11-11): it frees the model's memory in its runtime and leaves the chat at "No model loaded". The choice is kept, so the next launch asks to load it again.
+
 ## Consequences
 
 - The load dialog is the first screen of each session when no model is loaded.

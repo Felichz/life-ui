@@ -1,0 +1,167 @@
+import { SystemCore } from "../../system";
+import { Agent, recentHistory, type ChatFn, type SavedChat } from "../agent/agent";
+import type { ChatMessage, ModelReply } from "../agent/llm";
+
+/**
+ * The conversation itself: it is kept between launches, it can be stopped and
+ * started over, and what is sent to the model is always a whole exchange.
+ */
+
+const say = (content: string): ModelReply => ({ content, toolCalls: [] });
+const call = (name: string, args: object = {}): ModelReply => ({
+  content: "",
+  toolCalls: [
+    { id: `call-${name}`, type: "function", function: { name, arguments: JSON.stringify(args) } },
+  ],
+});
+
+function memoryStore(initial: SavedChat | null = null) {
+  let saved = initial;
+  return {
+    load: () => saved,
+    save: (chat: SavedChat) => {
+      saved = JSON.parse(JSON.stringify(chat)) as SavedChat;
+    },
+    get saved() {
+      return saved;
+    },
+  };
+}
+
+function newCore() {
+  const core = new SystemCore();
+  core.clearState();
+  return core;
+}
+
+describe("recentHistory", () => {
+  const user = (content: string): ChatMessage => ({ role: "user", content });
+  const toolCall: ChatMessage = {
+    role: "assistant",
+    content: null,
+    tool_calls: [{ id: "c1", type: "function", function: { name: "get_day", arguments: "{}" } }],
+  };
+  const toolResult: ChatMessage = { role: "tool", tool_call_id: "c1", content: "{}" };
+
+  it("keeps a short history whole", () => {
+    const history = [user("a"), toolCall, toolResult];
+    expect(recentHistory(history, 24)).toBe(history);
+  });
+
+  it("never starts on a tool result whose call was cut off", () => {
+    const history = [
+      user("a"),
+      toolCall,
+      toolResult,
+      user("b"),
+      { role: "assistant", content: "ok" },
+    ];
+    const recent = recentHistory(history as ChatMessage[], 3);
+    expect(recent[0]).toEqual(user("b"));
+    expect(recent).toHaveLength(2);
+  });
+});
+
+describe("the conversation", () => {
+  it("is kept between launches", async () => {
+    const store = memoryStore();
+    const core = newCore();
+    const first = new Agent({ core, prompt: "p", store, chat: async () => say("Hola.") });
+    await first.send("hola");
+
+    const second = new Agent({ core, prompt: "p", store, chat: async () => say("…") });
+    expect(second.entries.map((entry) => entry.kind)).toEqual(["user", "assistant"]);
+
+    // The model also gets what was said before
+    const seen: ChatMessage[][] = [];
+    const third = new Agent({
+      core,
+      prompt: "p",
+      store,
+      chat: async (messages) => {
+        seen.push(messages);
+        return say("Sigo aquí.");
+      },
+    });
+    await third.send("¿sigues ahí?");
+    expect(seen[0].filter((message) => message.role === "user")).toHaveLength(2);
+  });
+
+  it("starts over with clear, leaving the day as it is", async () => {
+    const store = memoryStore();
+    const core = newCore();
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      store,
+      chat: (() => {
+        const replies = [call("start_day"), say("Día empezado.")];
+        return (async () => replies.shift()!) as ChatFn;
+      })(),
+    });
+    agent.mode = "auto";
+    await agent.send("empiezo el día");
+    expect(core.getCurrentDay()).not.toBeNull();
+
+    agent.clear();
+    expect(agent.entries).toEqual([]);
+    expect(store.saved).toEqual({ entries: [], history: [] });
+    expect(core.getCurrentDay()).not.toBeNull();
+  });
+
+  it("stops a turn without reporting an error", async () => {
+    const core = newCore();
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      chat: (_messages, _tools, signal) =>
+        new Promise<ModelReply>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    });
+    const turn = agent.send("hola");
+    agent.stop();
+    await turn;
+    expect(agent.busy).toBe(false);
+    expect(agent.entries.map((entry) => entry.kind)).toEqual(["user"]);
+  });
+
+  it("a stop while a change waits for an answer counts as a no", async () => {
+    const core = newCore();
+    const replies = [call("start_day"), say("…")];
+    const agent = new Agent({ core, prompt: "p", chat: async () => replies.shift()! });
+    const turn = agent.send("empiezo el día");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(agent.entries.at(-1)).toMatchObject({ kind: "tool", status: "pending" });
+
+    agent.stop();
+    await turn;
+    expect(agent.entries.at(-1)).toMatchObject({ kind: "tool", status: "rejected" });
+    expect(core.getCurrentDay()).toBeNull();
+  });
+});
+
+describe("a change that fails", () => {
+  it("leaves nothing behind", async () => {
+    const core = newCore();
+    core.startDay();
+    const todo = core.getTimeBlocks().find((block) => block.isDefault)!;
+    const mail = core.createActivityTemplate({
+      title: "Correo",
+      description: "",
+      type: "clear-objective",
+      isSystemActivity: false,
+      clearObjectiveSettings: { estimatedDurationMinutes: 10 },
+    });
+    core.activateActivity(core.createActivityInstance(mail.id, todo.id).id);
+
+    // Starting something new creates it first; the core then refuses the start
+    const replies = [call("start_activity", { item: "Leer" }), say("Ya hay algo en marcha.")];
+    const agent = new Agent({ core, prompt: "p", chat: async () => replies.shift()! });
+    agent.mode = "auto";
+    await agent.send("empiezo a leer");
+
+    expect(agent.entries.find((entry) => entry.kind === "tool")).toMatchObject({ status: "error" });
+    expect(core.getActivityTemplates().map((template) => template.title)).toEqual(["Correo"]);
+  });
+});
