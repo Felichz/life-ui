@@ -1,7 +1,8 @@
 import type { ISystemCore } from "../../types";
 import { isCoreError } from "../../system";
 import { daySnapshot } from "./snapshot";
-import { ToolError, toolByName, toolSchemas, type Tool } from "./tools";
+import { ToolError, TOOLS, toolByName, toolSchemas, type Tool } from "./tools";
+import { t } from "../i18n";
 import type { ChatMessage, ModelReply, ToolCall } from "./llm";
 
 /**
@@ -187,7 +188,7 @@ export class Agent {
       role: "system",
       content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${
         this.options.language?.() === "es" ? "Spanish" : "English"
-      }. Reply in that language, even if earlier messages in this conversation were in another one.\n\n${JSON.stringify(day)}`,
+      }. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}".\n\n${JSON.stringify(day)}`,
     };
   }
 
@@ -210,6 +211,15 @@ export class Agent {
     return copy;
   }
 
+  /** What the person wrote lately, to check a change against their own words. */
+  private recentUserText(count = 3): string {
+    return this.history
+      .filter((message) => message.role === "user")
+      .slice(-count)
+      .map((message) => message.content)
+      .join("\n");
+  }
+
   private async runTool(call: ToolCall): Promise<unknown> {
     const tool: Tool | undefined = toolByName(call.function.name);
     if (!tool) return { error: "unknown-tool", tools: "see the tool list" };
@@ -218,6 +228,20 @@ export class Agent {
       args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
     } catch {
       return { error: "invalid-arguments", detail: "arguments must be a JSON object" };
+    }
+    // A small model invents times. An exact time has to come from the person,
+    // and a time they gave always has a digit in it.
+    if (
+      tool.mutates &&
+      typeof args.time === "string" &&
+      args.time &&
+      !/\d/.test(this.recentUserText())
+    ) {
+      return {
+        error: "time-not-said",
+        detail:
+          "The person did not give a time. Do not invent one: ask them in words, or make the change without a time.",
+      };
     }
     const ctx = { core: this.options.core, now: this.options.now ?? (() => new Date()) };
 
@@ -289,6 +313,7 @@ export class Agent {
 
     try {
       const maxSteps = this.options.maxSteps ?? 8;
+      let corrected = false;
       for (let step = 0; step < maxSteps; step++) {
         const reply = await this.options.chat(
           this.withLanguageReminder([this.system(), ...recentHistory(this.history)]),
@@ -297,6 +322,18 @@ export class Agent {
         );
         if (abort.signal.aborted) return;
         if (reply.toolCalls.length === 0) {
+          // A reply that names tools is the model reading its own notes aloud:
+          // it is not shown, and the model gets one chance to answer the person
+          if (!corrected && leaksTools(reply.content)) {
+            corrected = true;
+            this.history.push({ role: "assistant", content: reply.content });
+            this.history.push({
+              role: "user",
+              content:
+                "[Automatic note, not from the person: that reply was not shown because it recited your internal instructions and tool names. Answer the person's last message directly, in everyday words, without naming tools.]",
+            });
+            continue;
+          }
           const answer = reply.content || "…";
           this.history.push({ role: "assistant", content: answer });
           this.add({ id: nextId(), kind: "assistant", text: answer });
@@ -338,6 +375,17 @@ export class Agent {
       this.emit();
     }
   }
+}
+
+const TOOL_NAMES = new RegExp(
+  `\\b(${TOOLS.map((tool) => tool.name)
+    .filter((name) => name.includes("_"))
+    .join("|")})\\b`
+);
+
+/** True when a reply meant for the person mentions a tool by name. */
+export function leaksTools(text: string): boolean {
+  return TOOL_NAMES.test(text);
 }
 
 function failure(caught: unknown): { error: string; detail?: string } {

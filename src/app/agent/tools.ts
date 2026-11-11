@@ -3,7 +3,7 @@ import { UtilityService } from "../../system/utilityService";
 import { formatDayMinutes, parseDayMinutes } from "../lib/format";
 import { t } from "../i18n";
 import { daySnapshot, librarySnapshot, reviewSnapshot, shortId } from "./snapshot";
-import { GUIDES, type GuideName } from "./guides";
+import { GUIDES, GUIDE_NOTE, type GuideName } from "./guides";
 
 /**
  * The agent's tools (ADR-002): each one is a call into the domain core with a
@@ -238,7 +238,7 @@ export const TOOLS: Tool[] = [
     run: (_ctx, args) => {
       const guide = GUIDES[str(args.topic) as GuideName];
       if (!guide) throw new ToolError("guide-not-found", Object.keys(GUIDES).join(", "));
-      return guide;
+      return { private: GUIDE_NOTE, guide };
     },
   },
   {
