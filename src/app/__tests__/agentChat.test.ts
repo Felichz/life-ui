@@ -194,3 +194,51 @@ describe("the language of the replies", () => {
     expect(JSON.stringify(seen[2])).not.toContain("[Reply in English");
   });
 });
+
+describe("guards for a small model", () => {
+  it("refuses a time the person never said, without showing a card", async () => {
+    const core = newCore();
+    core.startDay();
+    const seen: ChatMessage[][] = [];
+    const replies = [
+      call("add_to_plan", { title: "Gym", minutes: 30, time: "16:00" }),
+      say("¿A qué hora te viene bien?"),
+    ];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      chat: async (messages) => {
+        seen.push(messages);
+        return replies.shift()!;
+      },
+    });
+    await agent.send("hace tiempo quiero hacer gym en casa");
+
+    expect(agent.entries.some((entry) => entry.kind === "tool")).toBe(false);
+    expect(JSON.stringify(seen[1])).toContain("time-not-said");
+    expect(core.getActivityTemplates()).toHaveLength(0);
+  });
+
+  it("accepts a time the person did say", async () => {
+    const core = newCore();
+    core.startDay();
+    const replies = [call("add_to_plan", { title: "Gym", minutes: 30, time: "16:00" }), say("ok")];
+    const agent = new Agent({ core, prompt: "p", chat: async () => replies.shift()! });
+    agent.mode = "auto";
+    await agent.send("pon gym a las 16");
+    expect(agent.entries.find((entry) => entry.kind === "tool")).toMatchObject({ status: "done" });
+  });
+
+  it("does not show a reply that recites tool names, and asks once for a real answer", async () => {
+    const replies = [
+      say("1. Revisa con get_library. 2. Usa add_to_plan."),
+      say("Te ayudo a planear."),
+    ];
+    const agent = new Agent({ core: newCore(), prompt: "p", chat: async () => replies.shift()! });
+    await agent.send("tú qué opinas");
+
+    const shown = agent.entries.filter((entry) => entry.kind === "assistant");
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toMatchObject({ text: "Te ayudo a planear." });
+  });
+});
