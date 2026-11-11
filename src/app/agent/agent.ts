@@ -187,8 +187,27 @@ export class Agent {
       role: "system",
       content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${
         this.options.language?.() === "es" ? "Spanish" : "English"
-      }. Answer in the language the person writes in.\n\n${JSON.stringify(day)}`,
+      }. Reply in that language, even if earlier messages in this conversation were in another one.\n\n${JSON.stringify(day)}`,
     };
+  }
+
+  /**
+   * Small models follow the last thing they read, and the old replies in the
+   * history are in the old language. A reminder rides on the latest message
+   * the person wrote (a copy: it is not kept in the history).
+   */
+  private withLanguageReminder(messages: ChatMessage[]): ChatMessage[] {
+    const language = this.options.language?.() === "es" ? "Spanish" : "English";
+    const index = messages.map((m) => m.role).lastIndexOf("user");
+    if (index < 0 || messages[index].role !== "user") return messages;
+    const copy = [...messages];
+    copy[index] = {
+      role: "user",
+      content: `${(messages[index] as { content: string }).content}
+
+[Reply in ${language}.]`,
+    };
+    return copy;
   }
 
   private async runTool(call: ToolCall): Promise<unknown> {
@@ -272,7 +291,7 @@ export class Agent {
       const maxSteps = this.options.maxSteps ?? 8;
       for (let step = 0; step < maxSteps; step++) {
         const reply = await this.options.chat(
-          [this.system(), ...recentHistory(this.history)],
+          this.withLanguageReminder([this.system(), ...recentHistory(this.history)]),
           toolSchemas(),
           abort.signal
         );
