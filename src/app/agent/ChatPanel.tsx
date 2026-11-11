@@ -16,6 +16,7 @@ import { useModel } from "../runtime/ModelGate";
 import { ModelBadge } from "../runtime/ModelBadge";
 import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
+import { Markdown } from "./Markdown";
 import type { Entry, Mode } from "./agent";
 
 /**
@@ -166,7 +167,9 @@ function EntryView({ entry }: { entry: Entry }) {
   }
   if (entry.kind === "assistant") {
     return (
-      <p className="mr-4 whitespace-pre-wrap text-base leading-relaxed text-ink">{entry.text}</p>
+      <div className="mr-4">
+        <Markdown>{entry.text}</Markdown>
+      </div>
     );
   }
   if (entry.kind === "error") {
