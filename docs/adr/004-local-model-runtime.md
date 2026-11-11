@@ -58,6 +58,10 @@ Rust commands (ADR-003): RAM from `sysinfo`; VRAM through NVML on NVIDIA GPUs an
 
 An RTX 3070 Laptop GPU with 8 GiB. LM Studio estimates `qwen/qwen3.5-9b` (Q4, 6.55 GB on disk) at 7.57 GiB of VRAM with a 16,384-token context and full GPU offload. With 4.35 GiB already in use by other programs, it would not fit entirely at that moment: the dialog has to say so, and say how much to free.
 
+### 7. The model in sight
+
+The loaded model is always visible: a bar at the top of the chat and a "Model" section first in Settings show its name, runtime, context and, when the runtime reports it, how much of it is on the GPU, with a button to change it. Changing reopens the picker, which marks the current model and offers to keep it; choosing another one unloads the current one first (`lms unload`, or Ollama's `keep_alive: 0`), so the load dialog sees the memory that is really free.
+
 ## Consequences
 
 - The load dialog is the first screen of each session when no model is loaded.

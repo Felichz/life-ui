@@ -32,6 +32,7 @@ pub fn run() {
             runtimes::lmstudio_loaded,
             runtimes::lmstudio_estimate,
             runtimes::lmstudio_load,
+            runtimes::lmstudio_unload,
             runtimes::start_runtime,
         ])
         .run(tauri::generate_context!())

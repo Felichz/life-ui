@@ -157,6 +157,10 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     loaded = String(model);
     return "";
   },
+  lmstudio_unload: () => {
+    loaded = null;
+    return "";
+  },
   start_runtime: () => {
     serverRunning = true;
     return null;

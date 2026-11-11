@@ -23,6 +23,8 @@ import {
   formatGiB,
   gpuProcesses,
   isLoaded,
+  placementOf,
+  unload,
   listModels,
   load,
   runtimeStatus,
@@ -66,11 +68,19 @@ const endpointFor = (model: LocalModel): ModelEndpoint => ({
 interface ModelContextValue {
   /** The loaded model the agent talks to, or null. */
   endpoint: ModelEndpoint | null;
+  /** The loaded model, and where it sits when known. */
+  model: LocalModel | null;
+  placement: Placement | null;
   /** Opens the model picker again. */
   openSetup: () => void;
 }
 
-const ModelContext = createContext<ModelContextValue>({ endpoint: null, openSetup: () => {} });
+const ModelContext = createContext<ModelContextValue>({
+  endpoint: null,
+  model: null,
+  placement: null,
+  openSetup: () => {},
+});
 
 export const useModel = () => useContext(ModelContext);
 
@@ -84,7 +94,10 @@ export function ModelGate({ children }: { children: ReactNode }) {
     isDesktop() ? { kind: "checking" } : { kind: "done" }
   );
   const [error, setError] = useState<string | null>(null);
-  const [endpoint, setEndpoint] = useState<ModelEndpoint | null>(null);
+  const [current, setCurrent] = useState<{ model: LocalModel; placement: Placement | null } | null>(
+    null
+  );
+  const endpoint = current ? endpointFor(current.model) : null;
 
   const openSetup = useCallback(async () => {
     const runtimes = await runtimeStatus();
@@ -93,7 +106,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
 
   const prepareLoad = useCallback(async (model: LocalModel) => {
     if (await isLoaded(model)) {
-      setEndpoint(endpointFor(model));
+      setCurrent({ model, placement: await placementOf(model) });
       return setStep({ kind: "done" });
     }
     const resources = await systemResources();
@@ -122,7 +135,16 @@ export function ModelGate({ children }: { children: ReactNode }) {
   const choose = async (model: LocalModel) => {
     saveChoice(model);
     setError(null);
-    await prepareLoad(model).catch((caught) => setError(String(caught)));
+    try {
+      // Changing models frees the old one first, so the new load sees the real free memory
+      if (current && (current.model.key !== model.key || current.model.runtime !== model.runtime)) {
+        await unload(current.model);
+        setCurrent(null);
+      }
+      await prepareLoad(model);
+    } catch (caught) {
+      setError(String(caught));
+    }
   };
 
   const start = async (runtime: RuntimeId) => {
@@ -155,7 +177,14 @@ export function ModelGate({ children }: { children: ReactNode }) {
     openSetup().catch((caught) => setError(String(caught)));
   }, [openSetup]);
   return (
-    <ModelContext.Provider value={{ endpoint, openSetup: reopen }}>
+    <ModelContext.Provider
+      value={{
+        endpoint,
+        model: current?.model ?? null,
+        placement: current?.placement ?? null,
+        openSetup: reopen,
+      }}
+    >
       {children}
       <Dialog open={open}>
         <DialogContent size="lg" hideClose aria-describedby={undefined}>
@@ -165,6 +194,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
               step={step}
               onChoose={choose}
               onStart={start}
+              current={current?.model ?? null}
               onSkip={() => setStep({ kind: "done" })}
             />
           )}
@@ -181,7 +211,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
             <Loaded
               step={step}
               onContinue={() => {
-                setEndpoint(endpointFor(step.model));
+                setCurrent({ model: step.model, placement: step.placement });
                 setStep({ kind: "done" });
               }}
             />
@@ -210,11 +240,13 @@ function Checking() {
 
 function Setup({
   step,
+  current,
   onChoose,
   onStart,
   onSkip,
 }: {
   step: Extract<Step, { kind: "setup" }>;
+  current: LocalModel | null;
   onChoose: (model: LocalModel) => void;
   onStart: (runtime: RuntimeId) => void;
   onSkip: () => void;
@@ -224,7 +256,10 @@ function Setup({
     <>
       <DialogHeader>
         <DialogTitle>{t("model.setup.title")}</DialogTitle>
-        <DialogDescription>{t("model.setup.body")}</DialogDescription>
+        <DialogDescription>
+          {t("model.setup.body")}
+          {current && ` ${t("model.setup.switch", { name: current.name })}`}
+        </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4 pb-4">
         <div className="grid grid-cols-2 gap-2">
@@ -265,7 +300,8 @@ function Setup({
                 <button
                   type="button"
                   onClick={() => onChoose(m)}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-subtle"
+                  aria-current={current?.key === m.key && current.runtime === m.runtime}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-subtle aria-[current=true]:bg-accent/5"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-medium text-ink">{m.name}</span>
@@ -293,7 +329,7 @@ function Setup({
       </DialogBody>
       <DialogFooter>
         <Button variant="ghost" onClick={onSkip}>
-          {t("model.skip")}
+          {current ? t("model.keep", { name: current.name }) : t("model.skip")}
         </Button>
       </DialogFooter>
     </>

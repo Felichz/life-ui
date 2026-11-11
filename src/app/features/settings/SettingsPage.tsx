@@ -21,6 +21,8 @@ import { errorMessage, useSystem } from "../../state/system";
 import { useTheme, type ThemePreference } from "../../state/theme";
 import { useToast } from "../../state/toast";
 import { LOCALES, LOCALE_NAMES, t, useLocale, type Locale } from "../../i18n";
+import { isDesktop } from "../../platform/desktop";
+import { ModelBadge } from "../../runtime/ModelBadge";
 
 function Section({
   title,
@@ -47,6 +49,7 @@ export function SettingsPage() {
     <Page width="narrow">
       <PageHeader title={t("nav.settings")} />
       <div className="mt-6">
+        {isDesktop() && <ModelSection />}
         <TargetSection />
         <AppearanceSection />
         <LanguageSection />
@@ -54,11 +57,7 @@ export function SettingsPage() {
           <dl className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2.5 text-base">
             {[
               [[modKeyLabel, "K"], t("settings.shortcut.palette")],
-              [["N"], t("palette.addActivity")],
-              [["E"], t("settings.shortcut.event")],
-              [["T"], t("settings.shortcut.finish")],
               [["G", "H"], t("settings.shortcut.goTo")],
-              [["0–9"], t("settings.shortcut.score")],
             ].map(([keys, label]) => (
               <div key={label as string} className="contents">
                 <dt className="flex gap-1">
@@ -158,6 +157,17 @@ function AppearanceSection() {
           { value: "dark", label: t("settings.theme.dark"), icon: <Moon /> },
         ]}
       />
+    </Section>
+  );
+}
+
+/** The model the agent runs on (ADR-004), and the way to change it. */
+function ModelSection() {
+  return (
+    <Section title={t("settings.model.title")} description={t("settings.model.description")}>
+      <div className="rounded-lg border border-line bg-panel px-3 py-2.5">
+        <ModelBadge />
+      </div>
     </Section>
   );
 }
