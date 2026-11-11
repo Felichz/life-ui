@@ -89,8 +89,10 @@ describe("summarize", () => {
     const small = await run(4096, "small");
     const large = await run(32768, "large");
     expect(small.chunks).toBeGreaterThan(large.chunks);
-    expect(calls.small).toBe(small.chunks);
-    expect(calls.large).toBe(large.chunks);
+    // One call per part, then the calls that put the notes in shape
+    expect(calls.small).toBeGreaterThanOrEqual(small.chunks);
+    expect(calls.large).toBeGreaterThanOrEqual(large.chunks);
+    expect(calls.small).toBeGreaterThan(calls.large);
   });
 
   it("summarizes the notes again when together they are still too long", async () => {

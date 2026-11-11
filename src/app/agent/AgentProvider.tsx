@@ -137,6 +137,11 @@ export function AgentProvider({
   const endpoint = useMemo(() => loaded ?? devEndpoint(), [loaded]);
   const endpointRef = useRef(endpoint);
   endpointRef.current = endpoint;
+  // Without the desktop shell nothing says what the model can see: assume it can
+  const visionRef = useRef(true);
+  visionRef.current = model ? Boolean(model.vision) : true;
+  const loadedRef = useRef(false);
+  loadedRef.current = Boolean(loaded);
 
   const agent = useMemo(() => {
     const created = new Agent({
@@ -144,6 +149,9 @@ export function AgentProvider({
       prompt,
       language: getLocale,
       context: () => endpointRef.current?.context ?? DEFAULT_CONTEXT,
+      vision: () => visionRef.current,
+      // A title costs one more call: only a model loaded for real is asked for it
+      titles: () => loadedRef.current,
       // Tests inject their own model and start from an empty conversation
       store: injected ? undefined : chatStore,
       chat: (messages, tools, signal, options) => {

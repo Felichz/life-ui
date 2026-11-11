@@ -21,6 +21,21 @@ Keep, with exact names, times and numbers:
 Leave out greetings, small talk, repeated text and how tools work.
 Do not invent anything. Do not address the person. Short plain lines, no title, no closing remark.`;
 
+/** The sections every finished summary has, in the language the person reads. */
+export const SUMMARY_HEADINGS = {
+  es: ["## Objetivo", "## Decisiones", "## Cambios en el día", "## Pendiente"],
+  en: ["## Goal", "## Decisions", "## Changes to the day", "## Open"],
+} as const;
+
+/** The last step of a compaction: the notes of every part, in one fixed shape. */
+export const SUMMARY_SHAPE = (headings: readonly string[], words: number, language: string) =>
+  `These are notes taken from a conversation between a person and the agent of LifeUI. Rewrite them as one summary in ${language}, in at most ${words} words, using exactly these headings, in this order:
+${headings[0]} (what the person wants and why, in their own terms)
+${headings[1]} (what was decided or agreed)
+${headings[2]} (what was added, moved, started or closed, with exact names, times and tempos)
+${headings[3]} (open questions and what was promised for later)
+Short bullet lines under each heading; write "-" under a heading with nothing to say. Keep every name, time and number exactly. Do not invent anything, do not address the person, and do not mention that this is a summary.`;
+
 export const GUIDES = {
   "plan-day": `Planning the day:
 1. Read get_day and get_library.

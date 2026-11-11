@@ -1,5 +1,5 @@
-import { COMPACT_GUIDE } from "./guides";
-import type { ChatMessage, ModelReply } from "./llm";
+import { COMPACT_GUIDE, SUMMARY_HEADINGS, SUMMARY_SHAPE } from "./guides";
+import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
 
 /**
  * The model's context window as a budget (ADR-007): how much a conversation
@@ -123,7 +123,7 @@ export type SummaryChat = (
   messages: ChatMessage[],
   tools: unknown[],
   signal?: AbortSignal,
-  options?: { maxTokens?: number }
+  options?: ChatOptions
 ) => Promise<ModelReply>;
 
 export interface SummarizeOptions {
@@ -190,5 +190,29 @@ export async function summarize(
     // Still too long: the notes themselves are summarized
     chunks = chunkLines(summary.split("\n"), chunkTokens);
   }
+
+  // The notes are put in a fixed shape, so the agent (and the person) always
+  // find the goal, the decisions, the changes and what is open in the same place
+  const headings = SUMMARY_HEADINGS[language === "Spanish" ? "es" : "en"];
+  const shaped = (text: string) => headings.filter((heading) => text.includes(heading)).length >= 2;
+  const ask: ChatMessage[] = [
+    { role: "system", content: SUMMARY_SHAPE(headings, Math.floor(targetTokens * 0.6), language) },
+    { role: "user", content: summary },
+  ];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const reply = await chat(ask, [], signal, { maxTokens: 3072 });
+    if (signal?.aborted) throw new Error("aborted");
+    const text = reply.content.trim();
+    if (shaped(text)) return { summary: text, chunks: firstPassChunks };
+    // One reminder, as a small model often answers in prose the first time
+    ask.push(
+      { role: "assistant", content: text || "…" },
+      {
+        role: "user",
+        content: `Write it again using exactly these headings:\n${headings.join("\n")}`,
+      }
+    );
+  }
+  // Notes without the shape are still the conversation: they are kept as they are
   return { summary, chunks: firstPassChunks };
 }
