@@ -188,13 +188,39 @@ export function installDesktopMock(): void {
     if (!String(input).includes("127.0.0.1:1234/v1/chat/completions")) {
       return browserFetch(input, init);
     }
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    return new Response(
-      JSON.stringify({
-        choices: [{ message: { content: "Hola. Soy el modelo de prueba." } }],
-        usage: { prompt_tokens: 3200, completion_tokens: 34 },
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
+    const body = JSON.parse(String(init?.body ?? "{}")) as { stream?: boolean };
+    if (!body.stream) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "Hola. Soy el modelo de prueba." } }],
+          usage: { prompt_tokens: 3200, completion_tokens: 34 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const words =
+      "Soy el modelo de prueba. Puedo **planear tu día**, empezar o cerrar una actividad y registrar eventos. Dime qué quieres hacer y lo vemos paso a paso.".split(
+        " "
+      );
+    const encoder = new TextEncoder();
+    const event = (data: unknown) => encoder.encode(`data: ${JSON.stringify(data)}\n\n`);
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        for (const word of words) {
+          await new Promise((resolve) => setTimeout(resolve, 45));
+          controller.enqueue(event({ choices: [{ delta: { content: `${word} ` } }] }));
+        }
+        controller.enqueue(
+          event({ choices: [], usage: { prompt_tokens: 3200, completion_tokens: 38 } })
+        );
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    });
   };
 }

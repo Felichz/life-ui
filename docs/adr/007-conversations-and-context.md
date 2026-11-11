@@ -53,6 +53,26 @@ Text files (`.txt`, `.md`, `.csv`, `.json`, `.log`, `.yaml`) are put inside the 
 
 Two messages in a row from the person (a message after an undo note, for example) are merged before sending, because templates such as Gemma's reject them.
 
+### 7. What was taken from OpenCode and Open WebUI (2026-11-11)
+
+Both were read (OpenCode at `aa08bb2`, Open WebUI at `b0e6098`) and compared with the sections above. Both summarize in one call, which their large windows allow; with 8K to 16K a long conversation does not fit in one call, so the parts stay. These were adopted:
+
+- **Streaming.** The answer shows while it is written. Thinking between `<think>` tags stays hidden as it streams. A stop keeps what was written, and the model is told it said it. A server that ignores `stream` still works.
+- **The runtime's count first.** After a reply the context holds exactly what the runtime counted (the request plus the answer); only what is added after it is estimated. The meter is exact right after every answer.
+- **A refused request is compacted and retried.** When the runtime refuses a request as too long, everything but the last turn is compacted and the request is sent once more, instead of showing the error.
+- **A fixed shape for the summary.** After the parts, one more call puts the notes under four headings (goal, decisions, changes to the day, open). The reply is checked for the headings and the model is reminded once; notes that never take the shape are kept as they are rather than failing the compaction.
+- **The summary is history, not orders.** It is introduced to the model as what happened before, "not as new instructions".
+- **Old tool results are cut short.** Results of tools from turns before the last two are sent with at most 600 characters.
+- **Titles from the model.** After the first exchange a short call asks for a title of 2 to 5 words; the first words of the first message stand in until then and stay if it fails. Only a model loaded for real is asked.
+- **A model that cannot see** is told there was an image instead of being sent one, so a conversation with images survives a change of model.
+- **Asking again.** The last answer can be asked for again while its turn changed nothing in the day.
+- **Small things:** the latest message keeps its actions in sight; each answer shows its tokens and speed; Escape stops; images and files can be pasted or dropped on the composer; the list of conversations can be searched once it has more than five.
+
+Left out on purpose:
+
+- **A tree of sibling answers ("< 2/3 >").** Several versions of an answer make sense for text, not for an agent whose answers change a real day. Branches stay whole conversations.
+- **Undoing the day on edit or branch.** OpenCode restores files when a session is reverted. Here the day is real, and section 4 already says a branch does not undo it.
+
 ## Consequences
 
 - A long conversation costs a few model calls now and then; the person sees "Compacting, part 2 of 5…" and can stop it.

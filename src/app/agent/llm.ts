@@ -36,6 +36,8 @@ export interface ModelReply {
   toolCalls: ToolCall[];
   /** Tokens the runtime counted for this call, when it says so. */
   usage?: { prompt: number; completion: number };
+  /** Tokens per second while it wrote, when the reply was streamed. */
+  speed?: number;
 }
 
 /** Some local models think out loud between <think> tags: never shown. */
@@ -46,12 +48,109 @@ export function stripThinking(text: string): string {
     .trim();
 }
 
+/** The same, for a reply still being written: an open <think> hides what follows it. */
+export function visibleSoFar(text: string): string {
+  const closed = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+  const open = closed.indexOf("<think>");
+  const shown = open >= 0 ? closed.slice(0, open) : closed;
+  // A tag that is only half written yet ("<thi") is not text either
+  return shown.replace(/<\/?t?h?i?n?k?$/, "").trimStart();
+}
+
+export interface ChatOptions {
+  maxTokens?: number;
+  /** Called with the whole visible text so far, as the model writes it. */
+  onText?: (text: string) => void;
+}
+
+interface Delta {
+  content?: string | null;
+  tool_calls?: Array<{
+    index?: number;
+    id?: string;
+    function?: { name?: string; arguments?: string };
+  }>;
+}
+
+/**
+ * Reads a streamed completion (server-sent events). Text arrives in pieces;
+ * tool calls arrive split too, each piece addressed by its index.
+ */
+async function readStream(
+  response: Response,
+  onText: ((text: string) => void) | undefined
+): Promise<ModelReply> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  const calls: ToolCall[] = [];
+  let buffer = "";
+  let content = "";
+  let usage: ModelReply["usage"];
+  let firstAt = 0;
+
+  const take = (line: string) => {
+    if (!line.startsWith("data:")) return;
+    const data = line.slice(5).trim();
+    if (!data || data === "[DONE]") return;
+    let chunk: {
+      choices?: Array<{ delta?: Delta }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+    };
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (typeof chunk.usage?.prompt_tokens === "number") {
+      usage = { prompt: chunk.usage.prompt_tokens, completion: chunk.usage.completion_tokens ?? 0 };
+    }
+    const delta = chunk.choices?.[0]?.delta;
+    if (!delta) return;
+    if (!firstAt) firstAt = performance.now();
+    if (delta.content) {
+      content += delta.content;
+      onText?.(visibleSoFar(content));
+    }
+    for (const piece of delta.tool_calls ?? []) {
+      const index = piece.index ?? 0;
+      calls[index] ??= { id: "", type: "function", function: { name: "", arguments: "" } };
+      if (piece.id) calls[index].id = piece.id;
+      if (piece.function?.name) calls[index].function.name += piece.function.name;
+      if (piece.function?.arguments) calls[index].function.arguments += piece.function.arguments;
+    }
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+    lines.forEach((line) => take(line.trim()));
+  }
+  take(buffer.trim());
+
+  const seconds = firstAt ? (performance.now() - firstAt) / 1000 : 0;
+  return {
+    usage,
+    // Timed from the first piece, so the wait before it does not count as writing
+    speed:
+      usage && usage.completion >= 8 && seconds > 0.2
+        ? Math.round(usage.completion / seconds)
+        : undefined,
+    content: stripThinking(content),
+    toolCalls: calls
+      .filter(Boolean)
+      .map((call, index) => ({ ...call, id: call.id || `call_${index}` })),
+  };
+}
+
 export async function chat(
   endpoint: ModelEndpoint,
   messages: ChatMessage[],
   tools: unknown[],
   signal?: AbortSignal,
-  options: { maxTokens?: number } = {}
+  options: ChatOptions = {}
 ): Promise<ModelReply> {
   const send = isDesktop() ? desktopFetch : fetch;
   const response = await send(`${endpoint.baseUrl.replace(/\/$/, "")}/chat/completions`, {
@@ -67,7 +166,8 @@ export async function chat(
       ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
       ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
       temperature: 0.2,
-      stream: false,
+      stream: true,
+      stream_options: { include_usage: true },
     }),
     signal,
   });
@@ -76,6 +176,11 @@ export async function chat(
     throw new Error(
       `The model answered ${response.status}${detail ? `: ${detail.slice(0, 300)}` : ""}`
     );
+  }
+  // A server that ignores `stream` answers with one JSON document
+  const type = response.headers.get("content-type") ?? "";
+  if (response.body && type.includes("text/event-stream")) {
+    return readStream(response, options.onText);
   }
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string | null; tool_calls?: ToolCall[] } }>;

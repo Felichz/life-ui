@@ -4,6 +4,8 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
@@ -21,7 +23,9 @@ import {
   Loader2,
   Paperclip,
   Pencil,
+  RefreshCw,
   RotateCcw,
+  Search,
   Square,
   SquarePen,
   Trash2,
@@ -112,11 +116,34 @@ export function ChatPanel({ className }: { className?: string }) {
       event.preventDefault();
       send();
     }
+    if (event.key === "Escape" && busy) agent.stop();
   };
 
-  const onFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = Array.from(event.clipboardData.files);
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    void addFiles(pasted);
+  };
+
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (event.dataTransfer.files.length === 0) return;
+    event.preventDefault();
+    void addFiles(Array.from(event.dataTransfer.files));
+  };
+
+  const writing = entries.some((e) => e.kind === "assistant" && e.writing);
+  const lastId = entries[entries.length - 1]?.id;
+
+  const onFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(event.target.files ?? []);
     event.target.value = "";
+    void addFiles(picked);
+  };
+
+  /** Files from the picker, the clipboard or a drop all come through here. */
+  const addFiles = async (picked: File[]) => {
+    if (picked.length === 0 || !available || blocked) return;
     // A file may take a quarter of the context at most: the rest is for the conversation
     const maxChars = Math.floor(usage.context * 0.25 * 3.2);
     const added: Attachment[] = [];
@@ -229,11 +256,16 @@ export function ChatPanel({ className }: { className?: string }) {
                 Array.isArray(group) ? (
                   <ToolList key={group[0].id} entries={group} />
                 ) : (
-                  <EntryView key={group.id} entry={group} onEdit={edit} />
+                  <EntryView
+                    key={group.id}
+                    entry={group}
+                    onEdit={edit}
+                    last={group.id === lastId}
+                  />
                 )
               )
             )}
-            {busy && !waiting && (
+            {busy && !waiting && !writing && (
               <p className="flex animate-entry-in items-center gap-2 text-sm text-ink-3">
                 <span className="flex items-center gap-1" aria-hidden>
                   {[0, 160, 320].map((delay) => (
@@ -275,6 +307,8 @@ export function ChatPanel({ className }: { className?: string }) {
               </div>
             )}
             <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={onDrop}
               className={cn(
                 "rounded-xl border border-line bg-canvas shadow-xs transition-[border-color,box-shadow] duration-150 focus-within:border-accent focus-within:ring-[3px] focus-within:ring-accent/20",
                 (!available || blocked) && "opacity-60"
@@ -310,6 +344,7 @@ export function ChatPanel({ className }: { className?: string }) {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={onKey}
+                onPaste={onPaste}
                 rows={1}
                 disabled={!available || blocked}
                 placeholder={t("agent.placeholder")}
@@ -335,7 +370,7 @@ export function ChatPanel({ className }: { className?: string }) {
                   multiple
                   hidden
                   accept={vision ? `image/*,${TEXT_FILES}` : TEXT_FILES}
-                  onChange={(event) => void onFiles(event)}
+                  onChange={onFiles}
                 />
                 <Tooltip content={t(vision ? "agent.attach.any" : "agent.attach.text")}>
                   <IconButton
@@ -437,8 +472,10 @@ function ContextMeter({ usage, busy }: { usage: ContextUsage; busy: boolean }) {
 function ChatList({ onOpen }: { onOpen: () => void }) {
   const { agent, busy } = useAgent();
   const [confirming, setConfirming] = useState<string | null>(null);
-  const chats = agent.list();
-  if (chats.length === 0) {
+  const [query, setQuery] = useState("");
+  const all = agent.list();
+  const chats = all.filter((chat) => chat.title.toLowerCase().includes(query.trim().toLowerCase()));
+  if (all.length === 0) {
     return (
       <p className="m-auto max-w-[280px] px-5 text-center text-sm text-ink-2">
         {t("agent.chats.empty")}
@@ -447,6 +484,21 @@ function ChatList({ onOpen }: { onOpen: () => void }) {
   }
   return (
     <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+      {all.length > 5 && (
+        <li className="mb-1 px-1">
+          <label className="flex h-8 items-center gap-2 rounded-md border border-line bg-canvas px-2.5 focus-within:border-accent coarse:h-10">
+            <Search className="size-3.5 shrink-0 text-ink-3" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("agent.chats.search")}
+              aria-label={t("agent.chats.search")}
+              className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
+            />
+          </label>
+        </li>
+      )}
       {chats.map((chat) => (
         <li key={chat.id} className="group relative">
           <button
@@ -631,11 +683,21 @@ function ToolList({ entries }: { entries: ToolEntry[] }) {
 }
 
 /** What can be done with one message: quiet until the message is pointed at. */
-function MessageActions({ children, align }: { children: ReactNode; align: "start" | "end" }) {
+function MessageActions({
+  children,
+  align,
+  shown = false,
+}: {
+  children: ReactNode;
+  align: "start" | "end";
+  /** The latest message keeps its actions in sight; older ones show them when pointed at. */
+  shown?: boolean;
+}) {
   return (
     <div
       className={cn(
-        "flex h-6 items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100 coarse:opacity-100",
+        "flex h-6 items-center gap-0.5 transition-opacity duration-150 focus-within:opacity-100 group-hover/message:opacity-100 coarse:opacity-100",
+        !shown && "opacity-0",
         align === "end" ? "justify-end" : "-ml-1.5 justify-start"
       )}
     >
@@ -724,7 +786,15 @@ function CompactNote({ entry }: { entry: Extract<Entry, { kind: "compact" }> }) 
   );
 }
 
-function EntryView({ entry, onEdit }: { entry: Entry; onEdit: (entryId: string) => void }) {
+function EntryView({
+  entry,
+  onEdit,
+  last,
+}: {
+  entry: Entry;
+  onEdit: (entryId: string) => void;
+  last: boolean;
+}) {
   const { agent } = useAgent();
   const entrance = useEntrance(entry.id);
   if (entry.kind === "compact") return <CompactNote entry={entry} />;
@@ -770,14 +840,35 @@ function EntryView({ entry, onEdit }: { entry: Entry; onEdit: (entryId: string) 
     return (
       <div className={cn("group/message flex flex-col gap-1 pr-2", entrance)}>
         <Markdown>{entry.text}</Markdown>
-        <MessageActions align="start">
-          <CopyButton text={entry.text} />
-          {agent.canRewind(entry.id) && (
-            <ActionButton label={t("agent.branch")} onClick={() => agent.branchFrom(entry.id)}>
-              <GitBranch />
-            </ActionButton>
-          )}
-        </MessageActions>
+        {/* While it is being written there is nothing to act on yet */}
+        {!entry.writing && (
+          <MessageActions align="start" shown={last}>
+            <CopyButton text={entry.text} />
+            {agent.canRegenerate(entry.id) && (
+              <ActionButton
+                label={t("agent.regenerate")}
+                onClick={() => void agent.regenerate(entry.id)}
+              >
+                <RefreshCw />
+              </ActionButton>
+            )}
+            {agent.canRewind(entry.id) && (
+              <ActionButton label={t("agent.branch")} onClick={() => agent.branchFrom(entry.id)}>
+                <GitBranch />
+              </ActionButton>
+            )}
+            {entry.stats && entry.stats.tokens > 0 && (
+              <span className="tabular ml-1.5 text-xs text-ink-3">
+                {entry.stats.speed
+                  ? t("agent.stats.speed", {
+                      tokens: formatNumber(entry.stats.tokens),
+                      speed: formatNumber(entry.stats.speed),
+                    })
+                  : t("agent.stats", { tokens: formatNumber(entry.stats.tokens) })}
+              </span>
+            )}
+          </MessageActions>
+        )}
       </div>
     );
   }
