@@ -12,6 +12,7 @@ import { useModel } from "../runtime/ModelGate";
 import { Agent, type ChatFn, type Mode } from "./agent";
 import { chat, type ModelEndpoint } from "./llm";
 import prompt from "./prompt";
+import { getLocale } from "../i18n";
 
 const MODE_KEY = "lifeui.agentMode";
 
@@ -50,6 +51,7 @@ export function AgentProvider({
     const created = new Agent({
       core,
       prompt,
+      language: getLocale,
       chat: (messages, tools) => {
         if (injected) return injected(messages, tools);
         const current = endpointRef.current;

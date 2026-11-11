@@ -34,6 +34,8 @@ export interface AgentOptions {
   now?: () => Date;
   /** Tool calls per message before the agent gives up (a small model can loop). */
   maxSteps?: number;
+  /** The interface's language, a hint for the reply's language. */
+  language?: () => string;
 }
 
 const MAX_HISTORY = 24;
@@ -106,7 +108,9 @@ export class Agent {
     const day = daySnapshot(this.options.core, now);
     return {
       role: "system",
-      content: `${this.options.prompt}\n\n## Right now\n\n${JSON.stringify(day)}`,
+      content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${
+        this.options.language?.() === "es" ? "Spanish" : "English"
+      }. Answer in the language the person writes in.\n\n${JSON.stringify(day)}`,
     };
   }
 
