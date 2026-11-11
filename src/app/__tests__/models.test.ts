@@ -1,4 +1,10 @@
-import { closingIsEnough, spillBytes, verdict, type Resources } from "../runtime/models";
+import {
+  closingIsEnough,
+  spillBytes,
+  trustedMeasure,
+  verdict,
+  type Resources,
+} from "../runtime/models";
 
 const GIB = 1024 ** 3;
 const pc = (vramFree: number, ramAvailable = 5 * GIB): Resources => ({
@@ -41,5 +47,20 @@ describe("where a model goes", () => {
     expect(closingIsEnough(7.3 * GIB, 3.4 * GIB, chrome)).toBe(false);
     // Nothing to close when it already fits
     expect(closingIsEnough(3 * GIB, 7 * GIB, python)).toBe(false);
+  });
+});
+
+describe("trustedMeasure", () => {
+  const GIB = 1024 ** 3;
+  const model = { sizeBytes: 6.1 * GIB } as Parameters<typeof trustedMeasure>[2];
+
+  it("trusts a load that left room on the GPU", () => {
+    expect(trustedMeasure(6.2 * GIB, 0.9 * GIB, model)).toBe(true);
+  });
+  it("does not trust a load that filled the GPU (part may have spilled)", () => {
+    expect(trustedMeasure(6.2 * GIB, 0.1 * GIB, model)).toBe(false);
+  });
+  it("does not trust a reading far below the weights (it landed elsewhere)", () => {
+    expect(trustedMeasure(0.4 * GIB, 5 * GIB, model)).toBe(false);
   });
 });
