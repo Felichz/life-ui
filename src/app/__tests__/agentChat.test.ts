@@ -165,3 +165,32 @@ describe("a change that fails", () => {
     expect(core.getActivityTemplates().map((template) => template.title)).toEqual(["Correo"]);
   });
 });
+
+describe("the language of the replies", () => {
+  it("follows the interface language of each message, whatever was said before", async () => {
+    let language = "en";
+    const seen: ChatMessage[][] = [];
+    const agent = new Agent({
+      core: newCore(),
+      prompt: "p",
+      language: () => language,
+      chat: async (messages) => {
+        seen.push(messages);
+        return say("ok");
+      },
+    });
+    await agent.send("hello");
+    language = "es";
+    await agent.send("hola");
+
+    const last = seen[1];
+    expect(String(last[0].content)).toContain("Spanish");
+    // The reminder rides on the newest message the person wrote, not on the older ones
+    const users = last.filter((m) => m.role === "user").map((m) => String(m.content));
+    expect(users[0]).not.toContain("[Reply in");
+    expect(users[1]).toContain("[Reply in Spanish.]");
+    // And it is not kept in the history
+    await agent.send("otra");
+    expect(JSON.stringify(seen[2])).not.toContain("[Reply in English");
+  });
+});
