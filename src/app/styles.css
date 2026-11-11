@@ -91,6 +91,17 @@
     background: rgb(var(--accent) / 0.22);
   }
 
+  /* The parts the browser draws follow the palette too */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+  }
+
+  input,
+  textarea {
+    caret-color: rgb(var(--accent));
+  }
+
   :focus-visible {
     outline: 2px solid rgb(var(--accent));
     outline-offset: 2px;

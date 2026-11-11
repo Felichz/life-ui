@@ -25,7 +25,22 @@ export type Entry =
     }
   | { id: string; kind: "error"; text: string };
 
-export type ChatFn = (messages: ChatMessage[], tools: unknown[]) => Promise<ModelReply>;
+export type ChatFn = (
+  messages: ChatMessage[],
+  tools: unknown[],
+  signal?: AbortSignal
+) => Promise<ModelReply>;
+
+/** The conversation as it is kept between launches. */
+export interface SavedChat {
+  entries: Entry[];
+  history: ChatMessage[];
+}
+
+export interface ChatStore {
+  load: () => SavedChat | null;
+  save: (chat: SavedChat) => void;
+}
 
 export interface AgentOptions {
   core: ISystemCore;
@@ -36,12 +51,28 @@ export interface AgentOptions {
   maxSteps?: number;
   /** The interface's language, a hint for the reply's language. */
   language?: () => string;
+  /** Where the conversation is kept, so closing the app does not lose it. */
+  store?: ChatStore;
 }
 
 const MAX_HISTORY = 24;
+/** Entries kept on screen and on disk; older ones fall off the top. */
+const MAX_ENTRIES = 200;
 
 let counter = 0;
-const nextId = () => `e${++counter}`;
+const nextId = () => `e${Date.now().toString(36)}-${++counter}`;
+
+/**
+ * The last messages sent to the model. A cut must not start in the middle of a
+ * tool exchange (a tool result without its call is an API error), so it backs
+ * up to the nearest message the person wrote.
+ */
+export function recentHistory(history: ChatMessage[], max = MAX_HISTORY): ChatMessage[] {
+  if (history.length <= max) return history;
+  let start = history.length - max;
+  while (start < history.length && history[start].role !== "user") start++;
+  return start < history.length ? history.slice(start) : history.slice(-1);
+}
 
 export class Agent {
   entries: Entry[] = [];
@@ -53,8 +84,43 @@ export class Agent {
   private decisions = new Map<string, (yes: boolean) => void>();
   /** The state before the last executed change, for undo. */
   private lastUndo: { entryId: string; snapshot: string } | null = null;
+  private abort: AbortController | null = null;
 
-  constructor(private readonly options: AgentOptions) {}
+  constructor(private readonly options: AgentOptions) {
+    const saved = options.store?.load();
+    if (saved) {
+      this.entries = saved.entries;
+      this.history = saved.history;
+    }
+  }
+
+  /** Written only between turns, so what is kept is always a whole exchange. */
+  private persist() {
+    this.options.store?.save({
+      entries: this.entries.slice(-MAX_ENTRIES),
+      history: recentHistory(this.history),
+    });
+  }
+
+  /** Starts a new conversation. The day itself is untouched. */
+  clear() {
+    if (this.busy) return;
+    this.entries = [];
+    this.history = [];
+    this.lastUndo = null;
+    this.persist();
+    this.emit();
+  }
+
+  /** Stops the turn in progress: the model call is dropped, a pending question counts as a no. */
+  stop() {
+    if (!this.busy) return;
+    this.abort?.abort();
+    for (const [id, resolve] of this.decisions) {
+      resolve(false);
+      this.decisions.delete(id);
+    }
+  }
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -96,6 +162,7 @@ export class Agent {
     if (entry?.kind === "tool") {
       this.history.push({ role: "user", content: `[I undid this change: ${entry.summary}]` });
     }
+    this.persist();
   }
 
   decide(entryId: string, yes: boolean) {
@@ -163,6 +230,9 @@ export class Agent {
       this.patch(entry.id, { status: "done" });
       return result ?? { ok: true };
     } catch (caught) {
+      // A change that fails halfway leaves nothing behind (an activity created
+      // for a start the core then refused, for example)
+      if (this.options.core.exportData() !== snapshot) this.options.core.importData(snapshot);
       const result = failure(caught);
       this.patch(entry.id, { status: "error", error: String(result.error) });
       return result;
@@ -174,6 +244,8 @@ export class Agent {
     const message = text.trim();
     if (!message || this.busy) return;
     this.busy = true;
+    const abort = new AbortController();
+    this.abort = abort;
     this.add({ id: nextId(), kind: "user", text: message });
     this.history.push({ role: "user", content: message });
 
@@ -181,9 +253,11 @@ export class Agent {
       const maxSteps = this.options.maxSteps ?? 8;
       for (let step = 0; step < maxSteps; step++) {
         const reply = await this.options.chat(
-          [this.system(), ...this.history.slice(-MAX_HISTORY)],
-          toolSchemas()
+          [this.system(), ...recentHistory(this.history)],
+          toolSchemas(),
+          abort.signal
         );
+        if (abort.signal.aborted) return;
         if (reply.toolCalls.length === 0) {
           const answer = reply.content || "…";
           this.history.push({ role: "assistant", content: answer });
@@ -197,23 +271,32 @@ export class Agent {
           tool_calls: reply.toolCalls,
         });
         for (const call of reply.toolCalls) {
-          const result = await this.runTool(call);
+          // After a stop the rest of the calls are answered, not run
+          const result = abort.signal.aborted
+            ? { rejected: true, note: "The person stopped this turn." }
+            : await this.runTool(call);
           this.history.push({
             role: "tool",
             tool_call_id: call.id,
             content: JSON.stringify(result),
           });
         }
+        if (abort.signal.aborted) return;
       }
       this.add({ id: nextId(), kind: "error", text: "too-many-steps" });
     } catch (caught) {
-      this.add({
-        id: nextId(),
-        kind: "error",
-        text: caught instanceof Error ? caught.message : String(caught),
-      });
+      // Stopping is the person's choice, not a failure to report
+      if (!abort.signal.aborted) {
+        this.add({
+          id: nextId(),
+          kind: "error",
+          text: caught instanceof Error ? caught.message : String(caught),
+        });
+      }
     } finally {
       this.busy = false;
+      this.abort = null;
+      this.persist();
       this.emit();
     }
   }

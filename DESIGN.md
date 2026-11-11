@@ -299,7 +299,7 @@ components:
 
 LifeUI is a heads-up display for a real day, built to the standard of a modern tool like Linear. It shows only what matters right now (what is running, for how long, and how many tempos the day has earned) and stays out of the way of everything else. The screen is mostly cool, near-white or near-black neutral surfaces separated by 1px lines. Color is scarce and every hue has one job, so a glance tells the user what kind of thing they are looking at: indigo is something you can do, green is something happening, amber is something earned.
 
-Density is moderate and deliberately calm. Each surface leads with one obvious next action, keeps running state always visible, and avoids piles of cards and metrics. The Today screen is a focus panel, not a dashboard: a large title and a tabular clock, one filled "Terminar" button, and supporting lists below. Numbers are set in Inter with tabular figures so running values never jitter.
+Density is moderate and deliberately calm. Each surface leads with one obvious next action, keeps running state always visible, and avoids piles of cards and metrics. The Today screen is a focus panel, not a dashboard: a large title and a tabular clock, with supporting lists below. Since ADR-002 the screens only show the day; every change goes through the chat column on the right (a sheet below 1280px). Numbers are set in Inter with tabular figures so running values never jitter.
 
 The system follows the operating system's light or dark preference (overridable in Ajustes) and both themes are first-class: the same token names resolve to different RGB channel values under `[data-theme="dark"]`. Nothing in the system reads as a report card; progress is shown as what was reached, never as what is missing.
 
@@ -310,7 +310,7 @@ The system follows the operating system's light or dark preference (overridable 
 - Inter Variable with tabular numerals for every changing number; weights 400/500/600 only.
 - 1px borders first, soft small shadows second; radii from 7px (controls) to 14px (panels, dialogs).
 - Sidebar at 1024px and up, bottom tab bar below; right rail for tempos and log at 1280px and up.
-- Keyboard-first on desktop (Ctrl/Cmd K, N, T, G then H/B/R/A); 36-44px touch targets on coarse pointers.
+- Keyboard on desktop for moving around (Ctrl/Cmd K, G then H/B/R/A); 36-44px touch targets on coarse pointers.
 
 ## Colors
 
@@ -483,7 +483,11 @@ The primitives in `src/app/components/ui/` are refined and restrained: quiet at 
 
 ### Focus Panel (signature)
 
-The heart of Hoy. **Running:** a 14px `panel` card with the `sm` shadow. The meta line reads "● En marcha · type · block · desde HH:MM", with the live dot and label in `live`. Below it, the title (display size) and the elapsed clock (clock size, tabular) share a baseline. An 8px-tall progress track follows: the `accent` fill shows elapsed time against the contract, an `accent/15` band marks a flexible range, `ink/50` ticks mark the estimate, minimum and maximum, and overtime extends in `accent/35`. A single kind status sentence sits under the track. The footer, on `subtle/60` behind a 1px line, holds a ghost "Ajustar" button and a large primary "Terminar" button (at least 132px wide). **Idle:** "Nada en marcha" with up to three suggestions. Only the first suggestion gets indigo treatment (an `accent/40` border, `accent/5` fill and a filled "Empezar" button); the rest are neutral rows.
+The heart of Hoy. **Running:** a 14px `panel` card with the `sm` shadow. The meta line reads "● En marcha · type · block · desde HH:MM", with the live dot and label in `live`. Below it, the title (display size) and the elapsed clock (clock size, tabular) share a baseline. An 8px-tall progress track follows: the `accent` fill shows elapsed time against the contract, an `accent/15` band marks a flexible range, `ink/50` ticks mark the estimate, minimum and maximum, and overtime extends in `accent/35`. A single kind status sentence sits under the track. The panel has no buttons: finishing and adjusting are said in the chat (ADR-002). **Idle:** "Nada en marcha" with the next items of the plan as plain rows.
+
+### Chat
+
+The column where the day changes (400px wide from 1280px, a bottom sheet below). Header: title, a "new conversation" icon button once there is something to clear, and the "Preguntar antes / Auto" segmented control; under it the model bar (name, runtime, context, GPU share, "Cambiar" and an unload icon button). The person's messages are `accent/10` bubbles aligned right; the agent's replies are plain Markdown text with no bubble. Changes already decided are one compact list on `subtle/60` (a 14px status icon and one line each, undo on the last one); a change waiting for an answer is the only card, with an `accent/50` border, `accent/5` fill and the "No" / "Hazlo" pair. The empty state offers three full-sentence suggestions as pills that send on click. While the agent works the send button becomes a neutral stop button.
 
 ### Tempo Meter (signature)
 

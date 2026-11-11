@@ -274,7 +274,12 @@ function PlanRow({ item, status, block, nowMinutes, card = false }: PlanRowProps
         </span>
       )}
       {!card && item.contract && (
-        <span className="tabular hidden shrink-0 text-sm text-ink-3 sm:block">
+        <span
+          className={cn(
+            "tabular shrink-0 text-sm text-ink-3",
+            (item.isActive || missed) && "hidden sm:block"
+          )}
+        >
           {item.contract.label}
         </span>
       )}

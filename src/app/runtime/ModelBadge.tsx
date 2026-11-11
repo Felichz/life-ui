@@ -1,5 +1,8 @@
-import { Cpu } from "lucide-react";
-import { Button } from "../components/ui/Button";
+import { useState } from "react";
+import { Cpu, Power } from "lucide-react";
+import { Button, IconButton } from "../components/ui/Button";
+import { Tooltip } from "../components/ui/Tooltip";
+import { useToast } from "../state/toast";
 import { cn } from "../lib/cn";
 import { formatNumber } from "../lib/format";
 import { isDesktop } from "../platform/desktop";
@@ -14,8 +17,26 @@ const RUNTIME_NAME = { lmstudio: "LM Studio", ollama: "Ollama" } as const;
  * context and how much of it sits on the GPU, with a way to change it.
  */
 export function ModelBadge({ className }: { className?: string }) {
-  const { model, placement, openSetup } = useModel();
+  const { model, placement, openSetup, unloadModel } = useModel();
+  const toast = useToast();
+  const [unloading, setUnloading] = useState(false);
   if (!isDesktop()) return null;
+
+  const unload = async () => {
+    if (!model) return;
+    setUnloading(true);
+    try {
+      await unloadModel();
+      toast({
+        title: t("model.badge.unloaded"),
+        description: t("model.badge.unloadedHint", { name: model.name }),
+      });
+    } catch (caught) {
+      toast({ tone: "error", title: t("model.badge.unloadFailed"), description: String(caught) });
+    } finally {
+      setUnloading(false);
+    }
+  };
 
   const details = model
     ? [
@@ -47,9 +68,23 @@ export function ModelBadge({ className }: { className?: string }) {
         </span>
         <span className="block truncate text-xs text-ink-2">{details}</span>
       </span>
-      <Button size="sm" variant="ghost" onClick={openSetup}>
-        {model ? t("model.badge.change") : t("agent.noModel.cta")}
-      </Button>
+      <span className="flex shrink-0 items-center gap-0.5">
+        <Button size="sm" variant="ghost" onClick={openSetup} disabled={unloading}>
+          {model ? t("model.badge.change") : t("agent.noModel.cta")}
+        </Button>
+        {model && (
+          <Tooltip content={t("model.badge.unload")} side="bottom">
+            <IconButton
+              label={t("model.badge.unload")}
+              size="sm"
+              disabled={unloading}
+              onClick={() => void unload()}
+            >
+              <Power />
+            </IconButton>
+          </Tooltip>
+        )}
+      </span>
     </div>
   );
 }

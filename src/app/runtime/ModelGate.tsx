@@ -73,6 +73,8 @@ interface ModelContextValue {
   placement: Placement | null;
   /** Opens the model picker again. */
   openSetup: () => void;
+  /** Frees the loaded model's memory; the choice is kept for the next launch. */
+  unloadModel: () => Promise<void>;
 }
 
 const ModelContext = createContext<ModelContextValue>({
@@ -80,6 +82,7 @@ const ModelContext = createContext<ModelContextValue>({
   model: null,
   placement: null,
   openSetup: () => {},
+  unloadModel: async () => {},
 });
 
 export const useModel = () => useContext(ModelContext);
@@ -176,6 +179,11 @@ export function ModelGate({ children }: { children: ReactNode }) {
     setError(null);
     openSetup().catch((caught) => setError(String(caught)));
   }, [openSetup]);
+  const unloadModel = useCallback(async () => {
+    if (!current) return;
+    await unload(current.model);
+    setCurrent(null);
+  }, [current]);
   return (
     <ModelContext.Provider
       value={{
@@ -183,6 +191,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
         model: current?.model ?? null,
         placement: current?.placement ?? null,
         openSetup: reopen,
+        unloadModel,
       }}
     >
       {children}

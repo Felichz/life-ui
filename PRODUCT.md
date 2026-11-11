@@ -8,7 +8,7 @@ web
 
 ## Users
 
-Primary: the author, using the app throughout the whole day to decide what to do next, run one thing at a time, and close each activity honestly. Used equally on desktop/laptop (a tab left open while working) and on the phone (starting and closing things away from the desk).
+Primary: the author, using the app throughout the whole day to decide what to do next, run one thing at a time, and close each activity honestly. Used on desktop/laptop as a desktop app (Tauri) with a local model, and as a web build (cloud models) on the phone.
 
 Later: other people who want the same kind of support. The product is personal today but should be understandable to a stranger without the author explaining it — no private jargon left unexplained, no dead ends that only the author knows how to escape.
 
@@ -16,7 +16,7 @@ Later: other people who want the same kind of support. The product is personal t
 
 LifeUI is "a UI for real life": like a game HUD, it shows the information that matters about the day without replacing the day. Life is the only real game; the app is only its interface.
 
-The loop: plan the day (library → time blocks), focus on exactly one active activity, close it through a single honest ritual (self-assessed satisfaction 0–10), and receive tempos. Tempos are an immutable reward, never a currency: they only go up, they never drain, and free time costs nothing.
+The loop: plan the day (library → time blocks), focus on exactly one active activity, close it honestly, and receive tempos. Since ADR-002 the person does all of this by talking to an agent in a chat column; the screens only show the day. The close is the person saying how it went in their own words, from which the agent infers the 0–10 satisfaction (never asked as a number). Tempos are an immutable reward, never a currency: they only go up, they never drain, and free time costs nothing.
 
 Success: the user keeps opening the app because each honest close feels good, and the daily picture (tempos, % of reference, satisfaction, timeline) tells them something true about their day.
 
@@ -34,7 +34,7 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 - Timeline of the day: completed and interrupted activities, the running one, events.
 - Overview: day metrics (tempos, % of reference, completed count, average satisfaction) and multi-day trends.
 - Settings: daily tempo reference (default 100), export / import JSON, clear data.
-- Offline-first; localStorage is the only source of truth.
+- Offline-first. The web build keeps its state in localStorage; the desktop app keeps it in a file (ADR-003). The agent runs on a local model through LM Studio or Ollama (ADR-004), or a cloud provider (ADR-005).
 - Bilingual UI: English and Spanish, switchable at any time; the first launch is in English and a saved choice wins after that. Spanish is the reference copy; English must stay equivalent in tone (kind, never judging).
 
 ## Capabilities and Constraints
@@ -53,7 +53,7 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 ## Evidence on Hand
 
 - No real user data, testimonials, or metrics exist. Anything shown as sample data must be clearly synthetic.
-- Product docs: `docs/adr/001-tempo-system.md` (tempo system decision record) and the original vision and flows in `docs/archive/`.
+- Product docs: `docs/adr/` (001 tempo system, 002 agent-mediated app, 003 desktop shell, 004 local model runtime, 005 model providers, 006 scheduled times), `AGENT.md` (the agent's prompt) and the original vision and flows in `docs/archive/`.
 
 ## Product Principles
 

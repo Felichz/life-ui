@@ -18,6 +18,7 @@ import { Kbd } from "../../components/ui/Kbd";
 import { Segmented } from "../../components/ui/Segmented";
 import { modKeyLabel } from "../../lib/useHotkey";
 import { errorMessage, useSystem } from "../../state/system";
+import { useAgent } from "../../agent/AgentProvider";
 import { useTheme, type ThemePreference } from "../../state/theme";
 import { useToast } from "../../state/toast";
 import { LOCALES, LOCALE_NAMES, t, useLocale, type Locale } from "../../i18n";
@@ -188,6 +189,7 @@ function LanguageSection() {
 
 function DataSection() {
   const { core, state } = useSystem();
+  const { agent } = useAgent();
   const toast = useToast();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -217,6 +219,8 @@ function DataSection() {
     if (!pendingImport) return;
     try {
       core.importData(pendingImport.json);
+      // The conversation was about the data that was just replaced
+      agent.clear();
       toast({ title: t("settings.data.imported") });
       setPendingImport(null);
       navigate("/");
@@ -232,6 +236,7 @@ function DataSection() {
 
   const confirmClear = () => {
     core.clearState();
+    agent.clear();
     setClearing(false);
     setConfirmText("");
     toast({ title: t("settings.data.cleared"), description: t("settings.data.clearedHint") });
