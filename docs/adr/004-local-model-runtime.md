@@ -64,6 +64,10 @@ The loaded model is always visible: a bar at the top of the chat and a "Model" s
 
 Next to "Change" there is an unload button (2026-11-11): it frees the model's memory in its runtime and leaves the chat at "No model loaded". The choice is kept, so the next launch asks to load it again.
 
+### 8. Measured beats estimated (2026-11-11)
+
+LM Studio's estimate runs high. On the author's PC it gave 7.16 GiB for Qwen3.5 9B at 8K context, and the load took 6.2 GiB (0.9 to 7.1 of 8.0 GiB), running at 56 tokens/s. That gap is enough to tell the person a model "does not fit" when it does. So after a load that leaves room on the GPU, the app keeps what the model really took (per model and context, `lifeui.modelMemory`) and uses it instead of the estimate from then on; the same load is reported as 100% on the GPU. A load that fills the GPU is not trusted, because part of it may have spilled. The first load of a model still relies on the estimate.
+
 ## Consequences
 
 - The load dialog is the first screen of each session when no model is loaded.

@@ -139,8 +139,52 @@ export async function listModels(runtimes: Runtimes): Promise<LocalModel[]> {
     .sort((a, b) => Number(b.toolUse) - Number(a.toolUse) || a.name.localeCompare(b.name));
 }
 
+const MEASURED_KEY = "lifeui.modelMemory";
+const measuredId = (model: LocalModel, context: number) =>
+  `${model.runtime}:${model.key}:${context}`;
+
+/**
+ * What a model really took on the GPU the last time it loaded entirely there.
+ * LM Studio's own estimate runs high (about 1 GiB for a 9B model on the
+ * author's PC), enough to call a model that fits "too big for the GPU".
+ */
+export function measuredNeed(model: LocalModel, context = AGENT_CONTEXT): number | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(MEASURED_KEY) ?? "{}") as Record<string, number>;
+    const bytes = all[measuredId(model, context)];
+    return typeof bytes === "number" && bytes > 0 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberNeed(model: LocalModel, context: number, bytes: number) {
+  try {
+    const all = JSON.parse(localStorage.getItem(MEASURED_KEY) ?? "{}") as Record<string, number>;
+    all[measuredId(model, context)] = Math.round(bytes);
+    localStorage.setItem(MEASURED_KEY, JSON.stringify(all));
+  } catch {
+    // the runtime's estimate is used next time
+  }
+}
+
+/**
+ * A full-GPU load measured this much and left room to spare: the number is
+ * the model's real need. A load that filled the GPU may have spilled, so it
+ * says nothing.
+ */
+export function trustedMeasure(
+  usedBytes: number,
+  freeAfterBytes: number,
+  model: LocalModel
+): boolean {
+  return freeAfterBytes > GPU_MARGIN && usedBytes > 0.8 * model.sizeBytes;
+}
+
 /** Bytes the model needs on the GPU to load entirely there. */
 export async function estimate(model: LocalModel, context = AGENT_CONTEXT): Promise<number> {
+  const measured = measuredNeed(model, context);
+  if (measured) return measured;
   if (model.runtime === "lmstudio") {
     const result = await invoke<{ gpu_bytes: number | null }>("lmstudio_estimate", {
       model: model.key,
@@ -232,6 +276,11 @@ export async function load(
     });
     const after = await systemResources();
     const used = (after.gpus[0]?.vram_used ?? 0) - (before.gpus[0]?.vram_used ?? 0);
+    // Room left after a load means all of it is on the GPU, whatever the estimate said
+    if (trustedMeasure(used, after.gpus[0]?.vram_free ?? 0, model)) {
+      rememberNeed(model, context, used);
+      return { onGpu: 1 };
+    }
     return { onGpu: Math.max(0, Math.min(1, used / needBytes)) };
   }
   await desktopFetch(`${OLLAMA}/api/generate`, {
