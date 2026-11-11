@@ -179,12 +179,9 @@ function Idle({ suggestions }: { suggestions: PlanItem[] }) {
         {suggestions.length > 0 ? t("focus.idle.next") : t("focus.idle.empty")}
       </p>
       {suggestions.length > 0 && (
-        <ul className="mt-4 flex flex-col gap-1.5">
+        <ul className="mt-4 divide-y divide-line border-t border-line">
           {suggestions.map((item) => (
-            <li
-              key={item.instance.id}
-              className="flex items-center gap-3 rounded-lg border border-line px-3 py-2.5"
-            >
+            <li key={item.instance.id} className="flex items-center gap-3 py-2.5 last:pb-0">
               <TypeIcon type={item.type} boxed />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base font-medium text-ink">{item.title}</span>

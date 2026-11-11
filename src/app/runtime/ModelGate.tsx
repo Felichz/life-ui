@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { ModelEndpoint } from "../agent/llm";
-import { AlertTriangle, Check, Cpu, HardDrive, MemoryStick, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  Cpu,
+  HardDrive,
+  MemoryStick,
+  Wrench,
+} from "lucide-react";
 import { Button } from "../components/ui/Button";
 import {
   Dialog,
@@ -321,15 +329,16 @@ function Setup({
                     </span>
                   </span>
                   {m.toolUse ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-success/10 px-1.5 py-0.5 text-xs text-success">
-                      <Wrench className="size-3" />
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-2">
+                      <Wrench className="size-3 text-ink-3" />
                       {t("model.tools")}
                     </span>
                   ) : (
-                    <span className="rounded bg-hover px-1.5 py-0.5 text-xs text-ink-3">
+                    <span className="shrink-0 rounded bg-hover px-1.5 py-0.5 text-xs text-ink-3">
                       {t("model.noTools")}
                     </span>
                   )}
+                  <ChevronRight className="size-4 shrink-0 text-ink-3" />
                 </button>
               </li>
             ))}
@@ -354,7 +363,8 @@ const VERDICT: Record<Verdict, { title: MessageKey; body: MessageKey; tone: stri
   offload: {
     title: "model.verdict.offload",
     body: "model.verdict.offloadBody",
-    tone: "bg-tempo/15 text-tempo-ink",
+    // Amber is for tempos only: a slower load is a neutral notice
+    tone: "bg-hover text-ink",
   },
   "too-big": {
     title: "model.verdict.tooBig",

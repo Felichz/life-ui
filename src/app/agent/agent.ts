@@ -22,6 +22,8 @@ export type Entry =
       summary: string;
       status: "pending" | "running" | "done" | "rejected" | "error" | "undone";
       error?: string;
+      /** Tempos the change earns: the preview while it waits, the real ones once done. */
+      tempos?: number;
     }
   | { id: string; kind: "error"; text: string };
 
@@ -85,13 +87,21 @@ export class Agent {
   /** The state before the last executed change, for undo. */
   private lastUndo: { entryId: string; snapshot: string } | null = null;
   private abort: AbortController | null = null;
+  /** Entries that came back from a previous session: shown without their entrance. */
+  private restored = new Set<string>();
 
   constructor(private readonly options: AgentOptions) {
     const saved = options.store?.load();
     if (saved) {
       this.entries = saved.entries;
       this.history = saved.history;
+      this.restored = new Set(saved.entries.map((entry) => entry.id));
     }
+  }
+
+  /** Added in this session (not restored from the last one). */
+  isFresh(entryId: string): boolean {
+    return !this.restored.has(entryId);
   }
 
   /** Written only between turns, so what is kept is always a whole exchange. */
@@ -201,8 +211,11 @@ export class Agent {
     }
 
     let summary: string;
+    let tempos: number | undefined;
     try {
-      summary = tool.describe?.(ctx, args) ?? tool.name;
+      const described = tool.describe?.(ctx, args) ?? tool.name;
+      if (typeof described === "string") summary = described;
+      else ({ text: summary, tempos } = described);
     } catch (caught) {
       return failure(caught);
     }
@@ -212,6 +225,7 @@ export class Agent {
       name: tool.name,
       summary,
       status: "pending",
+      ...(tempos !== undefined ? { tempos } : {}),
     });
 
     if (this.mode === "confirm" || tool.alwaysConfirm) {
@@ -227,7 +241,12 @@ export class Agent {
     try {
       const result = tool.run(ctx, args);
       this.lastUndo = { entryId: entry.id, snapshot };
-      this.patch(entry.id, { status: "done" });
+      // The card promised a preview; once done it shows what the core awarded
+      const earned = (result as { tempos_earned?: unknown } | undefined)?.tempos_earned;
+      this.patch(entry.id, {
+        status: "done",
+        ...(typeof earned === "number" ? { tempos: earned } : {}),
+      });
       return result ?? { ok: true };
     } catch (caught) {
       // A change that fails halfway leaves nothing behind (an activity created

@@ -95,6 +95,14 @@ export default {
           "0%": { transform: "scale(1)", opacity: "0.55" },
           "100%": { transform: "scale(2.6)", opacity: "0" },
         },
+        "entry-in": {
+          from: { opacity: "0", transform: "translateY(6px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        thinking: {
+          "0%, 60%, 100%": { opacity: "0.3", transform: "translateY(0)" },
+          "30%": { opacity: "1", transform: "translateY(-2px)" },
+        },
         "tempo-bump": {
           "0%": { transform: "scale(1)" },
           "35%": { transform: "scale(1.12)" },
@@ -109,6 +117,8 @@ export default {
         "pop-in": "pop-in 140ms cubic-bezier(0.16, 1, 0.3, 1)",
         "toast-in": "toast-in 220ms cubic-bezier(0.16, 1, 0.3, 1)",
         ring: "ring 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite",
+        "entry-in": "entry-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both",
+        thinking: "thinking 1.2s ease-in-out infinite",
         "tempo-bump": "tempo-bump 520ms cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },

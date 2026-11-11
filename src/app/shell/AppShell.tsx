@@ -84,7 +84,8 @@ function MobileChat({ raised }: { raised: boolean }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent variant="sheet" aria-describedby={undefined} className="p-0">
           <DialogTitle className="sr-only">{t("agent.title")}</DialogTitle>
-          <ChatPanel className="h-[80dvh]" />
+          {/* The sheet draws its own close button over the header's right end */}
+          <ChatPanel className="h-[80dvh] [&>header]:pr-12" />
         </DialogContent>
       </Dialog>
     </>

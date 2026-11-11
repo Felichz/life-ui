@@ -28,8 +28,8 @@ export interface Tool {
   /** Asks even in auto mode (ADR-002): deleting, ending the day. */
   alwaysConfirm?: boolean;
   run: (ctx: ToolContext, args: Args) => unknown;
-  /** One line for the card, in the person's language. */
-  describe?: (ctx: ToolContext, args: Args) => string;
+  /** One line for the card, in the person's language, and the tempos it would earn. */
+  describe?: (ctx: ToolContext, args: Args) => string | { text: string; tempos?: number };
 }
 
 /** A refusal the model can read and recover from, like the core's codes. */
@@ -446,11 +446,10 @@ export const TOOLS: Tool[] = [
         tempos_today: result.dailyTempoTotal,
       };
     },
-    describe: ({ core, now }, args) =>
-      t("agent.tool.finish", {
-        title: runningTitle(core),
-        tempos: previewTempos(core, Math.round(num(args.satisfaction) ?? 0), now()),
-      }),
+    describe: ({ core, now }, args) => ({
+      text: t("agent.tool.finish", { title: runningTitle(core) }),
+      tempos: previewTempos(core, Math.round(num(args.satisfaction) ?? 0), now()),
+    }),
   },
   {
     name: "stop_activity",
