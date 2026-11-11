@@ -72,7 +72,7 @@ LM Studio's estimate runs high. On the author's PC it gave 7.16 GiB for Qwen3.5 
 
 The context was fixed at 16K. Now the load dialog has a slider (4K, 8K, 12K, 16K, 24K, 32K, capped by the model's own maximum) and everything in the dialog follows it as it moves: the memory needed, the bar, the verdict and the list of what to close.
 
-- **Automatic by default:** the largest context that fits entirely on the GPU right now, and never less than 8K, which is the least that leaves room to talk after the agent's own 3.4K. A context chosen by hand is remembered per model; "Use automatic" goes back.
+- **Automatic by default:** the largest context that fits entirely on the GPU right now, and never less than 12K. The agent's own prompt and tools take about 5.4K since ADR-009 (they took 3.4K, and the floor was 8K), so 8K would leave under 2K to talk. A context chosen by hand is remembered per model; "Use automatic" goes back.
 - **In perspective:** under the slider, what the number means: about how many words and pages it is, how much the agent uses, and how many messages are left before a compaction.
 - **Estimates:** the need at every stop is asked from the runtime at once. A measured load (section 8) also records how far over the estimate ran, and that excess is taken off the model's other contexts. Before any measurement LM Studio's estimate is taken 10% lower, from the two points measured on the author's PC (13% and 14% over); this is one PC and one model, and a first load can still be off.
 - **Loaded elsewhere:** a model already loaded from LM Studio is used with the context it has there (`lms ps` reports it), not the one the app would have chosen.

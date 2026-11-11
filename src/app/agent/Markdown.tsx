@@ -1,5 +1,6 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { isDesktop, openExternal } from "../platform/desktop";
 
 /**
  * The agent's replies are Markdown. Rendered with the app's own type, no raw
@@ -28,7 +29,18 @@ const components: Components = {
     </pre>
   ),
   a: ({ children, href }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-accent-ink underline">
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      // The desktop window has no tabs: the link goes to the person's browser
+      onClick={(event) => {
+        if (!isDesktop() || !href) return;
+        event.preventDefault();
+        void openExternal(href);
+      }}
+      className="text-accent-ink underline underline-offset-2"
+    >
       {children}
     </a>
   ),

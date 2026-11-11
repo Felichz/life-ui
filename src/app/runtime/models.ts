@@ -52,8 +52,12 @@ export const AGENT_CONTEXT = 16384;
 
 /** The contexts the load dialog offers; a model's own maximum caps the list. */
 const CONTEXT_STOPS = [4096, 8192, 12288, 16384, 24576, 32768];
-/** Below this the agent's own instructions leave too little room to talk. */
-export const MIN_USEFUL_CONTEXT = 8192;
+/**
+ * Below this the agent's own instructions leave too little room to talk: the
+ * prompt and the tools take about 5.4K tokens since the coach and the web
+ * search (ADR-009), so 8K would leave under 2K for the conversation.
+ */
+export const MIN_USEFUL_CONTEXT = 12288;
 
 export function contextStops(model: LocalModel): number[] {
   const stops = CONTEXT_STOPS.filter((stop) => !model.maxContext || stop <= model.maxContext);

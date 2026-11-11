@@ -19,6 +19,7 @@ import {
   FileText,
   FoldVertical,
   GitBranch,
+  Globe,
   History,
   Loader2,
   Paperclip,
@@ -623,8 +624,10 @@ function useEntrance(entryId: string): string | false {
   return agent.isFresh(entryId) && "animate-entry-in";
 }
 
-function StatusIcon({ status }: { status: ToolEntry["status"] }) {
+function StatusIcon({ status, external }: { status: ToolEntry["status"]; external?: boolean }) {
   const className = "mt-0.5 size-3.5 shrink-0";
+  // A search changed nothing: it reads as a lookup, not as a change that went through
+  if (status === "done" && external) return <Globe className={cn(className, "text-ink-3")} />;
   if (status === "done") return <Check className={cn(className, "text-success")} />;
   if (status === "running") return <Loader2 className={cn(className, "animate-spin text-ink-3")} />;
   if (status === "error") return <TriangleAlert className={cn(className, "text-danger")} />;
@@ -653,7 +656,7 @@ function ToolRow({ entry }: { entry: ToolEntry }) {
   const quiet = entry.status === "rejected" || entry.status === "undone";
   return (
     <li className={cn("flex min-h-7 items-start gap-2 py-1", entrance)}>
-      <StatusIcon status={entry.status} />
+      <StatusIcon status={entry.status} external={entry.external} />
       <span className="min-w-0 flex-1 text-sm">
         <span
           className={cn(
@@ -907,6 +910,8 @@ function EntryView({
         {entry.summary}
         {entry.tempos !== undefined && <TempoBadge tempos={entry.tempos} />}
       </p>
+      {/* The first search asks: what leaves the machine, and where it goes */}
+      {entry.external && <p className="mt-1 text-xs text-ink-2">{t("agent.web.ask")}</p>}
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <span className="text-xs text-ink-2">{t(STATUS[entry.status])}</span>
         <span className="flex gap-1.5">
@@ -914,7 +919,7 @@ function EntryView({
             {t("agent.reject")}
           </Button>
           <Button size="sm" variant="primary" onClick={() => agent.decide(entry.id, true)}>
-            {t("agent.accept")}
+            {t(entry.external ? "agent.web.allow" : "agent.accept")}
           </Button>
         </span>
       </div>

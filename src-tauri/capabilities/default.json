@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window: core APIs and HTTP to local model runtimes and cloud providers",
+  "description": "The main window: core APIs, HTTP to local model runtimes, cloud providers and web search, and opening links in the browser",
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "opener:allow-open-url",
     {
       "identifier": "http:default",
       "allow": [

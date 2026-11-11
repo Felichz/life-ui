@@ -25,6 +25,19 @@ export async function desktopFetch(input: string, init?: RequestInit): Promise<R
   return rustFetch(input, init);
 }
 
+/** Opens a link in the person's browser (the app's own window never navigates away). */
+export async function openExternal(url: string): Promise<void> {
+  if (!/^https?:\/\//.test(url)) return;
+  if (
+    (window as unknown as { __TAURI_INTERNALS__?: { mock?: boolean } }).__TAURI_INTERNALS__?.mock
+  ) {
+    window.open(url, "_blank", "noreferrer");
+    return;
+  }
+  const { openUrl } = await import("@tauri-apps/plugin-opener");
+  await openUrl(url);
+}
+
 /**
  * Moves the persisted state to a file in the app's data folder. The file is
  * read once before the core starts; afterwards the core reads the in-memory
