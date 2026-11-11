@@ -85,7 +85,11 @@ export function DialogDescription({
 
 export function DialogBody({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-3", className)}>{children}</div>
+    // When a caller lays the body out as a column, its parts must keep their
+    // height and the body scroll, instead of the parts being squeezed to fit
+    <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-3 [&>*]:shrink-0", className)}>
+      {children}
+    </div>
   );
 }
 
