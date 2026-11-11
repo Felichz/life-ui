@@ -87,10 +87,23 @@ export function ChatPanel({ className }: { className?: string }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // The list follows the newest text only while the person is at the bottom:
+  // scrolling up to read stops it, and coming back down resumes it
+  const following = useRef(true);
+  const onScroll = () => {
+    const list = listRef.current;
+    if (list) following.current = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+  };
   useEffect(() => {
     const list = listRef.current;
+    if (list && following.current) list.scrollTop = list.scrollHeight;
+  }, [entries, busy]);
+  // Opening the conversation, or sending a message, always goes to the end
+  useEffect(() => {
+    following.current = true;
+    const list = listRef.current;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [entries, busy, view]);
+  }, [view, entries.length === 0]);
 
   const waiting = entries.some((e) => e.kind === "tool" && e.status === "pending");
   // The day's snapshot is part of what is sent, so the count follows the day too
@@ -103,6 +116,7 @@ export function ChatPanel({ className }: { className?: string }) {
 
   const send = (text = draft) => {
     if ((!text.trim() && files.length === 0) || busy || !available || blocked) return;
+    following.current = true;
     void agent.send(text, files);
     setDraft("");
     setFiles([]);
@@ -227,6 +241,7 @@ export function ChatPanel({ className }: { className?: string }) {
           {/* The last lines fade out under the composer instead of meeting a hard rule */}
           <div
             ref={listRef}
+            onScroll={onScroll}
             className="fade-bottom flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 pb-7 pt-5"
             aria-live="polite"
           >
