@@ -217,6 +217,10 @@ export class SystemCore implements ISystemCore {
   /**
    * Moves an activity instance to another block
    */
+  public scheduleActivityInstance(id: UUID, minute: DayMinutes | null): ActivityInstance {
+    return this.activityManager.scheduleActivityInstance(id, minute);
+  }
+
   public moveActivityInstance(id: UUID, targetBlockId: UUID, newOrder?: number): ActivityInstance {
     return this.activityManager.moveActivityInstance(id, targetBlockId, newOrder);
   }
@@ -248,7 +252,7 @@ export class SystemCore implements ISystemCore {
    */
   public completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
+    assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
   ): CompletionResult {
     return this.activityManager.completeActivity(activityId, assessment);
   }

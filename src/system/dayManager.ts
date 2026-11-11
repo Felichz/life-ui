@@ -100,9 +100,14 @@ export class DayManager {
 
       // Save the pending activities before clearing the current day
       // Make sure we only save activities that are not active
-      const pendingActivities = state.currentDay.activityInstances.filter(
-        (instance) => instance.state !== "active"
-      );
+      // A planned time belongs to its day (ADR-006)
+      const pendingActivities = state.currentDay.activityInstances
+        .filter((instance) => instance.state !== "active")
+        .map((instance) => {
+          if (instance.scheduledStart === undefined) return instance;
+          const { scheduledStart: _, ...rest } = instance;
+          return rest;
+        });
 
       // Initialize the field if it does not exist
       if (!state.global.pendingActivityInstances) {

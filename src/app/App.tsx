@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-r
 import type { ISystemCore } from "../types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ModelGate } from "./runtime/ModelGate";
+import { AgentProvider } from "./agent/AgentProvider";
+import type { ChatFn } from "./agent/agent";
 import { LocaleProvider, type Locale } from "./i18n";
 import { TooltipProvider } from "./components/ui/Tooltip";
 import { LibraryPage } from "./features/library/LibraryPage";
@@ -22,11 +24,14 @@ export function AppProviders({
   children,
   core,
   locale,
+  agentChat,
 }: {
   children: ReactNode;
   core?: ISystemCore;
   /** Pins the language (tests); otherwise it is detected and remembered. */
   locale?: Locale;
+  /** A scripted model for the agent (tests); otherwise the loaded model. */
+  agentChat?: ChatFn;
 }) {
   return (
     <LocaleProvider initial={locale}>
@@ -34,7 +39,12 @@ export function AppProviders({
         <SystemProvider core={core}>
           <TooltipProvider delayDuration={400} skipDelayDuration={200}>
             <ToastProvider>
-              <ClosingFlowProvider>{children}</ClosingFlowProvider>
+              <ClosingFlowProvider>
+                {/* The web build and tests skip the model gate: no local model there */}
+                <ModelGate>
+                  <AgentProvider chat={agentChat}>{children}</AgentProvider>
+                </ModelGate>
+              </ClosingFlowProvider>
             </ToastProvider>
           </TooltipProvider>
         </SystemProvider>
@@ -89,11 +99,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProviders>
-        <ModelGate>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </ModelGate>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
       </AppProviders>
     </ErrorBoundary>
   );

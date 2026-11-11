@@ -526,6 +526,57 @@ export const es = {
   "model.gpu.loading": "Viendo qué usa la GPU…",
   "model.gpu.unavailable": "No se puede ver qué programas usan la GPU.",
   "model.gpu.missing": "Para que quepa entero hay que liberar {size}",
+
+  // The agent and its chat (ADR-002)
+  "agent.tool.startDay": "Empezar el día",
+  "agent.tool.endDay": "Terminar el día",
+  "agent.tool.add": "Añadir «{title}» · {where}",
+  "agent.tool.schedule": "Planear «{title}» a las {time}",
+  "agent.tool.unschedule": "Quitarle la hora a «{title}»",
+  "agent.tool.move": "Mover «{title}» a {block}",
+  "agent.tool.remove": "Sacar «{title}» del plan",
+  "agent.tool.start": "Empezar «{title}»",
+  "agent.tool.finish": "Cerrar «{title}» · +{tempos} tempos",
+  "agent.tool.stop": "Parar «{title}», sin terminar",
+  "agent.tool.event": "Registrar «{name}»",
+  "agent.tool.delete": "Borrar «{title}» de la biblioteca",
+  "agent.title": "Chat",
+  "agent.placeholder": "Dile a LifeUI qué quieres hacer…",
+  "agent.send": "Enviar",
+  "agent.mode": "Cambios",
+  "agent.mode.confirm": "Preguntar antes",
+  "agent.mode.auto": "Auto",
+  "agent.mode.autoHint":
+    "Los cambios se hacen al momento. Borrar y terminar el día siguen preguntando.",
+  "agent.accept": "Hazlo",
+  "agent.reject": "No",
+  "agent.undo": "Deshacer",
+  "agent.status.pending": "Esperando tu respuesta",
+  "agent.status.running": "Haciéndolo…",
+  "agent.status.done": "Hecho",
+  "agent.status.rejected": "No se hizo",
+  "agent.status.error": "No se pudo",
+  "agent.status.undone": "Deshecho",
+  "agent.thinking": "Pensando…",
+  "agent.empty.title": "¿Qué quieres hacer hoy?",
+  "agent.empty.body":
+    "Escríbelo como lo dirías: «empiezo el día», «el informe a las 15», «terminé, salió bien».",
+  "agent.noModel.title": "No hay modelo cargado",
+  "agent.noModel.body": "LifeUI necesita un modelo para entenderte.",
+  "agent.noModel.cta": "Elegir modelo",
+  "agent.webModel":
+    "Los proveedores en la nube para la versión web llegan pronto. Usa la app de escritorio con un modelo local.",
+  "agent.error": "El modelo no respondió: {error}",
+  "agent.error.steps": "Me perdí haciendo eso. ¿Me lo dices de otra forma?",
+  "agent.open": "Hablar con LifeUI",
+  "focus.idle.next": "Lo siguiente en tu plan. Dile a LifeUI cuando empieces algo.",
+  "focus.idle.empty": "Tiempo libre. Cuando quieras hacer algo, díselo a LifeUI en el chat.",
+  "plan.pastNoticeChat":
+    "Este bloque ya pasó. Pídele a LifeUI que las mueva si todavía quieres hacerlas.",
+  "plan.emptyChat": "Nada aquí todavía.",
+  "plan.timePassed": "Se pasó la hora",
+  "start.chatHint":
+    "Cuando quieras empezar el día, díselo a LifeUI en el chat, por ejemplo «empiezo el día».",
 } as const;
 
 export type MessageKey = keyof typeof es;

@@ -111,6 +111,13 @@ export interface ActivityInstance {
   // Time data (only for the active activity)
   startTime?: ISODateTimeString;
 
+  /**
+   * Planned start, in minutes of the day (ADR-006). A plan, not a gate: the
+   * block still decides when it can start. Cleared when the activity carries
+   * over to another day.
+   */
+  scheduledStart?: DayMinutes;
+
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
 }
@@ -159,6 +166,8 @@ export interface CompletedActivityRecord {
   dayId: UUID;
 
   createdAt: ISODateTimeString;
+  /** What the person said about how it went, in their words (ADR-002). */
+  closingNote?: string;
 }
 
 /**
@@ -487,8 +496,9 @@ export interface ISystemCore {
   requestCompletion(activityId: UUID): CompletionRequest;
   completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
+    assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
   ): CompletionResult;
+  scheduleActivityInstance(id: UUID, minute: DayMinutes | null): ActivityInstance;
   interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 

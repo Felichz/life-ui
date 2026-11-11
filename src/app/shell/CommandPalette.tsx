@@ -4,29 +4,19 @@ import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   CalendarCheck2,
-  CircleStop,
   CornerDownLeft,
-  Flag,
   Languages,
   Library,
   Monitor,
   Moon,
-  Play,
   Plus,
   Search,
   Settings,
   Sun,
-  Sunrise,
 } from "lucide-react";
 import { LOCALES, LOCALE_NAMES, t, useLocale } from "../i18n";
-import { TypeIcon } from "../components/TypeIcon";
 import { Kbd } from "../components/ui/Kbd";
 import { cn } from "../lib/cn";
-import { blockStatus, contractOf, planItem, sortBlocks, templateMap } from "../lib/domain";
-import { minutesOfDay } from "../lib/format";
-import { useDayActions } from "../state/actions";
-import { useClosingFlow } from "../state/closing";
-import { useSystem } from "../state/system";
 import { useTheme } from "../state/theme";
 import { useShell } from "./ShellContext";
 
@@ -188,99 +178,15 @@ export function CommandPalette({
 }
 
 function useCommands(): Command[] {
-  const { state, core } = useSystem();
-  const { startInstance, startTemplate, logEvent } = useDayActions();
-  const { requestClose } = useClosingFlow();
-  const { openAddActivity, openTemplateEditor } = useShell();
+  const { openTemplateEditor } = useShell();
   const { setPreference } = useTheme();
   const navigate = useNavigate();
   const { locale, setLocale } = useLocale();
 
   return useMemo(() => {
     const list: Command[] = [];
-    const day = state.currentDay;
-    const templates = templateMap(state);
-    const nowMinutes = minutesOfDay(new Date());
 
-    if (day) {
-      const activeId = day.activeActivityInstanceId;
-      if (activeId) {
-        const active = day.activityInstances.find((item) => item.id === activeId);
-        const title = active ? templates.get(active.templateId)?.title : undefined;
-        list.push({
-          id: "close-active",
-          group: t("palette.group.running"),
-          label: t("palette.finish", { title: title ?? t("activity.fallbackName") }),
-          icon: <CircleStop />,
-          keywords: t("palette.kw.finish"),
-          run: () => requestClose(),
-        });
-      }
-
-      list.push({
-        id: "add",
-        group: t("palette.group.plan"),
-        label: t("palette.addActivity"),
-        icon: <Plus />,
-        shortcut: ["N"],
-        keywords: t("palette.kw.add"),
-        run: () => openAddActivity(),
-      });
-
-      for (const block of sortBlocks(core.getTimeBlocks())) {
-        const status = blockStatus(block, nowMinutes);
-        if (status !== "always" && status !== "now") continue;
-        for (const instance of day.activityInstances.filter((item) => item.blockId === block.id)) {
-          if (instance.id === activeId) continue;
-          const item = planItem(instance, templates);
-          list.push({
-            id: `start-${instance.id}`,
-            group: t("palette.group.startPlan"),
-            label: item.title,
-            hint: item.contract?.label,
-            icon: <Play />,
-            keywords: t("palette.kw.start"),
-            run: () => startInstance(instance.id),
-          });
-        }
-      }
-
-      for (const template of state.global.activityTemplates) {
-        list.push({
-          id: `start-template-${template.id}`,
-          group: t("palette.group.startNow"),
-          label: template.title,
-          hint: contractOf(template.type, template)?.label,
-          icon: <TypeIcon type={template.type} />,
-          keywords: t("palette.kw.startLibrary"),
-          run: () => startTemplate(template.id),
-        });
-      }
-
-      for (const event of state.global.eventTemplates) {
-        list.push({
-          id: `event-${event.id}`,
-          group: t("palette.group.logEvent"),
-          label: event.name,
-          icon: <Flag />,
-          keywords: t("palette.kw.event"),
-          run: () => logEvent(event.id),
-        });
-      }
-    } else {
-      list.push({
-        id: "start-day",
-        group: t("palette.group.day"),
-        label: t("start.cta"),
-        icon: <Sunrise />,
-        keywords: t("palette.kw.startDay"),
-        run: () => {
-          core.startDay();
-          navigate("/");
-        },
-      });
-    }
-
+    // Changes to the day go through the chat (ADR-002): the palette navigates and sets preferences
     list.push(
       {
         id: "go-today",
@@ -365,18 +271,5 @@ function useCommands(): Command[] {
     );
 
     return list;
-  }, [
-    core,
-    logEvent,
-    navigate,
-    openAddActivity,
-    openTemplateEditor,
-    requestClose,
-    setPreference,
-    locale,
-    setLocale,
-    startInstance,
-    startTemplate,
-    state,
-  ]);
+  }, [navigate, openTemplateEditor, setPreference, locale, setLocale]);
 }

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import type { ModelEndpoint } from "../agent/llm";
 import { AlertTriangle, Check, Cpu, HardDrive, MemoryStick, Wrench } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import {
@@ -51,6 +52,28 @@ type Step =
 
 const RUNTIME_NAME: Record<RuntimeId, string> = { lmstudio: "LM Studio", ollama: "Ollama" };
 
+const BASE_URL: Record<RuntimeId, string> = {
+  lmstudio: "http://127.0.0.1:1234/v1",
+  ollama: "http://127.0.0.1:11434/v1",
+};
+
+const endpointFor = (model: LocalModel): ModelEndpoint => ({
+  baseUrl: BASE_URL[model.runtime],
+  model: model.key,
+  context: AGENT_CONTEXT,
+});
+
+interface ModelContextValue {
+  /** The loaded model the agent talks to, or null. */
+  endpoint: ModelEndpoint | null;
+  /** Opens the model picker again. */
+  openSetup: () => void;
+}
+
+const ModelContext = createContext<ModelContextValue>({ endpoint: null, openSetup: () => {} });
+
+export const useModel = () => useContext(ModelContext);
+
 /**
  * The desktop app's way in (ADR-004): pick a downloaded model the first time,
  * and on every launch ask before loading it, showing whether it fits on the
@@ -61,6 +84,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
     isDesktop() ? { kind: "checking" } : { kind: "done" }
   );
   const [error, setError] = useState<string | null>(null);
+  const [endpoint, setEndpoint] = useState<ModelEndpoint | null>(null);
 
   const openSetup = useCallback(async () => {
     const runtimes = await runtimeStatus();
@@ -68,7 +92,10 @@ export function ModelGate({ children }: { children: ReactNode }) {
   }, []);
 
   const prepareLoad = useCallback(async (model: LocalModel) => {
-    if (await isLoaded(model)) return setStep({ kind: "done" });
+    if (await isLoaded(model)) {
+      setEndpoint(endpointFor(model));
+      return setStep({ kind: "done" });
+    }
     const resources = await systemResources();
     setStep({ kind: "load", model, resources, need: null });
     const need = await estimate(model).catch(() => null);
@@ -123,8 +150,12 @@ export function ModelGate({ children }: { children: ReactNode }) {
   };
 
   const open = step.kind !== "done";
+  const reopen = useCallback(() => {
+    setError(null);
+    openSetup().catch((caught) => setError(String(caught)));
+  }, [openSetup]);
   return (
-    <>
+    <ModelContext.Provider value={{ endpoint, openSetup: reopen }}>
       {children}
       <Dialog open={open}>
         <DialogContent size="lg" hideClose aria-describedby={undefined}>
@@ -147,7 +178,13 @@ export function ModelGate({ children }: { children: ReactNode }) {
           )}
           {step.kind === "loading" && <Loading model={step.model} />}
           {step.kind === "loaded" && (
-            <Loaded step={step} onContinue={() => setStep({ kind: "done" })} />
+            <Loaded
+              step={step}
+              onContinue={() => {
+                setEndpoint(endpointFor(step.model));
+                setStep({ kind: "done" });
+              }}
+            />
           )}
           {error && (
             <p
@@ -159,7 +196,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
           )}
         </DialogContent>
       </Dialog>
-    </>
+    </ModelContext.Provider>
   );
 }
 

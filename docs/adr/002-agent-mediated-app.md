@@ -67,6 +67,15 @@ The first target model is Qwen 3.5 9B running locally. Small models call tools l
 
 Before the presentational interface replaces the current one, the agent is measured against the real model with a fixed set of example conversations (planning, closing, a missed commitment, an ambiguous request).
 
+## Implementation (2026-11-10)
+
+- `src/app/agent/`: the loop (`agent.ts`), the tools over the core (`tools.ts`), the skills (`guides.ts`: plan-day, missed-commitment, closing-rubric, end-day), the state snapshot sent each turn (`snapshot.ts`), the chat completions client (`llm.ts`) and the chat (`ChatPanel.tsx`). The system prompt is `AGENT.md`, bundled as text.
+- Tools: `get_day`, `get_library`, `get_review`, `get_guide`, `start_day`, `end_day`, `add_to_plan` (creates the library activity when it is new), `schedule`, `move_to_block`, `remove_from_plan`, `start_activity`, `finish_activity` (score inferred, the person's words kept as `closingNote`), `stop_activity`, `log_event`, `delete_from_library`. Plan items are referred to by an 8-character id or by title.
+- Undo restores the state exported just before the last change; only the latest change can be undone.
+- The chat is a fixed column from 1280 px and a sheet below that. Today, the start screen, the sidebar and the command palette no longer change state.
+- Tests drive the agent with a scripted model: in Jest (`agentFlows.test.tsx`) and in Cypress, which answers the model's HTTP calls. Dev builds read a model endpoint from `localStorage` (`lifeui.devModel`) for that; production builds ignore it.
+- Not yet moved to the agent: editing the library, the time blocks and event names, which still have their own screens.
+
 ## Consequences
 
 - The UI built for editing (dialogs, editors, menus) is retired; the presentational parts (timeline, focus card, tempo meter, log, Review) are kept and rearranged around the timeline.
