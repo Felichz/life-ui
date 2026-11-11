@@ -104,7 +104,8 @@ describe("the day through the chat", () => {
 
     await write("terminé, salió bien");
     // 30 estimated minutes x 8 / 7, rounded up
-    expect(await screen.findByText("Cerrar «Escribir informe» · +35 tempos")).toBeInTheDocument();
+    expect(await screen.findByText("Cerrar «Escribir informe»")).toBeInTheDocument();
+    expect(screen.getByText("+35")).toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Hazlo" }));
     });

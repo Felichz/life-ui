@@ -487,7 +487,14 @@ The heart of Hoy. **Running:** a 14px `panel` card with the `sm` shadow. The met
 
 ### Chat
 
-The column where the day changes (400px wide from 1280px, a bottom sheet below). Header: title, a "new conversation" icon button once there is something to clear, and the "Preguntar antes / Auto" segmented control; under it the model bar (name, runtime, context, GPU share, "Cambiar" and an unload icon button). The person's messages are `accent/10` bubbles aligned right; the agent's replies are plain Markdown text with no bubble. Changes already decided are one compact list on `subtle/60` (a 14px status icon and one line each, undo on the last one); a change waiting for an answer is the only card, with an `accent/50` border, `accent/5` fill and the "No" / "Hazlo" pair. The empty state offers three full-sentence suggestions as pills that send on click. While the agent works the send button becomes a neutral stop button.
+The column where the day changes (400px wide from 1280px, a bottom sheet below).
+
+- **Header:** the title alone, with a "new conversation" icon button once there is something to clear. Under it, on the desktop app, the model bar (name, runtime, context, GPU share, "Cambiar" and an unload icon button).
+- **Messages:** the person's messages are neutral `hover` bubbles aligned right (10px radius, 5px on the bottom-right corner); the agent's replies are plain Markdown text with no bubble. A new turn gets 22px of air above it, the parts of one answer 10px. The Reserved Hues Rule applies here too: a message is not an action, so it is not indigo.
+- **Changes:** changes already decided are one compact list on `subtle/60` (a 14px status icon and one line each, undo on the last one). A close shows the tempos it earned as a tempo badge at the end of its line. A change waiting for an answer is the only card and the only indigo thing in the conversation: `accent/50` border, `accent/5` fill, the tempo badge with the preview when it is a close, and the "No" / "Hazlo" pair.
+- **Composer:** a 14px-radius `canvas` card with the field focus treatment (`accent` border, 3px `accent/20` ring). The message goes on top; the footer holds the "Preguntar antes / Auto" segmented control (small) on the left and the send button on the right, which becomes a neutral stop button while the agent works. One line of 12px `ink-3` text under the card says what the selected mode does. There is no rule above the composer: the list's last 28px fade out through a mask.
+- **Empty state:** the logo mark, a 17px title, one line of examples and three full-sentence suggestions as pills that send on click (they change once the day has started).
+- **Motion:** an entry added in this session rises 6px and fades in over 260ms; entries restored from the last session are simply there. A tempo badge plays the tempo bump once when the close is confirmed. While the agent thinks, three 4px dots rise in turn next to "Pensando…".
 
 ### Tempo Meter (signature)
 

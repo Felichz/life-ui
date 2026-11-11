@@ -160,6 +160,12 @@
     text-wrap: balance;
   }
 
+  /* A scrolling list whose last lines dissolve instead of meeting a rule */
+  .fade-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }

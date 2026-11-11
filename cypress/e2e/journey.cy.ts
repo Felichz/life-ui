@@ -94,7 +94,7 @@ describe("LifeUI", () => {
 
     write("terminé, salió bien");
     // 30 estimated minutes x 7 / 7 = 30, never showing the score
-    chat().contains("Cerrar «Escribir informe» · +30 tempos");
+    chat().contains("li", "Cerrar «Escribir informe»").should("contain", "+30");
     chat().contains("Cerrado: +30 tempos.");
     cy.get("main").contains("30");
 

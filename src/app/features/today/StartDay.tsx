@@ -18,9 +18,9 @@ export function StartDay() {
 
   return (
     <div className="mx-auto flex w-full max-w-[560px] flex-col px-5 pb-16 pt-[9vh] sm:pt-[14vh]">
-      <p className="text-base text-ink-2">{formatDateLong(today)}</p>
-      <h1 className="mt-1 text-4xl font-semibold text-ink">{greeting(today)}</h1>
-      <p className="mt-3 max-w-md text-md text-ink-2">
+      <h1 className="text-4xl font-semibold text-ink">{greeting(today)}</h1>
+      <p className="mt-1.5 text-md text-ink-2">{formatDateLong(today)}</p>
+      <p className="mt-5 max-w-md text-md text-ink-2">
         {firstRun ? t("start.intro", { app: APP_NAME }) : t("start.back")}
       </p>
 
@@ -54,9 +54,11 @@ export function StartDay() {
         </div>
       )}
 
-      <div className="mt-7 flex flex-wrap items-center gap-3">
-        <p className="rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 text-base text-ink">
-          {t("start.chatHint")}
+      {/* What to say, shown the way it will look once said */}
+      <div className="mt-8 flex flex-col items-start gap-2.5">
+        <p className="text-base text-ink-2">{t("start.chatLead")}</p>
+        <p className="rounded-lg rounded-br-sm bg-hover px-3 py-2 text-base text-ink">
+          {t("agent.suggest.start")}
         </p>
         {firstRun && (
           <Link
