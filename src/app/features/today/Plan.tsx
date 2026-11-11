@@ -16,6 +16,7 @@ import {
 import { cn } from "../../lib/cn";
 import { formatDayMinutes } from "../../lib/format";
 import { MISSED_AFTER } from "../../agent/snapshot";
+import { ActivityNotes, NotesToggle } from "./Upcoming";
 import { t } from "../../i18n";
 
 /**
@@ -233,74 +234,86 @@ function PlanRow({ item, status, block, nowMinutes, card = false }: PlanRowProps
           end: formatDayMinutes(block.endMinute),
         })
       : t("plan.pastLocked");
+  const notes = item.instance.notes;
+  const [open, setOpen] = useState(false);
 
   return (
     <div
       className={cn(
-        "relative flex items-center gap-2.5",
         card
-          ? "min-h-[52px] rounded-md border border-line bg-panel px-2.5 py-2 shadow-xs"
-          : "min-h-[44px] border-b border-line px-3 last:border-b-0 first:rounded-t-lg last:rounded-b-lg coarse:min-h-[52px]",
+          ? "rounded-md border border-line bg-panel shadow-xs"
+          : "border-b border-line last:border-b-0 first:rounded-t-lg last:rounded-b-lg",
         item.isActive && "bg-live/5"
       )}
     >
-      {scheduled !== undefined && (
-        <span
-          className={cn(
-            "tabular w-11 shrink-0 text-sm font-medium",
-            missed ? "text-ink-3 line-through" : "text-ink-2"
+      <div
+        className={cn(
+          "relative flex items-center gap-2.5",
+          card ? "min-h-[52px] px-2.5 py-2" : "min-h-[44px] px-3 coarse:min-h-[52px]"
+        )}
+      >
+        {scheduled !== undefined && (
+          <span
+            className={cn(
+              "tabular w-11 shrink-0 text-sm font-medium",
+              missed ? "text-ink-3 line-through" : "text-ink-2"
+            )}
+          >
+            {formatDayMinutes(scheduled)}
+          </span>
+        )}
+        <TypeIcon type={item.type} />
+        <div className={cn("min-w-0 flex-1", card && "py-0.5")}>
+          <span
+            className={cn(
+              "block truncate text-base font-medium",
+              status === "past" ? "text-ink-2" : "text-ink"
+            )}
+          >
+            {item.title}
+          </span>
+          {card && item.contract && (
+            <span className="tabular block text-sm text-ink-3">{item.contract.label}</span>
           )}
-        >
-          {formatDayMinutes(scheduled)}
-        </span>
-      )}
-      <TypeIcon type={item.type} />
-      <div className={cn("min-w-0 flex-1", card && "py-0.5")}>
-        <span
-          className={cn(
-            "block truncate text-base font-medium",
-            status === "past" ? "text-ink-2" : "text-ink"
-          )}
-        >
-          {item.title}
-        </span>
-        {card && item.contract && (
-          <span className="tabular block text-sm text-ink-3">{item.contract.label}</span>
+        </div>
+        {missed && (
+          <span className="shrink-0 rounded bg-hover px-1.5 py-0.5 text-xs text-ink-2">
+            {t("plan.timePassed")}
+          </span>
+        )}
+        {!card && item.contract && (
+          <span
+            className={cn(
+              "tabular shrink-0 text-sm text-ink-3",
+              (item.isActive || missed) && "hidden sm:block"
+            )}
+          >
+            {item.contract.label}
+          </span>
+        )}
+
+        {notes && <NotesToggle open={open} onToggle={() => setOpen((now) => !now)} />}
+        {item.isActive ? (
+          <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded px-2 text-sm font-medium text-live">
+            <LiveDot />
+            <span className={cn(card && "sr-only")}>{t("focus.running")}</span>
+          </span>
+        ) : (
+          !available && (
+            <Tooltip content={lockedReason}>
+              <span
+                tabIndex={0}
+                aria-label={lockedReason}
+                className="flex size-7 shrink-0 items-center justify-center rounded text-ink-3"
+              >
+                <Lock className="size-3.5" />
+              </span>
+            </Tooltip>
+          )
         )}
       </div>
-      {missed && (
-        <span className="shrink-0 rounded bg-hover px-1.5 py-0.5 text-xs text-ink-2">
-          {t("plan.timePassed")}
-        </span>
-      )}
-      {!card && item.contract && (
-        <span
-          className={cn(
-            "tabular shrink-0 text-sm text-ink-3",
-            (item.isActive || missed) && "hidden sm:block"
-          )}
-        >
-          {item.contract.label}
-        </span>
-      )}
-
-      {item.isActive ? (
-        <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded px-2 text-sm font-medium text-live">
-          <LiveDot />
-          <span className={cn(card && "sr-only")}>{t("focus.running")}</span>
-        </span>
-      ) : (
-        !available && (
-          <Tooltip content={lockedReason}>
-            <span
-              tabIndex={0}
-              aria-label={lockedReason}
-              className="flex size-7 shrink-0 items-center justify-center rounded text-ink-3"
-            >
-              <Lock className="size-3.5" />
-            </span>
-          </Tooltip>
-        )
+      {open && notes && (
+        <ActivityNotes notes={notes} className={card ? "mx-2 mb-2" : "mx-3 mb-3"} />
       )}
     </div>
   );

@@ -32,6 +32,21 @@ export function SystemProvider({
     return core.onStateChange(setState);
   }, [core]);
 
+  // What was planned for today joins the plan when the date comes, also when
+  // the day was left running overnight (ADR-008)
+  useEffect(() => {
+    const bring = () => {
+      try {
+        core.bringPlannedActivities();
+      } catch {
+        // nothing due, or no day running
+      }
+    };
+    bring();
+    const timer = window.setInterval(bring, 60_000);
+    return () => window.clearInterval(timer);
+  }, [core]);
+
   const value = useMemo(() => ({ core, state }), [core, state]);
   return <SystemContext.Provider value={value}>{children}</SystemContext.Provider>;
 }
@@ -65,6 +80,8 @@ const CORE_ERROR_KEYS: Record<CoreErrorCode, MessageKey> = {
   "invalid-daily-target": "coreError.invalid-daily-target",
   "invalid-minutes": "coreError.invalid-minutes",
   "invalid-time-format": "coreError.invalid-time-format",
+  "invalid-date": "coreError.invalid-date",
+  "too-many-planned": "coreError.too-many-planned",
   "invalid-state-json": "coreError.invalid-state-json",
   "invalid-state-shape": "coreError.invalid-state-shape",
   internal: "coreError.internal",

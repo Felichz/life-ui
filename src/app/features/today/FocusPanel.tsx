@@ -5,6 +5,7 @@ import { formatClock, formatTime } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
 import { useSystem } from "../../state/system";
 import { t } from "../../i18n";
+import { ActivityNotes } from "./Upcoming";
 
 interface FocusPanelProps {
   active: PlanItem | null;
@@ -64,6 +65,8 @@ function Running({ item }: { item: PlanItem }) {
         <p className={cn("text-sm text-ink-2", item.contract ? "mt-1" : "mt-3")}>
           {statusMessage(item, elapsedMinutes)}
         </p>
+        {/* What to do, in sight while it is being done (ADR-008) */}
+        {item.instance.notes && <ActivityNotes notes={item.instance.notes} className="mt-4" />}
       </div>
     </section>
   );

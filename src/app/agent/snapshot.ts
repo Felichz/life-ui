@@ -1,3 +1,4 @@
+import { localDate } from "../../system/agendaManager";
 import type { AppState, ISystemCore, TimeBlock } from "../../types";
 import {
   blockStatus,
@@ -45,7 +46,10 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
 
   const base = {
     now: formatDayMinutes(minute),
-    date: now.toISOString().slice(0, 10),
+    // The person's own calendar day and weekday: the model plans ahead from here
+    date: localDate(now),
+    weekday: WEEKDAY_NAMES[now.getDay()],
+    planned_ahead: core.getPlannedActivities().length,
     blocks: blocks.map((b) => ({
       name: blockLabel(b),
       ...(b.isDefault
@@ -78,6 +82,7 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
           : {}),
         duration: item.contract?.label ?? "free",
         status: itemStatus(item, block, minute),
+        ...(instance.notes ? { notes: instance.notes.slice(0, 300) } : {}),
       };
     });
 
@@ -120,6 +125,41 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
       percent_of_reference: summary.displayPercent,
       reference: summary.target,
     },
+  };
+}
+
+const WEEKDAY_NAMES = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+/** What is planned for the days ahead, grouped by date. */
+export function agendaSnapshot(core: ISystemCore, now = new Date(), days = 14) {
+  const templates = templateMap(core.getState());
+  const until = new Date(now);
+  until.setDate(until.getDate() + Math.max(1, Math.min(190, days)));
+  const all = core.getPlannedActivities();
+  const shown = all.filter((item) => item.date <= localDate(until));
+  const byDate = new Map<string, typeof shown>();
+  for (const item of shown) byDate.set(item.date, [...(byDate.get(item.date) ?? []), item]);
+  return {
+    today: localDate(now),
+    total_planned: all.length,
+    ...(all.length > shown.length ? { later: all.length - shown.length } : {}),
+    days: [...byDate.entries()].map(([date, items]) => ({
+      date,
+      weekday: WEEKDAY_NAMES[new Date(`${date}T12:00:00`).getDay()],
+      items: items.map((item) => ({
+        title: templates.get(item.templateId)?.title ?? "Activity",
+        ...(item.time !== undefined ? { time: formatDayMinutes(item.time) } : {}),
+        ...(item.notes ? { notes: item.notes.slice(0, 200) } : {}),
+      })),
+    })),
   };
 }
 

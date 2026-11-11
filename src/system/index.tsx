@@ -6,6 +6,7 @@ import type {
   Day,
   ActivityTemplate,
   ActivityInstance,
+  PlannedActivity,
   CompletedActivityRecord,
   TimeBlock,
   DayMinutes,
@@ -24,6 +25,7 @@ import type {
 } from "../types";
 import { PersistenceManager } from "./persistenceManager";
 import { DayManager } from "./dayManager";
+import { AgendaManager } from "./agendaManager";
 import { ActivityManager } from "./activityManager";
 import { TimeBlockManager } from "./timeBlockManager";
 import { EventManager } from "./eventManager";
@@ -47,6 +49,7 @@ export class SystemCore implements ISystemCore {
 
   // System modules
   private dayManager: DayManager;
+  private agendaManager: AgendaManager;
   private activityManager: ActivityManager;
   private timeBlockManager: TimeBlockManager;
   private eventManager: EventManager;
@@ -66,6 +69,7 @@ export class SystemCore implements ISystemCore {
 
     // Initialize modules with a reference to this
     this.dayManager = new DayManager(this);
+    this.agendaManager = new AgendaManager(this);
     this.activityManager = new ActivityManager(this);
     this.timeBlockManager = new TimeBlockManager(this);
     this.eventManager = new EventManager(this);
@@ -135,7 +139,29 @@ export class SystemCore implements ISystemCore {
     const newDay = this.dayManager.startDay();
     // Ensure the default "Por Hacer" block exists
     this.timeBlockManager.ensureDefaultBlockExists();
+    // What was planned for today, or for days that went by, joins the plan (ADR-008)
+    this.agendaManager.bringDue();
     return newDay;
+  }
+
+  public planActivity(
+    templateId: UUID,
+    dates: string[],
+    options?: { time?: DayMinutes; notes?: string }
+  ): PlannedActivity[] {
+    return this.agendaManager.planActivity(templateId, dates, options);
+  }
+
+  public getPlannedActivities(): PlannedActivity[] {
+    return this.agendaManager.getPlannedActivities();
+  }
+
+  public cancelPlannedActivities(ids: UUID[]): number {
+    return this.agendaManager.cancelPlannedActivities(ids);
+  }
+
+  public bringPlannedActivities(now?: Date): ActivityInstance[] {
+    return this.agendaManager.bringDue(now);
   }
 
   /**
@@ -184,6 +210,7 @@ export class SystemCore implements ISystemCore {
    */
   public deleteActivityTemplate(id: UUID): void {
     this.activityManager.deleteActivityTemplate(id);
+    this.agendaManager.forgetTemplate(id);
   }
 
   /**

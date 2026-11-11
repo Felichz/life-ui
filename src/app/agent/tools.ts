@@ -1,8 +1,9 @@
 import type { ActivityTemplate, ActivityType, ISystemCore, TimeBlock } from "../../types";
 import { UtilityService } from "../../system/utilityService";
-import { formatDayMinutes, parseDayMinutes } from "../lib/format";
-import { t } from "../i18n";
-import { daySnapshot, librarySnapshot, reviewSnapshot, shortId } from "./snapshot";
+import { localDate } from "../../system/agendaManager";
+import { formatDateShort, formatDayMinutes, formatDayMonth, parseDayMinutes } from "../lib/format";
+import { intlLocale, t } from "../i18n";
+import { agendaSnapshot, daySnapshot, librarySnapshot, reviewSnapshot, shortId } from "./snapshot";
 import { GUIDES, GUIDE_NOTE, type GuideName } from "./guides";
 
 /**
@@ -86,6 +87,122 @@ function findItem(core: ISystemCore, ref: unknown) {
     items.find((i) => wanted && same(title(i.templateId), wanted));
   if (!hit) throw new ToolError("item-not-found", `no plan item "${wanted}"; read get_day`);
   return { instance: hit, title: title(hit.templateId) };
+}
+
+const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+/** Words a model may use for a weekday, in English or Spanish. */
+const WEEKDAY_WORDS: Record<string, number> = {
+  sun: 0,
+  sunday: 0,
+  dom: 0,
+  domingo: 0,
+  mon: 1,
+  monday: 1,
+  lun: 1,
+  lunes: 1,
+  tue: 2,
+  tuesday: 2,
+  mar: 2,
+  martes: 2,
+  wed: 3,
+  wednesday: 3,
+  mie: 3,
+  mié: 3,
+  miercoles: 3,
+  miércoles: 3,
+  thu: 4,
+  thursday: 4,
+  jue: 4,
+  jueves: 4,
+  fri: 5,
+  friday: 5,
+  vie: 5,
+  viernes: 5,
+  sat: 6,
+  saturday: 6,
+  sab: 6,
+  sáb: 6,
+  sabado: 6,
+  sábado: 6,
+};
+
+/** A planned date at noon, so formatting it never slips a day. */
+const day = (date: string) => new Date(`${date}T12:00:00`);
+
+function weekdaysOf(args: Args): number[] | null {
+  if (!Array.isArray(args.weekdays) || args.weekdays.length === 0) return null;
+  const days = args.weekdays.map((word) => WEEKDAY_WORDS[str(word).toLocaleLowerCase()]);
+  if (days.some((value) => value === undefined)) {
+    throw new ToolError("invalid-weekday", `use ${WEEKDAYS.join(", ")}`);
+  }
+  return [...new Set(days)].sort();
+}
+
+/** "lun, mié y vie", in the person's language; "every day" when none are given. */
+function weekdayList(args: Args): string {
+  let days: number[] | null = null;
+  try {
+    days = weekdaysOf(args);
+  } catch {
+    // the run will refuse it
+  }
+  if (!days || days.length === 7) return t("agent.everyDay");
+  // 2023-01-01 was a Sunday
+  return days
+    .map((weekday) =>
+      new Intl.DateTimeFormat(intlLocale(), { weekday: "short" })
+        .format(new Date(2023, 0, 1 + weekday))
+        .replace(".", "")
+    )
+    .join(", ");
+}
+
+/**
+ * The dates a plan_ahead call means: one day, or the chosen weekdays (every
+ * day when none are chosen) for a number of weeks from the start.
+ */
+function datesFor(args: Args, now: Date): string[] {
+  const word = str(args.start).toLocaleLowerCase();
+  const start = new Date(now);
+  start.setHours(12, 0, 0, 0);
+  if (!word || ["tomorrow", "mañana", "manana"].includes(word)) start.setDate(start.getDate() + 1);
+  else if (!["today", "hoy"].includes(word)) {
+    const parsed = day(word);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(word) || Number.isNaN(parsed.getTime())) {
+      throw new ToolError("invalid-date", 'start is "today", "tomorrow" or YYYY-MM-DD');
+    }
+    start.setTime(parsed.getTime());
+  }
+  if (localDate(start) < localDate(now)) throw new ToolError("date-in-the-past", localDate(start));
+
+  const weekdays = weekdaysOf(args);
+  const weeks = Math.round(num(args.weeks) ?? 0);
+  if (!weekdays && weeks < 1) return [localDate(start)];
+  const span = Math.max(1, Math.min(26, weeks || 1)) * 7;
+  const dates: string[] = [];
+  for (let offset = 0; offset < span; offset++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + offset);
+    if (!weekdays || weekdays.includes(date.getDay())) dates.push(localDate(date));
+  }
+  if (dates.length === 0)
+    throw new ToolError("no-dates", "those weekdays do not fall in that span");
+  return dates;
+}
+
+/** Planned items of an activity, optionally within a range of dates. */
+function plannedMatching(core: ISystemCore, args: Args) {
+  const title = str(args.title);
+  const template = core.getActivityTemplates().find((tpl) => same(tpl.title, title));
+  if (!template) return [];
+  const from = str(args.from);
+  const to = str(args.to);
+  return core
+    .getPlannedActivities()
+    .filter(
+      (item) =>
+        item.templateId === template.id && (!from || item.date >= from) && (!to || item.date <= to)
+    );
 }
 
 type Kind = "goal" | "range" | "timebox";
@@ -228,7 +345,7 @@ export const TOOLS: Tool[] = [
   {
     name: "get_guide",
     description:
-      "Read a playbook before a task: plan-day, missed-commitment, closing-rubric, end-day.",
+      "Read a playbook before a task: plan-day, plan-ahead, missed-commitment, closing-rubric, end-day.",
     parameters: {
       type: "object",
       properties: { topic: { type: "string", enum: Object.keys(GUIDES) } },
@@ -281,6 +398,10 @@ export const TOOLS: Tool[] = [
           type: "string",
           description: "Start time HH:MM; it picks the block that contains it",
         },
+        notes: {
+          type: "string",
+          description: "What to do in it (a routine, steps), when the person asked for that",
+        },
         ...DURATION,
       },
       required: ["title"],
@@ -291,6 +412,7 @@ export const TOOLS: Tool[] = [
       const { template, override } = templateFor(core, args);
       const block = findBlock(core, args.block);
       const instance = core.createActivityInstance(template.id, block.id, override as never);
+      if (str(args.notes)) core.updateActivityInstance(instance.id, { notes: str(args.notes) });
       const placed = time !== null ? core.scheduleActivityInstance(instance.id, time) : instance;
       return {
         id: shortId(placed.id),
@@ -480,6 +602,150 @@ export const TOOLS: Tool[] = [
       return { logged: template.name };
     },
     describe: (_ctx, args) => t("agent.tool.event", { name: str(args.name) }),
+  },
+  {
+    name: "set_notes",
+    description:
+      "Write what to do inside a plan item of today (a routine, a checklist, steps). The person sees it on the item and while it runs. Empty text clears it.",
+    parameters: {
+      type: "object",
+      properties: {
+        item: { type: "string", description: "Plan item id or title" },
+        notes: { type: "string", description: "Plain text or a Markdown list" },
+      },
+      required: ["item", "notes"],
+    },
+    mutates: true,
+    run: ({ core }, args) => {
+      const { instance, title } = findItem(core, args.item);
+      core.updateActivityInstance(instance.id, { notes: str(args.notes) || undefined });
+      return { title, notes: str(args.notes) ? "saved" : "cleared" };
+    },
+    describe: ({ core }, args) => {
+      let title = str(args.item);
+      try {
+        title = findItem(core, args.item).title;
+      } catch {
+        // named as the model wrote it
+      }
+      return t(str(args.notes) ? "agent.tool.notes" : "agent.tool.notesClear", { title });
+    },
+  },
+  {
+    name: "plan_ahead",
+    description:
+      "Plan an activity for days ahead: once on a date, or repeated (certain weekdays, or every day, for a number of weeks). Each planned day joins that day's plan when it comes. Use one call per distinct routine: every date of a call gets the same notes. Uses the library activity with that title, or creates it.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        ...DURATION,
+        start: {
+          type: "string",
+          description: 'First day: "today", "tomorrow" or YYYY-MM-DD. Default: tomorrow',
+        },
+        weekdays: {
+          type: "array",
+          items: { type: "string", enum: WEEKDAYS },
+          description: "Days of the week it repeats on. Leave out for every day (with weeks)",
+        },
+        weeks: {
+          type: "integer",
+          minimum: 1,
+          maximum: 26,
+          description:
+            "How many weeks it repeats, counted from start. Leave out (and leave weekdays out) to plan it once",
+        },
+        time: { type: "string", description: "Start time HH:MM on each of those days" },
+        notes: {
+          type: "string",
+          description: "What to do each time: the exact routine, as a Markdown list",
+        },
+      },
+      required: ["title"],
+    },
+    mutates: true,
+    run: ({ core, now }, args) => {
+      const dates = datesFor(args, now());
+      const time = parseTime(args.time);
+      const { template } = templateFor(core, args);
+      const planned = core.planActivity(template.id, dates, {
+        ...(time !== null ? { time } : {}),
+        notes: str(args.notes) || undefined,
+      });
+      return {
+        title: template.title,
+        planned: planned.length,
+        first: dates[0],
+        last: dates[dates.length - 1],
+        ...(time !== null ? { time: formatDayMinutes(time) } : {}),
+      };
+    },
+    describe: ({ now }, args) => {
+      const title = str(args.title);
+      let dates: string[];
+      try {
+        dates = datesFor(args, now());
+      } catch {
+        return t("agent.tool.planOnce", { title, date: str(args.start) });
+      }
+      let time = "";
+      try {
+        const minutes = parseTime(args.time);
+        if (minutes !== null) time = ` · ${formatDayMinutes(minutes)}`;
+      } catch {
+        // the core will refuse the time
+      }
+      if (dates.length === 1) {
+        return t("agent.tool.planOnce", {
+          title,
+          date: `${formatDateShort(day(dates[0]))}${time}`,
+        });
+      }
+      return t("agent.tool.planMany", {
+        title,
+        when: `${weekdayList(args)}${time}`,
+        from: formatDayMonth(day(dates[0])),
+        to: formatDayMonth(day(dates[dates.length - 1])),
+        count: dates.length,
+      });
+    },
+  },
+  {
+    name: "get_agenda",
+    description:
+      "What is planned for the days ahead, by date. Read it before saying anything about future days.",
+    parameters: {
+      type: "object",
+      properties: { days: { type: "integer", description: "How many days ahead, default 14" } },
+    },
+    mutates: false,
+    run: ({ core, now }, args) => agendaSnapshot(core, now(), num(args.days) ?? 14),
+  },
+  {
+    name: "cancel_planned",
+    description:
+      "Cancel activities planned for days ahead: all the planned days of an activity, or only those in a range of dates.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "The activity's title" },
+        from: { type: "string", description: "First date to cancel, YYYY-MM-DD (optional)" },
+        to: { type: "string", description: "Last date to cancel, YYYY-MM-DD (optional)" },
+      },
+      required: ["title"],
+    },
+    mutates: true,
+    run: ({ core }, args) => {
+      const ids = plannedMatching(core, args).map((item) => item.id);
+      if (ids.length === 0) throw new ToolError("nothing-planned", "read get_agenda");
+      return { cancelled: core.cancelPlannedActivities(ids) };
+    },
+    describe: ({ core }, args) =>
+      t("agent.tool.cancelPlanned", {
+        title: str(args.title),
+        count: plannedMatching(core, args).length,
+      }),
   },
   {
     name: "delete_from_library",
