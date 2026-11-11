@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, CalendarCheck2, Library, Search, Settings } from "lucide-react";
-import { Button } from "../components/ui/Button";
+import { BarChart3, CalendarCheck2, Library, MessageSquare, Search, Settings } from "lucide-react";
+import { ChatPanel } from "../agent/ChatPanel";
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/Dialog";
 import { Kbd } from "../components/ui/Kbd";
 import { LiveDot, Logo, TypeIcon } from "../components/TypeIcon";
 import { TempoMeter } from "../components/TempoMeter";
@@ -23,17 +24,13 @@ const NAV: { to: string; label: MessageKey; icon: typeof Library; end: boolean; 
 ];
 
 export function AppShell() {
-  const { openPalette, openAddActivity } = useShell();
+  const { openPalette } = useShell();
   const { state } = useSystem();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const pillVisible = Boolean(state.currentDay?.activeActivityInstanceId) && pathname !== "/";
 
   useHotkey("k", openPalette, { mod: true, allowInInputs: true });
-  useHotkey("n", () => {
-    if (!state.currentDay) return;
-    openAddActivity();
-  });
 
   // Linear-style navigation: G, then H/B/R/A
   useGoTo((key) => {
@@ -54,10 +51,36 @@ export function AppShell() {
       >
         <Outlet />
       </main>
+      {/* The conversation is the way in (ADR-002): always beside the day from 1280 px */}
+      <ChatPanel className="sticky top-0 hidden h-dvh w-[400px] shrink-0 self-start border-l border-line xl:flex" />
+      <MobileChat />
       <MobileNav />
       <RunningPill />
       <ActivityWatcher />
     </div>
+  );
+}
+
+/** Below 1280 px the chat opens as a sheet from a floating button. */
+function MobileChat() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={t("agent.open")}
+        className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] right-4 z-30 flex size-12 items-center justify-center rounded-full bg-accent-fill text-white shadow-pop lg:bottom-6 xl:hidden"
+      >
+        <MessageSquare className="size-5" />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent variant="sheet" aria-describedby={undefined} className="p-0">
+          <DialogTitle className="sr-only">{t("agent.title")}</DialogTitle>
+          <ChatPanel className="h-[80dvh]" />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -87,10 +110,8 @@ function useGoTo(onKey: (key: string) => void) {
 
 function Sidebar() {
   const { openPalette } = useShell();
-  const { state, core } = useSystem();
+  const { state } = useSystem();
   const running = Boolean(state.currentDay?.activeActivityInstanceId);
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col self-start border-r border-line bg-sidebar px-3 pb-3 pt-4 lg:flex">
@@ -141,19 +162,6 @@ function Sidebar() {
           <div className="rounded-lg border border-line bg-panel p-3">
             <p className="text-sm font-medium text-ink">{t("shell.noDay")}</p>
             <p className="mt-0.5 text-sm text-ink-2">{t("shell.noDayHint")}</p>
-            {pathname !== "/" && (
-              <Button
-                variant="primary"
-                size="sm"
-                className="mt-3 w-full"
-                onClick={() => {
-                  core.startDay();
-                  navigate("/");
-                }}
-              >
-                {t("start.cta")}
-              </Button>
-            )}
           </div>
         )}
       </div>

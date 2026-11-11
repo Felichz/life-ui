@@ -1,41 +1,20 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowRight, CalendarCheck2, Library, Sparkles } from "lucide-react";
-import { Button } from "../../components/ui/Button";
-import { Kbd } from "../../components/ui/Kbd";
 import { TypeIcon } from "../../components/TypeIcon";
 import { daysNewestFirst, planItem, templateMap } from "../../lib/domain";
 import { formatDateLong, formatDateShort, formatNumber, greeting } from "../../lib/format";
-import { useHotkey } from "../../lib/useHotkey";
-import { errorMessage, useSystem } from "../../state/system";
-import { useToast } from "../../state/toast";
+import { useSystem } from "../../state/system";
 import { APP_NAME, t, tp } from "../../i18n";
 
-/** Screen with no day in progress: a single decision, start. */
+/** Screen with no day in progress: the day starts from the chat. */
 export function StartDay() {
   const { state, core } = useSystem();
-  const toast = useToast();
-  const navigate = useNavigate();
   const today = new Date();
   const lastDay = daysNewestFirst(state).find((day) => day.state === "inactive");
   const lastSummary = lastDay ? core.getTempoSummary(lastDay.id) : null;
   const pending = state.global.pendingActivityInstances ?? [];
   const templates = templateMap(state);
   const firstRun = state.global.days.length === 0;
-
-  const start = () => {
-    try {
-      core.startDay();
-      navigate("/");
-    } catch (caught) {
-      toast({
-        tone: "error",
-        title: t("error.startDay"),
-        description: errorMessage(caught),
-      });
-    }
-  };
-
-  useHotkey("Enter", start);
 
   return (
     <div className="mx-auto flex w-full max-w-[560px] flex-col px-5 pb-16 pt-[9vh] sm:pt-[14vh]">
@@ -76,18 +55,9 @@ export function StartDay() {
       )}
 
       <div className="mt-7 flex flex-wrap items-center gap-3">
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={start}
-          className="min-w-[180px]"
-          data-testid="start-day"
-        >
-          {t("start.cta")}
-          <Kbd tone="inverse" className="ml-1 hidden bg-white/20 text-white sm:inline-flex">
-            ↵
-          </Kbd>
-        </Button>
+        <p className="rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 text-base text-ink">
+          {t("start.chatHint")}
+        </p>
         {firstRun && (
           <Link
             to="/library"

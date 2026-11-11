@@ -8,6 +8,7 @@ import type {
   CompletionRequest,
   CompletionResult,
   ISODateTimeString,
+  DayMinutes,
 } from "../types";
 import { CoreError } from "./errors";
 
@@ -426,6 +427,32 @@ export class ActivityManager {
   }
 
   /**
+   * Plans an activity at a minute of the day, or clears its time (ADR-006).
+   * The activity moves to the block that contains that minute, or to the
+   * default block when none does, so its time and its block never disagree.
+   */
+  public scheduleActivityInstance(id: UUID, minute: DayMinutes | null): ActivityInstance {
+    if (minute !== null && (!Number.isInteger(minute) || minute < 0 || minute > 1439)) {
+      throw new CoreError("minutes-out-of-range");
+    }
+    const state = this.systemCore.getState();
+    if (!state.currentDay) throw new CoreError("no-active-day");
+    const instance = state.currentDay.activityInstances.find((item) => item.id === id);
+    if (!instance) throw new CoreError("activity-instance-not-found", `id ${id}`);
+
+    if (minute !== null) {
+      const blocks = state.global.timeBlocks;
+      const target =
+        blocks.find((b) => !b.isDefault && b.startMinute <= minute && minute < b.endMinute) ??
+        blocks.find((b) => b.isDefault);
+      if (target && target.id !== instance.blockId) {
+        this.moveActivityInstance(id, target.id);
+      }
+    }
+    return this.updateActivityInstance(id, { scheduledStart: minute ?? undefined });
+  }
+
+  /**
    * Deletes an activity instance
    * @param id ID of the instance
    * @throws Error if the instance does not exist, is active, or there is no active day
@@ -623,7 +650,7 @@ export class ActivityManager {
    */
   public completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number; endTime?: ISODateTimeString }
+    assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
   ): CompletionResult {
     // If the UI passes endTime (timestamp frozen when completion was requested),
     // use it. Otherwise fall back to "now". This keeps the duration from changing
@@ -701,6 +728,9 @@ export class ActivityManager {
         beatEstimate,
         createdAt: timestamp,
       };
+
+      const note = assessment.note?.trim();
+      if (note) completedRecord.closingNote = note.slice(0, 500);
 
       if (instance.clearObjectiveSettings) {
         completedRecord.clearObjectiveSettings = instance.clearObjectiveSettings;
