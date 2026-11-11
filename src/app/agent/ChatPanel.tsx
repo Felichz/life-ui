@@ -13,6 +13,7 @@ import { Segmented } from "../components/ui/Segmented";
 import { cn } from "../lib/cn";
 import { isDesktop } from "../platform/desktop";
 import { useModel } from "../runtime/ModelGate";
+import { ModelBadge } from "../runtime/ModelBadge";
 import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
 import type { Entry, Mode } from "./agent";
@@ -70,6 +71,7 @@ export function ChatPanel({ className }: { className?: string }) {
           ]}
         />
       </header>
+      <ModelBadge className="border-b border-line px-4 py-2.5" />
       {mode === "auto" && (
         <p className="border-b border-line bg-subtle px-4 py-2 text-xs text-ink-2">
           {t("agent.mode.autoHint")}

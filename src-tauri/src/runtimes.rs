@@ -218,6 +218,14 @@ pub async fn lmstudio_load(model: String, context: u32, gpu: String) -> Result<S
     .map_err(|e| e.to_string())?
 }
 
+/// Unloads a model from LM Studio, freeing its memory.
+#[tauri::command]
+pub async fn lmstudio_unload(model: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || run_lms(&["unload", &model]))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Starts a runtime's server and waits up to ten seconds for it to answer.
 #[tauri::command]
 pub async fn start_runtime(runtime: String) -> Result<(), String> {

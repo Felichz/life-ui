@@ -577,6 +577,15 @@ export const es = {
   "plan.timePassed": "Se pasó la hora",
   "start.chatHint":
     "Cuando quieras empezar el día, díselo a LifeUI en el chat, por ejemplo «empiezo el día».",
+  "model.setup.switch": "Si eliges otro, primero se descarga {name}.",
+  "model.keep": "Seguir con {name}",
+  "model.badge.context": "contexto de {tokens}K",
+  "model.badge.gpuFull": "100% en la GPU",
+  "model.badge.gpuPart": "{share}% en la GPU",
+  "model.badge.none": "Elige uno para hablar con LifeUI",
+  "model.badge.change": "Cambiar",
+  "settings.model.title": "Modelo",
+  "settings.model.description": "El modelo local con el que funciona el agente de LifeUI.",
 } as const;
 
 export type MessageKey = keyof typeof es;

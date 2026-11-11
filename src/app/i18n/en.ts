@@ -581,4 +581,13 @@ export const en: Record<MessageKey, string> = {
   "plan.timePassed": "Time passed",
   "start.chatHint":
     "Tell LifeUI in the chat when you want to start your day, for example “start my day”.",
+  "model.setup.switch": "Choosing another one unloads {name} first.",
+  "model.keep": "Keep {name}",
+  "model.badge.context": "{tokens}K context",
+  "model.badge.gpuFull": "100% on the GPU",
+  "model.badge.gpuPart": "{share}% on the GPU",
+  "model.badge.none": "Choose one to talk to LifeUI",
+  "model.badge.change": "Change",
+  "settings.model.title": "Model",
+  "settings.model.description": "The local model LifeUI’s agent runs on.",
 };

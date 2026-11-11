@@ -247,6 +247,31 @@ export async function load(
   return { onGpu: hit && hit.size ? hit.size_vram / hit.size : 0 };
 }
 
+/** Frees the model's memory in its runtime. */
+export async function unload(model: LocalModel): Promise<void> {
+  if (model.runtime === "lmstudio") {
+    await invoke("lmstudio_unload", { model: model.key });
+    return;
+  }
+  await desktopFetch(`${OLLAMA}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: model.key, keep_alive: 0 }),
+  });
+}
+
+/** Where a loaded model sits, when the runtime says it (Ollama); null otherwise. */
+export async function placementOf(model: LocalModel): Promise<Placement | null> {
+  if (model.runtime !== "ollama") return null;
+  const res = await desktopFetch(`${OLLAMA}/api/ps`).catch(() => null);
+  if (!res) return null;
+  const { models = [] } = (await res.json()) as {
+    models?: Array<{ name: string; size: number; size_vram: number }>;
+  };
+  const hit = models.find((m) => m.name === model.key);
+  return hit && hit.size ? { onGpu: hit.size_vram / hit.size } : null;
+}
+
 export const formatGiB = (bytes: number) => `${(bytes / GIB).toFixed(1)} GiB`;
 
 const CHOICE_KEY = "lifeui.model";
