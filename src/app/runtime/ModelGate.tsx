@@ -1,10 +1,22 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { agentBaseTokens } from "../agent/budget";
+import { REPLY_RESERVE } from "../agent/context";
+import { formatTokens } from "../lib/format";
 import type { ModelEndpoint } from "../agent/llm";
 import {
   AlertTriangle,
   Check,
   ChevronRight,
   Cpu,
+  Gauge,
   HardDrive,
   MemoryStick,
   Wrench,
@@ -26,12 +38,17 @@ import { t, type MessageKey } from "../i18n";
 import {
   AGENT_CONTEXT,
   GPU_MARGIN,
+  benchmark,
   closingIsEnough,
-  estimate,
+  contextStops,
+  estimateAll,
   formatGiB,
   gpuProcesses,
-  isLoaded,
+  loadedInfo,
+  pickContext,
   placementOf,
+  saveContext,
+  savedContext,
   unload,
   listModels,
   load,
@@ -55,9 +72,22 @@ import {
 type Step =
   | { kind: "checking" }
   | { kind: "setup"; runtimes: Runtimes; models: LocalModel[] }
-  | { kind: "load"; model: LocalModel; resources: Resources; need: number | null }
+  | {
+      kind: "load";
+      model: LocalModel;
+      resources: Resources;
+      /** GPU memory needed at each context on offer; null while it is being estimated. */
+      needs: Record<number, number | null> | null;
+    }
   | { kind: "loading"; model: LocalModel }
-  | { kind: "loaded"; model: LocalModel; placement: Placement }
+  | {
+      kind: "loaded";
+      model: LocalModel;
+      placement: Placement;
+      context: number;
+      /** Tokens per second from the speed test; "measuring" while it runs. */
+      speed: number | null | "measuring";
+    }
   | { kind: "done" };
 
 const RUNTIME_NAME: Record<RuntimeId, string> = { lmstudio: "LM Studio", ollama: "Ollama" };
@@ -67,11 +97,18 @@ const BASE_URL: Record<RuntimeId, string> = {
   ollama: "http://127.0.0.1:11434/v1",
 };
 
-const endpointFor = (model: LocalModel): ModelEndpoint => ({
+const endpointFor = (model: LocalModel, context: number): ModelEndpoint => ({
   baseUrl: BASE_URL[model.runtime],
   model: model.key,
-  context: AGENT_CONTEXT,
+  context,
 });
+
+interface Current {
+  model: LocalModel;
+  placement: Placement | null;
+  context: number;
+  speed: number | null;
+}
 
 interface ModelContextValue {
   /** The loaded model the agent talks to, or null. */
@@ -79,6 +116,10 @@ interface ModelContextValue {
   /** The loaded model, and where it sits when known. */
   model: LocalModel | null;
   placement: Placement | null;
+  /** Tokens of context the model was loaded with. */
+  context: number;
+  /** Tokens per second from the last speed test, when there is one. */
+  speed: number | null;
   /** Opens the model picker again. */
   openSetup: () => void;
   /** Frees the loaded model's memory; the choice is kept for the next launch. */
@@ -89,6 +130,8 @@ const ModelContext = createContext<ModelContextValue>({
   endpoint: null,
   model: null,
   placement: null,
+  context: AGENT_CONTEXT,
+  speed: null,
   openSetup: () => {},
   unloadModel: async () => {},
 });
@@ -105,26 +148,48 @@ export function ModelGate({ children }: { children: ReactNode }) {
     isDesktop() ? { kind: "checking" } : { kind: "done" }
   );
   const [error, setError] = useState<string | null>(null);
-  const [current, setCurrent] = useState<{ model: LocalModel; placement: Placement | null } | null>(
-    null
+  const [current, setCurrent] = useState<Current | null>(null);
+  const endpoint = useMemo(
+    () => (current ? endpointFor(current.model, current.context) : null),
+    [current]
   );
-  const endpoint = current ? endpointFor(current.model) : null;
+
+  /** The speed test runs on its own and fills in wherever the model is shown. */
+  const measureSpeed = useCallback((model: LocalModel) => {
+    void benchmark(BASE_URL[model.runtime], model.key).then((speed) => {
+      setStep((step) =>
+        step.kind === "loaded" && step.model.key === model.key ? { ...step, speed } : step
+      );
+      setCurrent((now) => (now && now.model.key === model.key ? { ...now, speed } : now));
+    });
+  }, []);
 
   const openSetup = useCallback(async () => {
     const runtimes = await runtimeStatus();
     setStep({ kind: "setup", runtimes, models: await listModels(runtimes) });
   }, []);
 
-  const prepareLoad = useCallback(async (model: LocalModel) => {
-    if (await isLoaded(model)) {
-      setCurrent({ model, placement: await placementOf(model) });
-      return setStep({ kind: "done" });
-    }
-    const resources = await systemResources();
-    setStep({ kind: "load", model, resources, need: null });
-    const need = await estimate(model).catch(() => null);
-    setStep({ kind: "load", model, resources, need });
-  }, []);
+  const prepareLoad = useCallback(
+    async (model: LocalModel) => {
+      const loaded = await loadedInfo(model);
+      if (loaded) {
+        // Loaded from outside the app: its real context is the one that counts
+        setCurrent({
+          model,
+          placement: await placementOf(model),
+          context: loaded.context ?? AGENT_CONTEXT,
+          speed: null,
+        });
+        measureSpeed(model);
+        return setStep({ kind: "done" });
+      }
+      const resources = await systemResources();
+      setStep({ kind: "load", model, resources, needs: null });
+      const needs = await estimateAll(model).catch(() => ({}));
+      setStep({ kind: "load", model, resources, needs });
+    },
+    [measureSpeed]
+  );
 
   useEffect(() => {
     if (step.kind !== "checking") return;
@@ -168,14 +233,20 @@ export function ModelGate({ children }: { children: ReactNode }) {
     }
   };
 
-  const doLoad = async (model: LocalModel, need: number, allowOffload: boolean) => {
+  const doLoad = async (
+    model: LocalModel,
+    need: number,
+    allowOffload: boolean,
+    context: number
+  ) => {
     setError(null);
     setStep({ kind: "loading", model });
     try {
       const runtimes = await runtimeStatus();
       if (!runtimes[model.runtime].running) await startRuntime(model.runtime);
-      const placement = await load(model, need, allowOffload);
-      setStep({ kind: "loaded", model, placement });
+      const placement = await load(model, need, allowOffload, context);
+      setStep({ kind: "loaded", model, placement, context, speed: "measuring" });
+      measureSpeed(model);
     } catch (caught) {
       setError(String(caught));
       await prepareLoad(model);
@@ -198,6 +269,8 @@ export function ModelGate({ children }: { children: ReactNode }) {
         endpoint,
         model: current?.model ?? null,
         placement: current?.placement ?? null,
+        context: current?.context ?? AGENT_CONTEXT,
+        speed: current?.speed ?? null,
         openSetup: reopen,
         unloadModel,
       }}
@@ -228,7 +301,12 @@ export function ModelGate({ children }: { children: ReactNode }) {
             <Loaded
               step={step}
               onContinue={() => {
-                setCurrent({ model: step.model, placement: step.placement });
+                setCurrent({
+                  model: step.model,
+                  placement: step.placement,
+                  context: step.context,
+                  speed: typeof step.speed === "number" ? step.speed : null,
+                });
                 setStep({ kind: "done" });
               }}
             />
@@ -385,12 +463,26 @@ function LoadDialog({
   onSkip,
 }: {
   step: Extract<Step, { kind: "load" }>;
-  onLoad: (model: LocalModel, need: number, allowOffload: boolean) => void;
+  onLoad: (model: LocalModel, need: number, allowOffload: boolean, context: number) => void;
   onChange: () => void;
   onSkip: () => void;
 }) {
-  const { model, resources, need } = step;
+  const { model, resources, needs } = step;
   const [confirming, setConfirming] = useState(false);
+  const stops = contextStops(model);
+  // The largest context that fits on the GPU right now, unless the person chose one before
+  const auto = needs ? pickContext(needs, resources, stops) : null;
+  const [chosen, setChosen] = useState<number | null>(() => {
+    const saved = savedContext(model);
+    return saved !== null && stops.includes(saved) ? saved : null;
+  });
+  const context = chosen ?? auto ?? AGENT_CONTEXT;
+  const need = needs?.[context] ?? null;
+  const choose = (next: number | null) => {
+    setChosen(next);
+    saveContext(model, next);
+    setConfirming(false);
+  };
   const gpu = [...resources.gpus].sort((a, b) => b.vram_free - a.vram_free)[0];
   const result = need === null ? null : verdict(need, resources);
   const spill = need === null ? 0 : spillBytes(need, resources);
@@ -401,10 +493,7 @@ function LoadDialog({
       <DialogHeader>
         <DialogTitle>{t("model.load.title", { name: model.name })}</DialogTitle>
         <DialogDescription>
-          {t("model.load.body", {
-            runtime: RUNTIME_NAME[model.runtime],
-            context: formatNumber(AGENT_CONTEXT),
-          })}
+          {t("model.load.body", { runtime: RUNTIME_NAME[model.runtime] })}
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-3 pb-4">
@@ -428,6 +517,13 @@ function LoadDialog({
         {gpu && need !== null && (
           <VramBar used={gpu.vram_used} need={need} total={gpu.vram_total} />
         )}
+        <ContextSlider
+          stops={stops}
+          value={context}
+          automatic={chosen === null}
+          onChange={choose}
+          disabled={needs === null}
+        />
         {meta && (
           <div className={cn("rounded-lg px-3.5 py-3 text-sm", meta.tone)}>
             <p className="flex items-center gap-1.5 font-medium">
@@ -470,7 +566,7 @@ function LoadDialog({
           disabled={need === null}
           onClick={() => {
             if (need === null) return;
-            if (result === "fits" || confirming) onLoad(model, need, result !== "fits");
+            if (result === "fits" || confirming) onLoad(model, need, result !== "fits", context);
             else setConfirming(true);
           }}
         >
@@ -542,6 +638,84 @@ function GpuUsers({ need, freeVram }: { need: number; freeVram: number }) {
   );
 }
 
+/**
+ * How much the model keeps in mind at once. Moving it changes the memory the
+ * load needs, so everything above and below it in the dialog follows.
+ */
+function ContextSlider({
+  stops,
+  value,
+  automatic,
+  onChange,
+  disabled,
+}: {
+  stops: number[];
+  value: number;
+  automatic: boolean;
+  onChange: (context: number | null) => void;
+  disabled: boolean;
+}) {
+  const index = Math.max(0, stops.indexOf(value));
+  const base = agentBaseTokens();
+  const room = Math.max(0, value - base - REPLY_RESERVE);
+  const words = Math.round((value * 0.65) / 100) * 100;
+  return (
+    <section className="rounded-lg border border-line px-3.5 py-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-medium text-ink">
+          <label htmlFor="model-context">{t("model.context")}</label>
+        </h3>
+        <p className="tabular text-sm text-ink">
+          <span className="font-semibold">{formatNumber(value)}</span> tokens
+          {automatic ? (
+            <span className="ml-2 text-xs text-ink-3">{t("model.context.auto")}</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onChange(null)}
+              className="ml-2 rounded text-xs font-medium text-accent-ink hover:underline"
+            >
+              {t("model.context.useAuto")}
+            </button>
+          )}
+        </p>
+      </div>
+      <input
+        id="model-context"
+        type="range"
+        min={0}
+        max={stops.length - 1}
+        step={1}
+        value={index}
+        disabled={disabled || stops.length < 2}
+        onChange={(event) => onChange(stops[Number(event.target.value)])}
+        aria-valuetext={`${formatNumber(value)} tokens`}
+        className="mt-2.5 block h-5 w-full cursor-pointer accent-accent disabled:cursor-not-allowed"
+      />
+      <div className="tabular mt-0.5 flex justify-between text-2xs text-ink-3" aria-hidden>
+        {stops.map((stop) => (
+          <span key={stop} className={stop === value ? "font-semibold text-ink-2" : undefined}>
+            {stop / 1024}K
+          </span>
+        ))}
+      </div>
+      <p className="mt-2.5 text-xs text-ink-2">
+        {t("model.context.note", {
+          words: formatNumber(words),
+          pages: formatNumber(Math.max(1, Math.round(words / 400))),
+        })}{" "}
+        {room < 1500
+          ? t("model.context.tight", { base: formatTokens(base) })
+          : t("model.context.room", {
+              base: formatTokens(base),
+              room: formatTokens(room),
+              messages: formatNumber(Math.round(room / 150 / 10) * 10),
+            })}
+      </p>
+    </section>
+  );
+}
+
 function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="bg-panel px-3 py-2.5">
@@ -590,6 +764,13 @@ function Loading({ model }: { model: LocalModel }) {
   );
 }
 
+/** What a speed feels like in a chat: an answer of a few lines is about 100 tokens. */
+function speedNote(speed: number): MessageKey {
+  if (speed >= 30) return "model.speed.fast";
+  if (speed >= 10) return "model.speed.ok";
+  return "model.speed.slow";
+}
+
 function Loaded({
   step,
   onContinue,
@@ -604,9 +785,26 @@ function Loaded({
       <DialogHeader>
         <DialogTitle>{t("model.loaded", { name: step.model.name })}</DialogTitle>
         <DialogDescription>
-          {full ? t("model.placement.full") : t("model.placement.partial", { share })}
+          {full ? t("model.placement.full") : t("model.placement.partial", { share })}{" "}
+          {t("model.loaded.context", { tokens: formatNumber(step.context) })}
         </DialogDescription>
       </DialogHeader>
+      <DialogBody className="pb-4">
+        <p className="flex items-center gap-2.5 rounded-lg border border-line px-3.5 py-3 text-sm text-ink">
+          <Gauge className="size-4 shrink-0 text-ink-3" />
+          {step.speed === "measuring" ? (
+            <span className="text-ink-2">{t("model.speed.measuring")}</span>
+          ) : step.speed === null ? (
+            <span className="text-ink-2">{t("model.speed.unknown")}</span>
+          ) : (
+            <span>
+              <span className="tabular font-semibold">{formatNumber(step.speed)}</span>{" "}
+              {t("model.speed.unit")}
+              <span className="text-ink-2"> · {t(speedNote(step.speed))}</span>
+            </span>
+          )}
+        </p>
+      </DialogBody>
       <DialogFooter>
         <Button variant="primary" onClick={onContinue}>
           {t("model.continue")}

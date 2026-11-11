@@ -47,8 +47,18 @@ export interface Resources {
   vram_note: string | null;
 }
 
-/** The context the agent runs with: room for the day's snapshot and a conversation. */
+/** The context used when nothing better is known (ADR-004, section 9). */
 export const AGENT_CONTEXT = 16384;
+
+/** The contexts the load dialog offers; a model's own maximum caps the list. */
+const CONTEXT_STOPS = [4096, 8192, 12288, 16384, 24576, 32768];
+/** Below this the agent's own instructions leave too little room to talk. */
+export const MIN_USEFUL_CONTEXT = 8192;
+
+export function contextStops(model: LocalModel): number[] {
+  const stops = CONTEXT_STOPS.filter((stop) => !model.maxContext || stop <= model.maxContext);
+  return stops.length > 0 ? stops : [CONTEXT_STOPS[0]];
+}
 
 const GIB = 1024 ** 3;
 const OLLAMA = "http://127.0.0.1:11434";
@@ -146,6 +156,24 @@ export async function listModels(runtimes: Runtimes): Promise<LocalModel[]> {
 const MEASURED_KEY = "lifeui.modelMemory";
 const measuredId = (model: LocalModel, context: number) =>
   `${model.runtime}:${model.key}:${context}`;
+/** How far over the runtime's estimate ran for a model, from its last trusted load. */
+const overshootId = (model: LocalModel) => `${model.runtime}:${model.key}:overshoot`;
+/**
+ * Before any load has been measured, LM Studio's estimate is taken 10% lower:
+ * on the author's PC it ran 13% over at 8K and 14% over at 16K for a 9B model.
+ */
+const LMSTUDIO_PRIOR = 0.1;
+
+/** The runtime's last raw estimate per model and context, to compare with the load. */
+const rawEstimates = new Map<string, number>();
+
+function readMeasures(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(MEASURED_KEY) ?? "{}") as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
 
 /**
  * What a model really took on the GPU the last time it loaded entirely there.
@@ -164,8 +192,11 @@ export function measuredNeed(model: LocalModel, context = AGENT_CONTEXT): number
 
 function rememberNeed(model: LocalModel, context: number, bytes: number) {
   try {
-    const all = JSON.parse(localStorage.getItem(MEASURED_KEY) ?? "{}") as Record<string, number>;
+    const all = readMeasures();
     all[measuredId(model, context)] = Math.round(bytes);
+    // The same excess is taken off the estimates for the model's other contexts
+    const raw = rawEstimates.get(measuredId(model, context));
+    if (raw && raw > bytes) all[overshootId(model)] = Math.round(raw - bytes);
     localStorage.setItem(MEASURED_KEY, JSON.stringify(all));
   } catch {
     // the runtime's estimate is used next time
@@ -185,10 +216,69 @@ export function trustedMeasure(
   return freeAfterBytes > GPU_MARGIN && usedBytes > 0.8 * model.sizeBytes;
 }
 
-/** Bytes the model needs on the GPU to load entirely there. */
+/**
+ * Bytes the model needs on the GPU to load entirely there: what it took last
+ * time at this context, or the runtime's estimate corrected by what is known
+ * about how high it runs.
+ */
 export async function estimate(model: LocalModel, context = AGENT_CONTEXT): Promise<number> {
   const measured = measuredNeed(model, context);
   if (measured) return measured;
+  const raw = await rawEstimate(model, context);
+  rawEstimates.set(measuredId(model, context), raw);
+  const overshoot = readMeasures()[overshootId(model)];
+  if (overshoot) return Math.max(model.sizeBytes, raw - overshoot);
+  return model.runtime === "lmstudio" ? raw * (1 - LMSTUDIO_PRIOR) : raw;
+}
+
+/** The need at every context the dialog offers (null where the runtime gave none). */
+export async function estimateAll(model: LocalModel): Promise<Record<number, number | null>> {
+  const stops = contextStops(model);
+  const needs = await Promise.all(stops.map((stop) => estimate(model, stop).catch(() => null)));
+  return Object.fromEntries(stops.map((stop, index) => [stop, needs[index]]));
+}
+
+/**
+ * The context to offer first: the largest one that fits entirely on the GPU
+ * right now, and never less than what the agent needs to be useful.
+ */
+export function pickContext(
+  needs: Record<number, number | null>,
+  resources: Resources,
+  stops: number[]
+): number {
+  const fitting = stops.filter((stop) => {
+    const need = needs[stop];
+    return need !== null && need !== undefined && verdict(need, resources) === "fits";
+  });
+  const floor = stops.find((stop) => stop >= MIN_USEFUL_CONTEXT) ?? stops[stops.length - 1];
+  return Math.max(floor, fitting.length > 0 ? fitting[fitting.length - 1] : 0);
+}
+
+const CONTEXT_KEY = "lifeui.modelContext";
+
+/** The context the person chose by hand for this model, if they did. */
+export function savedContext(model: LocalModel): number | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(CONTEXT_KEY) ?? "{}") as Record<string, number>;
+    return all[`${model.runtime}:${model.key}`] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveContext(model: LocalModel, context: number | null): void {
+  try {
+    const all = JSON.parse(localStorage.getItem(CONTEXT_KEY) ?? "{}") as Record<string, number>;
+    if (context === null) delete all[`${model.runtime}:${model.key}`];
+    else all[`${model.runtime}:${model.key}`] = context;
+    localStorage.setItem(CONTEXT_KEY, JSON.stringify(all));
+  } catch {
+    // the automatic choice is used next time
+  }
+}
+
+async function rawEstimate(model: LocalModel, context: number): Promise<number> {
   if (model.runtime === "lmstudio") {
     const result = await invoke<{ gpu_bytes: number | null }>("lmstudio_estimate", {
       model: model.key,
@@ -244,16 +334,57 @@ export function spillBytes(needBytes: number, resources: Resources): number {
   return Math.max(0, needBytes + GPU_MARGIN - gpu.vram_free);
 }
 
-/** Is it loaded right now? */
-export async function isLoaded(model: LocalModel): Promise<boolean> {
+/** Whether it is loaded right now, and with how much context when the runtime says. */
+export async function loadedInfo(model: LocalModel): Promise<{ context: number | null } | null> {
   if (model.runtime === "lmstudio") {
     const loaded = await invoke<Array<Record<string, unknown>>>("lmstudio_loaded").catch(() => []);
-    return loaded.some((m) => [m.modelKey, m.identifier, m.path].includes(model.key));
+    const hit = loaded.find((m) => [m.modelKey, m.identifier, m.path].includes(model.key));
+    return hit ? { context: Number(hit.contextLength) || null } : null;
   }
   const res = await desktopFetch(`${OLLAMA}/api/ps`).catch(() => null);
-  if (!res) return false;
-  const { models = [] } = (await res.json()) as { models?: Array<{ name: string }> };
-  return models.some((m) => m.name === model.key);
+  if (!res) return null;
+  const { models = [] } = (await res.json()) as {
+    models?: Array<{ name: string; context_length?: number }>;
+  };
+  const hit = models.find((m) => m.name === model.key);
+  return hit ? { context: hit.context_length ?? null } : null;
+}
+
+/**
+ * A quick speed test: how many tokens per second the loaded model writes.
+ * One token first to wake it up, then a short text timed from the outside.
+ */
+export async function benchmark(baseUrl: string, modelKey: string): Promise<number | null> {
+  const ask = async (maxTokens: number) => {
+    const started = performance.now();
+    const res = await desktopFetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modelKey,
+        messages: [
+          { role: "user", content: "Count from 1 to 80, numbers only, separated by spaces." },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { usage?: { completion_tokens?: number } };
+    const tokens = data.usage?.completion_tokens;
+    const seconds = (performance.now() - started) / 1000;
+    return tokens && seconds > 0 ? { tokens, seconds } : null;
+  };
+  try {
+    await ask(1);
+    const run = await ask(96);
+    // Too few tokens say nothing about speed
+    return run && run.tokens >= 16 ? Math.round(run.tokens / run.seconds) : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface Placement {

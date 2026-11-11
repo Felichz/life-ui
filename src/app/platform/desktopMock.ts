@@ -110,6 +110,7 @@ const MODELS = [
 ];
 
 let loaded: string | null = null;
+let loadedContext = 16384;
 let serverRunning = false;
 
 const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
@@ -127,8 +128,8 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       {
         name: "NVIDIA GeForce RTX 3070 Laptop GPU",
         vram_total: 8192 * MIB,
-        vram_used: (loaded ? 4368 + 7752 : 4368) * MIB,
-        vram_free: Math.max(0, 8192 - 4368 - (loaded ? 7752 : 0)) * MIB,
+        vram_used: (loaded ? 920 + 6650 : 920) * MIB,
+        vram_free: (8192 - 920 - (loaded ? 6650 : 0)) * MIB,
       },
     ],
     vram_note: null,
@@ -138,7 +139,6 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     loaded
       ? []
       : [
-          { pid: 39652, name: "python", bytes: 3477 * MIB, system: false },
           { pid: 20680, name: "chrome", bytes: 177 * MIB, system: false },
           { pid: 10100, name: "msedgewebview2", bytes: 103 * MIB, system: false },
           { pid: 22020, name: "explorer", bytes: 95 * MIB, system: true },
@@ -147,14 +147,18 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
           { pid: 19604, name: "csrss", bytes: 35 * MIB, system: true },
         ],
   lmstudio_models: () => MODELS,
-  lmstudio_loaded: () => (loaded ? [{ modelKey: loaded, identifier: loaded }] : []),
-  lmstudio_estimate: ({ model }) => ({
-    gpu_bytes: model === "qwen/qwen3.5-9b" ? 7.57 * GIB : null,
+  lmstudio_loaded: () =>
+    loaded ? [{ modelKey: loaded, identifier: loaded, contextLength: loadedContext }] : [],
+  // LM Studio's own figures for Qwen3.5 9B: 6.95 GiB at 4K, 7.57 GiB at 16K
+  lmstudio_estimate: ({ model, context }) => ({
+    gpu_bytes:
+      model === "qwen/qwen3.5-9b" ? (6.95 + ((Number(context) - 4096) / 4096) * 0.207) * GIB : null,
     total_bytes: null,
     raw: "",
   }),
-  lmstudio_load: ({ model }) => {
+  lmstudio_load: ({ model, context }) => {
     loaded = String(model);
+    loadedContext = Number(context);
     return "";
   },
   lmstudio_unload: () => {
@@ -176,5 +180,21 @@ export function installDesktopMock(): void {
       return handler(args);
     },
     transformCallback: () => 0,
+    mock: true,
+  };
+  // The runtime's server: every completion takes 0.6 s and writes 34 tokens (56 tokens/s)
+  const browserFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    if (!String(input).includes("127.0.0.1:1234/v1/chat/completions")) {
+      return browserFetch(input, init);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: "Hola. Soy el modelo de prueba." } }],
+        usage: { prompt_tokens: 3200, completion_tokens: 34 },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
   };
 }

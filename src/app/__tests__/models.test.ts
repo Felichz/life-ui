@@ -1,5 +1,7 @@
 import {
   closingIsEnough,
+  contextStops,
+  pickContext,
   spillBytes,
   trustedMeasure,
   verdict,
@@ -62,5 +64,38 @@ describe("trustedMeasure", () => {
   });
   it("does not trust a reading far below the weights (it landed elsewhere)", () => {
     expect(trustedMeasure(0.4 * GIB, 5 * GIB, model)).toBe(false);
+  });
+});
+
+describe("pickContext", () => {
+  const GIB = 1024 ** 3;
+  const resources = (freeGiB: number): Resources => ({
+    ram_total: 16 * GIB,
+    ram_available: 6 * GIB,
+    gpus: [
+      {
+        name: "GPU",
+        vram_total: 8 * GIB,
+        vram_used: (8 - freeGiB) * GIB,
+        vram_free: freeGiB * GIB,
+      },
+    ],
+    vram_note: null,
+  });
+  const stops = [4096, 8192, 16384, 32768];
+  const needs = { 4096: 6.2 * GIB, 8192: 6.4 * GIB, 16384: 6.8 * GIB, 32768: 7.6 * GIB };
+
+  it("offers the largest context that fits entirely on the GPU", () => {
+    expect(pickContext(needs, resources(7.1), stops)).toBe(16384);
+    expect(pickContext(needs, resources(7.9), stops)).toBe(32768);
+  });
+
+  it("never goes below what the agent needs to be useful, even when nothing fits", () => {
+    expect(pickContext(needs, resources(3), stops)).toBe(8192);
+  });
+
+  it("only offers contexts the model supports", () => {
+    const small = { maxContext: 8192 } as Parameters<typeof contextStops>[0];
+    expect(contextStops(small)).toEqual([4096, 8192]);
   });
 });

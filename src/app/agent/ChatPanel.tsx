@@ -35,7 +35,13 @@ import { Segmented } from "../components/ui/Segmented";
 import { Tooltip } from "../components/ui/Tooltip";
 import { Logo } from "../components/TypeIcon";
 import { cn } from "../lib/cn";
-import { formatDateShort, formatNumber, formatTime } from "../lib/format";
+import {
+  formatContext,
+  formatDateShort,
+  formatNumber,
+  formatTime,
+  formatTokens,
+} from "../lib/format";
 import { isDesktop } from "../platform/desktop";
 import { useModel } from "../runtime/ModelGate";
 import { useSystem } from "../state/system";
@@ -45,10 +51,6 @@ import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
 import { Markdown } from "./Markdown";
 import type { Attachment, ContextUsage, Entry, Mode } from "./agent";
-
-/** 4200 -> "4,2K": tokens are read at a glance, not counted. */
-export const formatTokens = (tokens: number) =>
-  tokens < 1000 ? formatNumber(tokens) : `${formatNumber(tokens / 1000, 1)}K`;
 
 const TEXT_FILES = ".txt,.md,.markdown,.csv,.json,.log,.yaml,.yml,text/plain";
 
@@ -258,7 +260,7 @@ export function ChatPanel({ className }: { className?: string }) {
                 <p className="text-sm text-ink">
                   {t("agent.overflow", {
                     used: formatTokens(usage.used),
-                    total: formatTokens(usage.context),
+                    total: formatContext(usage.context),
                   })}
                 </p>
                 <Button
@@ -394,7 +396,7 @@ function ContextMeter({ usage, busy }: { usage: ContextUsage; busy: boolean }) {
           type="button"
           aria-label={t("agent.context.label", {
             used: formatTokens(usage.used),
-            total: formatTokens(usage.context),
+            total: formatContext(usage.context),
           })}
           className="tabular mr-1 flex h-7 items-center gap-2 rounded px-2 text-xs text-ink-2 transition-colors duration-150 hover:bg-hover hover:text-ink coarse:h-9"
         >
@@ -404,7 +406,7 @@ function ContextMeter({ usage, busy }: { usage: ContextUsage; busy: boolean }) {
               style={{ width: `${Math.max(6, share * 100)}%` }}
             />
           </span>
-          {formatTokens(usage.used)} / {formatTokens(usage.context)}
+          {formatTokens(usage.used)} / {formatContext(usage.context)}
         </button>
       </MenuTrigger>
       <MenuContent className="w-[280px]">

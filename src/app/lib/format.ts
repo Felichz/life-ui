@@ -102,3 +102,13 @@ export function greeting(date = new Date()): string {
   if (hour < 20) return t("greeting.afternoon");
   return t("greeting.night");
 }
+
+/** 4200 -> "4,2K": tokens are read at a glance, not counted. */
+export function formatTokens(tokens: number): string {
+  return tokens < 1000 ? formatNumber(tokens) : `${formatNumber(tokens / 1000, 1)}K`;
+}
+
+/** A context window: 16384 -> "16K", the way runtimes name it. */
+export function formatContext(tokens: number): string {
+  return tokens % 1024 === 0 ? `${tokens / 1024}K` : formatTokens(tokens);
+}

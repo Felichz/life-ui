@@ -371,10 +371,10 @@ export class Agent {
    * the summary in their place. Returns false when there was nothing to
    * summarize.
    */
-  private async compactNow(signal: AbortSignal): Promise<boolean> {
+  private async compactNow(signal: AbortSignal, tailShare = 0.25): Promise<boolean> {
     const context = this.context;
     const available = Math.max(1000, context - this.fixedTokens() - REPLY_RESERVE);
-    const { old, tail } = splitForCompaction(this.history, Math.floor(available * 0.25));
+    const { old, tail } = splitForCompaction(this.history, Math.floor(available * tailShare));
     if (old.length === 0) {
       // One huge turn: its tool results are the only thing that can shrink
       this.history = shrinkToolResults(this.history);
@@ -420,7 +420,8 @@ export class Agent {
     this.abort = abort;
     this.emit();
     try {
-      await this.compactNow(abort.signal);
+      // Asked for by hand, everything but the last turn is summarized
+      await this.compactNow(abort.signal, 0);
     } catch (caught) {
       if (!abort.signal.aborted) {
         this.add({

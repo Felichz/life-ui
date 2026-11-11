@@ -68,6 +68,19 @@ Next to "Change" there is an unload button (2026-11-11): it frees the model's me
 
 LM Studio's estimate runs high. On the author's PC it gave 7.16 GiB for Qwen3.5 9B at 8K context, and the load took 6.2 GiB (0.9 to 7.1 of 8.0 GiB), running at 56 tokens/s. That gap is enough to tell the person a model "does not fit" when it does. So after a load that leaves room on the GPU, the app keeps what the model really took (per model and context, `lifeui.modelMemory`) and uses it instead of the estimate from then on; the same load is reported as 100% on the GPU. A load that fills the GPU is not trusted, because part of it may have spilled. The first load of a model still relies on the estimate.
 
+### 9. The context is chosen in the load dialog (2026-11-11)
+
+The context was fixed at 16K. Now the load dialog has a slider (4K, 8K, 12K, 16K, 24K, 32K, capped by the model's own maximum) and everything in the dialog follows it as it moves: the memory needed, the bar, the verdict and the list of what to close.
+
+- **Automatic by default:** the largest context that fits entirely on the GPU right now, and never less than 8K, which is the least that leaves room to talk after the agent's own 3.4K. A context chosen by hand is remembered per model; "Use automatic" goes back.
+- **In perspective:** under the slider, what the number means: about how many words and pages it is, how much the agent uses, and how many messages are left before a compaction.
+- **Estimates:** the need at every stop is asked from the runtime at once. A measured load (section 8) also records how far over the estimate ran, and that excess is taken off the model's other contexts. Before any measurement LM Studio's estimate is taken 10% lower, from the two points measured on the author's PC (13% and 14% over); this is one PC and one model, and a first load can still be off.
+- **Loaded elsewhere:** a model already loaded from LM Studio is used with the context it has there (`lms ps` reports it), not the one the app would have chosen.
+
+### 10. A speed test after loading (2026-11-11)
+
+After a load, and when a loaded model is found at launch, the app asks the model for one token to wake it up and then for a short text, and divides the tokens written by the time taken. The result shows in the "ready" step ("56 tokens per second · it answers right away") and next to the model's name. It is timed from outside, so it includes the wait before the first token: a rough figure, good enough to tell fast from slow.
+
 ## Consequences
 
 - The load dialog is the first screen of each session when no model is loaded.

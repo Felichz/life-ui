@@ -15,6 +15,12 @@ export async function invoke<T>(command: string, args?: Record<string, unknown>)
 
 /** fetch that runs in Rust: no CORS for local runtimes or cloud providers. */
 export async function desktopFetch(input: string, init?: RequestInit): Promise<Response> {
+  // The dev stand-in for the shell has no Rust side: the browser's fetch answers
+  if (
+    (window as unknown as { __TAURI_INTERNALS__?: { mock?: boolean } }).__TAURI_INTERNALS__?.mock
+  ) {
+    return fetch(input, init);
+  }
   const { fetch: rustFetch } = await import("@tauri-apps/plugin-http");
   return rustFetch(input, init);
 }
