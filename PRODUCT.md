@@ -31,6 +31,7 @@ Not a todo app, not a habit tracker, not a time tracker. The distinctive mechani
 - Time blocks: user-defined, non-overlapping hour ranges (e.g. Morning 06:00–12:00) plus the permanent "To do" block. Only activities in "To do" or in the block that is current right now can be activated; future/past blocks are visible but locked.
 - Exactly one active activity at a time. Switching, completing, ending the day or interrupting all route through the closing ritual (requestCompletion → modal → completeActivity / interruptActivity). Closing the modal without choosing leaves the activity running.
 - Days ahead (ADR-008): an activity can be planned for a future date, once or repeated on weekdays for a number of weeks, with a time and notes (what to do in it: a routine, a checklist). Planned days join the plan of the day when their date comes; a date that went by is not a debt and comes along with the next day.
+- The agent is also a coach (ADR-009): for a goal, a habit or a project it asks, recommends with reasons, and plans it small and exact. With the person's permission it can search the web to support its advice; only the search text leaves the machine, and every search shows in the chat.
 - Events: one-tap point-in-time markers ("Tomé ibuprofeno", "Café") from reusable event templates.
 - Timeline of the day: completed and interrupted activities, the running one, events.
 - Overview: day metrics (tempos, % of reference, completed count, average satisfaction) and multi-day trends.

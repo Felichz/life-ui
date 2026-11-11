@@ -91,7 +91,7 @@ describe("pickContext", () => {
   });
 
   it("never goes below what the agent needs to be useful, even when nothing fits", () => {
-    expect(pickContext(needs, resources(3), stops)).toBe(8192);
+    expect(pickContext(needs, resources(3), stops)).toBe(16384);
   });
 
   it("only offers contexts the model supports", () => {

@@ -11,6 +11,8 @@ mod state;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
+        // Links in the chat (the sources of a web search) open in the person's browser
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

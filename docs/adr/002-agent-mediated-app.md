@@ -56,6 +56,8 @@ These rules go to the model as its system prompt (`AGENT.md`) and are the test t
 8. **Local and private.** With a local model nothing leaves the machine. A remote provider is used only when the user configures one (ADR-005).
 9. **Kind, never judging.** The voice of `PRODUCT.md`: progress is shown as what was reached, never as what is missing.
 
+> Amended by ADR-009 (2026-11-11): goals, habits and projects are coached, brevity is a default rather than a ceiling, and the agent's lane widens from "organizing the day" to how the person uses their days. The rest of this section stands.
+
 ### 5. The model is small, so the design assumes mistakes
 
 The first target model is Qwen 3.5 9B running locally. Small models call tools less reliably than large ones. The design compensates:

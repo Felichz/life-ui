@@ -19,6 +19,8 @@ import {
   type SavedChats,
 } from "./agent";
 import { DEFAULT_CONTEXT } from "./context";
+import { desktopFetch, isDesktop } from "../platform/desktop";
+import { getWebSetting, setWebSetting } from "./web";
 import { chat, type ChatMessage, type ModelEndpoint } from "./llm";
 import prompt from "./prompt";
 import { getLocale } from "../i18n";
@@ -152,6 +154,13 @@ export function AgentProvider({
       vision: () => visionRef.current,
       // A title costs one more call: only a model loaded for real is asked for it
       titles: () => loadedRef.current,
+      web: {
+        setting: getWebSetting,
+        allow: () => setWebSetting("on"),
+        // In the desktop app the request leaves from Rust: no CORS in the way
+        http: (input, init) =>
+          isDesktop() ? desktopFetch(String(input), init) : fetch(input, init),
+      },
       // Tests inject their own model and start from an empty conversation
       store: injected ? undefined : chatStore,
       chat: (messages, tools, signal, options) => {

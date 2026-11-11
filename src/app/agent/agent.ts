@@ -1,7 +1,7 @@
 import type { ISystemCore } from "../../types";
 import { isCoreError } from "../../system";
 import { daySnapshot } from "./snapshot";
-import { ToolError, TOOLS, toolByName, toolSchemas, type Tool } from "./tools";
+import { ToolError, TOOLS, toolByName, toolSchemas, type Tool, type ToolContext } from "./tools";
 import { t } from "../i18n";
 import {
   DEFAULT_CONTEXT,
@@ -14,6 +14,7 @@ import {
   textOf,
 } from "./context";
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
+import type { WebSetting } from "./web";
 
 /**
  * The agent loop (ADR-002): the person writes, the model answers or calls
@@ -62,6 +63,8 @@ export type Entry =
       error?: string;
       /** Tempos the change earns: the preview while it waits, the real ones once done. */
       tempos?: number;
+      /** A search on the web rather than a change to the day. */
+      external?: boolean;
     }
   | {
       id: string;
@@ -139,6 +142,13 @@ export interface AgentOptions {
   vision?: () => boolean;
   /** Whether to ask the model for a short title after the first exchange. */
   titles?: () => boolean;
+  /** Research on the web (ADR-009): the person's setting, and how to reach out. */
+  web?: {
+    setting: () => WebSetting;
+    /** Called when the person allows searching from the chat. */
+    allow: () => void;
+    http: typeof fetch;
+  };
 }
 
 /** Entries kept on screen and on disk per conversation; older ones fall off the top. */
@@ -195,6 +205,8 @@ export class Agent {
   /** What the runtime counted at the last reply, and the history length it covers. */
   private measured: { tokens: number; at: number } | null = null;
   private titled = false;
+  /** Something read from the web is in this turn: changes ask first, whatever the mode. */
+  private webThisTurn = false;
 
   constructor(private readonly options: AgentOptions) {
     const saved = options.store?.load();
@@ -357,11 +369,20 @@ export class Agent {
     return this.options.context?.() ?? DEFAULT_CONTEXT;
   }
 
+  private webSetting(): WebSetting {
+    return this.options.web?.setting() ?? "off";
+  }
+
+  /** The tools the model is offered now: web search only while the person allows it. */
+  private schemas() {
+    return toolSchemas(this.webSetting() !== "off");
+  }
+
   /** What every request carries before the conversation: the prompt, the day and the tools. */
   private fixedTokens(): number {
     return (
       estimateTokens(this.system().content as string) +
-      estimateTokens(JSON.stringify(toolSchemas()))
+      estimateTokens(JSON.stringify(this.schemas()))
     );
   }
 
@@ -572,7 +593,11 @@ export class Agent {
       : "";
     return {
       role: "system",
-      content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${this.languageName()}. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}".\n\n${JSON.stringify(day)}${earlier}`,
+      content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${this.languageName()}. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}". ${
+        this.webSetting() === "off"
+          ? "Web search is turned off: you cannot look things up. The person can turn it on in Settings."
+          : "You can look things up with web_search."
+      }\n\n${JSON.stringify(day)}${earlier}`,
     };
   }
 
@@ -633,7 +658,14 @@ export class Agent {
           "The person did not give a time. Do not invent one: ask them in words, or make the change without a time.",
       };
     }
-    const ctx = { core: this.options.core, now: this.options.now ?? (() => new Date()) };
+    const ctx = {
+      core: this.options.core,
+      now: this.options.now ?? (() => new Date()),
+      http: this.options.web?.http,
+      signal: this.abort?.signal,
+    };
+
+    if (tool.external) return this.runExternal(tool, ctx, args);
 
     if (!tool.mutates) {
       try {
@@ -661,7 +693,9 @@ export class Agent {
       ...(tempos !== undefined ? { tempos } : {}),
     });
 
-    if (this.mode === "confirm" || tool.alwaysConfirm) {
+    // What a web page says must not change the day on its own: after a search
+    // in this turn every change waits for the person, also in auto mode
+    if (this.mode === "confirm" || tool.alwaysConfirm || this.webThisTurn) {
       const yes = await new Promise<boolean>((resolve) => this.decisions.set(entry.id, resolve));
       if (!yes) {
         this.patch(entry.id, { status: "rejected" });
@@ -688,6 +722,63 @@ export class Agent {
       const result = failure(caught);
       this.patch(entry.id, { status: "error", error: String(result.error) });
       return result;
+    }
+  }
+
+  /**
+   * A tool that reaches outside the machine (a web search). It shows in the
+   * conversation, so what left the machine is always in sight, and the first
+   * one waits for the person's yes.
+   */
+  private async runExternal(tool: Tool, ctx: ToolContext, args: Record<string, unknown>) {
+    const web = this.options.web;
+    const setting = this.webSetting();
+    if (!web || setting === "off") {
+      return {
+        error: "web-off",
+        detail:
+          "Web search is turned off. Answer from what you know and say that you did not check it.",
+      };
+    }
+    let summary: string;
+    try {
+      const described = tool.describe?.(ctx, args) ?? tool.name;
+      summary = typeof described === "string" ? described : described.text;
+    } catch (caught) {
+      return failure(caught);
+    }
+    const entry = this.add({
+      id: nextId(),
+      kind: "tool",
+      name: tool.name,
+      summary,
+      status: "pending",
+      external: true,
+    });
+    if (setting === "ask") {
+      const yes = await new Promise<boolean>((resolve) => this.decisions.set(entry.id, resolve));
+      if (!yes) {
+        this.patch(entry.id, { status: "rejected" });
+        return {
+          rejected: true,
+          note: "The person does not want a web search now. Answer from what you know and say that you did not check it.",
+        };
+      }
+      web.allow();
+    }
+    this.patch(entry.id, { status: "running" });
+    try {
+      const result = await tool.run(ctx, args);
+      this.webThisTurn = true;
+      this.patch(entry.id, { status: "done" });
+      return result;
+    } catch (caught) {
+      const result = failure(caught);
+      this.patch(entry.id, { status: "error", error: String(result.error) });
+      return {
+        ...result,
+        note: "The search failed. Answer from what you know and say that you did not check it.",
+      };
     }
   }
 
@@ -764,6 +855,7 @@ export class Agent {
   /** One turn of the model: it answers, or calls tools and is asked again. */
   private async run() {
     this.busy = true;
+    this.webThisTurn = false;
     const abort = new AbortController();
     this.abort = abort;
     this.emit();
@@ -810,7 +902,7 @@ export class Agent {
         const request = this.request();
         let reply: ModelReply;
         try {
-          reply = await this.options.chat(request, toolSchemas(), abort.signal, { onText });
+          reply = await this.options.chat(request, this.schemas(), abort.signal, { onText });
         } catch (caught) {
           // The estimate was short and the runtime refused the request as too
           // long: compact everything but the last turn and ask once more
@@ -898,7 +990,7 @@ export class Agent {
   /** The runtime's own token count corrects the estimate from then on. */
   private learnTokens(request: ChatMessage[], reply: ModelReply) {
     if (!reply.usage?.prompt) return;
-    const estimated = historyTokens(request) + estimateTokens(JSON.stringify(toolSchemas()));
+    const estimated = historyTokens(request) + estimateTokens(JSON.stringify(this.schemas()));
     if (estimated <= 0) return;
     this.tokenRatio = Math.max(0.6, Math.min(1.8, reply.usage.prompt / estimated));
   }

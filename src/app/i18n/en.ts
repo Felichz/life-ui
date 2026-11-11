@@ -568,6 +568,17 @@ export const en: Record<MessageKey, string> = {
   "agent.tool.planMany": "Plan “{title}” · {when} · {from} to {to} ({count} times)",
   "agent.tool.cancelPlanned": "Cancel planned “{title}” ({count} times)",
   "agent.everyDay": "every day",
+  "agent.tool.web": "Search the web: “{query}”",
+  "agent.web.ask":
+    "Only the search text leaves your machine, to Exa. If you allow it, LifeUI will search when it helps; you can change it in Settings.",
+  "agent.web.allow": "Allow searches",
+  "settings.web.title": "Web research",
+  "settings.web.description": "LifeUI can look things up to support what it advises.",
+  "settings.web.ask": "Ask",
+  "settings.web.on": "On",
+  "settings.web.off": "Off",
+  "settings.web.detail":
+    "Every search shows in the chat. Only the search text leaves your machine, to the Exa search engine; nothing about your day or your data.",
   "agent.tool.delete": "Delete “{title}” from the library",
   "agent.title": "Chat",
   "agent.placeholder": "Tell LifeUI what you want to do…",

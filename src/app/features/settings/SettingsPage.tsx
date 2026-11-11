@@ -1,4 +1,12 @@
-import { useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { getWebSetting, onWebSetting, setWebSetting, type WebSetting } from "../../agent/web";
 import { Download, Monitor, Moon, Sun, Trash2, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { UtilityService } from "../../../system/utilityService";
@@ -54,6 +62,7 @@ export function SettingsPage() {
         <TargetSection />
         <AppearanceSection />
         <LanguageSection />
+        <WebSection />
         <Section title={t("settings.shortcuts")} description={t("settings.shortcutsHint")}>
           <dl className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2.5 text-base">
             {[
@@ -183,6 +192,26 @@ function LanguageSection() {
         onChange={setLocale}
         options={LOCALES.map((option) => ({ value: option, label: LOCALE_NAMES[option] }))}
       />
+    </Section>
+  );
+}
+
+/** Whether the agent may look things up on the web (ADR-009). */
+function WebSection() {
+  const setting = useSyncExternalStore(onWebSetting, getWebSetting);
+  return (
+    <Section title={t("settings.web.title")} description={t("settings.web.description")}>
+      <Segmented<WebSetting>
+        label={t("settings.web.title")}
+        value={setting}
+        onChange={setWebSetting}
+        options={[
+          { value: "ask", label: t("settings.web.ask") },
+          { value: "on", label: t("settings.web.on") },
+          { value: "off", label: t("settings.web.off") },
+        ]}
+      />
+      <p className="mt-2.5 max-w-md text-sm text-ink-2">{t("settings.web.detail")}</p>
     </Section>
   );
 }

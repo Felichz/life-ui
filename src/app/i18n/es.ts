@@ -564,6 +564,17 @@ export const es = {
   "agent.tool.planMany": "Programar «{title}» · {when} · del {from} al {to} ({count} veces)",
   "agent.tool.cancelPlanned": "Cancelar «{title}» programada ({count} veces)",
   "agent.everyDay": "todos los días",
+  "agent.tool.web": "Buscar en internet: «{query}»",
+  "agent.web.ask":
+    "Solo sale de tu equipo el texto de la búsqueda, hacia Exa. Si lo permites, LifeUI buscará cuando le sirva; se cambia en Ajustes.",
+  "agent.web.allow": "Permitir búsquedas",
+  "settings.web.title": "Investigar en internet",
+  "settings.web.description": "LifeUI puede buscar información para apoyar lo que te aconseja.",
+  "settings.web.ask": "Preguntar",
+  "settings.web.on": "Activado",
+  "settings.web.off": "Desactivado",
+  "settings.web.detail":
+    "Cada búsqueda aparece en el chat. Solo sale de tu equipo el texto de la búsqueda, hacia el buscador Exa; nada de tu día ni de tus datos.",
   "agent.tool.delete": "Borrar «{title}» de la biblioteca",
   "agent.title": "Chat",
   "agent.placeholder": "Dile a LifeUI qué quieres hacer…",
