@@ -43,6 +43,16 @@ function devEndpoint(): ModelEndpoint | null {
   }
 }
 
+/** Dev builds only: the coach's notes with the dev model, to try the real thing in a browser. */
+function devNotes(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  try {
+    return localStorage.getItem("lifeui.devNotes") === "1";
+  } catch {
+    return false;
+  }
+}
+
 const CHATS_KEY = "lifeui.chats";
 /** The single conversation of earlier versions, read once and moved over. */
 const LEGACY_KEY = "lifeui.chat";
@@ -156,7 +166,7 @@ export function AgentProvider({
       // A title costs one more call: only a model loaded for real is asked for it
       titles: () => loadedRef.current,
       // The coach's notes cost one more short call: as with titles, only with a real model
-      notes: () => loadedRef.current,
+      notes: () => loadedRef.current || devNotes(),
       reasoning: getReasoning,
       web: {
         setting: getWebSetting,

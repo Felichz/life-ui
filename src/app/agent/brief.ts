@@ -399,11 +399,14 @@ export async function updateBrief(options: {
       time: text(plan.time),
     };
     const exact = bind(brief?.plan?.exact ?? {}, options.person, noted);
+    // An instruction about the day ("add reading, 20 minutes") says nothing lasting
+    // about the person: whatever the model listed for it is not kept
+    const lasting = notes.instruction === true && plan.wanted !== true ? {} : notes;
     const next: Brief = {
-      wants: merge(brief?.wants ?? [], strings(notes.wants)),
-      has: merge(brief?.has ?? [], strings(notes.has)),
-      limits: merge(brief?.limits ?? [], strings(notes.limits)),
-      unsure: merge(brief?.unsure ?? [], strings(notes.unsure)),
+      wants: merge(brief?.wants ?? [], strings(lasting.wants)),
+      has: merge(brief?.has ?? [], strings(lasting.has)),
+      limits: merge(brief?.limits ?? [], strings(lasting.limits)),
+      unsure: merge(brief?.unsure ?? [], strings(lasting.unsure)),
       ...(wanted
         ? {
             plan: {
@@ -498,7 +501,12 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
       .slice(0, 2)
       .join("; ")}. Ask nothing else.`;
   }
-  if (!brief.plan) return answer;
+  if (!brief.plan) {
+    // No plan was asked for. If the coach is about to propose one anyway, it
+    // does not make up the time the person has: told only "I never use my
+    // weights", a 9B model laid out 45 minutes, three days a week, at 19:00.
+    return `${answer}If you are about to propose a routine or a plan, do not lay it out yet unless the notes say how long a session can be and on which days: ask for those first, two questions at most. Never give a duration, days or an hour of your own as if they were theirs.`;
+  }
   if (brief.plan.built) {
     return `${answer}The plan is DONE: it is in the app as a roadmap, with every session on the calendar. If they ask for the roadmap or the plan, tell them it is already made and that they can see it on the Goals page. Do not build it again, do not ask for a yes to it, and ask them nothing more about it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change.`;
   }

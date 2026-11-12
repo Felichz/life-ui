@@ -273,6 +273,9 @@ export function addNote(current: string, note: string, section: string): string 
 
 type Kind = "goal" | "range" | "timebox";
 
+/** A note in the ideal life is one idea: a list of everything asked for in a chat is not. */
+const MAX_NOTE = 180;
+
 const plain = (text: string) =>
   text
     .toLocaleLowerCase()
@@ -944,6 +947,12 @@ export const TOOLS: Tool[] = [
     run: ({ core, spoken }, args) => {
       const note = str(args.text);
       if (!note) throw new ToolError("missing-text");
+      if (note.length > MAX_NOTE) {
+        throw new ToolError(
+          "too-long",
+          `one idea per note, in at most ${MAX_NOTE} characters: the one thing they said about the life they want. Requests for today, for a plan or for a search are not it.`
+        );
+      }
       // Their ideal life is written in their words. A model asked to note a wish
       // wrote a nicer one of its own ("because I value my voice…").
       if (spoken !== undefined && !inTheirWords(note, spoken)) {
