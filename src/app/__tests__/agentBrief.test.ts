@@ -215,6 +215,16 @@ describe("the notes", () => {
     expect(next?.agreed).toBeUndefined();
   });
 
+  it("say what a message is even when it says nothing about the person", async () => {
+    const brief = await updateBrief({
+      brief: null,
+      person: "agrega leer 20 minutos",
+      language: "Spanish",
+      chat: async () => notes({ instruction: true }),
+    });
+    expect(brief).toMatchObject({ instruction: true, wants: [] });
+  });
+
   it("stay as they were when the call fails or brings nothing", async () => {
     const before: Brief = { wants: ["dormir mejor"], has: [], limits: [], unsure: [] };
     const failed = await updateBrief({
