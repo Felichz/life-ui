@@ -142,6 +142,8 @@ export interface AgentOptions {
   vision?: () => boolean;
   /** Whether to ask the model for a short title after the first exchange. */
   titles?: () => boolean;
+  /** Whether the model thinks before answering. Left out: the model's own default. */
+  reasoning?: () => boolean;
   /** Research on the web (ADR-009): the person's setting, and how to reach out. */
   web?: {
     setting: () => WebSetting;
@@ -913,7 +915,10 @@ export class Agent {
         const request = this.request();
         let reply: ModelReply;
         try {
-          reply = await this.options.chat(request, this.schemas(), abort.signal, { onText });
+          reply = await this.options.chat(request, this.schemas(), abort.signal, {
+            onText,
+            reasoning: this.options.reasoning?.(),
+          });
         } catch (caught) {
           // The estimate was short and the runtime refused the request as too
           // long: compact everything but the last turn and ask once more
@@ -1041,7 +1046,8 @@ export class Agent {
         ],
         [],
         undefined,
-        { maxTokens: 1024 }
+        // A title needs no thinking
+        { maxTokens: 1024, reasoning: false }
       )
       .then((reply) => {
         const title = (reply.content.split("\n").find((line) => line.trim()) ?? "")

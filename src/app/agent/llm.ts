@@ -59,6 +59,11 @@ export function visibleSoFar(text: string): string {
 
 export interface ChatOptions {
   maxTokens?: number;
+  /**
+   * false: a reasoning model is asked to answer straight away, without
+   * thinking first (ADR-004, section 12). Left out: the model's own default.
+   */
+  reasoning?: boolean;
   /** Called with the whole visible text so far, as the model writes it. */
   onText?: (text: string) => void;
 }
@@ -145,6 +150,9 @@ async function readStream(
   };
 }
 
+/** Endpoints that answered 400 to the reasoning switch, for this session. */
+const refusesSwitch = new Set<string>();
+
 export async function chat(
   endpoint: ModelEndpoint,
   messages: ChatMessage[],
@@ -153,24 +161,37 @@ export async function chat(
   options: ChatOptions = {}
 ): Promise<ModelReply> {
   const send = isDesktop() ? desktopFetch : fetch;
-  const response = await send(`${endpoint.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(endpoint.apiKey ? { Authorization: `Bearer ${endpoint.apiKey}` } : {}),
-    },
-    body: JSON.stringify({
-      model: endpoint.model,
-      messages,
-      // A call without tools (a summary) must not carry an empty tool list
-      ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
-      ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
-      temperature: 0.2,
-      stream: true,
-      stream_options: { include_usage: true },
-    }),
-    signal,
-  });
+  const post = (reasoningOff: boolean) =>
+    send(`${endpoint.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(endpoint.apiKey ? { Authorization: `Bearer ${endpoint.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: endpoint.model,
+        messages,
+        // A call without tools (a summary) must not carry an empty tool list
+        ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
+        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        // LM Studio turns thinking off with reasoning_effort "none" (measured:
+        // 2 s instead of 62 s on Qwen3.5 9B); Ollama's own switch is `think`
+        ...(reasoningOff ? { reasoning_effort: "none", think: false } : {}),
+        temperature: 0.2,
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+      signal,
+    });
+  // A server or a model that does not know the switch refuses the request:
+  // it is sent again without it, and not offered the switch again
+  const id = `${endpoint.baseUrl}|${endpoint.model}`;
+  const reasoningOff = options.reasoning === false && !refusesSwitch.has(id);
+  let response = await post(reasoningOff);
+  if (reasoningOff && response.status === 400) {
+    refusesSwitch.add(id);
+    response = await post(false);
+  }
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(

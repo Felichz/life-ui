@@ -177,7 +177,8 @@ export async function summarize(
         [],
         signal,
         // Thinking models spend output tokens before they write: leave them room
-        { maxTokens: 2048 }
+        // and a summary needs no thinking at all, when the model can skip it
+        { maxTokens: 2048, reasoning: false }
       );
       if (signal?.aborted) throw new Error("aborted");
       const note = reply.content.trim();
@@ -200,7 +201,7 @@ export async function summarize(
     { role: "user", content: summary },
   ];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const reply = await chat(ask, [], signal, { maxTokens: 3072 });
+    const reply = await chat(ask, [], signal, { maxTokens: 3072, reasoning: false });
     if (signal?.aborted) throw new Error("aborted");
     const text = reply.content.trim();
     if (shaped(text)) return { summary: text, chunks: firstPassChunks };

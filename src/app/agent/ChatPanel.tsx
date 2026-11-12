@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ChangeEvent,
   type ClipboardEvent,
   type DragEvent,
@@ -12,6 +13,7 @@ import {
 import {
   ArrowLeft,
   ArrowUp,
+  Brain,
   Check,
   ChevronDown,
   CircleSlash,
@@ -54,6 +56,7 @@ import { useToast } from "../state/toast";
 import { ModelBadge } from "../runtime/ModelBadge";
 import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
+import { getReasoning, onReasoning, setReasoning } from "./reasoning";
 import { Markdown } from "./Markdown";
 import type { Attachment, ContextUsage, Entry, Mode } from "./agent";
 
@@ -81,6 +84,7 @@ export function ChatPanel({ className }: { className?: string }) {
   const { openSetup, endpoint } = useModel();
   const { state } = useSystem();
   const toast = useToast();
+  const reasoning = useSyncExternalStore(onReasoning, getReasoning);
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const [view, setView] = useState<"chat" | "list">("chat");
@@ -388,6 +392,17 @@ export function ChatPanel({ className }: { className?: string }) {
                   accept={vision ? `image/*,${TEXT_FILES}` : TEXT_FILES}
                   onChange={onFiles}
                 />
+                <Tooltip content={t(reasoning ? "agent.reasoning.on" : "agent.reasoning.off")}>
+                  <IconButton
+                    label={t("agent.reasoning")}
+                    aria-pressed={reasoning}
+                    disabled={!available}
+                    onClick={() => setReasoning(!reasoning)}
+                    className={cn(reasoning && "bg-accent/10 text-accent-ink hover:bg-accent/15")}
+                  >
+                    <Brain />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip content={t(vision ? "agent.attach.any" : "agent.attach.text")}>
                   <IconButton
                     label={t("agent.attach")}
