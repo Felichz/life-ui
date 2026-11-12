@@ -14,7 +14,7 @@ export function GoalsStrip() {
   const { core, state } = useSystem();
   const progress = useMemo(
     () => core.getRoadmapProgress().filter((item) => item.roadmap.status === "active"),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [core, state]
   );
   if (progress.length === 0) return null;
