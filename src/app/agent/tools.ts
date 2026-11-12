@@ -2,8 +2,8 @@ import type { ActivityTemplate, ActivityType, ISystemCore, TimeBlock } from "../
 import { UtilityService } from "../../system/utilityService";
 import { localDate } from "../../system/agendaManager";
 import { sessionDates, sessionMinutes } from "../../system/directionManager";
-import { formatDateShort, formatDayMinutes, formatDayMonth, parseDayMinutes } from "../lib/format";
-import { intlLocale, t } from "../i18n";
+import { formatDateShort, formatDayMinutes, formatDayMonth } from "../lib/format";
+import { t } from "../i18n";
 import { agendaSnapshot, daySnapshot, librarySnapshot, reviewSnapshot, shortId } from "./snapshot";
 import { GUIDES, GUIDE_NOTE, type GuideName } from "./guides";
 import { searchWeb } from "./web";
@@ -41,6 +41,8 @@ export interface ToolContext {
    * in the app already. `built` is called when a roadmap is saved for it.
    */
   planning?: { given: boolean; agreed: boolean; built: () => void };
+  /** What the person said only as a guess about themselves: it never goes into a search. */
+  private?: string[];
   /** The latest of the conversation, for a tool that hands its work to another agent. */
   conversation?: string;
   /** The model itself, for a tool that hands its work to another agent (ADR-010). */
@@ -269,13 +271,58 @@ export function addNote(current: string, note: string, section: string): string 
 
 type Kind = "goal" | "range" | "timebox";
 
+/** Words too common to say anything about a person. */
+const COMMON = new Set([
+  "quiza",
+  "quizas",
+  "tengo",
+  "tenga",
+  "tener",
+  "algo",
+  "creo",
+  "puede",
+  "seguro",
+  "poco",
+  "mucho",
+  "maybe",
+  "think",
+  "have",
+  "something",
+  "might",
+  "probably",
+  "sure",
+  "little",
+]);
+
+/** The words of what the person guessed about themselves that would give it away in a search. */
+function personalWords(guesses: string[]): string[] {
+  const words = guesses
+    .join(" ")
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 4 && !COMMON.has(word));
+  return [...new Set(words)];
+}
+
+/** What to do when a close is asked for and nothing runs: the usual cause is a start that was never made. */
+const NOTHING_RUNNING =
+  "Nothing is running. If they are telling you they have started something, start it with start_activity. If they did it without starting it here, say that it was not being timed, and offer to start it now or to take it off the plan.";
+
 /** Duration settings from the model's simple fields. */
 function settingsFrom(
   args: Args
 ): { type: ActivityType; settings: Partial<ActivityTemplate> } | null {
   const minutes = num(args.minutes);
-  const min = num(args.min_minutes);
-  const max = num(args.max_minutes);
+  let min = num(args.min_minutes);
+  let max = num(args.max_minutes);
+  // "20 minutes" given as minutes 20 and again as a limit of 20 is one estimate,
+  // not a timebox: a model fills every field it is offered
+  if (minutes !== undefined) {
+    if (min === minutes) min = undefined;
+    if (max === minutes) max = undefined;
+  }
   const kind = str(args.kind) as Kind | "";
   if (kind === "timebox" || (!kind && (min !== undefined) !== (max !== undefined))) {
     const both = min !== undefined && max !== undefined;
@@ -561,7 +608,7 @@ export const TOOLS: Tool[] = [
   {
     name: "start_activity",
     description:
-      "Start a plan item, or a library activity by title (it is added to the plan). Only one runs at a time: close the running one first.",
+      'The person is starting something now, or says they have just started it ("empiezo…", "ya empecé…", "starting now"). A plan item, or a library activity by title (it is added to the plan). Only one runs at a time: close the running one first.',
     parameters: {
       type: "object",
       properties: { item: { type: "string", description: "Plan item id or title" } },
@@ -594,7 +641,7 @@ export const TOOLS: Tool[] = [
   {
     name: "finish_activity",
     description:
-      "Close the running activity as done. Satisfaction is inferred from their words (closing-rubric guide), never asked.",
+      'The person finished what is running ("terminé", "listo", "done"): close it as done. Not for something they are only starting. Satisfaction is inferred from their words (closing-rubric guide), never asked.',
     parameters: {
       type: "object",
       properties: {
@@ -611,7 +658,7 @@ export const TOOLS: Tool[] = [
     mutates: true,
     run: ({ core }, args) => {
       const active = core.getActiveActivity();
-      if (!active) throw new ToolError("nothing-running");
+      if (!active) throw new ToolError("nothing-running", NOTHING_RUNNING);
       const score = Math.round(num(args.satisfaction) ?? Number.NaN);
       const request = core.requestCompletion(active.id);
       const result = core.completeActivity(active.id, {
@@ -638,7 +685,7 @@ export const TOOLS: Tool[] = [
     mutates: true,
     run: ({ core }) => {
       const active = core.getActiveActivity();
-      if (!active) throw new ToolError("nothing-running");
+      if (!active) throw new ToolError("nothing-running", NOTHING_RUNNING);
       const record = core.interruptActivity(active.id);
       return { stopped: record.templateTitle };
     },
@@ -1044,10 +1091,20 @@ export const TOOLS: Tool[] = [
     },
     mutates: false,
     external: true,
-    run: async ({ http, signal }, args) => {
+    run: async ({ http, signal, private: guesses }, args) => {
       const query = str(args.query);
       if (!query) throw new ToolError("missing-query");
       if (!http) throw new ToolError("web-unavailable");
+      // A guess about their own health or character is theirs: the query is about the topic
+      const personal = personalWords(guesses ?? []).filter((word) =>
+        new RegExp(`(^|[^\\p{L}])${word}([^\\p{L}]|$)`, "iu").test(query)
+      );
+      if (personal.length > 0) {
+        throw new ToolError(
+          "about-the-person",
+          `the query names something the person said about themselves (${personal.join(", ")}). Search the topic only: the method and who it is for in general, nothing about them.`
+        );
+      }
       const results = await searchWeb(query, http, signal);
       if (results.length === 0) return { results: [], note: "Nothing found. Try other words." };
       return {

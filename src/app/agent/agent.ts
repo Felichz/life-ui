@@ -175,6 +175,22 @@ export interface AgentOptions {
 
 /** The longest answer the coach is allowed in one go. */
 const MAX_REPLY_TOKENS = 2048;
+/**
+ * The way out of the first move of a turn, for a message that needs nothing
+ * read and nothing changed.
+ */
+const JUST_ANSWER = {
+  type: "function" as const,
+  function: {
+    name: "just_answer",
+    description:
+      "Nothing has to be read, looked up or changed for this message: answer the person in words. Never for a message that asks you to add, move, start, finish, plan or note something: that is done with its tool.",
+    parameters: { type: "object", properties: {} },
+  },
+};
+
+/** The tools that put a plan on the calendar. */
+const PLANNING_TOOLS = new Set(["plan_roadmap", "plan_ahead"]);
 /** Failures of one tool in one turn before it is not run again. */
 const MAX_FAILURES = 2;
 /** A reply this long, to someone who wants a plan, is taken to be the plan (ADR-012). */
@@ -239,6 +255,8 @@ export class Agent {
   private brief: Brief | null = null;
   /** Something read from the web is in this turn: changes ask first, whatever the mode. */
   private webThisTurn = false;
+  /** The notes speak of the person's latest message (the call was made, and it worked). */
+  private notesRead = false;
   /** Tool calls that failed in this turn, by tool. */
   private failures = new Map<string, number>();
 
@@ -410,8 +428,24 @@ export class Agent {
   }
 
   /** The tools the model is offered now: web search only while the person allows it. */
+  /**
+   * The tools offered in this turn. Those that change something are offered
+   * when the person told the app to do something, or said yes to what was
+   * proposed (the notes say which, ADR-012); otherwise only those that read
+   * and search. Rule 0 of the prompt ("act only on a request"), held by
+   * construction: made to choose a tool, a 9B model told a time of day
+   * planned 63 sessions, and told of a bad habit tried to delete an activity.
+   */
   private schemas() {
-    return toolSchemas(this.webSetting() !== "off");
+    const all = toolSchemas(this.webSetting() !== "off");
+    // The notes do not speak of this message (too short, or the call failed): nothing is held back
+    if (!this.notesRead || this.brief?.instruction) return all;
+    if (this.brief?.agreed) {
+      // A plan they said yes to goes in as a roadmap, which puts its own sessions on the calendar
+      const plan = this.brief.plan;
+      return plan && !plan.built ? all.filter((tool) => tool.function.name !== "plan_ahead") : all;
+    }
+    return all.filter((tool) => !toolByName(tool.function.name)?.mutates);
   }
 
   /** What every request carries before the conversation: the prompt, the day and the tools. */
@@ -669,24 +703,28 @@ export class Agent {
    * Brings the coach's notes up to date with what the person just wrote
    * (ADR-012). Skipped for a message too short to say anything about them.
    */
-  private async takeNotes(signal: AbortSignal) {
+  private async takeNotes(signal: AbortSignal, late = false) {
+    if (!late) this.notesRead = false;
     if (!this.options.notes?.()) return;
-    const last = this.history[this.history.length - 1];
-    if (last?.role !== "user") return;
+    // The person's latest message (when the notes are taken late, the model has answered since)
+    const at = this.history.map((message) => message.role).lastIndexOf("user");
+    const last = this.history[at];
+    if (last?.role !== "user" || (!late && at !== this.history.length - 1)) return;
     const person = textOf(last.content);
-    const before = [...this.history]
+    const before = this.history
+      .slice(0, at)
       .reverse()
       .find((message) => message.role === "assistant" && !message.tool_calls?.length);
     // Counted here, where a compaction cannot reset it
     const said = before ? textOf(before.content ?? "") : "";
-    if (this.brief && /[?¿]/.test(said)) {
+    if (!late && this.brief && /[?¿]/.test(said)) {
       this.brief = { ...this.brief, asked: (this.brief.asked ?? 0) + 1 };
     }
     // Once they want a plan, a long reply is the plan: it is not to be written again
     if (this.brief?.plan && !this.brief.plan.given && said.length >= PLAN_LENGTH) {
       this.brief = { ...this.brief, plan: { ...this.brief.plan, given: true } };
     }
-    if (!worthNoting(person, this.brief)) {
+    if (!late && !worthNoting(person, this.brief)) {
       this.brief = unagreed(this.brief);
       return;
     }
@@ -697,7 +735,15 @@ export class Agent {
       person,
       language: this.languageName(),
       signal,
+      onRead: () => {
+        this.notesRead = true;
+      },
     });
+  }
+
+  /** The person asked for something to be looked up, searching is allowed, and no search was made yet. */
+  private owesSearch(): boolean {
+    return Boolean(this.brief?.research) && this.webSetting() !== "off" && !this.webThisTurn;
   }
 
   /** Whether a tool has changed something since the person's last message. */
@@ -743,6 +789,11 @@ export class Agent {
         "The change is made. Tell them what was done, from the tool's answer as it is, in a few lines. Do not ask for a yes to what is already saved, and do not plan it again."
       );
       return notes;
+    }
+    if (this.owesSearch()) {
+      notes.push(
+        "They asked you to look this up: call web_search now, before you say anything about what is known. Never say you looked something up without a search in this reply."
+      );
     }
     // With notes on the person, the move comes from them: ask what is missing, or recommend
     const move = nextMove(this.brief, personAsked);
@@ -832,6 +883,26 @@ export class Agent {
     const name = call.function.name;
     // A small model told "that did not work" tries the same thing again, eight
     // times if let. After two failures in one turn the tool is not run again.
+    // A message too short to be worth notes may still ask for a whole plan
+    // ("armame un plan"). The model reaching for a planning tool is the sign:
+    // the notes are taken then, so the plan is not built before it was seen.
+    if (
+      PLANNING_TOOLS.has(name) &&
+      this.options.notes?.() &&
+      !this.notesRead &&
+      this.abort &&
+      !this.abort.signal.aborted
+    ) {
+      await this.takeNotes(this.abort.signal, true);
+    }
+    // A tool that was not offered (a model can name one from memory) changes nothing
+    if (toolByName(name) && !this.schemas().some((tool) => tool.function.name === name)) {
+      return {
+        error: "not-yet",
+        detail:
+          "Nothing is changed in this reply: the person has not asked for this change, and has not said yes to one. Answer in words. If a change would help, propose it and ask for their yes.",
+      };
+    }
     if ((this.failures.get(name) ?? 0) >= MAX_FAILURES) {
       return {
         error: "stop-trying",
@@ -875,6 +946,7 @@ export class Agent {
       http: this.options.web?.http,
       signal: this.abort?.signal,
       said: saidIn(this.brief),
+      private: this.brief?.unsure ?? [],
       conversation: this.recentConversation(),
       ...(this.brief?.plan
         ? {
@@ -1194,6 +1266,8 @@ export class Agent {
       if (abort.signal.aborted) return;
       const maxSteps = this.options.maxSteps ?? 8;
       let corrected = false;
+      let searchOwed = false;
+      let chosen = false;
       let compacted = false;
       let recovered = false;
       for (let step = 0; step < maxSteps; step++) {
@@ -1204,10 +1278,26 @@ export class Agent {
           if (abort.signal.aborted) return;
         }
         const request = this.request();
+        // The first move of a turn is a choice held to a schema (ADR-012): one
+        // of the tools, or "just answer". Left free, a 9B model told to add
+        // something answered "added" three times out of three and called
+        // nothing. A choice it has to make by name, it makes right.
+        const choosing: boolean = !chosen;
+        chosen = true;
+        const offered = choosing ? [...this.schemas(), JUST_ANSWER] : this.schemas();
         let reply: ModelReply;
         try {
-          reply = await this.options.chat(request, this.schemas(), abort.signal, {
-            onText,
+          reply = await this.options.chat(request, offered, abort.signal, {
+            // The choice arrives as JSON, which is not text to show while it is
+            // written. Words (from a server that holds the model to nothing) are.
+            ...(choosing
+              ? {
+                  toolChoice: "required" as const,
+                  onText: (text: string) => {
+                    if (!text.trimStart().startsWith("{")) onText(text);
+                  },
+                }
+              : { onText }),
             reasoning: this.options.reasoning?.(),
             // Long enough for a whole plan laid out in the chat; a bound on a runaway answer
             maxTokens: MAX_REPLY_TOKENS,
@@ -1217,6 +1307,7 @@ export class Agent {
           // long: compact everything but the last turn and ask once more
           if (abort.signal.aborted || recovered || !isContextOverflow(caught)) throw caught;
           recovered = true;
+          chosen = !choosing;
           discard();
           await this.compactNow(abort.signal, 0);
           if (abort.signal.aborted) return;
@@ -1224,7 +1315,23 @@ export class Agent {
           continue;
         }
         if (abort.signal.aborted) return;
-        this.learnTokens(request, reply);
+        if (choosing) {
+          const [only] = reply.toolCalls;
+          const words =
+            reply.toolCalls.length === 0 && reply.content.trimStart().startsWith("{")
+              ? "" // a choice cut short before it was whole: not an answer
+              : reply.content;
+          // Nothing to read or change: it answers in words, in a call of its own
+          if (
+            (reply.toolCalls.length === 1 && only.function.name === JUST_ANSWER.function.name) ||
+            (reply.toolCalls.length === 0 && !words)
+          ) {
+            step--;
+            continue;
+          }
+          // A server that holds the model to nothing answers in words at once: taken as they are
+        }
+        this.learnTokens(request, reply, offered);
         const stats =
           reply.usage || reply.speed
             ? { stats: { tokens: reply.usage?.completion ?? 0, speed: reply.speed } }
@@ -1240,6 +1347,19 @@ export class Agent {
               role: "user",
               content:
                 "[Automatic note, not from the person: that reply was not shown because it recited your internal instructions and tool names. Answer the person's last message directly, in everyday words, without naming tools.]",
+            });
+            continue;
+          }
+          // "I have looked into it", with no search made: a 9B model said just
+          // that. The reply is not shown, and it is told to search.
+          if (!searchOwed && this.owesSearch()) {
+            searchOwed = true;
+            discard();
+            this.history.push({ role: "assistant", content: reply.content });
+            this.history.push({
+              role: "user",
+              content:
+                "[Automatic note, not from the person: that reply was not shown. They asked you to look this up and you made no search. Call web_search now, with a query that names the exact question; then answer from what it finds.]",
             });
             continue;
           }
@@ -1297,9 +1417,10 @@ export class Agent {
   }
 
   /** The runtime's own token count corrects the estimate from then on. */
-  private learnTokens(request: ChatMessage[], reply: ModelReply) {
+  private learnTokens(request: ChatMessage[], reply: ModelReply, tools: unknown[]) {
     if (!reply.usage?.prompt) return;
-    const estimated = historyTokens(request) + estimateTokens(JSON.stringify(this.schemas()));
+    // The tools as they were sent: which ones are offered changes from turn to turn
+    const estimated = historyTokens(request) + estimateTokens(JSON.stringify(tools));
     if (estimated <= 0) return;
     this.tokenRatio = Math.max(0.6, Math.min(1.8, reply.usage.prompt / estimated));
   }

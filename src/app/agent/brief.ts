@@ -1,5 +1,4 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
-import { weekdaysIn } from "./when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012).
@@ -37,7 +36,7 @@ export interface Brief {
      * Read from the person's own words and nowhere else: only these bind a
      * roadmap. A day the model picked out of the coach's question does not.
      */
-    exact?: { minutes?: number; time?: number; weekdays?: number[] };
+    exact?: { minutes?: number; time?: number };
     /** The coach has laid a plan out for them already. */
     given?: boolean;
     /** The plan is in the app: a roadmap was saved for it in this conversation. */
@@ -48,6 +47,10 @@ export interface Brief {
    * goes into the app on the coach's own reading of the mood.
    */
   agreed?: boolean;
+  /** Whether their latest message asks for something to be looked up. */
+  research?: boolean;
+  /** Whether their latest message tells the app to do something now. */
+  instruction?: boolean;
   /**
    * Replies in which the coach has asked them questions. Kept here, not
    * counted from the conversation, so a compaction does not start it over.
@@ -76,6 +79,10 @@ The lists:
 
 agrees: true only when this message says yes to what the coach proposed, or tells the coach to go ahead ("sí", "dale", "ok, hazlo", "sounds good, do it"). Asking for something else, or answering a question, is not a yes.
 
+instruction: true only when this message tells the app to do something right now: add, move, schedule, start, finish, stop or delete something, or write something down. Wanting a plan, or agreeing to one, is not an instruction.
+
+research: true only when this message asks the coach to look something up, search the internet or check what is known about it.
+
 The plan:
 - wanted: true when they want something set up to do again and again or over weeks (a plan, a routine, a habit, a programme of study or training).
 - session_length: how long one session can be, as they say it ("15 minutos"). Fill it whenever the message gives or accepts a duration, even if it is also a limit. Empty otherwise.
@@ -101,6 +108,8 @@ const KEEP_NOTES = {
         limits: list,
         unsure: list,
         agrees: { type: "boolean" },
+        research: { type: "boolean" },
+        instruction: { type: "boolean" },
         plan: {
           type: "object",
           properties: {
@@ -116,7 +125,7 @@ const KEEP_NOTES = {
           additionalProperties: false,
         },
       },
-      required: [...LISTS, "agrees", "plan"],
+      required: [...LISTS, "agrees", "research", "instruction", "plan"],
       additionalProperties: false,
     },
   },
@@ -155,7 +164,13 @@ export function durationIn(message: string): string {
   const minutes = /(\d{1,3})\s*(?:min\b|mins\b|minutos?\b|minutes?\b)/i.exec(message);
   if (minutes) return `${minutes[1]} min`;
   const hours = /(\d(?:[.,]\d)?)\s*(?:h\b|hs\b|horas?\b|hours?\b)/i.exec(message);
-  return hours ? `${hours[1]} h` : "";
+  if (hours) return `${hours[1]} h`;
+  // Said in words, as people do
+  if (/\b(hora y media|an hour and a half)\b/i.test(message)) return "90 min";
+  if (/\b(media hora|half an hour)\b/i.test(message)) return "30 min";
+  if (/\b(un cuarto de hora|a quarter of an hour)\b/i.test(message)) return "15 min";
+  if (/\b(una hora|an hour|one hour)\b/i.test(message)) return "60 min";
+  return "";
 }
 
 /**
@@ -169,7 +184,12 @@ export function clockIn(message: string): { time: string; sure: boolean } | null
     new RegExp(`\\b(\\d{1,2})(?::(\\d{2}))?\\s*${half}`, "i").exec(message) ??
     /\b(?:a las?|at|around|sobre las?)\s+(\d{1,2})(?::(\d{2}))?\b()/i.exec(message) ??
     /\b(\d{1,2}):(\d{2})\b()/.exec(message);
-  if (!clock) return null;
+  if (!clock) {
+    // An hour said by its name
+    if (/\b(mediod[ií]a|noon|midday)\b/i.test(message)) return { time: "12:00", sure: true };
+    if (/\b(medianoche|midnight)\b/i.test(message)) return { time: "00:00", sure: true };
+    return null;
+  }
   let hour = Number(clock[1]);
   const suffix = (clock[3] ?? "").toLowerCase();
   const morning = /^a|mañana|manana|morning/.test(suffix);
@@ -207,8 +227,6 @@ export interface Said {
   weeks?: number;
   /** Minutes of the day the sessions start. */
   time?: number;
-  /** The days of the week, 0 for Sunday. */
-  weekdays?: number[];
 }
 
 export function saidIn(brief: Brief | null): Said {
@@ -240,9 +258,6 @@ const clockOf = (said: string): { minutes: number; sure: boolean } | null => {
     : null;
 };
 
-const sameDays = (a: number[], b: number[]) =>
-  a.length === b.length && a.every((day, index) => day === b[index]);
-
 /**
  * What binds a roadmap after this message (ADR-011, section 5).
  *
@@ -252,6 +267,10 @@ const sameDays = (a: number[], b: number[]) =>
  * from a question of the coach's. So a number binds when the two agree, and
  * when the message speaks of it and they do not, nothing binds: the planner
  * then works from the conversation, and the person sees the result on the card.
+ *
+ * Days of the week bind nothing at all. Both readings take "empezando el
+ * lunes" for a plan on Mondays; no rule tried here told the days of a plan
+ * from the day it starts, so the planner copies them from the conversation.
  */
 function bind(
   previous: Exact,
@@ -265,15 +284,6 @@ function bind(
   if (wrote || model) {
     if (wrote && (!model || model === wrote)) exact.minutes = wrote;
     else if (!(model && !wrote && exact.minutes === model)) delete exact.minutes;
-  }
-
-  const wroteDays = weekdaysIn(person);
-  const modelDays = weekdaysIn(noted.days);
-  if (wroteDays.length > 0 || modelDays.length > 0) {
-    if (wroteDays.length > 0 && sameDays(wroteDays, modelDays)) exact.weekdays = wroteDays;
-    else if (!(wroteDays.length === 0 && exact.weekdays && sameDays(exact.weekdays, modelDays))) {
-      delete exact.weekdays;
-    }
   }
 
   // An hour written without "am" or "pm" is the same hour as one already
@@ -303,10 +313,13 @@ function bind(
 const clockText = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 
-/** A yes belongs to the message it was said in: it does not carry over to the next. */
+/**
+ * A yes, and a request to look something up, belong to the message they were
+ * said in: they do not carry over to the next.
+ */
 export function unagreed(brief: Brief | null): Brief | null {
-  if (!brief?.agreed) return brief;
-  const { agreed: _agreed, ...rest } = brief;
+  if (!brief?.agreed && !brief?.research && !brief?.instruction) return brief;
+  const { agreed: _agreed, research: _research, instruction: _instruction, ...rest } = brief;
   return rest;
 }
 
@@ -318,7 +331,8 @@ export function unagreed(brief: Brief | null): Brief | null {
 export function worthNoting(message: string, brief: Brief | null): boolean {
   const words = message.trim().split(/\s+/).filter(Boolean).length;
   if (brief?.plan) return words >= 1;
-  return words >= 8 || (brief !== null && words >= 4);
+  // Three words can ask for anything; one or two ("hola", "terminé") are read by the model alone
+  return words >= 3;
 }
 
 /** The questions in a reply: what the person's next message answers. */
@@ -342,6 +356,8 @@ export async function updateBrief(options: {
   person: string;
   language: string;
   signal?: AbortSignal;
+  /** Called when the message was read: the notes now speak of it. */
+  onRead?: () => void;
 }): Promise<Brief | null> {
   const { brief } = options;
   try {
@@ -402,7 +418,11 @@ export async function updateBrief(options: {
         : {}),
     };
     if (brief?.asked) next.asked = brief.asked;
+    // (agreed and research are of this message alone: they are set below, never carried)
     if (notes.agrees === true) next.agreed = true;
+    if (notes.research === true) next.research = true;
+    if (notes.instruction === true) next.instruction = true;
+    options.onRead?.();
     const total = LISTS.reduce((sum, name) => sum + next[name].length, 0);
     return total === 0 && !next.plan ? unagreed(brief) : next;
   } catch {
@@ -469,7 +489,7 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
   }
   if (!brief.plan) return answer;
   if (brief.plan.built) {
-    return `${answer}The plan is in the app already, as a roadmap with its sessions on the calendar. Do not build it again and do not ask for a yes to it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change; otherwise answer what they say.`;
+    return `${answer}The plan is DONE: it is in the app as a roadmap, with every session on the calendar. If they ask for the roadmap or the plan, tell them it is already made and that they can see it on the Goals page. Do not build it again, do not ask for a yes to it, and ask them nothing more about it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change.`;
   }
   if (brief.plan.given) {
     const keep =
@@ -482,5 +502,5 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
     missing.length > 0
       ? ` If they still have not said ${missing.join(" or ")}, say what you assume and ask them to confirm it; never ask again for something that is in the notes or in the conversation.`
       : "";
-  return `${answer}Give them the plan now, whole, built on the notes above.${open} Close it with two or three lines on how it fits the time and the limits they gave (add up the minutes of what a session contains), and ask for their yes. Do not read these notes back to them, and put nothing in the app before their yes.`;
+  return `${answer}Give them the plan now, whole, built on the notes above, in 350 words at most: the phases, what one session contains in each, how it progresses.${open} Close it with two or three lines on how it fits the time and the limits they gave (add up the minutes of what a session contains), and ask for their yes. Do not read these notes back to them, and put nothing in the app before their yes.`;
 }

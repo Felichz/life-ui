@@ -344,19 +344,7 @@ export class RoadmapDraft {
     if (start < localDate(this.now)) {
       throw new DraftError("date-in-the-past", `"start" ${start} is before today`);
     }
-    // The days are the person's: a model that turns "martes, jueves" into other days is told so
-    const theirs = this.said.weekdays;
-    if (theirs && theirs.join() !== weekdays.join()) {
-      throw new DraftError(
-        "not-their-days",
-        `the person said ${theirs.map((day) => WEEKDAYS[day]).join(", ")}; the schedule has ${weekdays
-          .map((day) => WEEKDAYS[day])
-          .join(
-            ", "
-          )}. Use the person's days. If the request in front of you clearly names other days, call cannot_do and say which.`
-      );
-    }
-    // The time is the person's too: theirs is used, whatever was written here
+    // The time is the person's: theirs is used, whatever was written here
     const at = this.said.time ?? time;
     return { weekdays, ...(at !== undefined ? { time: at } : {}), start };
   }
