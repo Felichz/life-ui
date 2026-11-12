@@ -814,6 +814,16 @@ export class Agent {
       notes.push(
         "The change is made. Tell them what was done, from the tool's answer as it is, in a few lines. Do not ask for a yes to what is already saved, and do not plan it again."
       );
+      const made = this.options.core.getRoadmaps();
+      if (this.brief?.plan && made.length > 0) {
+        notes.push(
+          `The roadmap they asked for exists already (${made
+            .map((roadmap) => `"${roadmap.title}"`)
+            .join(
+              ", "
+            )}), with its sessions on the calendar: if they ask for it, say it is done and that they can see it on the Goals page.`
+        );
+      }
       return notes;
     }
     if (this.owesSearch()) {
@@ -1184,6 +1194,12 @@ export class Agent {
       return result;
     } catch (caught) {
       const result = failure(caught);
+      if (result.error === "about-the-person") {
+        // Nothing left the machine, and the query is not worth a line: the model searches again
+        this.entries = this.entries.filter((one) => one.id !== entry.id);
+        this.emit();
+        return result;
+      }
       this.patch(entry.id, { status: "error", error: String(result.error) });
       return {
         ...result,
