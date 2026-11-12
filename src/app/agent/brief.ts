@@ -1,4 +1,5 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
+import { weekdaysIn } from "./when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012).
@@ -227,12 +228,20 @@ export interface Said {
   weeks?: number;
   /** Minutes of the day the sessions start. */
   time?: number;
+  /** The weekday they said it starts on ("empezando el lunes"), 0 for Sunday. */
+  startOn?: number;
 }
 
 export function saidIn(brief: Brief | null): Said {
   const plan = brief?.plan;
   if (!plan) return {};
-  return { ...plan.exact, ...(plan.weeks ? { weeks: plan.weeks } : {}) };
+  // "Starting on Monday": one weekday in what they said of the start, and nothing else to mistake
+  const start = weekdaysIn(plan.start);
+  return {
+    ...plan.exact,
+    ...(plan.weeks ? { weeks: plan.weeks } : {}),
+    ...(start.length === 1 ? { startOn: start[0] } : {}),
+  };
 }
 
 type Exact = NonNullable<NonNullable<Brief["plan"]>["exact"]>;

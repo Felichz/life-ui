@@ -972,6 +972,13 @@ export class Agent {
       http: this.options.web?.http,
       signal: this.abort?.signal,
       said: saidIn(this.brief),
+      // What the person has written in this conversation, and what was noted of it
+      spoken: [
+        ...this.history
+          .filter((message) => message.role === "user")
+          .map((message) => textOf(message.content)),
+        ...(this.brief ? [...this.brief.wants, ...this.brief.has, ...this.brief.limits] : []),
+      ].join(" "),
       // Their guesses about themselves, and their own measures ("80kg", "180cm")
       private: [
         ...(this.brief?.unsure ?? []),

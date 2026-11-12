@@ -100,6 +100,8 @@ export class RoadmapDraft {
   private readonly library: string[];
   /** Minutes one session of each library activity lasts. */
   private readonly lengths = new Map<string, number>();
+  /** A roadmap longer than asked was sent back to the planner already. */
+  private sentBack = false;
   /** Each stored roadmap as it was when the draft began, to tell what changed. */
   private readonly original = new Map<UUID, string>();
 
@@ -346,7 +348,18 @@ export class RoadmapDraft {
     }
     // The time is the person's: theirs is used, whatever was written here
     const at = this.said.time ?? time;
-    return { weekdays, ...(at !== undefined ? { time: at } : {}), start };
+    return {
+      weekdays,
+      ...(at !== undefined ? { time: at } : {}),
+      start: this.said.startOn !== undefined ? this.next(this.said.startOn) : start,
+    };
+  }
+
+  /** The next day that is this weekday, today included. */
+  private next(weekday: number): string {
+    const day = new Date(`${localDate(this.now)}T12:00:00`);
+    while (day.getDay() !== weekday) day.setDate(day.getDate() + 1);
+    return localDate(day);
   }
 
   /** A new roadmap keeps to what the person said: how long a session is, how long the plan runs. */
@@ -498,7 +511,23 @@ export class RoadmapDraft {
         rules: text(fields.rules).slice(0, 2000) || existing?.rules,
         milestones,
       };
-      if (!existing) this.keepsTo(roadmap);
+      if (!existing) {
+        this.keepsTo(roadmap);
+        // Sent back once: most often the days or a count were copied wrong, and
+        // the numbers show which. A second time it stands, and the card says so.
+        const longer = this.longerThanAsked(roadmap);
+        if (longer && !this.sentBack) {
+          this.sentBack = true;
+          const total = roadmap.milestones
+            .flatMap((milestone) => milestone.steps)
+            .reduce((sum, step) => sum + this.sessionsOf(step), 0);
+          const perWeek = roadmap.schedule?.weekdays.length ?? 1;
+          throw new DraftError(
+            "longer-than-asked",
+            `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run ${longer.weeks} weeks, to ${longer.until}. Check the days of the week and the number of sessions against the plan in the conversation: in ${this.said.weeks} weeks, ${perWeek} day${perWeek === 1 ? "" : "s"} a week is ${this.said.weeks! * perWeek} sessions. If the plan they agreed to really is this long, send the same call again.`
+          );
+        }
+      }
       this.roadmaps = existing
         ? this.roadmaps.map((item) => (item === existing ? roadmap : item))
         : [...this.roadmaps, roadmap];

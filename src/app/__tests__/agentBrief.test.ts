@@ -143,7 +143,8 @@ describe("what the person said, as numbers a roadmap is held to", () => {
       days: "lunes",
       start: "el lunes",
     });
-    expect(saidIn(brief)).toEqual({});
+    // The days bind nothing. The start does: one weekday, said of the start
+    expect(saidIn(brief)).toEqual({ startOn: 1 });
     expect(brief?.plan).toMatchObject({ days: "lunes", start: "el lunes" });
   });
 });
@@ -663,6 +664,53 @@ describe("notes in the conversation", () => {
     // Only the query about the topic left the machine
     expect(sent).toHaveLength(1);
     expect(sent[0]).not.toMatch(/tdah|80kg/i);
+  });
+
+  it("keep the ideal life in the person's own words", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const seen: ChatMessage[][] = [];
+    const coach = [
+      // A nicer wish than the one they have
+      call("note_ideal_life", {
+        text: "Valoro mi voz y deseo crecer profesionalmente con seguridad y liderazgo.",
+      }),
+      call("note_ideal_life", {
+        text: "Quiero participar en las reuniones del trabajo sin quedarme callado.",
+      }),
+      say("Anotado."),
+    ];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages) => {
+        if (isNotes(messages)) return notes({ instruction: true });
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    agent.subscribe(() => {
+      for (const entry of agent.entries) {
+        if (entry.kind === "tool" && entry.status === "pending") {
+          // The card is answered once it is up: a note in the ideal life always asks
+          setTimeout(() => agent.decide(entry.id, true), 0);
+        }
+      }
+    });
+    await agent.send(
+      "anota en mi vida ideal que quiero participar en las reuniones del trabajo sin quedarme callado"
+    );
+    const results = seen
+      .at(-1)!
+      .filter((message) => message.role === "tool")
+      .map((message) => String(message.content));
+    expect(results[0]).toContain("not-their-words");
+    expect(core.getIdealLife()?.text).toContain(
+      "Quiero participar en las reuniones del trabajo sin quedarme callado."
+    );
+    expect(core.getIdealLife()?.text).not.toContain("liderazgo");
   });
 
   it("are off unless asked for", async () => {

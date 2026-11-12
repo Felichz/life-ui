@@ -41,6 +41,8 @@ export interface ToolContext {
    * in the app already. `built` is called when a roadmap is saved for it.
    */
   planning?: { given: boolean; agreed: boolean; built: () => void };
+  /** Everything the person has written in this conversation: their words, to check a note against. */
+  spoken?: string;
   /** What the person said only as a guess about themselves: it never goes into a search. */
   private?: string[];
   /** The latest of the conversation, for a tool that hands its work to another agent. */
@@ -270,6 +272,28 @@ export function addNote(current: string, note: string, section: string): string 
 }
 
 type Kind = "goal" | "range" | "timebox";
+
+const plain = (text: string) =>
+  text
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+/**
+ * Whether a note is made of what the person wrote: at least two in three of
+ * its longer words are theirs (a stem is enough: "participar", "participo").
+ */
+function inTheirWords(note: string, spoken: string): boolean {
+  const theirs = plain(spoken);
+  const words = plain(note)
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 5);
+  if (words.length === 0) return true;
+  const found = words.filter((word) =>
+    theirs.includes(word.slice(0, Math.max(5, word.length - 3)))
+  );
+  return found.length / words.length >= 2 / 3;
+}
 
 /** Words too common to say anything about a person. */
 const COMMON = new Set([
@@ -917,9 +941,17 @@ export const TOOLS: Tool[] = [
     mutates: true,
     // Their own document: nothing is written in it without their yes, in any mode
     alwaysConfirm: true,
-    run: ({ core }, args) => {
+    run: ({ core, spoken }, args) => {
       const note = str(args.text);
       if (!note) throw new ToolError("missing-text");
+      // Their ideal life is written in their words. A model asked to note a wish
+      // wrote a nicer one of its own ("because I value my voice…").
+      if (spoken !== undefined && !inTheirWords(note, spoken)) {
+        throw new ToolError(
+          "not-their-words",
+          "most of this note is not something the person wrote. Note what they said, with their own words copied from their messages, or ask them how they would put it."
+        );
+      }
       const current = core.getIdealLife()?.text ?? "";
       if (current.toLocaleLowerCase().includes(note.toLocaleLowerCase())) {
         throw new ToolError("already-noted", "that is already written there");
