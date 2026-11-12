@@ -6,6 +6,7 @@ import {
   durationIn,
   missingFrom,
   nextMove,
+  overfull,
   saidIn,
   timeIn,
   updateBrief,
@@ -39,6 +40,9 @@ const notes = (fields: Partial<Record<string, unknown>>) =>
 const isNotes = (messages: ChatMessage[]) =>
   String(messages[0].content).startsWith("You keep a coach's notes");
 
+const isNeeds = (messages: ChatMessage[]) =>
+  String(messages[0].content).startsWith("A coach is about to write");
+
 const isCheck = (messages: ChatMessage[]) =>
   String(messages[0].content).startsWith("You compare a plan");
 
@@ -63,6 +67,47 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(clockIn("a las 7pm")).toEqual({ time: "19:00", sure: true });
     expect(durationIn("no tengo idea")).toBe("");
     expect(timeIn("peso 80kg y mido 180cm")).toBe("");
+  });
+});
+
+describe("the parts of a session, added up", () => {
+  it("finds the phase whose timed parts do not fit the session", () => {
+    const plan = [
+      "### Fase 1 (Semanas 1-2)",
+      "**Sesión (15 min):**",
+      "1. Calentamiento (3 min)",
+      "2. Circuito A (10 min)",
+      "3. Enfriamiento (2 min)",
+      "### Fase 2 (Semanas 3-5)",
+      "1. Calentamiento (3 min)",
+      "2. Trabajo principal (12 min): 3 series",
+      "3. Estiramientos (4 min)",
+    ].join("\n");
+    expect(overfull(plan, 15)).toEqual({ phase: "Fase 2 (Semanas 3-5)", sum: 19 });
+    expect(overfull(plan, 30)).toBeNull();
+    expect(overfull("Sin tiempos escritos", 15)).toBeNull();
+  });
+});
+
+describe("what a plan's numbers depend on", () => {
+  it("is asked for once, with the days and the length", () => {
+    const brief = {
+      wants: ["un plan con el peso de cada ejercicio"],
+      has: ["mancuernas"],
+      limits: [],
+      unsure: [],
+      plan: { length: "", days: "", time: "", start: "" },
+      needs: ["how heavy their dumbbells are"],
+    };
+    const move = nextMove(brief, false);
+    expect(move).toContain("three things at most");
+    expect(move).toContain(
+      "how long one session can be; which days of the week; how heavy their dumbbells are"
+    );
+    // Asked already: the plan is given, with a rule where the number is unknown
+    const later = nextMove({ ...brief, needs: [], asked: 2 }, false);
+    expect(later).toContain("Give them the plan now");
+    expect(later).not.toContain("dumbbells");
   });
 });
 
@@ -386,6 +431,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           seen.notes++;
           return noted.shift() ?? notes({});
@@ -486,6 +532,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages, offeredNow) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) return noted.shift() ?? notes({});
         if (isCheck(messages)) return gaps();
         if (String(messages[0].content).startsWith("You are the roadmap planner")) {
@@ -550,6 +597,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({ agrees: true, plan: { ...NO_PLAN, wanted: true } });
         }
@@ -595,6 +643,7 @@ describe("notes in the conversation", () => {
       notes: () => true,
       web: { setting: () => "on", allow: () => {}, http },
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages))
           return notes({ wants: ["saber cuántos días entrenar"], research: true });
         seen.push(messages);
@@ -633,6 +682,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages, tools) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) return noted.shift()!;
         offered.push(
           (tools as Array<{ function: { name: string } }>).map((tool) => tool.function.name)
@@ -679,6 +729,7 @@ describe("notes in the conversation", () => {
       notes: () => true,
       web: { setting: () => "on", allow: () => {}, http },
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({
             unsure: ["quizá tengo TDAH o algo"],
@@ -718,6 +769,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({
             wants: ["un plan con repeticiones"],
@@ -775,6 +827,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) return notes({ instruction: true });
         seen.push(messages);
         return coach.shift()!;

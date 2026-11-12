@@ -54,6 +54,12 @@ export interface Brief {
    * ("yes, and I also want…"). It goes into the plan before it is saved.
    */
   added?: string[];
+  /**
+   * Facts the numbers of the plan depend on and the person has not given
+   * ("how heavy the dumbbells are"), worked out once when a plan is first
+   * wanted. Asked for once, with the rest; emptied when they have been.
+   */
+  needs?: string[];
   /** Whether their latest message asks for something to be looked up. */
   research?: boolean;
   /** Whether their latest message tells the app to do something now. */
@@ -236,6 +242,8 @@ export interface Said {
   time?: number;
   /** The weekday they said it starts on ("empezando el lunes"), 0 for Sunday. */
   startOn?: number;
+  /** What their yes came with: the roadmap has to carry it. */
+  added?: string[];
   /**
    * The days of the week as the conversation last stated them, with the line
    * that does. They bind nothing: a roadmap on other days is sent back once.
@@ -253,6 +261,7 @@ export function saidIn(brief: Brief | null): Said {
     ...plan.exact,
     ...(plan.weeks ? { weeks: plan.weeks } : {}),
     ...(start.length === 1 ? { startOn: start[0] } : {}),
+    ...(brief?.added?.length ? { added: brief.added } : {}),
   };
 }
 
@@ -461,6 +470,7 @@ export async function updateBrief(options: {
         : {}),
     };
     if (brief?.asked) next.asked = brief.asked;
+    if (brief?.needs) next.needs = brief.needs;
     // (agreed and research are of this message alone: they are set below, never carried)
     if (notes.agrees === true) next.agreed = true;
     // A yes that comes with something new: the plan takes it in before it is saved
@@ -559,6 +569,12 @@ export async function planGaps(options: {
           `it names ${longest} minutes, and one session is ${theirs} minutes in every phase unless they asked for longer ones`,
         ]
       : [];
+  const full = theirs ? overfull(plan, theirs) : null;
+  if (full) {
+    over.push(
+      `in "${full.phase}" the timed parts of one session add up to ${full.sum} minutes, and a session is ${theirs}`
+    );
+  }
   if (brief.has.length + brief.wants.length + brief.limits.length === 0) return over;
   try {
     const reply = await options.chat(
@@ -608,6 +624,92 @@ export async function planGaps(options: {
   }
 }
 
+const WHAT_TO_ASK = {
+  type: "function" as const,
+  function: {
+    name: "what_to_ask",
+    description: "Facts a plan's numbers depend on that the person has not given.",
+    parameters: {
+      type: "object",
+      properties: {
+        facts: {
+          type: "array",
+          maxItems: 2,
+          items: said(
+            "One fact about what they have or where they start from, that a number they asked the plan to give depends on, and that is NOT in what they said. Written as what to ask for, in a few words. Never the days, the time of day or the length of a session."
+          ),
+        },
+      },
+      required: ["facts"],
+    },
+  },
+};
+
+/**
+ * What the numbers of a plan depend on and the person has not said (ADR-012):
+ * asked for a plan "with the weight for each exercise", a coach has to know
+ * how heavy their weights are, and a 9B model writing the plan does not stop
+ * to ask. Asked this one question on its own, it finds it. Worked out once,
+ * when a plan is first wanted; empty on any failure.
+ */
+export async function planNeeds(options: {
+  chat: Chat;
+  brief: Brief;
+  signal?: AbortSignal;
+}): Promise<string[]> {
+  const { brief } = options;
+  try {
+    const reply = await options.chat(
+      [
+        {
+          role: "system",
+          content:
+            "A coach is about to write a plan for a person. You say which facts about the person the numbers of that plan depend on and are still unknown. Often there is none: an empty list is a good answer. English, a few words each.",
+        },
+        {
+          role: "user",
+          content: `THEY ASKED FOR:\n${brief.wants.map((one) => `- ${one}`).join("\n") || "-"}\n\nTHEY HAVE / THEY ARE:\n${
+            brief.has.map((one) => `- ${one}`).join("\n") || "-"
+          }\n\nLIMITS:\n${brief.limits.map((one) => `- ${one}`).join("\n") || "-"}`,
+        },
+      ],
+      [WHAT_TO_ASK],
+      options.signal,
+      { reasoning: false, maxTokens: 150, toolChoice: "required" }
+    );
+    const call = reply.toolCalls.find((one) => one.function.name === "what_to_ask");
+    if (!call) return [];
+    const found = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+    return strings(found.facts)
+      .filter((fact) => fact.length <= 120)
+      .slice(0, 2);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The parts of a session as a plan times them ("warm-up (3 min)", "circuit
+ * (10 min)"), added up phase by phase: the first phase whose parts come to
+ * more than the session has. A label with the whole session's minutes is
+ * not a part.
+ */
+export function overfull(plan: string, minutes: number): { phase: string; sum: number } | null {
+  const blocks = plan.split(/\n(?=[#*\s]*(?:fase|phase|etapa|stage|semanas?|weeks?)\b)/i);
+  for (const block of blocks) {
+    const parts = [...block.matchAll(/\((\d{1,3})\s*(?:min|minutos?|minutes?)\b[^)]*\)/gi)].map(
+      (found) => Number(found[1])
+    );
+    const whole = parts.indexOf(minutes);
+    if (whole >= 0) parts.splice(whole, 1);
+    const sum = parts.reduce((total, part) => total + part, 0);
+    if (parts.length >= 2 && sum > minutes * 1.1) {
+      return { phase: block.split("\n")[0].replace(/[#*_]/g, "").trim().slice(0, 60), sum };
+    }
+  }
+  return null;
+}
+
 /**
  * What exact advice still needs and the person has not said. Worked out here,
  * not by the model: a plan cannot be built without knowing how long a session
@@ -619,6 +721,7 @@ export function missingFrom(brief: Brief): string[] {
   if (brief.plan) {
     if (!brief.plan.length) missing.push("how long one session can be");
     if (!brief.plan.days) missing.push("which days of the week");
+    missing.push(...(brief.needs ?? []));
     if (!brief.plan.time) missing.push("at what time of day, if they want a fixed one");
   } else if (brief.has.length === 0) {
     missing.push("what they have to work with");
@@ -664,13 +767,11 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
     ? "They asked you something: answer it first, directly, with the number if it has one. "
     : "";
   if (missing.length > 0 && (brief.asked ?? 0) < 2 && !personAsked) {
-    return `If they want advice or a plan: do not give it yet. In one short message, ask only for what they have not told you, two things at most: ${missing
-      .slice(0, 2)
-      .join("; ")}. Ask nothing else.${
-      brief.plan
-        ? " One exception: if the numbers of the plan will depend on exactly what they have or where they start from (how much, which sizes, what level) and they did not say it, you may ask that too, in the same message."
-        : ""
-    }`;
+    // A plan is asked about in one message: when, how long, and what its numbers hang on
+    const most = brief.plan && brief.needs?.length ? 3 : 2;
+    return `If they want advice or a plan: do not give it yet. In one short message, ask only for what they have not told you, ${most === 3 ? "three" : "two"} things at most: ${missing
+      .slice(0, most)
+      .join("; ")}. Ask nothing else.`;
   }
   if (!brief.plan) {
     // No plan was asked for. If the coach is about to propose one anyway, it

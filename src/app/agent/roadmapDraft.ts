@@ -104,6 +104,8 @@ export class RoadmapDraft {
   private sentBack = false;
   /** A roadmap on other days than the conversation names was sent back already. */
   private daysSentBack = false;
+  /** A roadmap without what the person added with their yes was sent back already. */
+  private addedSentBack = false;
   /** Each stored roadmap as it was when the draft began, to tell what changed. */
   private readonly original = new Map<UUID, string>();
 
@@ -385,6 +387,44 @@ export class RoadmapDraft {
     );
   }
 
+  /**
+   * What the person added with their yes is somewhere in the roadmap: in a
+   * session's notes or in the rules. Sent back once when no word of it is.
+   */
+  private carriesWhatWasAdded(roadmap: DraftRoadmap) {
+    const added = this.said.added ?? [];
+    if (added.length === 0 || this.addedSentBack) return;
+    const bare = (words: string) =>
+      words
+        .toLocaleLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    const written = bare(
+      [
+        roadmap.rules ?? "",
+        ...roadmap.milestones.flatMap((milestone) => [
+          milestone.title,
+          ...milestone.steps.map((step) => `${step.activity} ${step.notes ?? ""}`),
+        ]),
+      ].join(" ")
+    );
+    const absent = added.filter((thing) => {
+      const words = bare(thing)
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length >= 6);
+      return (
+        words.length > 0 &&
+        !words.some((word) => written.includes(word.slice(0, Math.max(5, word.length - 2))))
+      );
+    });
+    if (absent.length === 0) return;
+    this.addedSentBack = true;
+    throw new DraftError(
+      "left-out",
+      `with their yes the person added: ${absent.join("; ")}. Nothing in the sessions' notes or in the rules says it. Put it where it belongs (in the notes of the phases it touches, with its numbers, or in the rules) and send the call again.`
+    );
+  }
+
   /** A new roadmap keeps to what the person said: how long a session is, how long the plan runs. */
   private keepsTo(roadmap: DraftRoadmap) {
     const first = roadmap.milestones[0]?.steps[0];
@@ -550,6 +590,7 @@ export class RoadmapDraft {
       if (!existing) {
         this.keepsTo(roadmap);
         this.onTheirDays(roadmap);
+        this.carriesWhatWasAdded(roadmap);
         // Sent back once: most often the days or a count were copied wrong, and
         // the numbers show which. A second time it stands, and the card says so.
         const shorter = this.shorterThanAsked(roadmap);
