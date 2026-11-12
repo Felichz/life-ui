@@ -581,6 +581,17 @@ export class Agent {
     this.decisions.delete(entryId);
   }
 
+  /**
+   * The prompt for this request. How and when to research is a long section:
+   * a model that cannot search is not sent it.
+   */
+  private promptText(): string {
+    const section = /<!-- web:start -->([\s\S]*?)<!-- web:end -->/;
+    return this.options.prompt
+      .replace(section, this.webSetting() === "off" ? "" : "$1")
+      .replace(/\n{3,}/g, "\n\n");
+  }
+
   private languageName(): string {
     return this.options.language?.() === "es" ? "Spanish" : "English";
   }
@@ -593,9 +604,9 @@ export class Agent {
       : "";
     return {
       role: "system",
-      content: `${this.options.prompt}\n\n## Right now\n\nThe app's interface is in ${this.languageName()}. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}". ${
+      content: `${this.promptText()}\n\n## Right now\n\nThe app's interface is in ${this.languageName()}. Reply in that language, even if earlier messages in this conversation were in another one. The "To do" block is shown to the person as "${t("block.todo")}". ${
         this.webSetting() === "off"
-          ? "Web search is turned off: you cannot look things up. The person can turn it on in Settings."
+          ? "Web search is turned off: you cannot look things up. Say when an answer is unchecked; the person can turn web research on in Settings."
           : "You can look things up with web_search."
       }\n\n${JSON.stringify(day)}${earlier}`,
     };
