@@ -383,7 +383,7 @@ A cool, almost colorless neutral field with one indigo voice and a handful of hu
 
 ## Layout
 
-**Shell.** At 1024px and up (`lg`), a sticky full-height sidebar (232px, `sidebar` background, 1px right border) holds the logo and wordmark, a search button that opens the command palette (with Ctrl/Cmd K hints), four nav items (Hoy, Biblioteca, Resumen, Ajustes) and, pinned to the bottom, a day card with the compact tempo meter and the running activity with its clock. Below 1024px the sidebar disappears and a fixed bottom tab bar takes over: 64px tall plus the safe-area inset, `panel` at 95% with a medium backdrop blur, four equal columns capped at 448px, 22px icons over 11px labels. `main` reserves that height at the bottom.
+**Shell.** At 1024px and up (`lg`), a sticky full-height sidebar (232px, `sidebar` background, 1px right border) holds the logo and wordmark, a search button that opens the command palette (with Ctrl/Cmd K hints), five nav items (Hoy, Metas, Biblioteca, Resumen, Ajustes) and, pinned to the bottom, a day card with the compact tempo meter and the running activity with its clock. Below 1024px the sidebar disappears and a fixed bottom tab bar takes over: 64px tall plus the safe-area inset, `panel` at 95% with a medium backdrop blur, five equal columns capped at 448px, 22px icons over 11px labels. `main` reserves that height at the bottom.
 
 **Page.** Content is centered at 1240px max (880px for narrow pages) with side gutters of 16px, then 24px from 640px, then 40px from 1024px. Top padding is 20px (32px from 1024px) and bottom padding is 40px. Page headers put the title and subtitle on the left and actions on the right, bottom-aligned from 640px.
 
@@ -499,6 +499,14 @@ The column where the day changes (400px wide from 1280px, a bottom sheet below).
 - **Attachments:** a paperclip icon button in the composer footer; files show as 28px chips above the text, images as thumbnails inside the bubble.
 - **Empty state:** the logo mark, a 17px title, one line of examples and three full-sentence suggestions as pills that send on click (they change once the day has started).
 - **Motion:** an entry added in this session rises 6px and fades in over 260ms; entries restored from the last session are simply there. A tempo badge plays the tempo bump once when the close is confirmed. While the agent thinks, three 4px dots rise in turn next to "Pensando…".
+
+### Goals page
+
+- **Ideal life:** a 14px `panel` card with the text as Markdown and a footer line in `ink-3`; "Editar" is a ghost button in the section title. Editing swaps the card for a textarea (280px tall at least) with "Cancelar" and a filled "Guardar". Empty, it is a dashed card that says what the text is for.
+- **Roadmap card:** a 14px `panel` card. Header: the goal (20px/600), its why in `ink-2`, "N de M pasos", and the percentage at display size on the right. Under it the track: one 6px segment per milestone, as wide as its share of the steps, `accent` on `hover`, 4px apart. A paused roadmap sits on `subtle/60` with a neutral pill.
+- **Milestones:** down a 1px rail. The node is 23px: reached is `ink` with a check, the current one is `accent-fill` with its number (indigo marks where the person is: the selected point), later ones are hollow. The rail behind a reached milestone is `ink-3`, ahead it is `line`. The label reads "Alcanzada el…", "Aquí estás" (in `accent-ink`) or "Después".
+- **Steps:** the type icon, the activity, and its count in tabular figures ("3 de 8 sesiones"). The current milestone's steps add a 4px `accent` bar and one line in `ink-3` with the next planned date. Progress is only what was reached: nothing shows what is missing, and no step is ever red.
+- **On Today:** one row per active roadmap (goal, current milestone, a 112px bar, the percentage), linking to the page.
 
 ### Tempo Meter (signature)
 

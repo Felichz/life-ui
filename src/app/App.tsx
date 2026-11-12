@@ -7,6 +7,7 @@ import { AgentProvider } from "./agent/AgentProvider";
 import type { ChatFn } from "./agent/agent";
 import { LocaleProvider, type Locale } from "./i18n";
 import { TooltipProvider } from "./components/ui/Tooltip";
+import { GoalsPage } from "./features/goals/GoalsPage";
 import { LibraryPage } from "./features/library/LibraryPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { TodayPage } from "./features/today/TodayPage";
@@ -59,6 +60,8 @@ export function AppRoutes() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<TodayPage />} />
+          <Route path="goals" element={<GoalsPage />} />
+          <Route path="metas" element={<Navigate to="/goals" replace />} />
           <Route path="library" element={<LibraryPage />} />
           <Route
             path="review"
