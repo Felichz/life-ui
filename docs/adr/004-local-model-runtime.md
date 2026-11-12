@@ -90,6 +90,33 @@ The list of programs using the GPU said what to close; now each one has a "Close
 - **Never Windows, never LifeUI.** Windows' own processes have no button, and the command refuses them whatever the interface sends. LifeUI's own window is a WebView2 process that also uses the GPU: it is shown as "LifeUI (this window)", without a button, and refused too.
 - **The figures follow.** After a close the memory is read again, so the bar, the verdict and the automatic context update at once.
 
+### 12. Thinking before answering is a switch, off by default (2026-11-11)
+
+Reasoning models think before they answer. On the author's PC, Qwen3.5 9B spent about 675 tokens thinking before a one-line reply: 62 seconds, against 2 seconds without. For a chat that changes a day in small steps, that wait is most of the experience.
+
+How to turn it off was read from other projects and then measured against LM Studio 0.4.28 with that model, one request per way:
+
+| Sent with the request                                                     | Result                        |
+| ------------------------------------------------------------------------- | ----------------------------- |
+| nothing                                                                   | 675 reasoning tokens, 62 s    |
+| `reasoning_effort: "none"`                                                | **0 reasoning tokens, 2.4 s** |
+| `reasoning_effort: "low"`                                                 | still 678 reasoning tokens    |
+| `reasoning: { effort: "none" }`                                           | ignored                       |
+| `chat_template_kwargs: { enable_thinking: false }` (llama.cpp's way)      | refused, HTTP 400             |
+| `enable_thinking: false`                                                  | refused, HTTP 400             |
+| `think: false` (Ollama's way)                                             | ignored                       |
+| `/no_think` in the message or the system prompt (Qwen3's old soft switch) | ignored                       |
+| an assistant message that already closes the thinking block               | works, 3.3 s                  |
+
+Open WebUI sends `reasoning_effort` to OpenAI-style servers and `think` to Ollama, which matches. So:
+
+- The composer has a switch, "Think before answering", **off by default**. Off, every request carries `reasoning_effort: "none"` and `think: false`; on, nothing is sent and the model does as it was loaded.
+- A server or a model that does not know the switch answers 400: the request is sent again without it, and that endpoint is not offered the switch again in the session.
+- Summaries, titles and the shaping of a compaction never think, whatever the switch says.
+- Thinking arrives apart from the answer (`reasoning_content`), and anything between `<think>` tags is stripped, so it is never shown either way.
+
+The cost of the default: a small model may plan a tool call a little worse without thinking. The switch is one click away for the turns that deserve it.
+
 ## Consequences
 
 - The load dialog is the first screen of each session when no model is loaded.

@@ -21,6 +21,7 @@ import {
 import { DEFAULT_CONTEXT } from "./context";
 import { desktopFetch, isDesktop } from "../platform/desktop";
 import { getWebSetting, setWebSetting } from "./web";
+import { getReasoning } from "./reasoning";
 import { chat, type ChatMessage, type ModelEndpoint } from "./llm";
 import prompt from "./prompt";
 import { getLocale } from "../i18n";
@@ -154,6 +155,7 @@ export function AgentProvider({
       vision: () => visionRef.current,
       // A title costs one more call: only a model loaded for real is asked for it
       titles: () => loadedRef.current,
+      reasoning: getReasoning,
       web: {
         setting: getWebSetting,
         allow: () => setWebSetting("on"),
