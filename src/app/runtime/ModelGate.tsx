@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Cpu,
   Gauge,
+  Loader2,
   HardDrive,
   MemoryStick,
   Wrench,
@@ -39,6 +40,7 @@ import {
   AGENT_CONTEXT,
   GPU_MARGIN,
   benchmark,
+  closeProcess,
   closingIsEnough,
   contextStops,
   estimateAll,
@@ -294,6 +296,11 @@ export function ModelGate({ children }: { children: ReactNode }) {
               onLoad={doLoad}
               onChange={() => void openSetup()}
               onSkip={() => setStep({ kind: "done" })}
+              onRefresh={() =>
+                void systemResources().then((resources) =>
+                  setStep((now) => (now.kind === "load" ? { ...now, resources } : now))
+                )
+              }
             />
           )}
           {step.kind === "loading" && <Loading model={step.model} />}
@@ -461,11 +468,14 @@ function LoadDialog({
   onLoad,
   onChange,
   onSkip,
+  onRefresh,
 }: {
   step: Extract<Step, { kind: "load" }>;
   onLoad: (model: LocalModel, need: number, allowOffload: boolean, context: number) => void;
   onChange: () => void;
   onSkip: () => void;
+  /** Reads the machine's memory again (after a program was closed). */
+  onRefresh: () => void;
 }) {
   const { model, resources, needs } = step;
   const [confirming, setConfirming] = useState(false);
@@ -544,7 +554,7 @@ function LoadDialog({
           </div>
         )}
         {gpu && need !== null && result !== "fits" && (
-          <GpuUsers need={need} freeVram={gpu.vram_free} />
+          <GpuUsers need={need} freeVram={gpu.vram_free} onFreed={onRefresh} />
         )}
         {confirming && result !== "fits" && (
           <p className="text-sm font-medium text-ink">
@@ -581,25 +591,55 @@ function LoadDialog({
   );
 }
 
-/** What holds the GPU's memory now, and which one is enough to close. */
-function GpuUsers({ need, freeVram }: { need: number; freeVram: number }) {
+/** What holds the GPU's memory now, which one is enough to close, and the way to close it. */
+function GpuUsers({
+  need,
+  freeVram,
+  onFreed,
+}: {
+  need: number;
+  freeVram: number;
+  /** A program was closed: the memory figures above have to be read again. */
+  onFreed: () => void;
+}) {
   const [list, setList] = useState<GpuProcess[] | null | "error">(null);
+  // The row being closed: asking first, then closing, then (if it stayed) offering to force it
+  const [closing, setClosing] = useState<{
+    pid: number;
+    stage: "confirm" | "working" | "stayed" | "failed";
+  } | null>(null);
+
+  const read = useCallback(
+    () =>
+      gpuProcesses()
+        .then(setList)
+        .catch(() => setList("error")),
+    []
+  );
   useEffect(() => {
-    let live = true;
-    gpuProcesses()
-      .then((found) => live && setList(found))
-      .catch(() => live && setList("error"));
-    return () => {
-      live = false;
-    };
-  }, []);
+    void read();
+  }, [read]);
+
+  const close = async (pid: number, force: boolean) => {
+    setClosing({ pid, stage: "working" });
+    try {
+      const gone = await closeProcess(pid, force);
+      if (!gone) return setClosing({ pid, stage: "stayed" });
+      setClosing(null);
+      await read();
+      onFreed();
+    } catch {
+      setClosing({ pid, stage: "failed" });
+    }
+  };
 
   if (list === "error") return <p className="text-sm text-ink-2">{t("model.gpu.unavailable")}</p>;
   if (list === null) return <p className="text-sm text-ink-2">{t("model.gpu.loading")}</p>;
 
   const MIN = 50 * 1024 ** 2;
-  const apps = list.filter((p) => !p.system && p.bytes >= MIN).slice(0, 5);
+  const apps = list.filter((p) => !p.system && !p.own && p.bytes >= MIN).slice(0, 5);
   const windows = list.filter((p) => p.system).reduce((sum, p) => sum + p.bytes, 0);
+  const own = list.filter((p) => p.own).reduce((sum, p) => sum + p.bytes, 0);
   return (
     <section>
       <h3 className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 text-sm font-medium text-ink">
@@ -609,28 +649,88 @@ function GpuUsers({ need, freeVram }: { need: number; freeVram: number }) {
         </span>
       </h3>
       <ul className="overflow-hidden rounded-lg border border-line">
-        {apps.map((p) => (
-          <li
-            key={p.pid}
-            className="flex items-center gap-3 border-b border-line px-3 py-2 text-sm last:border-b-0"
-          >
-            <span className="min-w-0 flex-1 truncate">
-              <span className="font-medium text-ink">{p.name}</span>
-              <span className="tabular ml-2 text-xs text-ink-3">PID {p.pid}</span>
-            </span>
-            {closingIsEnough(need, freeVram, p) && (
-              <span className="inline-flex items-center gap-1 rounded bg-success/10 px-1.5 py-0.5 text-xs text-success">
-                <Check className="size-3" />
-                {t("model.gpu.enough")}
-              </span>
-            )}
-            <span className="tabular w-20 text-right text-ink-2">{formatGiB(p.bytes)}</span>
+        {apps.map((p) => {
+          const stage = closing?.pid === p.pid ? closing.stage : null;
+          return (
+            <li key={p.pid} className="border-b border-line px-3 py-2 text-sm last:border-b-0">
+              <div className="flex min-h-7 items-center gap-3">
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium text-ink">{p.name}</span>
+                  <span className="tabular ml-2 text-xs text-ink-3">PID {p.pid}</span>
+                </span>
+                {closingIsEnough(need, freeVram, p) && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded bg-success/10 px-1.5 py-0.5 text-xs text-success">
+                    <Check className="size-3" />
+                    {t("model.gpu.enough")}
+                  </span>
+                )}
+                <span className="tabular w-16 shrink-0 text-right text-ink-2">
+                  {formatGiB(p.bytes)}
+                </span>
+                {stage === null && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={closing !== null}
+                    onClick={() => setClosing({ pid: p.pid, stage: "confirm" })}
+                  >
+                    {t("model.gpu.close")}
+                  </Button>
+                )}
+                {stage === "working" && (
+                  <span className="flex h-7 items-center px-2.5 text-ink-3">
+                    <Loader2 className="size-4 animate-spin" />
+                  </span>
+                )}
+              </div>
+              {/* Closing someone else's program is asked twice: once to close, once more to force it */}
+              {(stage === "confirm" || stage === "stayed" || stage === "failed") && (
+                <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-md bg-subtle px-2.5 py-2">
+                  <p className="min-w-0 flex-1 text-xs text-ink-2">
+                    {t(
+                      stage === "confirm"
+                        ? "model.gpu.closeConfirm"
+                        : stage === "stayed"
+                          ? "model.gpu.closeStayed"
+                          : "model.gpu.closeFailed",
+                      { name: p.name }
+                    )}
+                  </p>
+                  <span className="flex shrink-0 gap-1.5">
+                    <Button size="sm" variant="ghost" onClick={() => setClosing(null)}>
+                      {t("common.cancel")}
+                    </Button>
+                    {stage === "confirm" ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void close(p.pid, false)}
+                      >
+                        {t("model.gpu.closeYes", { name: p.name })}
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="danger" onClick={() => void close(p.pid, true)}>
+                        {t("model.gpu.force")}
+                      </Button>
+                    )}
+                  </span>
+                </div>
+              )}
+            </li>
+          );
+        })}
+        {own > 0 && (
+          <li className="flex items-center gap-3 border-b border-line px-3 py-2 text-sm text-ink-2 last:border-b-0">
+            <span className="min-w-0 flex-1">{t("model.gpu.own")}</span>
+            <span className="tabular w-16 text-right">{formatGiB(own)}</span>
+            <span className="w-[62px]" aria-hidden />
           </li>
-        ))}
+        )}
         {windows > 0 && (
           <li className="flex items-center gap-3 px-3 py-2 text-sm text-ink-2">
             <span className="min-w-0 flex-1">{t("model.gpu.windows")}</span>
-            <span className="tabular w-20 text-right">{formatGiB(windows)}</span>
+            <span className="tabular w-16 text-right">{formatGiB(windows)}</span>
+            <span className="w-[62px]" aria-hidden />
           </li>
         )}
       </ul>

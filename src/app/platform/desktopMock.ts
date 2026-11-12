@@ -109,6 +109,21 @@ const MODELS = [
   },
 ];
 
+/** What holds the GPU besides the model: a script someone left running, and the usual apps. */
+const OTHERS = [
+  { pid: 39652, name: "python", bytes: 1200 * MIB, system: false },
+  { pid: 20680, name: "chrome", bytes: 177 * MIB, system: false },
+  { pid: 10100, name: "msedgewebview2", bytes: 103 * MIB, system: false, own: true },
+  { pid: 22020, name: "explorer", bytes: 95 * MIB, system: true },
+  { pid: 7800, name: "claude", bytes: 86 * MIB, system: false },
+  { pid: 24612, name: "explorer", bytes: 38 * MIB, system: true },
+  { pid: 19604, name: "csrss", bytes: 35 * MIB, system: true },
+];
+const closed = new Set<number>();
+/** GPU memory in use without the model: 400 MiB of Windows itself plus what is still open. */
+const othersMiB = () =>
+  400 + OTHERS.filter((p) => !closed.has(p.pid)).reduce((sum, p) => sum + p.bytes, 0) / MIB;
+
 let loaded: string | null = null;
 let loadedContext = 16384;
 let serverRunning = false;
@@ -128,24 +143,20 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       {
         name: "NVIDIA GeForce RTX 3070 Laptop GPU",
         vram_total: 8192 * MIB,
-        vram_used: (loaded ? 920 + 6650 : 920) * MIB,
-        vram_free: (8192 - 920 - (loaded ? 6650 : 0)) * MIB,
+        vram_used: (othersMiB() + (loaded ? 6000 : 0)) * MIB,
+        vram_free: (8192 - othersMiB() - (loaded ? 6000 : 0)) * MIB,
       },
     ],
     vram_note: null,
   }),
   // Measured with gpu_processes on the author's PC, 2026-11-10
-  gpu_processes: () =>
-    loaded
-      ? []
-      : [
-          { pid: 20680, name: "chrome", bytes: 177 * MIB, system: false },
-          { pid: 10100, name: "msedgewebview2", bytes: 103 * MIB, system: false },
-          { pid: 22020, name: "explorer", bytes: 95 * MIB, system: true },
-          { pid: 7800, name: "claude", bytes: 86 * MIB, system: false },
-          { pid: 24612, name: "explorer", bytes: 38 * MIB, system: true },
-          { pid: 19604, name: "csrss", bytes: 35 * MIB, system: true },
-        ],
+  gpu_processes: () => (loaded ? [] : OTHERS.filter((p) => !closed.has(p.pid))),
+  // The first, polite try leaves chrome open (as if it asked about unsaved work)
+  close_process: ({ pid, force }) => {
+    if (Number(pid) === 20680 && !force) return false;
+    closed.add(Number(pid));
+    return true;
+  },
   lmstudio_models: () => MODELS,
   lmstudio_loaded: () =>
     loaded ? [{ modelKey: loaded, identifier: loaded, contextLength: loadedContext }] : [],

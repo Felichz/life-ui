@@ -545,6 +545,15 @@ export const en: Record<MessageKey, string> = {
   "model.continue": "Continue",
   "model.gpu.title": "Using the GPU now",
   "model.gpu.windows": "Windows",
+  "model.gpu.close": "Close",
+  "model.gpu.closeConfirm":
+    "{name} is asked to close. If it has unsaved work it may ask you first.",
+  "model.gpu.closeYes": "Close {name}",
+  "model.gpu.closeStayed":
+    "{name} is still open. Forcing it ends it now; anything unsaved is lost.",
+  "model.gpu.closeFailed": "{name} could not be closed. Forcing it may work.",
+  "model.gpu.force": "Force close",
+  "model.gpu.own": "LifeUI (this window)",
   "model.gpu.enough": "Closing it is enough",
   "model.gpu.loading": "Looking at what uses the GPU…",
   "model.gpu.unavailable": "Can’t see which programs use the GPU.",
