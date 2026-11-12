@@ -20,6 +20,7 @@ import {
   briefLines,
   nextMove,
   planGaps,
+  planNeeds,
   saidIn,
   unagreed,
   updateBrief,
@@ -746,7 +747,12 @@ export class Agent {
     // Counted here, where a compaction cannot reset it
     const said = before ? textOf(before.content ?? "") : "";
     if (!late && this.brief && /[?¿]/.test(said)) {
-      this.brief = { ...this.brief, asked: (this.brief.asked ?? 0) + 1 };
+      this.brief = {
+        ...this.brief,
+        asked: (this.brief.asked ?? 0) + 1,
+        // What the plan's numbers depend on has been asked for with the rest: once
+        ...(this.brief.needs ? { needs: [] } : {}),
+      };
     }
     // Once they want a plan, a long reply is the plan: it is not to be written again
     if (this.brief?.plan && !this.brief.plan.given && said.length >= PLAN_LENGTH) {
@@ -768,6 +774,17 @@ export class Agent {
         this.notesRead = true;
       },
     });
+    // A plan is wanted and there is still room to ask: what do its numbers depend on?
+    if (
+      this.brief?.plan &&
+      !this.brief.plan.given &&
+      this.brief.needs === undefined &&
+      (this.brief.asked ?? 0) < 2 &&
+      !signal.aborted
+    ) {
+      const needs = await planNeeds({ chat: this.options.chat, brief: this.brief, signal });
+      if (this.brief) this.brief = { ...this.brief, needs };
+    }
   }
 
   /** The person asked for something to be looked up, searching is allowed, and no search was made yet. */

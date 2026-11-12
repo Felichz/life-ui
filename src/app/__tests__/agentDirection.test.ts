@@ -344,6 +344,16 @@ describe("the roadmap draft", () => {
       brief.saveRoadmap(few);
       expect(brief.changed).toBe(true);
 
+      // What they added with their yes is in no session and no rule: sent back once
+      const more = new RoadmapDraft(setup(), new Date(), {
+        added: ["tambien quiero estirar al final", "sentadilla"],
+      });
+      expect(() => more.saveRoadmap(ROADMAP)).toThrow(
+        /left-out: with their yes the person added: tambien quiero estirar al final\. Nothing/
+      );
+      more.saveRoadmap({ ...ROADMAP, rules: "- Estirar dos minutos al final" });
+      expect(more.changed).toBe(true);
+
       // Other days than the conversation names: sent back once, with the line they were read from
       const core3 = setup();
       const other = new RoadmapDraft(core3, new Date(), {
