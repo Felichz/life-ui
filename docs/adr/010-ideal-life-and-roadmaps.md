@@ -3,6 +3,7 @@
 - Status: accepted
 - Date: 2026-11-11
 - Builds on: ADR-002 (the agent), ADR-008 (days ahead), ADR-009 (the coach)
+- Changed by: ADR-011 (a roadmap now plans its own sessions, and the planner's main tool takes one activity and phases counted in sessions)
 
 ## Context
 

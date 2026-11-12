@@ -149,6 +149,58 @@ export interface RoadmapStep {
   /** times: sessions closed. minutes: minutes of closed sessions. */
   unit: "times" | "minutes";
   amount: number;
+  /**
+   * What one session of this step consists of (a routine, a checklist). Each
+   * session the roadmap plans carries it (ADR-011).
+   */
+  notes?: string;
+  /**
+   * How long one session of this step lasts, when it is not the activity's
+   * usual length: sessions often grow from one phase to the next.
+   */
+  sessionMinutes?: MinutesNumber;
+}
+
+/** The days a roadmap's sessions happen on (ADR-011). */
+export interface RoadmapSchedule {
+  /** 0 is Sunday. At least one. */
+  weekdays: number[];
+  /** Planned start of each session; a plan, not a gate (ADR-006). */
+  time?: DayMinutes;
+  /** "YYYY-MM-DD": the first day a session may fall on. */
+  start: string;
+}
+
+/** A roadmap as it is given to the core: ids are the core's business. */
+export interface RoadmapInput {
+  id?: UUID;
+  title: string;
+  why?: string;
+  targetDate?: string;
+  status?: Roadmap["status"];
+  /** Left out: an existing roadmap keeps its own. null: it has none any more. */
+  schedule?: RoadmapSchedule | null;
+  rules?: string;
+  milestones: Array<{
+    title: string;
+    note?: string;
+    steps: Array<{
+      title?: string;
+      templateId: UUID;
+      unit: "times" | "minutes";
+      amount: number;
+      notes?: string;
+      sessionMinutes?: MinutesNumber;
+    }>;
+  }>;
+}
+
+/** One milestone's sessions on the calendar, as a roadmap's schedule lays them out. */
+export interface RoadmapSessions {
+  milestone: string;
+  sessions: number;
+  first?: string;
+  last?: string;
 }
 
 export interface RoadmapMilestone {
@@ -167,6 +219,16 @@ export interface Roadmap {
   /** "YYYY-MM-DD", when the person wants to be there. A hope, never a deadline to fail. */
   targetDate?: string;
   status: "active" | "paused";
+  /**
+   * When its sessions happen. A roadmap with a schedule keeps the sessions
+   * that are left planned on those days, by itself (ADR-011).
+   */
+  schedule?: RoadmapSchedule;
+  /**
+   * What holds in every session of every phase (how to progress, what counts
+   * on a bad day). Each planned session carries it under its own notes.
+   */
+  rules?: string;
   milestones: RoadmapMilestone[];
   createdAt: ISODateTimeString;
   updatedAt: ISODateTimeString;
@@ -216,6 +278,10 @@ export interface PlannedActivity {
   notes?: string;
   /** Items planned in one go (every Monday for two months) share it. */
   seriesId?: UUID;
+  /** How long this one is planned to last, when not the activity's usual length. */
+  minutes?: MinutesNumber;
+  /** Set when a roadmap planned it: the session belongs to that step (ADR-011). */
+  roadmap?: { id: UUID; stepId: UUID };
   createdAt: ISODateTimeString;
 }
 
@@ -619,19 +685,10 @@ export interface ISystemCore {
   getIdealLife(): IdealLife | null;
   setIdealLife(text: string): IdealLife;
   getRoadmaps(): Roadmap[];
-  saveRoadmap(input: {
-    id?: UUID;
-    title: string;
-    why?: string;
-    targetDate?: string;
-    status?: Roadmap["status"];
-    milestones: Array<{
-      title: string;
-      note?: string;
-      steps: Array<{ title?: string; templateId: UUID; unit: "times" | "minutes"; amount: number }>;
-    }>;
-  }): Roadmap;
+  saveRoadmap(input: RoadmapInput): Roadmap;
   deleteRoadmap(id: UUID): void;
+  /** Where each milestone's planned sessions fall, for a roadmap with a schedule. */
+  getRoadmapSessions(id: UUID): RoadmapSessions[];
   getRoadmapProgress(): RoadmapProgress[];
   interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;

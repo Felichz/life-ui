@@ -10,6 +10,7 @@ import type {
   IdealLife,
   Roadmap,
   RoadmapProgress,
+  RoadmapSessions,
   CompletedActivityRecord,
   TimeBlock,
   DayMinutes,
@@ -147,6 +148,7 @@ export class SystemCore implements ISystemCore {
     this.timeBlockManager.ensureDefaultBlockExists();
     // What was planned for today, or for days that went by, joins the plan (ADR-008)
     this.agendaManager.bringDue();
+    this.directionManager.syncSessions();
     return newDay;
   }
 
@@ -167,7 +169,15 @@ export class SystemCore implements ISystemCore {
   }
 
   public bringPlannedActivities(now?: Date): ActivityInstance[] {
-    return this.agendaManager.bringDue(now);
+    const brought = this.agendaManager.bringDue(now);
+    // A roadmap keeps its remaining sessions on the calendar (ADR-011)
+    this.directionManager.syncSessions(undefined, now);
+    return brought;
+  }
+
+  /** For the managers: the agenda, where planned sessions live. */
+  public get agenda(): AgendaManager {
+    return this.agendaManager;
   }
 
   /**
@@ -239,6 +249,10 @@ export class SystemCore implements ISystemCore {
 
   public deleteRoadmap(id: UUID): void {
     this.directionManager.deleteRoadmap(id);
+  }
+
+  public getRoadmapSessions(id: UUID): RoadmapSessions[] {
+    return this.directionManager.getRoadmapSessions(id);
   }
 
   public getRoadmapProgress(): RoadmapProgress[] {

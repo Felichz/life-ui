@@ -99,15 +99,16 @@ npm install
 npm run dev          # http://localhost:5174
 ```
 
-| Script              | What it does                                            |
-| ------------------- | ------------------------------------------------------- |
-| `npm run dev`       | Vite dev server on port 5174                            |
-| `npm run build`     | Type-check and build for production into `dist/`        |
-| `npm run preview`   | Serve the production build on port 5174                 |
-| `npm run typecheck` | Type-check the app, tooling and Cypress projects        |
-| `npm run lint`      | ESLint with Prettier, zero warnings allowed             |
-| `npm test`          | Unit and integration tests (Jest)                       |
-| `npm run test:e2e`  | End-to-end run in Cypress (needs `npm run dev` running) |
+| Script              | What it does                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `npm run dev`       | Vite dev server on port 5174                                                          |
+| `npm run build`     | Type-check and build for production into `dist/`                                      |
+| `npm run preview`   | Serve the production build on port 5174                                               |
+| `npm run typecheck` | Type-check the app, tooling and Cypress projects                                      |
+| `npm run lint`      | ESLint with Prettier, zero warnings allowed                                           |
+| `npm test`          | Unit and integration tests (Jest)                                                     |
+| `npm run test:e2e`  | End-to-end run in Cypress (needs `npm run dev` running)                               |
+| `npm run sim`       | Talk to the real agent and a local model from the terminal (see `scripts/sim/sim.ts`) |
 
 Keyboard: `Ctrl/⌘ K` command palette · `N` add activity · `E` log event · `T` finish the running activity · `G` then `H`/`B`/`R`/`A` to navigate · `0` to `9` to score in the closing ritual.
 

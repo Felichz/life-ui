@@ -105,7 +105,14 @@ describe("searching the web from the chat", () => {
     expect(JSON.parse(web.sent[0]).params.arguments.query).toBe(
       "habit formation consistency research"
     );
-    expect(agent.entries.find((entry) => entry.kind === "tool")).toMatchObject({ status: "done" });
+    // The links are shown by the app itself: they do not depend on the model citing them
+    expect(agent.entries.find((entry) => entry.kind === "tool")).toMatchObject({
+      status: "done",
+      sources: [
+        { title: "Habit formation review", url: "https://example.org/habits" },
+        { title: "https://example.org/second", url: "https://example.org/second" },
+      ],
+    });
     // The sources reach the model marked as information, not instructions
     const result = JSON.stringify(seen[1].messages.at(-1));
     expect(result).toContain("https://example.org/habits");

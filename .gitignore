@@ -13,6 +13,7 @@ coverage
 .impeccable/
 .vercel
 .visual-review*/
+.sim/
 *.log
 $null
 

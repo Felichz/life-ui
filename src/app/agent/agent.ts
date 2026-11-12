@@ -15,6 +15,15 @@ import {
 } from "./context";
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
 import type { WebSetting } from "./web";
+import {
+  briefLines,
+  nextMove,
+  saidIn,
+  unagreed,
+  updateBrief,
+  worthNoting,
+  type Brief,
+} from "./brief";
 
 /**
  * The agent loop (ADR-002): the person writes, the model answers or calls
@@ -67,6 +76,8 @@ export type Entry =
       external?: boolean;
       /** What the change consists of, line by line (a roadmap's milestones). */
       details?: string[];
+      /** What a search found: shown by the app itself, whatever the model says of it. */
+      sources?: Array<{ title: string; url: string }>;
     }
   | {
       id: string;
@@ -99,6 +110,8 @@ export interface SavedChat {
   dropped?: number;
   /** The title came from the model (otherwise it is the first words of the first message). */
   titled?: boolean;
+  /** The coach's notes on what the person has told it (ADR-012). */
+  brief?: Brief;
 }
 
 export interface SavedChats {
@@ -146,6 +159,11 @@ export interface AgentOptions {
   titles?: () => boolean;
   /** Whether the model thinks before answering. Left out: the model's own default. */
   reasoning?: () => boolean;
+  /**
+   * Whether the coach keeps notes on what the person tells it (ADR-012). One
+   * short call more per message that says something; off unless asked for.
+   */
+  notes?: () => boolean;
   /** Research on the web (ADR-009): the person's setting, and how to reach out. */
   web?: {
     setting: () => WebSetting;
@@ -157,6 +175,10 @@ export interface AgentOptions {
 
 /** The longest answer the coach is allowed in one go. */
 const MAX_REPLY_TOKENS = 2048;
+/** Failures of one tool in one turn before it is not run again. */
+const MAX_FAILURES = 2;
+/** A reply this long, to someone who wants a plan, is taken to be the plan (ADR-012). */
+const PLAN_LENGTH = 700;
 /** How much of the ideal life goes in every request: about 450 tokens. */
 const IDEAL_LIFE_CHARS = 1500;
 /** Entries kept on screen and on disk per conversation; older ones fall off the top. */
@@ -213,8 +235,12 @@ export class Agent {
   /** What the runtime counted at the last reply, and the history length it covers. */
   private measured: { tokens: number; at: number } | null = null;
   private titled = false;
+  /** What the person has told the coach, kept in a few lists. */
+  private brief: Brief | null = null;
   /** Something read from the web is in this turn: changes ask first, whatever the mode. */
   private webThisTurn = false;
+  /** Tool calls that failed in this turn, by tool. */
+  private failures = new Map<string, number>();
 
   constructor(private readonly options: AgentOptions) {
     const saved = options.store?.load();
@@ -236,6 +262,7 @@ export class Agent {
     this.entries = chat.entries;
     this.history = chat.history;
     this.titled = chat.titled ?? false;
+    this.brief = chat.brief ?? null;
     this.lastUndo = null;
     this.measured = null;
   }
@@ -254,6 +281,7 @@ export class Agent {
       ...(this.summary ? { summary: this.summary } : {}),
       ...(this.dropped ? { dropped: this.dropped } : {}),
       ...(this.titled ? { titled: true } : {}),
+      ...(this.brief ? { brief: this.brief } : {}),
     };
   }
 
@@ -638,15 +666,125 @@ export class Agent {
   }
 
   /**
+   * Brings the coach's notes up to date with what the person just wrote
+   * (ADR-012). Skipped for a message too short to say anything about them.
+   */
+  private async takeNotes(signal: AbortSignal) {
+    if (!this.options.notes?.()) return;
+    const last = this.history[this.history.length - 1];
+    if (last?.role !== "user") return;
+    const person = textOf(last.content);
+    const before = [...this.history]
+      .reverse()
+      .find((message) => message.role === "assistant" && !message.tool_calls?.length);
+    // Counted here, where a compaction cannot reset it
+    const said = before ? textOf(before.content ?? "") : "";
+    if (this.brief && /[?¿]/.test(said)) {
+      this.brief = { ...this.brief, asked: (this.brief.asked ?? 0) + 1 };
+    }
+    // Once they want a plan, a long reply is the plan: it is not to be written again
+    if (this.brief?.plan && !this.brief.plan.given && said.length >= PLAN_LENGTH) {
+      this.brief = { ...this.brief, plan: { ...this.brief.plan, given: true } };
+    }
+    if (!worthNoting(person, this.brief)) {
+      this.brief = unagreed(this.brief);
+      return;
+    }
+    this.brief = await updateBrief({
+      chat: this.options.chat,
+      brief: this.brief,
+      coach: before ? textOf(before.content ?? "") : undefined,
+      person,
+      language: this.languageName(),
+      signal,
+    });
+  }
+
+  /** Whether a tool has changed something since the person's last message. */
+  private changedThisTurn(): boolean {
+    const from = this.history.map((message) => message.role).lastIndexOf("user");
+    const calls = new Map<string, string>();
+    for (const message of this.history.slice(from + 1)) {
+      if (message.role === "assistant") {
+        message.tool_calls?.forEach((call) => calls.set(call.id, call.function.name));
+      } else if (message.role === "tool") {
+        const tool = toolByName(calls.get(message.tool_call_id) ?? "");
+        if (tool?.mutates && !/"(error|rejected)"/.test(message.content)) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * What this turn calls for, read from the conversation itself. A small model
+   * keeps asking the same questions and walks past the one it was asked: a
+   * rule in the prompt does not hold it, a line next to the message does.
+   */
+  private turnNotes(): string[] {
+    const notes: string[] = [];
+    const turns = this.history.filter(
+      (message) =>
+        message.role === "user" ||
+        (message.role === "assistant" && !message.tool_calls?.length && message.content)
+    );
+    const last = turns[turns.length - 1];
+    const personAsked = last?.role === "user" && /[?¿]/.test(textOf(last.content));
+    // The replies before this message that ended in questions, counted back from the latest
+    let asked = 0;
+    for (let index = turns.length - 2; index >= 0; index--) {
+      const message = turns[index];
+      if (message.role !== "assistant") continue;
+      if (!/[?¿]/.test(textOf(message.content))) break;
+      asked++;
+    }
+    // Something was changed in this turn already: what is left is to say so
+    if (this.changedThisTurn()) {
+      notes.push(
+        "The change is made. Tell them what was done, from the tool's answer as it is, in a few lines. Do not ask for a yes to what is already saved, and do not plan it again."
+      );
+      return notes;
+    }
+    // With notes on the person, the move comes from them: ask what is missing, or recommend
+    const move = nextMove(this.brief, personAsked);
+    if (move) notes.push(move);
+    // What exists is said last: a plan that is already a roadmap is not built twice
+    const roadmaps = this.options.core.getRoadmaps();
+    if (this.brief?.plan && roadmaps.length > 0) {
+      notes.push(
+        `Roadmaps that exist already, with their sessions on the calendar: ${roadmaps
+          .map((roadmap) => `"${roadmap.title}"`)
+          .join(
+            ", "
+          )}. If the plan is one of these it is done: say so, and never build it again. To change one, hand the planner only the change.`
+      );
+    } else if (personAsked) {
+      notes.push(
+        "They asked you something: answer it first, directly, with the number if it has one."
+      );
+    } else if (asked >= 2) {
+      notes.push(
+        `Your last ${asked} replies asked them questions. Do not ask again: give your recommendation now, and say what you assumed where you are not sure.`
+      );
+    }
+    return notes;
+  }
+
+  /**
    * Small models follow the last thing they read, and the old replies in the
    * history are in the old language. A reminder rides on the latest message
-   * the person wrote (a copy: it is not kept in the history).
+   * the person wrote (a copy: it is not kept in the history), with what this
+   * turn calls for.
    */
   private withLanguageReminder(messages: ChatMessage[]): ChatMessage[] {
     const index = messages.map((m) => m.role).lastIndexOf("user");
     const message = messages[index];
     if (!message || message.role !== "user") return messages;
-    const reminder = `\n\n[Reply in ${this.languageName()}.]`;
+    const brief = briefLines(this.brief);
+    // The notes first, the move last: a small model acts on the last thing it reads
+    const reminder = `\n\n[${brief ? `${brief}\n\n` : ""}${[
+      ...this.turnNotes(),
+      `Reply in ${this.languageName()}.`,
+    ].join(" ")}]`;
     const copy = [...messages];
     copy[index] = {
       role: "user",
@@ -662,6 +800,25 @@ export class Agent {
     return this.withLanguageReminder(mergeUserRuns([this.system(), ...this.sendable()]));
   }
 
+  /**
+   * The latest of what was said, as text: the plan the person agreed to is in
+   * it, and a planner that reads it does not depend on the coach retelling it.
+   */
+  private recentConversation(limit = 7000): string {
+    const lines: string[] = [];
+    let size = 0;
+    for (const message of [...this.history].reverse()) {
+      if (message.role !== "user" && message.role !== "assistant") continue;
+      const words = textOf(message.content ?? "").trim();
+      if (!words) continue;
+      const line = `${message.role === "user" ? "PERSON" : "COACH"}: ${words}`;
+      if (size + line.length > limit && lines.length > 0) break;
+      lines.unshift(line.slice(-limit));
+      size += line.length;
+    }
+    return lines.join("\n\n");
+  }
+
   /** What the person wrote lately, to check a change against their own words. */
   private recentUserText(count = 3): string {
     return this.history
@@ -672,6 +829,24 @@ export class Agent {
   }
 
   private async runTool(call: ToolCall): Promise<unknown> {
+    const name = call.function.name;
+    // A small model told "that did not work" tries the same thing again, eight
+    // times if let. After two failures in one turn the tool is not run again.
+    if ((this.failures.get(name) ?? 0) >= MAX_FAILURES) {
+      return {
+        error: "stop-trying",
+        detail:
+          "This has not worked twice in this turn. Do not try again: tell the person in plain words that it could not be done this time, without naming tools or inner workings, and ask how they want to go on.",
+      };
+    }
+    const result = await this.runToolOnce(call);
+    if (result && typeof result === "object" && "error" in result) {
+      this.failures.set(name, (this.failures.get(name) ?? 0) + 1);
+    }
+    return result;
+  }
+
+  private async runToolOnce(call: ToolCall): Promise<unknown> {
     const tool: Tool | undefined = toolByName(call.function.name);
     if (!tool) return { error: "unknown-tool", tools: "see the tool list" };
     let args: Record<string, unknown>;
@@ -699,6 +874,21 @@ export class Agent {
       now: this.options.now ?? (() => new Date()),
       http: this.options.web?.http,
       signal: this.abort?.signal,
+      said: saidIn(this.brief),
+      conversation: this.recentConversation(),
+      ...(this.brief?.plan
+        ? {
+            planning: {
+              given: Boolean(this.brief.plan.given),
+              agreed: Boolean(this.brief.agreed),
+              built: () => {
+                if (this.brief?.plan) {
+                  this.brief = { ...this.brief, plan: { ...this.brief.plan, built: true } };
+                }
+              },
+            },
+          }
+        : {}),
       delegate: {
         chat: this.options.chat,
         language: this.languageName(),
@@ -869,7 +1059,19 @@ export class Agent {
     try {
       const result = await tool.run(ctx, args);
       this.webThisTurn = true;
-      this.patch(entry.id, { status: "done" });
+      const found = (result as { results?: Array<{ title?: string; url?: string }> }).results;
+      this.patch(entry.id, {
+        status: "done",
+        // The links are the app's to show: a model names its sources and forgets to link them
+        ...(Array.isArray(found) && found.length > 0
+          ? {
+              sources: found
+                .filter((one) => one.url && /^https?:\/\//.test(one.url))
+                .slice(0, 5)
+                .map((one) => ({ title: one.title || one.url!, url: one.url! })),
+            }
+          : {}),
+      });
       return result;
     } catch (caught) {
       const result = failure(caught);
@@ -955,6 +1157,7 @@ export class Agent {
   private async run() {
     this.busy = true;
     this.webThisTurn = false;
+    this.failures.clear();
     const abort = new AbortController();
     this.abort = abort;
     this.emit();
@@ -987,6 +1190,8 @@ export class Agent {
     };
 
     try {
+      await this.takeNotes(abort.signal);
+      if (abort.signal.aborted) return;
       const maxSteps = this.options.maxSteps ?? 8;
       let corrected = false;
       let compacted = false;

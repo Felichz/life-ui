@@ -49,7 +49,7 @@ import {
   formatTime,
   formatTokens,
 } from "../lib/format";
-import { isDesktop } from "../platform/desktop";
+import { isDesktop, openExternal } from "../platform/desktop";
 import { useModel } from "../runtime/ModelGate";
 import { useSystem } from "../state/system";
 import { useToast } from "../state/toast";
@@ -665,6 +665,15 @@ function TempoBadge({ tempos, earned = false }: { tempos: number; earned?: boole
   );
 }
 
+/** "who.int", from a link. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 function ToolRow({ entry }: { entry: ToolEntry }) {
   const { agent } = useAgent();
   const entrance = useEntrance(entry.id);
@@ -685,6 +694,28 @@ function ToolRow({ entry }: { entry: ToolEntry }) {
           <span className={entry.status === "error" ? "text-danger" : "text-ink-3"}>
             {" · "}
             {t(STATUS[entry.status])}
+          </span>
+        )}
+        {/* What a search found, linked by the app itself */}
+        {entry.sources && entry.sources.length > 0 && (
+          <span className="mt-1 flex flex-col gap-0.5">
+            {entry.sources.map((source) => (
+              <a
+                key={source.url}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => {
+                  if (!isDesktop()) return;
+                  event.preventDefault();
+                  void openExternal(source.url);
+                }}
+                className="truncate text-xs text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-ink"
+              >
+                {source.title}
+                <span className="text-ink-3"> · {hostOf(source.url)}</span>
+              </a>
+            ))}
           </span>
         )}
       </span>

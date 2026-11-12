@@ -10,6 +10,8 @@ import { cn } from "../../lib/cn";
 import { templateMap } from "../../lib/domain";
 import { formatDateShort, formatDayMinutes, formatDayMonth, formatNumber } from "../../lib/format";
 import { useSystem } from "../../state/system";
+import { whenLabel } from "../../agent/when";
+import { ActivityNotes, NotesToggle } from "../today/Upcoming";
 import { useToast } from "../../state/toast";
 import { t, tp } from "../../i18n";
 
@@ -169,6 +171,12 @@ function RoadmapCard({ progress }: { progress: RoadmapProgress }) {
                   {t("goals.paused")}
                 </span>
               )}
+              {/* The days its sessions are on: what makes it a plan and not a wish */}
+              {roadmap.schedule && !paused && (
+                <span className="tabular">
+                  · {whenLabel(roadmap.schedule.weekdays, roadmap.schedule.time)}
+                </span>
+              )}
               {roadmap.targetDate && (
                 <span>
                   ·{" "}
@@ -213,6 +221,7 @@ function RoadmapCard({ progress }: { progress: RoadmapProgress }) {
             entry={entry}
             number={index + 1}
             last={index === progress.milestones.length - 1}
+            rules={roadmap.rules}
           />
         ))}
       </ol>
@@ -224,10 +233,13 @@ function Milestone({
   entry,
   number,
   last,
+  rules,
 }: {
   entry: RoadmapProgress["milestones"][number];
   number: number;
   last: boolean;
+  /** What holds in every session of the roadmap. */
+  rules?: string;
 }) {
   const { milestone, status } = entry;
   return (
@@ -281,7 +293,7 @@ function Milestone({
         {milestone.note && <p className="mt-0.5 text-sm text-ink-2">{milestone.note}</p>}
         <ul className="mt-2 flex flex-col gap-2">
           {entry.steps.map((step) => (
-            <Step key={step.step.id} step={step} status={status} />
+            <Step key={step.step.id} step={step} status={status} rules={rules} />
           ))}
         </ul>
       </div>
@@ -292,11 +304,16 @@ function Milestone({
 function Step({
   step,
   status,
+  rules,
 }: {
   step: StepProgress;
   status: RoadmapProgress["milestones"][number]["status"];
+  rules?: string;
 }) {
   const { state } = useSystem();
+  const [open, setOpen] = useState(false);
+  // What a session of this step consists of, then what always holds
+  const notes = [step.step.notes, rules].filter(Boolean).join("\n\n");
   const template = templateMap(state).get(step.step.templateId);
   const upcoming = status === "upcoming";
   const amount = t(step.step.unit === "times" ? "goals.step.times" : "goals.step.minutes", {
@@ -334,7 +351,17 @@ function Step({
               )
             : amount}
         </span>
+        {notes && <NotesToggle open={open} onToggle={() => setOpen((value) => !value)} />}
       </div>
+      {open && notes && <ActivityNotes notes={notes} className="ml-[26px] mt-1.5" />}
+      {/* A phase still ahead already has its dates */}
+      {upcoming && step.next && (
+        <p className="tabular ml-[26px] mt-0.5 text-sm text-ink-3">
+          {t("goals.step.from", {
+            date: formatDateShort(new Date(`${step.next.date}T12:00:00`)),
+          })}
+        </p>
+      )}
       {status === "current" && (
         <div className="ml-[26px] mt-1.5">
           <span className="block h-1 overflow-hidden rounded-full bg-hover" aria-hidden>
