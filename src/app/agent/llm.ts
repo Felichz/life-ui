@@ -64,6 +64,8 @@ export interface ChatOptions {
    * thinking first (ADR-004, section 12). Left out: the model's own default.
    */
   reasoning?: boolean;
+  /** "required": the model has to answer with a tool call, not with words. */
+  toolChoice?: "required";
   /** Called with the whole visible text so far, as the model writes it. */
   onText?: (text: string) => void;
 }
@@ -150,6 +152,8 @@ async function readStream(
   };
 }
 
+/** Tokens left for thinking on top of a call's limit (675 were measured on a short answer). */
+const REASONING_ROOM = 4096;
 /** Endpoints that answered 400 to the reasoning switch, for this session. */
 const refusesSwitch = new Set<string>();
 
@@ -161,7 +165,7 @@ export async function chat(
   options: ChatOptions = {}
 ): Promise<ModelReply> {
   const send = isDesktop() ? desktopFetch : fetch;
-  const post = (reasoningOff: boolean) =>
+  const post = (reasoningOff: boolean, required = options.toolChoice === "required") =>
     send(`${endpoint.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
@@ -172,8 +176,12 @@ export async function chat(
         model: endpoint.model,
         messages,
         // A call without tools (a summary) must not carry an empty tool list
-        ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
-        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        ...(tools.length > 0 ? { tools, tool_choice: required ? "required" : "auto" } : {}),
+        // What a model thinks counts against the limit too: while it thinks it
+        // gets room for that, or the limit would cut the answer itself
+        ...(options.maxTokens
+          ? { max_tokens: options.maxTokens + (reasoningOff ? 0 : REASONING_ROOM) }
+          : {}),
         // LM Studio turns thinking off with reasoning_effort "none" (measured:
         // 2 s instead of 62 s on Qwen3.5 9B); Ollama's own switch is `think`
         ...(reasoningOff ? { reasoning_effort: "none", think: false } : {}),
@@ -191,6 +199,10 @@ export async function chat(
   if (reasoningOff && response.status === 400) {
     refusesSwitch.add(id);
     response = await post(false);
+  }
+  // A server that does not know "required" still gets the request, as a free choice
+  if (options.toolChoice === "required" && response.status === 400) {
+    response = await post(reasoningOff && !refusesSwitch.has(id), false);
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => "");

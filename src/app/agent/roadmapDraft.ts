@@ -18,7 +18,6 @@ export class DraftError extends Error {
 }
 
 interface DraftStep {
-  title?: string;
   /** The library activity's title, as the library (or a new activity of this draft) has it. */
   activity: string;
   unit: "times" | "minutes";
@@ -73,13 +72,13 @@ export class RoadmapDraft {
         title: milestone.title,
         note: milestone.note,
         steps: milestone.steps.map((step) => ({
-          title: step.title,
           activity: titles.get(step.templateId) ?? step.title,
           unit: step.unit,
           amount: step.amount,
         })),
       })),
     }));
+    // (a step's own title in the core is its activity's: see `step` below)
     this.before = this.fingerprint();
     for (const roadmap of this.roadmaps) {
       if (roadmap.id) this.original.set(roadmap.id, JSON.stringify(roadmap));
@@ -148,9 +147,7 @@ export class RoadmapDraft {
     const index =
       number !== undefined && String(ref).trim() === String(number)
         ? number - 1
-        : milestone.steps.findIndex(
-            (step) => same(step.activity, text(ref)) || same(step.title ?? "", text(ref))
-          );
+        : milestone.steps.findIndex((step) => same(step.activity, text(ref)));
     if (index < 0 || index >= milestone.steps.length) {
       throw new DraftError(
         "step-not-found",
@@ -174,31 +171,31 @@ export class RoadmapDraft {
       this.newActivities.get(activity.toLocaleLowerCase())?.title;
     let title = known;
     if (!title) {
-      const minutes = whole(fields.new_activity_minutes);
-      if (minutes === undefined || minutes < 1 || minutes > 600) {
+      const session = whole(fields.session_minutes ?? fields.new_activity_minutes);
+      if (session === undefined || session < 1 || session > 600) {
         throw new DraftError(
           "activity-not-found",
           `${where}: "${activity}" is not in the person's library. Library: ${
             this.library.map((item) => `"${item}"`).join(", ") || "empty"
-          }. Use one of those, or create it by adding new_activity_minutes (minutes a session lasts).`
+          }. Use one of those, or create it by adding session_minutes (how long one session lasts).`
         );
       }
-      this.newActivities.set(activity.toLocaleLowerCase(), { title: activity, minutes });
+      this.newActivities.set(activity.toLocaleLowerCase(), { title: activity, minutes: session });
       title = activity;
     }
-    const times = whole(fields.times);
-    const minutes = whole(fields.minutes);
+    const times = whole(fields.sessions ?? fields.times);
+    const minutes = whole(fields.total_minutes ?? fields.minutes);
     if ((times === undefined) === (minutes === undefined)) {
       throw new DraftError(
         "step-needs-amount",
-        `${where}: give exactly one of "times" (sessions) or "minutes" (total minutes)`
+        `${where}: give exactly one of "sessions" (how many) or "total_minutes" (minutes over all sessions), not both and not neither. The length of one session is session_minutes.`
       );
     }
     const amount = times ?? minutes!;
     if (amount < 1)
       throw new DraftError("step-needs-amount", `${where}: the amount must be 1 or more`);
+    // A step is named after its activity: the row on the Goals page is one line
     return {
-      ...(text(fields.title) ? { title: text(fields.title) } : {}),
       activity: title,
       unit: times !== undefined ? "times" : "minutes",
       amount,
@@ -330,15 +327,16 @@ export class RoadmapDraft {
     const milestone = this.milestone(roadmap, fields.milestone);
     const index = this.stepIndex(milestone, fields.step);
     const current = milestone.steps[index];
-    const amountGiven = fields.times !== undefined || fields.minutes !== undefined;
+    const amountGiven = ["sessions", "times", "total_minutes", "minutes"].some(
+      (name) => fields[name] !== undefined
+    );
     milestone.steps[index] = this.step(
       {
-        title: text(fields.title) || current.title,
+        ...fields,
         activity: text(fields.activity) || current.activity,
-        new_activity_minutes: fields.new_activity_minutes,
         ...(amountGiven
-          ? { times: fields.times, minutes: fields.minutes }
-          : { [current.unit]: current.amount }),
+          ? {}
+          : { [current.unit === "times" ? "sessions" : "total_minutes"]: current.amount }),
       },
       "the step"
     );
@@ -441,7 +439,6 @@ export class RoadmapDraft {
           title: milestone.title,
           note: milestone.note,
           steps: milestone.steps.map((step) => ({
-            title: step.title,
             templateId: ids.get(step.activity.toLocaleLowerCase()) ?? "",
             unit: step.unit,
             amount: step.amount,

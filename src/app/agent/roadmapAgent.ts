@@ -22,7 +22,7 @@ const PROMPT = (language: string) =>
 
 - A roadmap leads to one goal of the person. It has a title (the goal), a why, and milestones in order.
 - A milestone is a phase the person passes before the next one. It has steps.
-- A step is an amount of ONE activity of the person's library: a number of sessions ("times") or a total of minutes.
+- A step is an amount of ONE activity of the person's library: a number of sessions, or a total of minutes. Never both.
 - Progress is never written by you. The app counts it from the sessions the person really closes, milestone after milestone.
 
 ## How to build one
@@ -30,7 +30,8 @@ const PROMPT = (language: string) =>
 - Use what the coach's request says: the goal, the phases, the activities, the numbers. Do not add a programme nobody asked for.
 - 2 to 5 milestones. The first one small: reachable in a week or two, so the person starts by winning.
 - 1 to 3 steps per milestone. Amounts a real person would finish.
-- Every step needs an activity. Use one from the library below when it fits. When the plan needs a new one, name it so it can be told apart ("Train: base phase") and give new_activity_minutes: how long one session lasts.
+- Every step needs an activity. Use one from the library below when it fits. When the plan needs a new one, give it a short name that can be told apart ("Train: base phase") and session_minutes: how long one session lasts.
+- What a phase is for goes in the milestone's note, in one line. A step has no text of its own.
 - When the request leaves a number out, choose a modest one and say so in your answer.
 - Create or rewrite a whole roadmap with save_roadmap, in one call. Use the small tools only for small changes to a roadmap that exists.
 - Titles, notes and the why are written in ${language}.
@@ -43,17 +44,22 @@ Read it: it says what is wrong and how to fix it. Fix the call. Never send the s
 
 Answer the coach in plain words: what you created or changed, any number you had to choose yourself, and anything you could not do. No lists of tools.`;
 
+// The names say what each number is: with "times" and "minutes" a 9B model
+// gave both, reading "minutes" as the length of a session
 const STEP = {
   type: "object",
   properties: {
     activity: { type: "string", description: "Title of the library activity" },
-    times: { type: "integer", description: "Sessions to close. Give this or minutes" },
-    minutes: { type: "integer", description: "Total minutes to reach. Give this or times" },
-    new_activity_minutes: {
+    sessions: { type: "integer", description: "How many sessions to close. This OR total_minutes" },
+    total_minutes: {
       type: "integer",
-      description: "Only when the activity is not in the library: minutes one session lasts",
+      description: "Minutes to add up over all sessions. This OR sessions, never both",
     },
-    title: { type: "string", description: "Optional name for the step" },
+    session_minutes: {
+      type: "integer",
+      description:
+        "Only for an activity that is not in the library yet: how long one session lasts",
+    },
   },
   required: ["activity"],
 };
@@ -245,6 +251,8 @@ export interface PlannerRun {
 
 /** Tool calls before the planner is stopped: a small model can go in circles. */
 const MAX_STEPS = 8;
+/** A whole roadmap in one call is about 400 tokens; this leaves room and bounds a runaway. */
+const MAX_CALL_TOKENS = 1500;
 
 /**
  * Runs the planner on one request. It ends when the planner answers in words
@@ -270,11 +278,39 @@ export async function runRoadmapPlanner(options: {
   ];
   let reply = "";
   let lastError: string | undefined;
+  let nudges = 0;
+  let nudged = false;
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const answer = await chat(messages, schemas, signal, { reasoning: options.reasoning });
+    // Its first move, and the one after being told that words change nothing,
+    // has to be a tool call. After a call that failed it is free again, so it
+    // can say what is missing instead of inventing a roadmap.
+    const mustAct = step === 0 || nudged;
+    nudged = false;
+    const answer = await chat(messages, schemas, signal, {
+      reasoning: options.reasoning,
+      // A forced tool call once ran away for 5,700 tokens (eight minutes): never again
+      maxTokens: MAX_CALL_TOKENS,
+      ...(mustAct ? { toolChoice: "required" as const } : {}),
+    });
     if (signal?.aborted) throw new Error("aborted");
     if (answer.toolCalls.length === 0) {
+      // Seen with Qwen3.5 9B: "I have created the roadmap", without one call.
+      // Words change nothing, so it is told so and asked again.
+      if (!draft.changed && nudges < 2) {
+        nudges++;
+        nudged = true;
+        messages.push(
+          // Cut short: a runaway answer must not fill the context of the next try
+          { role: "assistant", content: (answer.content || "…").slice(0, 300) },
+          {
+            role: "user",
+            content:
+              "Nothing exists yet: you answered in words and called no tool. Call save_roadmap now with the whole roadmap (title, why, milestones with their steps). If the request truly cannot be carried out, say exactly what is missing.",
+          }
+        );
+        continue;
+      }
       reply = answer.content;
       break;
     }

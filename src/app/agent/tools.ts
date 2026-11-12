@@ -820,7 +820,11 @@ export const TOOLS: Tool[] = [
       type: "object",
       properties: {
         text: { type: "string" },
-        section: { type: "string", description: "Heading it goes under (Health, Work…), optional" },
+        section: {
+          type: "string",
+          description:
+            "Heading it goes under, in the person's language (Salud, Trabajo…). Optional",
+        },
       },
       required: ["text"],
     },
@@ -918,11 +922,14 @@ export const TOOLS: Tool[] = [
       if (!run.draft.changed) {
         return {
           failed: Boolean(run.lastError),
+          // Said as an error on purpose: a model that reads "the planner said it
+          // created it" repeats that to the person, and nothing was created
           result: {
-            changed: false,
-            planner_said: run.reply || "The planner changed nothing.",
+            error: "nothing-saved",
+            detail:
+              "No roadmap was created or changed. Do NOT tell the person it was. Say it did not work this time, and offer to try again.",
+            ...(run.reply ? { planner_said_but_did_not_do: run.reply.slice(0, 300) } : {}),
             ...(run.lastError ? { last_error: run.lastError } : {}),
-            note: "Nothing was saved. Tell the person plainly, and give the planner a more complete request if you try again.",
           },
         };
       }
