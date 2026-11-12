@@ -54,14 +54,39 @@ const WEEKDAY_WORDS: Record<string, number> = {
  */
 export const WEEKDAY_NAMES = Object.keys(WEEKDAY_WORDS);
 
-/** The weekdays named anywhere in a sentence ("lunes, miércoles y viernes"), in order. */
+const EVERY_DAY = /\b(todos los d[ií]as|cada d[ií]a|a diario|every ?day|daily)\b/;
+const WEEKEND = /\b(fines? de semana|weekends?)\b/;
+const WORKDAYS = /\b(entre semana|d[ií]as h[aá]biles|d[ií]as laborables|weekdays|work ?days)\b/;
+/** What stands between two weekdays that name a stretch: "lunes a viernes", "mon to fri". */
+const THROUGH = new Set(["a", "al", "hasta", "to", "through", "thru"]);
+
+/**
+ * The weekdays a sentence names, in order: one by one ("lunes, miércoles y
+ * viernes"), as a stretch ("de lunes a viernes" is five days, not two), or
+ * together ("todos los días", "weekends").
+ */
 export function weekdaysIn(text: string): number[] {
-  const days = text
-    .toLocaleLowerCase()
-    .split(/[^a-záéíóúñ]+/)
-    .map((word) => WEEKDAY_WORDS[word])
-    .filter((day): day is number => day !== undefined);
-  return [...new Set(days)].sort();
+  const lower = text.toLocaleLowerCase();
+  const days = new Set<number>();
+  if (EVERY_DAY.test(lower)) for (let day = 0; day < 7; day++) days.add(day);
+  if (WEEKEND.test(lower)) [6, 0].forEach((day) => days.add(day));
+  if (WORKDAYS.test(lower)) [1, 2, 3, 4, 5].forEach((day) => days.add(day));
+  const words = lower.replace(/\s*[-–—]\s*/g, " to ").split(/[^a-záéíóúñ]+/);
+  for (let index = 0; index < words.length; index++) {
+    const from = WEEKDAY_WORDS[words[index]];
+    if (from === undefined) continue;
+    const to = THROUGH.has(words[index + 1]) ? WEEKDAY_WORDS[words[index + 2]] : undefined;
+    if (to === undefined) {
+      days.add(from);
+      continue;
+    }
+    for (let day = from; ; day = (day + 1) % 7) {
+      days.add(day);
+      if (day === to) break;
+    }
+    index += 2;
+  }
+  return [...days].sort();
 }
 
 /** The weekdays a list of words names, in order; null when one is not a weekday. */

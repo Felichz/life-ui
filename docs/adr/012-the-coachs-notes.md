@@ -35,7 +35,7 @@ It costs two to five seconds. What makes it dependable is what the code does aro
 
 - **Nothing noted is lost.** New phrases are added to the lists; the model's answer never replaces them.
 - **Only the coach's questions are passed along** with the person's message, so an answer like "yes, those days" can be read, and what the coach proposed is not written down as something the person said.
-- **A duration, a time and days of the week are read from the person's own words**, by the code. They fill in what the model filed elsewhere ("15 minutos… a las 7pm" gives 15 min and 19:00), and they alone are what a roadmap is held to (ADR-011, section 5): what the model noted spares a question, it does not bind a plan.
+- **A duration, a time and days of the week are also read from the person's own words**, by the code: "15 minutos… a las 7pm" gives 15 min and 19:00, "de lunes a viernes" five days, "media hora al mediodía" 30 min at 12:00. They fill in what the model filed elsewhere. **A roadmap is held to one of them only when this reading and the model's agree** (ADR-011, section 5). Each is wrong alone often enough: the code reads "los viernes no voy a poder" as Friday, and the model takes a day from a question of the coach's. When a message speaks of days, a time or a length and the two readings differ, nothing binds, and what was held before is let go.
 - **A failure leaves the notes as they were.** They help the answer; they are not needed for it.
 - A message too short to say anything costs no call.
 
@@ -60,7 +60,24 @@ What a coach should do next is a short policy, and it is applied here, not left 
 
 The count of replies with questions is kept with the notes, so a compaction does not start it again.
 
-### 4. What stays the model's
+### 4. The first move of every turn is a choice held to a schema
+
+Told "add reading, 20 minutes", the model answered "I have added it" and called no tool: three times out of three, with this prompt and with the one before it. The same had been seen in the planner (ADR-010, section 3b), and the same cure works. The first call of a turn is sent held to a schema (ADR-010, section 3c): one of the agent's tools, or `just_answer`, a tool that does nothing and means "this message needs nothing read and nothing changed".
+
+- An instruction comes back as its tool call. Asked what is left for today, the model reads the day first (rule 2 of the prompt, now kept).
+- `just_answer` is followed by a second, free call that writes the answer: about a second more for small talk.
+- After the first move the model is free again, as before.
+- A server that holds the model to nothing answers in words at once, and those are taken as they are.
+
+Three more things are held by the code, each after a run in which a rule in the prompt did not hold:
+
+- **Asked to look something up, the coach searches.** The notes call says whether the message asks for that. If the reply then comes with no search made ("I have looked into it…"), it is not shown, and the model is told to search.
+- **While a plan is being worked out, nothing that changes anything is offered.** Held to choosing a tool, the model chose to act: told a time of day, it planned 63 sessions nobody had agreed to. So the tools sent with a request depend on where the coaching stands. Until the person says yes to the plan, or tells the app to do something (the notes call says which, one true or false each), the model is offered the tools that read and the search, and no others. After their yes it is offered everything but planning loose sessions: the plan goes in as a roadmap, which puts its own sessions on the calendar (ADR-011). Once the plan is built, or for a plain instruction, everything is offered. This is rule 0 of the prompt ("act only on a request") held by construction.
+- **A first roadmap is not built before the plan was shown and accepted.** Behind the rule above, the tool itself refuses a plan that was agreed to before it was ever laid out, and says what is missing.
+- **A short message can ask for a whole plan** ("armame un plan"), and it is too short to be worth the notes. When the model reaches for a planning tool and the notes do not speak of the message yet, they are taken then, before the tool runs.
+- **A tool that failed twice in a turn is not run a third time.** The model is told to stop and say so plainly. It had tried the same call eight times.
+
+### 5. What stays the model's
 
 What to recommend, in which words, and what a session should contain. The notes and the move decide when to ask, what to ask for, and when to stop asking.
 

@@ -251,3 +251,62 @@ describe("a tool that keeps failing", () => {
     expect(String(seen.at(-1)!.at(-1)!.content)).toContain("item-not-found");
   });
 });
+
+describe("the first move of a turn", () => {
+  type Asked = { tools: string[]; choice?: string; streams: boolean };
+  const call = (name: string, args: object): ModelReply => ({
+    content: "",
+    toolCalls: [
+      { id: `c-${name}`, type: "function", function: { name, arguments: JSON.stringify(args) } },
+    ],
+  });
+  function agentWith(replies: ModelReply[]) {
+    const core = newCore();
+    core.startDay();
+    const asked: Asked[] = [];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      chat: async (_messages, tools, _signal, options) => {
+        asked.push({
+          tools: (tools as Array<{ function: { name: string } }>).map((tool) => tool.function.name),
+          choice: options?.toolChoice,
+          streams: Boolean(options?.onText),
+        });
+        return replies.shift()!;
+      },
+    });
+    agent.mode = "auto";
+    return { agent, core, asked };
+  }
+
+  it("is a choice among the tools, and what it chooses is done", async () => {
+    const { agent, core, asked } = agentWith([
+      call("add_to_plan", { title: "Leer", minutes: 20, max_minutes: 20 }),
+      say("Añadido."),
+    ]);
+    await agent.send("agrega leer 20 minutos");
+    // Held to a tool, with a way out for a message that needs none
+    expect(asked[0].choice).toBe("required");
+    expect(asked[0].tools).toContain("just_answer");
+    // After the first move the model is free again, and its words are shown as they come
+    expect(asked[1].choice).toBeUndefined();
+    expect(asked[1].tools).not.toContain("just_answer");
+    expect(core.getState().currentDay!.activityInstances).toHaveLength(1);
+    // "20 minutes", given twice over, is one estimate and not a timebox
+    expect(core.getActivityTemplates().find((tpl) => tpl.title === "Leer")).toMatchObject({
+      type: "clear-objective",
+      clearObjectiveSettings: { estimatedDurationMinutes: 20 },
+    });
+  });
+
+  it("can be to just answer, and then the answer is written in a call of its own", async () => {
+    const { agent, asked } = agentWith([call("just_answer", {}), say("Hola, todo bien.")]);
+    await agent.send("hola");
+    expect(asked).toHaveLength(2);
+    expect(asked[1].choice).toBeUndefined();
+    // The choice leaves no trace: one message from the person, one from the agent
+    expect(agent.entries.map((entry) => entry.kind)).toEqual(["user", "assistant"]);
+    expect(agent.entries.at(-1)).toMatchObject({ text: "Hola, todo bien." });
+  });
+});

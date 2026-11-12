@@ -278,15 +278,11 @@ describe("the roadmap draft", () => {
     jest.setSystemTime(new Date("2026-11-12T10:00:00"));
     try {
       const core = setup();
-      // From the coach's notes: 20 minutes a session, Tuesdays and Thursdays at 19:00, eight weeks
-      const said = { minutes: 20, weekdays: [2, 4], time: 19 * 60, weeks: 8 };
+      // From the coach's notes: 20 minutes a session, at 19:00, for eight weeks
+      const said = { minutes: 20, time: 19 * 60, weeks: 8 };
       const draft = new RoadmapDraft(core, new Date(), said);
       const theirs = { weekdays: ["martes", "jueves"], start: "tomorrow" };
 
-      // The model turned their days into other days
-      expect(() => draft.saveRoadmap({ ...ROADMAP, schedule: SCHEDULE })).toThrow(
-        /not-their-days.*the person said tue, thu/
-      );
       // Sessions three times as long as they said they had
       expect(() =>
         draft.saveRoadmap({

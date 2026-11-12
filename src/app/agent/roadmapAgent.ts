@@ -4,7 +4,7 @@ import { contractOf } from "../lib/domain";
 import type { ChatMessage, ChatOptions, ModelReply, ToolCall } from "./llm";
 import { DraftError, RoadmapDraft } from "./roadmapDraft";
 import { formatDayMinutes } from "../lib/format";
-import { WEEKDAYS, WEEKDAY_NAMES, weekdayNames } from "./when";
+import { WEEKDAYS, WEEKDAY_NAMES } from "./when";
 import type { Said } from "./brief";
 
 /**
@@ -68,25 +68,6 @@ const STEP_FIELDS = {
     description:
       "What ONE session consists of, as a short Markdown list (its parts, how many of each). The person reads it when they do the session",
   },
-};
-const { activity, sessions, total_minutes, session_minutes, notes } = STEP_FIELDS;
-// A step is one of two shapes, so a move held to this schema cannot carry
-// both amounts or neither: counted in sessions, or in minutes
-const STEP = {
-  anyOf: [
-    {
-      type: "object",
-      properties: { activity, sessions, session_minutes, notes },
-      required: ["activity", "sessions"],
-      additionalProperties: false,
-    },
-    {
-      type: "object",
-      properties: { activity, total_minutes, session_minutes, notes },
-      required: ["activity", "total_minutes"],
-      additionalProperties: false,
-    },
-  ],
 };
 const PHASE_FIELDS = {
   title: { type: "string", description: "The phase, in a few words" },
@@ -466,7 +447,6 @@ export async function runRoadmapPlanner(options: {
   const draft = new RoadmapDraft(core, options.now, said);
   const theirs = [
     said.minutes && `one session can be ${said.minutes} minutes`,
-    said.weekdays && `the days are ${said.weekdays.map((day) => WEEKDAYS[day]).join(", ")}`,
     said.time !== undefined && `the time is ${formatDayMinutes(said.time)}`,
     said.weeks && `the plan runs about ${said.weeks} weeks`,
   ].filter(Boolean);

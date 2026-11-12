@@ -13,6 +13,7 @@ import {
   type Brief,
 } from "../agent/brief";
 import type { ChatMessage, ModelReply } from "../agent/llm";
+import { weekdaysIn } from "../agent/when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012): kept by a short
@@ -43,13 +44,35 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(durationIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("15 min");
     expect(timeIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("19:00");
     expect(durationIn("I can do 1 hour")).toBe("1 h");
+    expect(durationIn("tengo media hora al mediodia")).toBe("30 min");
+    expect(durationIn("una hora y media los sábados")).toBe("90 min");
     expect(timeIn("at 6:30 before work")).toBe("06:30");
     expect(timeIn("sobre las 21")).toBe("21:00");
     expect(timeIn("a las 7 de la tarde")).toBe("19:00");
+    expect(clockIn("tengo media hora al mediodia de lunes a viernes")).toEqual({
+      time: "12:00",
+      sure: true,
+    });
     expect(clockIn("a las 7")).toEqual({ time: "07:00", sure: false });
     expect(clockIn("a las 7pm")).toEqual({ time: "19:00", sure: true });
     expect(durationIn("no tengo idea")).toBe("");
     expect(timeIn("peso 80kg y mido 180cm")).toBe("");
+  });
+});
+
+describe("days of the week, as people say them", () => {
+  it("are read one by one, as a stretch, or together", () => {
+    expect(weekdaysIn("lunes, miércoles y viernes")).toEqual([1, 3, 5]);
+    // A stretch is every day in it, not its two ends
+    expect(weekdaysIn("media hora al mediodia de lunes a viernes")).toEqual([1, 2, 3, 4, 5]);
+    expect(weekdaysIn("Mon-Fri at noon")).toEqual([1, 2, 3, 4, 5]);
+    expect(weekdaysIn("de viernes a lunes")).toEqual([0, 1, 5, 6]);
+    expect(weekdaysIn("todos los días")).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(weekdaysIn("los fines de semana")).toEqual([0, 6]);
+    expect(weekdaysIn("entre semana y el sábado")).toEqual([1, 2, 3, 4, 5, 6]);
+    // "a" after a weekday is not always a stretch
+    expect(weekdaysIn("el lunes a las 7")).toEqual([1]);
+    expect(weekdaysIn("cuando pueda")).toEqual([]);
   });
 });
 
@@ -72,7 +95,9 @@ describe("what the person said, as numbers a roadmap is held to", () => {
       session_length: "20 minutos",
       weeks: 8,
     });
-    expect(saidIn(brief)).toEqual({ minutes: 20, weeks: 8, time: 20 * 60, weekdays: [2, 4] });
+    // The days are noted, and bind nothing (see below)
+    expect(saidIn(brief)).toEqual({ minutes: 20, weeks: 8, time: 20 * 60 });
+    expect(brief?.plan?.days).toBe("martes y jueves");
 
     // "A las 8", after "8pm", is the same hour: it does not become eight in the morning
     const again = await update(brief, "si, a las 8 esta bien, arrancamos", {});
@@ -94,26 +119,32 @@ describe("what the person said, as numbers a roadmap is held to", () => {
   });
 
   it("binds nothing when the two readings differ, and lets go of what it held", async () => {
-    const before = await update(empty, "lunes, miércoles y viernes a las 7pm", {
-      days: "lunes, miércoles y viernes",
+    const before = await update(empty, "sesiones de 15 minutos a las 7pm", {
+      session_length: "15 minutos",
       time: "19:00",
     });
-    expect(saidIn(before)).toEqual({ time: 19 * 60, weekdays: [1, 3, 5] });
+    expect(saidIn(before)).toEqual({ minutes: 15, time: 19 * 60 });
 
-    // The code reads four days here; the model, the three they mean. Neither is trusted alone
-    const after = await update(
-      before,
-      "los viernes no voy a poder, pasame las sesiones a lunes, miercoles y sabado",
-      { days: "lunes, miércoles y sábado" }
-    );
-    expect(saidIn(after)).toEqual({ time: 19 * 60 });
-    expect(after?.plan?.days).toBe("lunes, miércoles y sábado");
-
-    // The same with a number: "15 is too little, better 30"
-    const length = await update(after, "15 minutos es poco, mejor 30", {
+    // "15 is too little, better 30": the code reads 15, the model 30. Neither is trusted alone
+    const length = await update(before, "15 minutos es poco, mejor 30", {
       session_length: "30 minutos",
     });
-    expect(saidIn(length).minutes).toBeUndefined();
+    expect(saidIn(length)).toEqual({ time: 19 * 60 });
+    // "I finish work at 18:00, so 19:00": the code reads the first hour, the model the one meant
+    const hour = await update(before, "salgo del trabajo a las 18:00, asi que mejor 20:00", {
+      time: "20:00",
+    });
+    expect(saidIn(hour)).toEqual({ minutes: 15 });
+  });
+
+  it("never binds a roadmap to days of the week", async () => {
+    // "Starting on Monday" is not "on Mondays", and both readings take it for that
+    const brief = await update(empty, "dale armalo, empezando el lunes", {
+      days: "lunes",
+      start: "el lunes",
+    });
+    expect(saidIn(brief)).toEqual({});
+    expect(brief?.plan).toMatchObject({ days: "lunes", start: "el lunes" });
   });
 });
 
@@ -217,7 +248,10 @@ describe("the notes", () => {
         plan: { length: "", days: "", time: "", start: "" },
       })
     ).toBe(true);
-    expect(worthNoting("agrega leer a las 15", null)).toBe(false);
+    expect(worthNoting("hola", null)).toBe(false);
+    // Three words can ask for anything: they are read, so the right tools are offered
+    expect(worthNoting("agrega leer a las 15", null)).toBe(true);
+    expect(worthNoting("duermo mal, qué hago", null)).toBe(true);
     expect(worthNoting("quiero volver a entrenar pero nunca me organizo bien", null)).toBe(true);
     // Mid-conversation a short answer still says something
     expect(
@@ -352,7 +386,8 @@ describe("notes in the conversation", () => {
   it("give way to saying what was done once a change is made in the turn", async () => {
     const { agent, seen } = agentWith(
       [call("add_to_plan", { title: "Entrenar", minutes: 15 }), say("Añadido.")],
-      [notes({ wants: ["entrenar hoy"], plan: { ...NO_PLAN, wanted: true } })]
+      // They told the app to do something: that is what lets it be done
+      [notes({ wants: ["entrenar hoy"], instruction: true, plan: { ...NO_PLAN, wanted: true } })]
     );
     await agent.send("quiero entrenar hoy quince minutos, agrégalo a mi plan por favor");
     expect(lastUser(seen.coach[0])).toContain("ask only for what they have not told you");
@@ -397,17 +432,19 @@ describe("notes in the conversation", () => {
       notes({ plan }),
     ];
     const seen: ChatMessage[][] = [];
+    const tools: unknown[][] = [];
     const agent = new Agent({
       core,
       prompt: "p",
       notes: () => true,
-      chat: async (messages) => {
+      chat: async (messages, offeredNow) => {
         if (isNotes(messages)) return noted.shift() ?? notes({});
         if (String(messages[0].content).startsWith("You are the roadmap planner")) {
           planner++;
           return call("save_roadmap", roadmap);
         }
         seen.push(messages);
+        tools.push(offeredNow);
         return coach.shift()!;
       },
     });
@@ -417,26 +454,196 @@ describe("notes in the conversation", () => {
     const reminder = () =>
       String([...seen.at(-1)!].reverse().find((message) => message.role === "user")!.content);
 
+    // While the plan is being worked out nothing that changes anything is offered
     await agent.send("quiero un plan para volver a entrenar, puedo a las 7pm quince minutos");
-    expect(lastTool()).toContain("no-yes-yet");
-    expect(lastTool()).toContain("has not seen a plan yet");
+    expect(lastTool()).toContain("not-yet");
     expect(planner).toBe(0);
+    const offered = (index: number) =>
+      (tools[index] as Array<{ function: { name: string } }>).map((tool) => tool.function.name);
+    expect(offered(0)).toContain("get_day");
+    expect(offered(0)).toContain("just_answer");
+    expect(offered(0)).not.toContain("plan_roadmap");
+    expect(offered(0)).not.toContain("plan_ahead");
+    expect(offered(0)).not.toContain("add_to_plan");
 
     await agent.send("antes quiero que lo pienses mejor");
-    expect(lastTool()).toContain("has not said yes to the plan yet");
+    expect(lastTool()).toContain("not-yet");
     expect(planner).toBe(0);
     expect(core.getRoadmaps()).toEqual([]);
 
+    // Their yes: the roadmap's tool is offered, and planning loose sessions is not
     await agent.send("si dale");
+    expect(offered(tools.length - 2)).toContain("plan_roadmap");
+    expect(offered(tools.length - 2)).not.toContain("plan_ahead");
     expect(planner).toBe(1);
     expect(core.getRoadmaps().map((one) => one.title)).toEqual(["Volver a entrenar"]);
 
     // From here on the coach is told the plan is built, not to build it again
     await agent.send("gracias, y el roadmap?");
-    expect(reminder()).toContain("The plan is in the app already");
+    expect(reminder()).toContain("The plan is DONE");
     expect(reminder()).toContain(
       'Roadmaps that exist already, with their sessions on the calendar: "Volver a entrenar"'
     );
+  });
+
+  it("refuse a roadmap for a plan that was agreed to before it was ever laid out", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const seen: ChatMessage[][] = [];
+    const coach = [
+      call("plan_roadmap", { request: "Arma la hoja de ruta." }),
+      say("Te cuento el plan."),
+    ];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages) => {
+        if (isNotes(messages)) {
+          return notes({ agrees: true, plan: { ...NO_PLAN, wanted: true } });
+        }
+        if (String(messages[0].content).startsWith("You are the roadmap planner")) {
+          throw new Error("the planner must not be asked");
+        }
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("dale, armame un plan para entrenar");
+    const result = String(
+      [...seen.at(-1)!].reverse().find((message) => message.role === "tool")!.content
+    );
+    expect(result).toContain("no-yes-yet");
+    expect(result).toContain("has not seen a plan yet");
+    expect(core.getRoadmaps()).toEqual([]);
+  });
+
+  it("hold the coach to searching when it was asked to look something up", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const sent: string[] = [];
+    const http = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(String(init?.body));
+      const text =
+        "Title: Guidelines\nURL: https://example.org/g\nPublished: N/A\nText:\nTwo to three days a week.";
+      const body = `event: message\ndata: ${JSON.stringify({ result: { content: [{ type: "text", text }] } })}\n\n`;
+      return { ok: true, status: 200, text: async () => body } as Response;
+    }) as typeof fetch;
+    const coach: ModelReply[] = [
+      // It says it looked, and looked at nothing
+      say("He investigado y la evidencia dice que tres días por semana es lo ideal."),
+      call("web_search", { query: "resistance training frequency novices guidelines" }),
+      say("Encontré una guía: dos o tres días por semana."),
+    ];
+    const seen: ChatMessage[][] = [];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      web: { setting: () => "on", allow: () => {}, http },
+      chat: async (messages) => {
+        if (isNotes(messages))
+          return notes({ wants: ["saber cuántos días entrenar"], research: true });
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("quiero que investigues en internet cuántos días conviene entrenar");
+
+    // Told so next to the message, and held to it: the claim was never shown
+    expect(String(seen[0].at(-1)!.content)).toContain("call web_search now");
+    expect(
+      agent.entries.some((entry) => entry.kind === "assistant" && /He investigado/.test(entry.text))
+    ).toBe(false);
+    expect(String(seen[1].at(-1)!.content)).toContain("you made no search");
+    expect(sent).toHaveLength(1);
+    expect(agent.entries.at(-1)).toMatchObject({
+      text: "Encontré una guía: dos o tres días por semana.",
+    });
+  });
+
+  it("offer the tools that change something only for an instruction or a yes", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const offered: string[][] = [];
+    const noted = [
+      // Talking about a problem: nothing to change
+      notes({ has: ["me quedo viendo videos en la cama"] }),
+      // Telling the app to do something
+      notes({ instruction: true }),
+    ];
+    const coach = [say("Te propongo dejar el celular fuera."), say("Hecho.")];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages, tools) => {
+        if (isNotes(messages)) return noted.shift()!;
+        offered.push(
+          (tools as Array<{ function: { name: string } }>).map((tool) => tool.function.name)
+        );
+        return coach.shift()!;
+      },
+    });
+    agent.mode = "auto";
+
+    await agent.send("lo que mas me cuesta es dejar el celular, me quedo viendo videos en la cama");
+    expect(offered[0]).toContain("get_day");
+    expect(offered[0]).toContain("just_answer");
+    expect(offered[0]).not.toContain("delete_from_library");
+    expect(offered[0]).not.toContain("add_to_plan");
+    expect(offered[0]).not.toContain("note_ideal_life");
+
+    await agent.send("agrega una actividad para dejar el celular fuera a las 23");
+    expect(offered[1]).toContain("add_to_plan");
+    expect(offered[1]).toContain("delete_from_library");
+  });
+
+  it("keep a guess the person made about themselves out of a search", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const sent: string[] = [];
+    const http = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(String(init?.body));
+      const body = `event: message\ndata: ${JSON.stringify({ result: { content: [{ type: "text", text: "Title: G\nURL: https://example.org/g\nPublished: N/A\nText:\nx" }] } })}\n\n`;
+      return { ok: true, status: 200, text: async () => body } as Response;
+    }) as typeof fetch;
+    const seen: ChatMessage[][] = [];
+    const coach = [
+      call("web_search", { query: "home strength training beginners and TDAH guidelines" }),
+      call("web_search", { query: "home strength training beginners guidelines" }),
+      say("Esto encontré."),
+    ];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      web: { setting: () => "on", allow: () => {}, http },
+      chat: async (messages) => {
+        if (isNotes(messages)) {
+          return notes({ unsure: ["quizá tengo TDAH o algo"], research: true });
+        }
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("quizá tengo tdah o algo, quiero que investigues cómo empezar a entrenar");
+    const results = seen
+      .at(-1)!
+      .filter((message) => message.role === "tool")
+      .map((message) => String(message.content));
+    expect(results[0]).toContain("about-the-person");
+    expect(results[0]).toContain("tdah");
+    // Only the query about the topic left the machine
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).not.toMatch(/tdah/i);
   });
 
   it("are off unless asked for", async () => {

@@ -41,7 +41,7 @@ const clip = (text: string, max: number) =>
 
 /** The system prompt is AGENT.md, from the rule on (see src/app/agent/prompt.ts). */
 function prompt(): string {
-  const source = fs.readFileSync(path.resolve("AGENT.md"), "utf8");
+  const source = fs.readFileSync(path.resolve(process.env.SIM_PROMPT ?? "AGENT.md"), "utf8");
   const rule = /^---\s*$/m;
   return rule.test(source) ? source.slice(source.search(rule)).replace(rule, "").trim() : source;
 }
@@ -197,7 +197,13 @@ async function main() {
     const isPlanner = String(messages[0].content).startsWith("You are the roadmap planner");
     const isNotes = String(messages[0].content).startsWith("You keep a coach's notes");
     const at = Date.now();
-    const reply = await chat(endpoint, messages, tools, signal, options);
+    const reply = await chat(endpoint, messages, tools, signal, options).catch((caught) => {
+      // The agent recovers from some errors in silence: here they are seen
+      console.error(
+        `  · ERROR ${((Date.now() - at) / 1000).toFixed(1)}s: ${String(caught).slice(0, 400)}`
+      );
+      throw caught;
+    });
     // Each call as it ends, on stderr: a turn that takes minutes shows where the time went
     console.error(
       `  · ${isPlanner ? "planificador" : isNotes ? "notas" : "coach"} ${((Date.now() - at) / 1000).toFixed(1)}s, ${reply.usage?.completion ?? "?"} tokens${
