@@ -1,6 +1,6 @@
 import { SystemCore } from "../../system";
 import { Agent } from "../agent/agent";
-import type { ChatMessage, ModelReply } from "../agent/llm";
+import type { ChatMessage, ChatOptions, ModelReply } from "../agent/llm";
 import { RoadmapDraft } from "../agent/roadmapDraft";
 import { addNote } from "../agent/tools";
 
@@ -41,28 +41,31 @@ function setup() {
 /** One model plays both parts: the coach's replies and the planner's are scripted apart. */
 function agentWith(core: SystemCore, coach: ModelReply[], planner: ModelReply[] = []) {
   const seen = { coach: [] as ChatMessage[][], planner: [] as ChatMessage[][] };
+  /** How each call to the planner was made: forced to act or free, and its limit. */
+  const asked: ChatOptions[] = [];
   const agent = new Agent({
     core,
     prompt: "p",
-    chat: async (messages) => {
+    chat: async (messages, _tools, _signal, options) => {
       const who = isPlanner(messages) ? "planner" : "coach";
       seen[who].push(messages);
+      if (who === "planner") asked.push(options ?? {});
       const reply = (who === "planner" ? planner : coach).shift();
       if (!reply) throw new Error(`${who} script ran out`);
       return reply;
     },
   });
-  return { agent, seen };
+  return { agent, seen, asked };
 }
 
 const ROADMAP = {
   title: "Entrenar en casa",
   why: "Sentirme fuerte",
   milestones: [
-    { title: "Crear el hábito", steps: [{ activity: "Entrenar: base", times: 6 }] },
+    { title: "Crear el hábito", steps: [{ activity: "Entrenar: base", sessions: 6 }] },
     {
       title: "Subir la carga",
-      steps: [{ activity: "Entrenar: con carga", times: 12, new_activity_minutes: 40 }],
+      steps: [{ activity: "Entrenar: con carga", sessions: 12, session_minutes: 40 }],
     },
   ],
 };
@@ -122,7 +125,7 @@ describe("the roadmap draft", () => {
         title: "Meta",
         milestones: [{ title: "Fase", steps: [{ activity: "Nadar", times: 3 }] }],
       })
-    ).toThrow(/activity-not-found.*"Entrenar: base".*new_activity_minutes/);
+    ).toThrow(/activity-not-found.*"Entrenar: base".*session_minutes/);
     expect(() =>
       draft.saveRoadmap({
         title: "Meta",
@@ -143,7 +146,7 @@ describe("the roadmap draft", () => {
     const draft = new RoadmapDraft(core);
     draft.saveRoadmap(ROADMAP);
     draft.setStep({ milestone: 1, step: 1, times: 8 });
-    draft.addStep({ milestone: "Subir la carga", activity: "Entrenar: base", minutes: 120 });
+    draft.addStep({ milestone: "Subir la carga", activity: "Entrenar: base", total_minutes: 120 });
     expect(() => draft.removeStep({ milestone: 1, step: "Entrenar: base" })).toThrow(/last-step/);
     expect(() => draft.setStep({ milestone: 3, step: 1, times: 2 })).toThrow(
       /milestone-not-found.*1\. "Crear el hábito"/
@@ -202,7 +205,7 @@ describe("the roadmap planner", () => {
 
   it("gets its own mistakes back as errors, fixes them, and nothing wrong is saved", async () => {
     const core = setup();
-    const { agent, seen } = agentWith(
+    const { agent, seen, asked } = agentWith(
       core,
       [
         call("plan_roadmap", { request: "Meta: nadar. Fase 1: 4 sesiones de natación." }),
@@ -218,7 +221,7 @@ describe("the roadmap planner", () => {
           milestones: [
             {
               title: "Empezar",
-              steps: [{ activity: "Nadar", times: 4, new_activity_minutes: 30 }],
+              steps: [{ activity: "Nadar", times: 4, session_minutes: 30 }],
             },
           ],
         }),
@@ -230,20 +233,35 @@ describe("the roadmap planner", () => {
     // The planner's whole conversation, as it stood at its last call
     expect(JSON.stringify(seen.planner.at(-1))).toContain("activity-not-found");
     expect(core.getRoadmaps().map((roadmap) => roadmap.title)).toEqual(["Nadar"]);
+    // Its first move has to be a tool call; after a call that failed it is free
+    // to say what is missing. No call may run on without a limit.
+    expect(asked.map((options) => options.toolChoice)).toEqual(["required", undefined, undefined]);
+    expect(asked.every((options) => (options.maxTokens ?? 0) > 0)).toBe(true);
   });
 
   it("saves nothing and says so when the planner could not build it", async () => {
     const core = setup();
-    const { agent, seen } = agentWith(
+    const { agent, seen, asked } = agentWith(
       core,
       [call("plan_roadmap", { request: "algo" }), say("No pude armarla.")],
-      [say("Me falta saber la meta y las fases.")]
+      // It talks instead of acting; it is told that nothing exists, twice, and still only talks
+      [say("He creado la hoja de ruta."), say("Ya está creada."), say("Me falta saber la meta.")]
     );
     agent.mode = "auto";
     await agent.send("hazme una hoja de ruta");
     expect(core.getRoadmaps()).toEqual([]);
     expect(agent.entries.some((entry) => entry.kind === "tool")).toBe(false);
-    expect(String(seen.coach[1].at(-1)!.content)).toContain("Me falta saber la meta");
+    expect(JSON.stringify(seen.planner.at(-1))).toContain("Nothing exists yet");
+    // Each time it is told that words change nothing, the next move is forced again
+    expect(asked.map((options) => options.toolChoice)).toEqual([
+      "required",
+      "required",
+      "required",
+    ]);
+    // The coach is told as an error, so it does not repeat the planner's claim
+    const result = String(seen.coach[1].at(-1)!.content);
+    expect(result).toContain("nothing-saved");
+    expect(result).toContain("Do NOT tell the person it was");
   });
 
   it("asks before deleting a roadmap even in auto mode", async () => {

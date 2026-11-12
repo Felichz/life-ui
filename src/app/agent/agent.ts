@@ -155,6 +155,8 @@ export interface AgentOptions {
   };
 }
 
+/** The longest answer the coach is allowed in one go. */
+const MAX_REPLY_TOKENS = 2048;
 /** How much of the ideal life goes in every request: about 450 tokens. */
 const IDEAL_LIFE_CHARS = 1500;
 /** Entries kept on screen and on disk per conversation; older ones fall off the top. */
@@ -1002,6 +1004,8 @@ export class Agent {
           reply = await this.options.chat(request, this.schemas(), abort.signal, {
             onText,
             reasoning: this.options.reasoning?.(),
+            // Long enough for a whole plan laid out in the chat; a bound on a runaway answer
+            maxTokens: MAX_REPLY_TOKENS,
           });
         } catch (caught) {
           // The estimate was short and the runtime refused the request as too
