@@ -45,7 +45,7 @@ This is what makes the distance to a goal concrete: "3 of 8 sessions" is a count
 The coach's context is the scarce thing (about 5K tokens are fixed before a word is said). Everything about how roadmaps are built stays out of it.
 
 - The coach has one tool, `plan_roadmap`, with one argument: a request in words. It also has `get_roadmaps` to read where the person stands, and one line per roadmap in the day's snapshot.
-- The **planner** is a separate run of the same model with its own prompt (what a roadmap is, how to build one), its own state (the ideal life, every roadmap with its real progress, the library with session lengths, what is planned ahead) and its own eight tools: `save_roadmap` (a whole roadmap in one call), `set_roadmap`, `delete_roadmap`, `add_milestone`, `remove_milestone`, `add_step`, `set_step`, `remove_step`. It cannot talk to the person, so the coach is told to agree the shape first and put everything in the request.
+- The **planner** is a separate run of the same model with its own prompt (what a roadmap is, how to build one), its own state (the ideal life, every roadmap with its real progress, the library with session lengths, what is planned ahead) and its own tools over the roadmaps: `save_roadmap` (a whole roadmap in one call), `set_roadmap`, `delete_roadmap`, `add_milestone`, `remove_milestone`, `add_step`, `set_step`, `remove_step`, plus the two that end its run (section 3c). It cannot talk to the person, so the coach is told to agree the shape first and put everything in the request.
 - **Errors that teach.** The planner's tools work on a draft and check every call: an activity that is not in the library ("…is not in the person's library. Library: … Use one of those, or create it by adding session_minutes"), a step with no amount or with both, a milestone that would be left empty, a roadmap or milestone that does not exist (with the list of those that do). The planner reads the error and fixes the call.
 - **A draft, then a yes.** Nothing the planner does reaches the core while it works. When it finishes, the person is shown the resulting roadmap, milestone by milestone, with any activity it would add to the library; on their yes it is saved in one go, and one undo takes all of it back. Deleting a roadmap asks even in auto mode. When the planner changed nothing, nothing is shown and the coach is told why.
 - **A short way back.** The coach gets a few lines: what was saved, what the planner said, and, when the first milestone has no sessions planned, a note to offer planning them. Planning dates stays with the coach (`plan_ahead`): a roadmap says how much, the agenda says when.
@@ -61,9 +61,30 @@ The first version was run against Qwen3.5 9B in LM Studio, with the request a pe
 - **It gave both `times` and `minutes`**, reading "minutes" as how long a session lasts, and wrote a sentence in a step's title. The fields are now named after what they are: `sessions`, `total_minutes`, and `session_minutes` for a new activity. A step has no title of its own: it is named after its activity, and what a phase is for goes in the milestone's note. The old names are still understood.
 - **One forced call ran for eight minutes** (5,726 tokens of output). Every planner call is now limited to 1,500 tokens, the coach's to 2,048, and a runaway answer is cut to 300 characters before the next try so it cannot fill the context. While thinking is on, a call gets 4,096 more, because what the model thinks counts against the same limit.
 
-After the first three changes one run of the same request ended with the roadmap saved: two milestones, two new activities, a note on each milestone.
+After the first three changes one run of the same request ended with the roadmap saved: two milestones, two new activities, a note on each milestone. It was not enough, and the forced call and the nudges of the first point were replaced by what follows.
 
-**Still open.** A later run, through the app's own streaming client and with the token limit in place, failed three times in a row: the model wrote the call as text (`save_roadmap(title=…)`) and went on until the limit, 120 s each time. LM Studio does not hold the model to `tool_choice: "required"`. The limit bounded the damage and the coach was told that nothing was saved, but no roadmap was made. A probe showed what LM Studio does enforce: `response_format` with a JSON schema (`{name, arguments}`, one shape per tool) gave well-formed JSON every time, with tools in the request and with streaming. The next step is to make every planner move a schema-held call, with `finish` and `cannot_do` as the ways out, and a step schema that cannot carry both `sessions` and `total_minutes`. It is not built yet.
+### 3c. Every move is a call held to a schema
+
+A later run, through the app's own streaming client and with the token limit in place, failed three times in a row: the model wrote the call as text (`save_roadmap(title=…)`) and went on until the limit, 120 s each time. LM Studio does not hold a model to `tool_choice: "required"`.
+
+What it does enforce, with a grammar, is `response_format` with a JSON schema. So a call that has to be a tool call is now sent with a schema built from the tools: one shape per tool, `{ "name": <that tool>, "arguments": <its parameters> }`, the shape models already write a call in. The tools stay in the request, so the model reads what each is for. The answer arrives as text and is read back as the tool call it is. A server that refuses the schema gets `tool_choice: "required"`, and one that refuses that too gets the plain request; what an endpoint refused is remembered only when the request then went through without it.
+
+The planner changed with it:
+
+- **Every move is a tool call**, the last one included. `finish` (a line for the coach) and `cannot_do` (what is missing) are the two ways out: a model held to a schema has no other way to say it is done.
+- **`finish` creates nothing.** Called while the draft is untouched it gets an error like any other misuse ("No tool has created or changed anything yet… Call save_roadmap now, or call cannot_do"), twice at most.
+- **A step is one of two shapes**: counted in sessions, or in minutes. Held to the schema, a move cannot carry both amounts or neither. The draft still checks, for the servers that hold the model to nothing.
+- **The why is its own required field**, so the reason is not glued to the title.
+- **A call that fails is asked once more**, keeping the moves already made.
+
+Measured on Qwen3.5 9B (LM Studio, 12K context, thinking off), with requests a coach would write:
+
+|                                                | Before (free tool calls)                                    | After (schema-held moves)     |
+| ---------------------------------------------- | ----------------------------------------------------------- | ----------------------------- |
+| Planner alone                                  | 1 of 4 runs saved a roadmap; 120 s to 500 s per failed call | 10 of 10; 6 s to 27 s per run |
+| Coach and planner, one message from the person | failed or took minutes                                      | 5 of 5; 40 s to 99 s          |
+
+In one of those five runs two planner calls came back empty before the third worked. It did not happen again in three more runs and its cause is not known. Two things were done about it: an error sent inside a stream is now raised instead of reading as a model that said nothing, and the planner asks once more after a failed call.
 
 ### 4. The Goals page
 
@@ -84,7 +105,7 @@ The page is read-only apart from the ideal life: roadmaps are built and changed 
 
 ## Consequences
 
-- Building a roadmap costs several model calls (the planner's), which on a small model takes a while; a line in the chat says it is being prepared, and it can be stopped.
+- Building a roadmap costs the planner's calls on top of the coach's: two or three, about ten to thirty seconds on a 9B model. A line in the chat says it is being prepared, and it can be stopped.
 - A small model will sometimes write a poor roadmap. The person sees it whole before it is saved, and can ask for changes in words.
 - The fixed part of every request had grown to about 6.5K tokens. With this added, the prompt was rewritten more tightly and the tool descriptions shortened: it is now about 5K, plus the ideal life.
 - The state gains two optional fields in `global`. Older saved states load unchanged.

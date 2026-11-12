@@ -39,7 +39,7 @@ function setup() {
 }
 
 /** One model plays both parts: the coach's replies and the planner's are scripted apart. */
-function agentWith(core: SystemCore, coach: ModelReply[], planner: ModelReply[] = []) {
+function agentWith(core: SystemCore, coach: ModelReply[], planner: Array<ModelReply | Error> = []) {
   const seen = { coach: [] as ChatMessage[][], planner: [] as ChatMessage[][] };
   /** How each call to the planner was made: forced to act or free, and its limit. */
   const asked: ChatOptions[] = [];
@@ -52,6 +52,7 @@ function agentWith(core: SystemCore, coach: ModelReply[], planner: ModelReply[] 
       if (who === "planner") asked.push(options ?? {});
       const reply = (who === "planner" ? planner : coach).shift();
       if (!reply) throw new Error(`${who} script ran out`);
+      if (reply instanceof Error) throw reply;
       return reply;
     },
   });
@@ -225,7 +226,7 @@ describe("the roadmap planner", () => {
             },
           ],
         }),
-        say("Creé «Nadar»; elegí 30 minutos por sesión."),
+        call("finish", { message: "Creé «Nadar»; elegí 30 minutos por sesión." }),
       ]
     );
     agent.mode = "auto";
@@ -233,10 +234,71 @@ describe("the roadmap planner", () => {
     // The planner's whole conversation, as it stood at its last call
     expect(JSON.stringify(seen.planner.at(-1))).toContain("activity-not-found");
     expect(core.getRoadmaps().map((roadmap) => roadmap.title)).toEqual(["Nadar"]);
-    // Its first move has to be a tool call; after a call that failed it is free
-    // to say what is missing. No call may run on without a limit.
-    expect(asked.map((options) => options.toolChoice)).toEqual(["required", undefined, undefined]);
+    // Every move has to be a tool call, and none may run on without a limit
+    expect(asked.map((options) => options.toolChoice)).toEqual([
+      "required",
+      "required",
+      "required",
+    ]);
     expect(asked.every((options) => (options.maxTokens ?? 0) > 0)).toBe(true);
+    // What it said on finishing reaches the coach
+    expect(String(seen.coach[1].at(-1)!.content)).toContain("elegí 30 minutos por sesión");
+  });
+
+  it("is not believed when it says it is done and has done nothing", async () => {
+    const core = setup();
+    const { agent, seen } = agentWith(
+      core,
+      [call("plan_roadmap", { request: "Meta: entrenar. Fase 1: 6 sesiones." }), say("Listo.")],
+      [
+        // The claim Qwen3.5 9B made in words, now made as a call
+        call("finish", { message: "He creado la hoja de ruta." }),
+        call("save_roadmap", {
+          title: "Entrenar",
+          milestones: [{ title: "Fase 1", steps: [{ activity: "Entrenar: base", sessions: 6 }] }],
+        }),
+        call("finish", { message: "Creé «Entrenar» con una fase de 6 sesiones." }),
+      ]
+    );
+    agent.mode = "auto";
+    await agent.send("armame la hoja de ruta");
+    expect(JSON.stringify(seen.planner[1])).toContain("nothing-to-finish");
+    expect(core.getRoadmaps().map((roadmap) => roadmap.title)).toEqual(["Entrenar"]);
+  });
+
+  it("asks once more when a call to the model fails, and keeps what it had done", async () => {
+    const core = setup();
+    const { agent } = agentWith(
+      core,
+      [call("plan_roadmap", { request: "Meta: entrenar. Fase 1: 6 sesiones." }), say("Listo.")],
+      [
+        call("save_roadmap", {
+          title: "Entrenar",
+          why: "",
+          milestones: [{ title: "Fase 1", steps: [{ activity: "Entrenar: base", sessions: 6 }] }],
+        }),
+        new Error("The model stopped with an error: slot unavailable"),
+        call("finish", { message: "Creé «Entrenar»." }),
+      ]
+    );
+    agent.mode = "auto";
+    await agent.send("armame la hoja de ruta");
+    expect(core.getRoadmaps().map((roadmap) => roadmap.title)).toEqual(["Entrenar"]);
+  });
+
+  it("can say that a request cannot be carried out, and nothing is saved", async () => {
+    const core = setup();
+    const { agent, seen } = agentWith(
+      core,
+      [call("plan_roadmap", { request: "hazle una hoja de ruta" }), say("Me falta la meta.")],
+      [call("cannot_do", { missing: "La petición no dice cuál es la meta ni las fases." })]
+    );
+    agent.mode = "auto";
+    await agent.send("hazme una hoja de ruta");
+    expect(core.getRoadmaps()).toEqual([]);
+    const result = String(seen.coach[1].at(-1)!.content);
+    expect(result).toContain("nothing-saved");
+    expect(result).toContain("no dice cuál es la meta");
   });
 
   it("saves nothing and says so when the planner could not build it", async () => {
@@ -244,7 +306,8 @@ describe("the roadmap planner", () => {
     const { agent, seen, asked } = agentWith(
       core,
       [call("plan_roadmap", { request: "algo" }), say("No pude armarla.")],
-      // It talks instead of acting; it is told that nothing exists, twice, and still only talks
+      // A server that holds the model to nothing: it talks instead of acting, is told
+      // that nothing exists, twice, and still only talks
       [say("He creado la hoja de ruta."), say("Ya está creada."), say("Me falta saber la meta.")]
     );
     agent.mode = "auto";
