@@ -80,6 +80,64 @@ export class AgendaManager {
     return planned;
   }
 
+  /**
+   * The sessions a roadmap plans for itself (ADR-011): whatever it had planned
+   * is replaced by these, in one go. Nothing is touched when they are already
+   * the same, so calling it again and again changes nothing.
+   */
+  public replaceRoadmapSessions(
+    roadmapId: UUID,
+    sessions: Array<{
+      templateId: UUID;
+      stepId: UUID;
+      date: string;
+      time?: DayMinutes;
+      notes?: string;
+      minutes?: number;
+    }>
+  ): void {
+    const all = this.systemCore.getState().global.plannedActivities ?? [];
+    const mine = all.filter((item) => item.roadmap?.id === roadmapId);
+    const others = all.filter((item) => item.roadmap?.id !== roadmapId);
+    const key = (item: {
+      templateId: UUID;
+      date: string;
+      time?: DayMinutes;
+      notes?: string;
+      minutes?: number;
+      stepId: UUID;
+    }) =>
+      [
+        item.stepId,
+        item.templateId,
+        item.date,
+        item.time ?? "",
+        item.minutes ?? "",
+        item.notes ?? "",
+      ].join("|");
+    const wanted = sessions.map(key).sort();
+    const current = mine.map((item) => key({ ...item, stepId: item.roadmap!.stepId })).sort();
+    if (wanted.length === current.length && wanted.every((one, i) => one === current[i])) return;
+    if (others.length + sessions.length > MAX_PLANNED) {
+      throw new CoreError("too-many-planned", `limit ${MAX_PLANNED}`);
+    }
+    const createdAt = UtilityService.getCurrentISODateTime();
+    const planned: PlannedActivity[] = sessions.map((session) => ({
+      id: UtilityService.generateUUID(),
+      templateId: session.templateId,
+      date: session.date,
+      ...(session.time !== undefined ? { time: session.time } : {}),
+      ...(session.notes ? { notes: session.notes } : {}),
+      ...(session.minutes ? { minutes: session.minutes } : {}),
+      roadmap: { id: roadmapId, stepId: session.stepId },
+      createdAt,
+    }));
+    this.systemCore.updateState((state) => {
+      state.global.plannedActivities = [...others, ...planned];
+      return state;
+    });
+  }
+
   /** Removes planned items by id. Returns how many were removed. */
   public cancelPlannedActivities(ids: UUID[]): number {
     const wanted = new Set(ids);
@@ -118,11 +176,21 @@ export class AgendaManager {
     if (due.length === 0) return [];
 
     const todo = state.global.timeBlocks.find((block) => block.isDefault);
-    const known = new Set(state.global.activityTemplates.map((template) => template.id));
+    const known = new Map(
+      state.global.activityTemplates.map((template) => [template.id, template])
+    );
     const brought: ActivityInstance[] = [];
     for (const item of due) {
-      if (!todo || !known.has(item.templateId)) continue;
-      let instance = this.systemCore.createActivityInstance(item.templateId, todo.id);
+      const template = known.get(item.templateId);
+      if (!todo || !template) continue;
+      // A session planned longer or shorter than usual keeps that length today
+      let instance = this.systemCore.createActivityInstance(
+        item.templateId,
+        todo.id,
+        item.minutes && template.type === "clear-objective"
+          ? { clearObjectiveSettings: { estimatedDurationMinutes: item.minutes } }
+          : undefined
+      );
       if (item.notes) {
         instance = this.systemCore.updateActivityInstance(instance.id, { notes: item.notes });
       }

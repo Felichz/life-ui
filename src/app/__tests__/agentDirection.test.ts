@@ -3,6 +3,11 @@ import { Agent } from "../agent/agent";
 import type { ChatMessage, ChatOptions, ModelReply } from "../agent/llm";
 import { RoadmapDraft } from "../agent/roadmapDraft";
 import { addNote } from "../agent/tools";
+import { setLocale } from "../i18n";
+
+// What the person reads (the card, the dates) is checked as they read it
+beforeAll(() => setLocale("es"));
+afterAll(() => setLocale("en"));
 
 /**
  * Where the person is going, through the chat (ADR-010): the agent notes
@@ -59,14 +64,23 @@ function agentWith(core: SystemCore, coach: ModelReply[], planner: Array<ModelRe
   return { agent, seen, asked };
 }
 
+const SCHEDULE = { weekdays: ["mon", "wed", "fri"], time: "19:00", start: "tomorrow" };
+
+/** A roadmap as the planner gives it: one activity, its days, and phases counted in sessions. */
 const ROADMAP = {
   title: "Entrenar en casa",
   why: "Sentirme fuerte",
+  activity: "Entrenar: base",
+  schedule: SCHEDULE,
+  rules: "- Día malo: una serie de cada ejercicio",
   milestones: [
-    { title: "Crear el hábito", steps: [{ activity: "Entrenar: base", sessions: 6 }] },
+    { title: "Crear el hábito", sessions: 6, notes: "- Sentadilla 2x10\n- Remo 2x10" },
     {
       title: "Subir la carga",
-      steps: [{ activity: "Entrenar: con carga", sessions: 12, session_minutes: 40 }],
+      sessions: 12,
+      notes: "- Sentadilla 3x10\n- Remo 3x10",
+      activity: "Entrenar: con carga",
+      session_minutes: 40,
     },
   ],
 };
@@ -124,12 +138,14 @@ describe("the roadmap draft", () => {
     expect(() =>
       draft.saveRoadmap({
         title: "Meta",
+        schedule: SCHEDULE,
         milestones: [{ title: "Fase", steps: [{ activity: "Nadar", times: 3 }] }],
       })
     ).toThrow(/activity-not-found.*"Entrenar: base".*session_minutes/);
     expect(() =>
       draft.saveRoadmap({
         title: "Meta",
+        schedule: SCHEDULE,
         milestones: [{ title: "Fase", steps: [{ activity: "Entrenar: base" }] }],
       })
     ).toThrow(/step-needs-amount/);
@@ -140,6 +156,52 @@ describe("the roadmap draft", () => {
       /roadmap-not-found/
     );
     expect(draft.changed).toBe(false);
+  });
+
+  it("cannot be created without the days its sessions happen on", () => {
+    const draft = new RoadmapDraft(setup());
+    const { schedule: _schedule, ...withoutDays } = ROADMAP;
+    expect(() => draft.saveRoadmap(withoutDays)).toThrow(/roadmap-needs-schedule.*cannot_do/);
+    expect(() => draft.saveRoadmap({ ...ROADMAP, schedule: { start: "tomorrow" } })).toThrow(
+      /schedule-needs-weekdays/
+    );
+    expect(() =>
+      draft.saveRoadmap({ ...ROADMAP, schedule: { weekdays: ["mon"], start: "2020-01-01" } })
+    ).toThrow(/date-in-the-past/);
+    expect(draft.changed).toBe(false);
+  });
+
+  it("teaches that the parts of a session are not steps and not activities", () => {
+    const core = setup();
+    const draft = new RoadmapDraft(core);
+    const parts = ["Sentadillas", "Flexiones", "Zancadas", "Remo", "Press"];
+    // Five exercises given as five steps of one phase
+    expect(() =>
+      draft.saveRoadmap({
+        title: "Fuerza",
+        schedule: SCHEDULE,
+        milestones: [
+          {
+            title: "Fase 1",
+            steps: parts.map((activity) => ({ activity, sessions: 3, session_minutes: 2 })),
+          },
+        ],
+      })
+    ).toThrow(/too-many-steps.*goes in that step's "notes"/);
+    // Or spread over phases: still four new activities for what is one session
+    expect(() =>
+      draft.saveRoadmap({
+        title: "Fuerza",
+        schedule: SCHEDULE,
+        milestones: parts.slice(0, 4).map((activity) => ({
+          title: `Fase ${activity}`,
+          steps: [{ activity, sessions: 3, session_minutes: 2 }],
+        })),
+      })
+    ).toThrow(/too-many-activities.*ONE activity for the session/);
+    // A call that was refused leaves nothing of itself behind
+    expect(draft.changed).toBe(false);
+    expect(draft.describe().details).toEqual([]);
   });
 
   it("is edited by number or by title, and never left with an empty milestone", () => {
@@ -154,10 +216,134 @@ describe("the roadmap draft", () => {
     );
     draft.commit();
     const [saved] = core.getRoadmaps();
-    expect(saved.milestones[0].steps[0]).toMatchObject({ unit: "times", amount: 8 });
+    // The amount changed; what a session consists of stayed
+    expect(saved.milestones[0].steps[0]).toMatchObject({
+      unit: "times",
+      amount: 8,
+      notes: "- Sentadilla 2x10\n- Remo 2x10",
+    });
     expect(saved.milestones[1].steps).toHaveLength(2);
     // The activity the plan needed was created in the library, with its session length
     expect(core.getActivityTemplates().map((tpl) => tpl.title)).toContain("Entrenar: con carga");
+  });
+
+  it("puts every session on the calendar when it is saved, and says where they fell", () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-11-12T10:00:00")); // a Thursday
+    try {
+      const core = setup();
+      const draft = new RoadmapDraft(core, new Date());
+      draft.saveRoadmap(ROADMAP);
+
+      // The card shows the real dates before anything is saved
+      const card = draft.describe();
+      expect(card.details[0]).toBe(
+        "lun, mié, vie · 19:00 · 18 sesiones, del vie 13 nov al mié 23 dic"
+      );
+      expect(card.details[1]).toContain(
+        "Crear el hábito: Entrenar: base × 6 (vie 13 nov → mié 25 nov)"
+      );
+      expect(core.getPlannedActivities()).toEqual([]);
+
+      const result = draft.commit();
+      const planned = core.getPlannedActivities();
+      expect(planned).toHaveLength(18);
+      expect(planned[0]).toMatchObject({ date: "2026-11-13", time: 19 * 60 });
+      expect(planned[0].notes).toBe(
+        "- Sentadilla 2x10\n- Remo 2x10\n\n- Día malo: una serie de cada ejercicio"
+      );
+      // What the coach is given: dates with their weekday, ready to be said as they are
+      expect(result.sessions).toEqual([
+        {
+          roadmap: "Entrenar en casa",
+          days: "lun, mié, vie",
+          time: "19:00",
+          total: 18,
+          first: "vie 13 nov",
+          first_is: "tomorrow",
+          last: "mié 23 dic",
+          milestones: [
+            { milestone: "Crear el hábito", sessions: 6, from: "vie 13 nov", to: "mié 25 nov" },
+            { milestone: "Subir la carga", sessions: 12, from: "vie 27 nov", to: "mié 23 dic" },
+          ],
+        },
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("holds a new roadmap to what the person said", () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-11-12T10:00:00"));
+    try {
+      const core = setup();
+      // From the coach's notes: 20 minutes a session, Tuesdays and Thursdays at 19:00, eight weeks
+      const said = { minutes: 20, weekdays: [2, 4], time: 19 * 60, weeks: 8 };
+      const draft = new RoadmapDraft(core, new Date(), said);
+      const theirs = { weekdays: ["martes", "jueves"], start: "tomorrow" };
+
+      // The model turned their days into other days
+      expect(() => draft.saveRoadmap({ ...ROADMAP, schedule: SCHEDULE })).toThrow(
+        /not-their-days.*the person said tue, thu/
+      );
+      // Sessions three times as long as they said they had
+      expect(() =>
+        draft.saveRoadmap({
+          title: "Otra",
+          activity: "Sesión larga",
+          session_minutes: 60,
+          schedule: theirs,
+          milestones: [{ title: "Fase", sessions: 4, notes: "- algo" }],
+        })
+      ).toThrow(/session-too-long.*20 minutes/);
+      expect(draft.changed).toBe(false);
+
+      // Much longer than the plan they asked for: not refused, but said on the card
+      draft.saveRoadmap({
+        ...ROADMAP,
+        schedule: theirs,
+        milestones: [{ title: "Fase", sessions: 40, notes: "- algo" }],
+      });
+      expect(draft.warnings).toEqual(["Ojo: pediste unas 8 semanas y esta dura 20."]);
+      expect(draft.describe().details[0]).toBe("Ojo: pediste unas 8 semanas y esta dura 20.");
+
+      // Within what they said it goes through, at their time though none was written
+      draft.saveRoadmap({
+        ...ROADMAP,
+        schedule: theirs,
+        milestones: [{ title: "Fase", sessions: 16, notes: "- algo" }],
+      });
+      expect(draft.warnings).toEqual([]);
+      draft.commit();
+      const planned = core.getPlannedActivities();
+      expect(planned).toHaveLength(16);
+      expect(planned[0]).toMatchObject({ date: "2026-11-17", time: 19 * 60 });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("moves a roadmap's sessions to other days", () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-11-12T10:00:00"));
+    try {
+      const core = setup();
+      const first = new RoadmapDraft(core, new Date());
+      first.saveRoadmap(ROADMAP);
+      first.commit();
+
+      const draft = new RoadmapDraft(core, new Date());
+      draft.setSchedule({ weekdays: ["tue", "thu"], start: "tomorrow" });
+      draft.commit();
+      const planned = core.getPlannedActivities();
+      expect(planned).toHaveLength(18);
+      expect(planned.slice(0, 2).map((item) => item.date)).toEqual(["2026-11-17", "2026-11-19"]);
+      // The time was left out, so it stayed
+      expect(planned[0].time).toBe(19 * 60);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -182,7 +368,9 @@ describe("the roadmap planner", () => {
     expect(card).toMatchObject({ kind: "tool", status: "pending" });
     if (card.kind === "tool") {
       expect(card.summary).toContain("Entrenar en casa");
-      expect(card.details?.[0]).toContain("Crear el hábito");
+      // Its days and how many sessions, then each phase
+      expect(card.details?.[0]).toMatch(/lun, mié, vie · 19:00 · 18 sesiones/);
+      expect(card.details?.[1]).toContain("Crear el hábito");
     }
     expect(core.getRoadmaps()).toEqual([]);
 
@@ -190,18 +378,47 @@ describe("the roadmap planner", () => {
     await turn;
     expect(core.getRoadmaps()).toHaveLength(1);
     expect(core.getRoadmapProgress()[0]).toMatchObject({ totalSteps: 2, fraction: 0 });
+    // Saved, and on the calendar in the same go
+    expect(core.getPlannedActivities()).toHaveLength(18);
 
     // The planner saw the real library; the coach only got the outcome
     expect(String(seen.planner[0][0].content)).toContain("Entrenar: base");
     const result = String(seen.coach[1].at(-1)!.content);
     expect(result).toContain("Creé la hoja de ruta con dos etapas.");
-    expect(result).toContain("No sessions are planned yet");
-    expect(result.length).toBeLessThan(700);
+    // The coach is given the dates to say, and told not to plan them again
+    expect(result).toContain('"total":18');
+    expect(result).toContain("do not plan these sessions again");
+    expect(result.length).toBeLessThan(1500);
 
-    // One undo takes back the roadmap and the activity it created
+    // One undo takes back the roadmap, the activity it created and every session it planned
     agent.undo(card.id);
     expect(core.getRoadmaps()).toEqual([]);
     expect(core.getActivityTemplates()).toHaveLength(1);
+    expect(core.getPlannedActivities()).toEqual([]);
+  });
+
+  it("builds and finishes in one call, reading the plan from the conversation", async () => {
+    const core = setup();
+    const { agent, seen, asked } = agentWith(
+      core,
+      [
+        say("Te propongo dos fases: seis sesiones de base y después doce con carga. ¿Te parece?"),
+        call("plan_roadmap", { request: "Arma la hoja de ruta del plan de arriba." }),
+        say("Lista."),
+      ],
+      [call("save_roadmap", { ...ROADMAP, message: "Creé la hoja de ruta.", then: "finish" })]
+    );
+    agent.mode = "auto";
+    await agent.send("quiero volver a entrenar en casa");
+    await agent.send("sí, dale");
+    // One call to the planner, and it was not asked again
+    expect(asked).toHaveLength(1);
+    expect(core.getRoadmaps().map((roadmap) => roadmap.title)).toEqual(["Entrenar en casa"]);
+    // It had the plan as the person read it, not only the coach's one-line request
+    const system = String(seen.planner[0][0].content);
+    expect(system).toContain("COACH: Te propongo dos fases: seis sesiones de base");
+    expect(system).toContain("PERSON: sí, dale");
+    expect(String(seen.coach.at(-1)!.at(-1)!.content)).toContain("Creé la hoja de ruta.");
   });
 
   it("gets its own mistakes back as errors, fixes them, and nothing wrong is saved", async () => {
@@ -215,16 +432,16 @@ describe("the roadmap planner", () => {
       [
         call("save_roadmap", {
           title: "Nadar",
-          milestones: [{ title: "Empezar", steps: [{ activity: "Nadar", times: 4 }] }],
+          activity: "Nadar",
+          schedule: SCHEDULE,
+          milestones: [{ title: "Empezar", sessions: 4, notes: "- 10 largos" }],
         }),
         call("save_roadmap", {
           title: "Nadar",
-          milestones: [
-            {
-              title: "Empezar",
-              steps: [{ activity: "Nadar", times: 4, session_minutes: 30 }],
-            },
-          ],
+          activity: "Nadar",
+          session_minutes: 30,
+          schedule: SCHEDULE,
+          milestones: [{ title: "Empezar", sessions: 4, notes: "- 10 largos" }],
         }),
         call("finish", { message: "Creé «Nadar»; elegí 30 minutos por sesión." }),
       ]
@@ -255,7 +472,9 @@ describe("the roadmap planner", () => {
         call("finish", { message: "He creado la hoja de ruta." }),
         call("save_roadmap", {
           title: "Entrenar",
-          milestones: [{ title: "Fase 1", steps: [{ activity: "Entrenar: base", sessions: 6 }] }],
+          activity: "Entrenar: base",
+          schedule: SCHEDULE,
+          milestones: [{ title: "Fase 1", sessions: 6, notes: "- Sentadilla 2x10" }],
         }),
         call("finish", { message: "Creé «Entrenar» con una fase de 6 sesiones." }),
       ]
@@ -275,7 +494,9 @@ describe("the roadmap planner", () => {
         call("save_roadmap", {
           title: "Entrenar",
           why: "",
-          milestones: [{ title: "Fase 1", steps: [{ activity: "Entrenar: base", sessions: 6 }] }],
+          activity: "Entrenar: base",
+          schedule: SCHEDULE,
+          milestones: [{ title: "Fase 1", sessions: 6, notes: "- Sentadilla 2x10" }],
         }),
         new Error("The model stopped with an error: slot unavailable"),
         call("finish", { message: "Creé «Entrenar»." }),

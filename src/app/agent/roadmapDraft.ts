@@ -1,11 +1,19 @@
 import type { ISystemCore, Roadmap, UUID } from "../../types";
+import { localDate } from "../../system/agendaManager";
+import { dayAfter, sessionDates, sessionMinutes } from "../../system/directionManager";
+import { formatDayMinutes } from "../lib/format";
 import { t } from "../i18n";
+import { WEEKDAYS, dayLabel, startDate, timeOfDay, weekdayNames, weekdayNumbers } from "./when";
+import type { Said } from "./brief";
 
 /**
- * A working copy of the person's roadmaps (ADR-010). The roadmap planner
- * edits it with its tools; nothing reaches the core until the person has seen
- * the result and said yes. Every edit is checked here, and a wrong one comes
- * back as an error the planner can read and fix.
+ * A working copy of the person's roadmaps (ADR-010, ADR-011). The roadmap
+ * planner edits it with its tools; nothing reaches the core until the person
+ * has seen the result and said yes. Every edit is checked here, and a wrong
+ * one comes back as an error the planner can read and fix.
+ *
+ * A roadmap is made of real sessions on real days: it cannot be created
+ * without saying when its sessions happen, and saving it plans them.
  */
 
 export class DraftError extends Error {
@@ -17,17 +25,33 @@ export class DraftError extends Error {
   }
 }
 
+/** A step is one kind of session, not one part of it. */
+const MAX_STEPS = 3;
+/** Activities one request may add to the library: a session is one activity, its parts are not. */
+const MAX_NEW_ACTIVITIES = 3;
+const MAX_SESSIONS = 200;
+
 interface DraftStep {
   /** The library activity's title, as the library (or a new activity of this draft) has it. */
   activity: string;
   unit: "times" | "minutes";
   amount: number;
+  /** What one session of this step consists of. */
+  notes?: string;
+  /** How long one session of this step lasts, when not the activity's usual length. */
+  minutes?: number;
 }
 
 interface DraftMilestone {
   title: string;
   note?: string;
   steps: DraftStep[];
+}
+
+interface DraftSchedule {
+  weekdays: number[];
+  time?: number;
+  start: string;
 }
 
 interface DraftRoadmap {
@@ -37,6 +61,9 @@ interface DraftRoadmap {
   why?: string;
   targetDate?: string;
   status: Roadmap["status"];
+  schedule?: DraftSchedule;
+  /** What holds in every session of every phase. */
+  rules?: string;
   milestones: DraftMilestone[];
 }
 
@@ -49,25 +76,53 @@ const whole = (value: unknown): number | undefined => {
   return typeof n === "number" && Number.isFinite(n) ? Math.round(n) : undefined;
 };
 
+/** What saving a roadmap put on the calendar, in words the coach can repeat as they are. */
+export interface PlannedSessions {
+  roadmap: string;
+  days: string;
+  time?: string;
+  total: number;
+  first?: string;
+  /** "today", "tomorrow" or "in 4 days": how far the first session is. */
+  first_is?: string;
+  last?: string;
+  milestones: Array<{ milestone: string; sessions: number; from?: string; to?: string }>;
+  /** Sessions that went straight into today's plan. */
+  in_todays_plan?: string[];
+}
+
 export class RoadmapDraft {
   private roadmaps: DraftRoadmap[];
   private readonly before: string;
-  private readonly deleted: Array<{ id: UUID; title: string }> = [];
+  private deleted: Array<{ id: UUID; title: string }> = [];
   /** Activities the plan needs that the library does not have yet: title -> minutes a session. */
-  private readonly newActivities = new Map<string, { title: string; minutes: number }>();
+  private newActivities = new Map<string, { title: string; minutes: number }>();
   private readonly library: string[];
+  /** Minutes one session of each library activity lasts. */
+  private readonly lengths = new Map<string, number>();
   /** Each stored roadmap as it was when the draft began, to tell what changed. */
   private readonly original = new Map<UUID, string>();
 
-  constructor(private readonly core: ISystemCore) {
-    const titles = new Map(core.getActivityTemplates().map((tpl) => [tpl.id, tpl.title]));
+  constructor(
+    private readonly core: ISystemCore,
+    private readonly now = new Date(),
+    /** What the person said that a roadmap has to keep to (ADR-011). */
+    private readonly said: Said = {}
+  ) {
+    const templates = core.getActivityTemplates();
+    const titles = new Map(templates.map((tpl) => [tpl.id, tpl.title]));
     this.library = [...titles.values()];
+    for (const tpl of templates) {
+      this.lengths.set(tpl.title.toLocaleLowerCase(), sessionMinutes(tpl));
+    }
     this.roadmaps = core.getRoadmaps().map((roadmap) => ({
       id: roadmap.id,
       title: roadmap.title,
       why: roadmap.why,
       targetDate: roadmap.targetDate,
       status: roadmap.status,
+      schedule: roadmap.schedule,
+      rules: roadmap.rules,
       milestones: roadmap.milestones.map((milestone) => ({
         title: milestone.title,
         note: milestone.note,
@@ -75,10 +130,11 @@ export class RoadmapDraft {
           activity: titles.get(step.templateId) ?? step.title,
           unit: step.unit,
           amount: step.amount,
+          notes: step.notes,
+          minutes: step.sessionMinutes,
         })),
       })),
     }));
-    // (a step's own title in the core is its activity's: see `step` below)
     this.before = this.fingerprint();
     for (const roadmap of this.roadmaps) {
       if (roadmap.id) this.original.set(roadmap.id, JSON.stringify(roadmap));
@@ -93,7 +149,7 @@ export class RoadmapDraft {
   }
 
   private fingerprint(): string {
-    return JSON.stringify([this.roadmaps, this.deleted, [...this.newActivities.values()]]);
+    return JSON.stringify([this.roadmaps, this.deleted]);
   }
 
   get changed(): boolean {
@@ -102,6 +158,26 @@ export class RoadmapDraft {
 
   get deletes(): boolean {
     return this.deleted.length > 0;
+  }
+
+  /**
+   * An edit either goes in whole or leaves the draft as it was: a call that is
+   * refused half way must not leave a piece of itself behind.
+   */
+  private edit<T>(change: () => T): T {
+    const roadmaps = JSON.stringify(this.roadmaps);
+    const deleted = [...this.deleted];
+    const activities = new Map(this.newActivities);
+    try {
+      const result = change();
+      this.check();
+      return result;
+    } catch (caught) {
+      this.roadmaps = JSON.parse(roadmaps) as DraftRoadmap[];
+      this.deleted = deleted;
+      this.newActivities = activities;
+      throw caught;
+    }
   }
 
   // ---------------------------------------------------------------- finding things
@@ -170,19 +246,24 @@ export class RoadmapDraft {
       this.library.find((title) => same(title, activity)) ??
       this.newActivities.get(activity.toLocaleLowerCase())?.title;
     let title = known;
+    const session = whole(fields.session_minutes ?? fields.new_activity_minutes);
+    if (session !== undefined && (session < 1 || session > 600)) {
+      throw new DraftError("invalid-minutes", `${where}: session_minutes is 1 to 600`);
+    }
     if (!title) {
-      const session = whole(fields.session_minutes ?? fields.new_activity_minutes);
-      if (session === undefined || session < 1 || session > 600) {
+      if (session === undefined) {
         throw new DraftError(
           "activity-not-found",
           `${where}: "${activity}" is not in the person's library. Library: ${
             this.library.map((item) => `"${item}"`).join(", ") || "empty"
-          }. Use one of those, or create it by adding session_minutes (how long one session lasts).`
+          }. Use one of those, or create "${activity}" by giving session_minutes: how long one session lasts.`
         );
       }
       this.newActivities.set(activity.toLocaleLowerCase(), { title: activity, minutes: session });
       title = activity;
     }
+    // A phase whose sessions last longer or shorter than the activity's usual keeps its own length
+    const own = session !== undefined && session !== this.length(title) ? session : undefined;
     const times = whole(fields.sessions ?? fields.times);
     const minutes = whole(fields.total_minutes ?? fields.minutes);
     if ((times === undefined) === (minutes === undefined)) {
@@ -194,12 +275,44 @@ export class RoadmapDraft {
     const amount = times ?? minutes!;
     if (amount < 1)
       throw new DraftError("step-needs-amount", `${where}: the amount must be 1 or more`);
+    const notes = text(fields.notes).slice(0, 4000);
     // A step is named after its activity: the row on the Goals page is one line
     return {
       activity: title,
       unit: times !== undefined ? "times" : "minutes",
       amount,
+      ...(notes ? { notes } : {}),
+      ...(own ? { minutes: own } : {}),
     };
+  }
+
+  /**
+   * The steps of a milestone as it is given. The usual shape is a phase: so
+   * many sessions (or minutes) of the roadmap's one activity, with what a
+   * session consists of. A list of steps is also read, for a phase that
+   * really has more than one kind of session.
+   */
+  private stepsOf(milestone: Fields, roadmap: Fields): Fields[] {
+    if (Array.isArray(milestone.steps) && milestone.steps.length > 0) {
+      return milestone.steps as Fields[];
+    }
+    const own = text(milestone.activity);
+    const activity = own || text(roadmap.activity);
+    if (!activity) {
+      throw new DraftError(
+        "roadmap-needs-activity",
+        'give "activity": the one thing the person does in every session of this roadmap'
+      );
+    }
+    return [
+      {
+        activity,
+        session_minutes: milestone.session_minutes ?? (own ? undefined : roadmap.session_minutes),
+        sessions: milestone.sessions,
+        total_minutes: milestone.total_minutes,
+        notes: milestone.notes,
+      },
+    ];
   }
 
   private date(value: unknown): string | undefined {
@@ -211,166 +324,387 @@ export class RoadmapDraft {
     return date;
   }
 
+  /** When a roadmap's sessions happen: the weekdays, a time if there is one, and from when. */
+  private schedule(value: unknown): DraftSchedule {
+    const fields = (value && typeof value === "object" ? value : {}) as Fields;
+    const weekdays = weekdayNumbers(fields.weekdays);
+    if (!weekdays) {
+      throw new DraftError(
+        "schedule-needs-weekdays",
+        `give "weekdays": the days the sessions happen on, from ${WEEKDAYS.join(", ")}. If the request does not say which days, call cannot_do: the coach has to ask the person.`
+      );
+    }
+    const time = text(fields.time) ? timeOfDay(fields.time) : undefined;
+    if (time === null)
+      throw new DraftError("invalid-time", `"time" is HH:MM, got "${fields.time}"`);
+    const start = startDate(fields.start, this.now);
+    if (!start) {
+      throw new DraftError("invalid-date", '"start" is "today", "tomorrow" or YYYY-MM-DD');
+    }
+    if (start < localDate(this.now)) {
+      throw new DraftError("date-in-the-past", `"start" ${start} is before today`);
+    }
+    // The days are the person's: a model that turns "martes, jueves" into other days is told so
+    const theirs = this.said.weekdays;
+    if (theirs && theirs.join() !== weekdays.join()) {
+      throw new DraftError(
+        "not-their-days",
+        `the person said ${theirs.map((day) => WEEKDAYS[day]).join(", ")}; the schedule has ${weekdays
+          .map((day) => WEEKDAYS[day])
+          .join(
+            ", "
+          )}. Use the person's days. If the request in front of you clearly names other days, call cannot_do and say which.`
+      );
+    }
+    // The time is the person's too: theirs is used, whatever was written here
+    const at = this.said.time ?? time;
+    return { weekdays, ...(at !== undefined ? { time: at } : {}), start };
+  }
+
+  /** A new roadmap keeps to what the person said: how long a session is, how long the plan runs. */
+  private keepsTo(roadmap: DraftRoadmap) {
+    const first = roadmap.milestones[0]?.steps[0];
+    const length = first ? (first.minutes ?? this.length(first.activity)) : 0;
+    if (this.said.minutes && length > this.said.minutes * 1.1) {
+      throw new DraftError(
+        "session-too-long",
+        `the person said a session can be ${this.said.minutes} minutes; the sessions of the first phase last ${length}. Start with ${this.said.minutes}; a later phase may be longer only if the plan they agreed to says so.`
+      );
+    }
+  }
+
+  /**
+   * A roadmap that runs clearly longer than the person asked for. Said to
+   * them on the card, not refused: how many weeks they meant is the model's
+   * reading of their words, and they are the one to decide.
+   */
+  private longerThanAsked(roadmap: DraftRoadmap): { weeks: number; until: string } | null {
+    if (roadmap.id || !this.said.weeks) return null;
+    const layout = this.layout(roadmap).filter((entry) => entry.last);
+    if (layout.length === 0) return null;
+    const until = layout[layout.length - 1].last;
+    const days =
+      (new Date(`${until}T12:00:00`).getTime() -
+        new Date(`${layout[0].first}T12:00:00`).getTime()) /
+      86_400_000;
+    const weeks = Math.ceil((days + 1) / 7);
+    return weeks > this.said.weeks + Math.max(1, Math.round(this.said.weeks * 0.2))
+      ? { weeks, until }
+      : null;
+  }
+
+  /** What the person should look at before saying yes. */
+  get warnings(): string[] {
+    return this.touched().flatMap((roadmap) => {
+      const longer = this.longerThanAsked(roadmap);
+      return longer
+        ? [t("roadmap.card.longer", { asked: this.said.weeks!, weeks: longer.weeks })]
+        : [];
+    });
+  }
+
+  /** How far a date is from today, in words a model cannot get wrong. */
+  private howFar(date: string): string {
+    const days = Math.round(
+      (new Date(`${date}T12:00:00`).getTime() -
+        new Date(`${localDate(this.now)}T12:00:00`).getTime()) /
+        86_400_000
+    );
+    return days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+  }
+
+  private length(activity: string): number {
+    const key = activity.toLocaleLowerCase();
+    return this.newActivities.get(key)?.minutes ?? this.lengths.get(key) ?? 30;
+  }
+
+  private sessionsOf(step: DraftStep): number {
+    return step.unit === "times"
+      ? step.amount
+      : Math.ceil(step.amount / (step.minutes ?? this.length(step.activity)));
+  }
+
+  /** What holds for the whole draft after any edit. */
+  private check() {
+    for (const roadmap of this.roadmaps) {
+      roadmap.milestones.forEach((milestone, index) => {
+        if (milestone.steps.length > MAX_STEPS) {
+          throw new DraftError(
+            "too-many-steps",
+            `milestone ${index + 1} ("${milestone.title}") has ${milestone.steps.length} steps; a milestone has 1 to ${MAX_STEPS}. A step is one kind of session the person sits down to do, not one part of it: what a session contains (its exercises, chapters, sub-tasks) goes in that step's "notes".`
+          );
+        }
+      });
+      const total = roadmap.milestones
+        .flatMap((milestone) => milestone.steps)
+        .reduce((sum, step) => sum + this.sessionsOf(step), 0);
+      if (total > MAX_SESSIONS) {
+        throw new DraftError(
+          "too-many-sessions",
+          `"${roadmap.title}" adds up to ${total} sessions; a roadmap plans at most ${MAX_SESSIONS}. Make it shorter, or cover a first stretch now.`
+        );
+      }
+    }
+    const used = [...this.newActivities.values()].filter((activity) => this.uses(activity.title));
+    if (used.length > MAX_NEW_ACTIVITIES) {
+      throw new DraftError(
+        "too-many-activities",
+        `this would add ${used.length} activities to the person's library (${used
+          .map((activity) => `"${activity.title}"`)
+          .join(
+            ", "
+          )}); at most ${MAX_NEW_ACTIVITIES}. An activity is something the person sits down to do as one session. The parts of a session are not activities: use ONE activity for the session and write its parts in the step's "notes".`
+      );
+    }
+  }
+
+  private uses(activity: string): boolean {
+    return this.roadmaps.some((roadmap) =>
+      roadmap.milestones.some((m) => m.steps.some((step) => same(step.activity, activity)))
+    );
+  }
+
   // ---------------------------------------------------------------- the planner's tools
 
   /** Creates a roadmap, or rewrites the one with that title, whole. */
   saveRoadmap(fields: Fields) {
-    const title = text(fields.title);
-    if (!title)
-      throw new DraftError("roadmap-needs-title", 'give "title": the goal, in a few words');
-    const list = Array.isArray(fields.milestones) ? (fields.milestones as Fields[]) : [];
-    if (list.length === 0) {
-      throw new DraftError("roadmap-needs-milestones", 'give "milestones": at least one, in order');
-    }
-    const milestones = list.map((milestone, index): DraftMilestone => {
-      const where = `milestone ${index + 1}`;
-      if (!text(milestone.title)) throw new DraftError("milestone-needs-title", where);
-      const steps = Array.isArray(milestone.steps) ? (milestone.steps as Fields[]) : [];
-      if (steps.length === 0) {
+    return this.edit(() => {
+      const title = text(fields.title);
+      if (!title)
+        throw new DraftError("roadmap-needs-title", 'give "title": the goal, in a few words');
+      const list = Array.isArray(fields.milestones) ? (fields.milestones as Fields[]) : [];
+      if (list.length === 0) {
         throw new DraftError(
-          "milestone-needs-steps",
-          `${where} ("${text(milestone.title)}"): give "steps", each one an activity and an amount`
+          "roadmap-needs-milestones",
+          'give "milestones": at least one, in order'
         );
       }
-      return {
-        title: text(milestone.title),
-        ...(text(milestone.note) ? { note: text(milestone.note) } : {}),
-        steps: steps.map((step, i) => this.step(step, `${where}, step ${i + 1}`)),
+      const milestones = list.map((milestone, index): DraftMilestone => {
+        const where = `milestone ${index + 1}`;
+        if (!text(milestone.title)) throw new DraftError("milestone-needs-title", where);
+        const steps = this.stepsOf(milestone, fields);
+        return {
+          title: text(milestone.title),
+          ...(text(milestone.note) ? { note: text(milestone.note) } : {}),
+          steps: steps.map((step, i) => this.step(step, `${where}, step ${i + 1}`)),
+        };
+      });
+      const existing = this.roadmaps.find((roadmap) => same(roadmap.title, title));
+      const schedule =
+        fields.schedule !== undefined && fields.schedule !== null
+          ? this.schedule(fields.schedule)
+          : existing?.schedule;
+      if (!schedule) {
+        throw new DraftError(
+          "roadmap-needs-schedule",
+          'a roadmap is made of real sessions on real days. Give "schedule": {"weekdays": [...], "time": "HH:MM" (only if the request gives one), "start": "today", "tomorrow" or a date}. If the request does not say which days, call cannot_do: the coach has to ask the person.'
+        );
+      }
+      const roadmap: DraftRoadmap = {
+        id: existing?.id,
+        title,
+        why: text(fields.why) || existing?.why,
+        targetDate: this.date(fields.target_date) ?? existing?.targetDate,
+        status: existing?.status ?? "active",
+        schedule,
+        rules: text(fields.rules).slice(0, 2000) || existing?.rules,
+        milestones,
       };
+      if (!existing) this.keepsTo(roadmap);
+      this.roadmaps = existing
+        ? this.roadmaps.map((item) => (item === existing ? roadmap : item))
+        : [...this.roadmaps, roadmap];
+      return this.outline(roadmap);
     });
-    const existing = this.roadmaps.find((roadmap) => same(roadmap.title, title));
-    const roadmap: DraftRoadmap = {
-      id: existing?.id,
-      title,
-      why: text(fields.why) || existing?.why,
-      targetDate: this.date(fields.target_date) ?? existing?.targetDate,
-      status: existing?.status ?? "active",
-      milestones,
-    };
-    this.roadmaps = existing
-      ? this.roadmaps.map((item) => (item === existing ? roadmap : item))
-      : [...this.roadmaps, roadmap];
-    return this.outline(roadmap);
   }
 
   setRoadmap(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    const title = text(fields.new_title);
-    if (title) roadmap.title = title;
-    if (text(fields.why)) roadmap.why = text(fields.why);
-    const date = this.date(fields.target_date);
-    if (date) roadmap.targetDate = date;
-    const status = text(fields.status);
-    if (status) {
-      if (status !== "active" && status !== "paused") {
-        throw new DraftError("invalid-status", 'status is "active" or "paused"');
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      const title = text(fields.new_title);
+      if (title) roadmap.title = title;
+      if (text(fields.why)) roadmap.why = text(fields.why);
+      if (fields.rules !== undefined)
+        roadmap.rules = text(fields.rules).slice(0, 2000) || undefined;
+      const date = this.date(fields.target_date);
+      if (date) roadmap.targetDate = date;
+      const status = text(fields.status);
+      if (status) {
+        if (status !== "active" && status !== "paused") {
+          throw new DraftError("invalid-status", 'status is "active" or "paused"');
+        }
+        roadmap.status = status;
       }
-      roadmap.status = status;
-    }
-    return this.outline(roadmap);
+      return this.outline(roadmap);
+    });
+  }
+
+  /** Moves a roadmap's sessions to other days, another time or another start. */
+  setSchedule(fields: Fields) {
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      roadmap.schedule = this.schedule({
+        // What is left out stays as it was
+        weekdays: fields.weekdays ?? roadmap.schedule?.weekdays.map((weekday) => WEEKDAYS[weekday]),
+        time:
+          fields.time ??
+          (roadmap.schedule?.time !== undefined ? formatDayMinutes(roadmap.schedule.time) : ""),
+        start: fields.start ?? "today",
+      });
+      return this.outline(roadmap);
+    });
   }
 
   deleteRoadmap(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    this.roadmaps = this.roadmaps.filter((item) => item !== roadmap);
-    if (roadmap.id) this.deleted.push({ id: roadmap.id, title: roadmap.title });
-    return { deleted: roadmap.title };
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      this.roadmaps = this.roadmaps.filter((item) => item !== roadmap);
+      if (roadmap.id) this.deleted.push({ id: roadmap.id, title: roadmap.title });
+      return { deleted: roadmap.title };
+    });
   }
 
   addMilestone(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    if (!text(fields.title)) throw new DraftError("milestone-needs-title", 'give "title"');
-    const steps = Array.isArray(fields.steps) ? (fields.steps as Fields[]) : [];
-    if (steps.length === 0) {
-      throw new DraftError(
-        "milestone-needs-steps",
-        'give "steps": at least one, each an activity and an amount'
-      );
-    }
-    const milestone: DraftMilestone = {
-      title: text(fields.title),
-      ...(text(fields.note) ? { note: text(fields.note) } : {}),
-      steps: steps.map((step, i) => this.step(step, `step ${i + 1}`)),
-    };
-    const position = whole(fields.position);
-    const at =
-      position !== undefined && position >= 1 && position <= roadmap.milestones.length + 1
-        ? position - 1
-        : roadmap.milestones.length;
-    roadmap.milestones.splice(at, 0, milestone);
-    return this.outline(roadmap);
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      if (!text(fields.title)) throw new DraftError("milestone-needs-title", 'give "title"');
+      // A phase added later runs on the roadmap's own activity unless it names another
+      const steps = this.stepsOf(fields, {
+        activity: roadmap.milestones[0]?.steps[0]?.activity,
+      });
+      const milestone: DraftMilestone = {
+        title: text(fields.title),
+        ...(text(fields.note) ? { note: text(fields.note) } : {}),
+        steps: steps.map((step, i) => this.step(step, `step ${i + 1}`)),
+      };
+      const position = whole(fields.position);
+      const at =
+        position !== undefined && position >= 1 && position <= roadmap.milestones.length + 1
+          ? position - 1
+          : roadmap.milestones.length;
+      roadmap.milestones.splice(at, 0, milestone);
+      return this.outline(roadmap);
+    });
   }
 
   removeMilestone(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    const milestone = this.milestone(roadmap, fields.milestone);
-    if (roadmap.milestones.length === 1) {
-      throw new DraftError(
-        "last-milestone",
-        "a roadmap needs at least one milestone; delete the roadmap instead, or add another first"
-      );
-    }
-    roadmap.milestones = roadmap.milestones.filter((item) => item !== milestone);
-    return this.outline(roadmap);
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      const milestone = this.milestone(roadmap, fields.milestone);
+      if (roadmap.milestones.length === 1) {
+        throw new DraftError(
+          "last-milestone",
+          "a roadmap needs at least one milestone; delete the roadmap instead, or add another first"
+        );
+      }
+      roadmap.milestones = roadmap.milestones.filter((item) => item !== milestone);
+      return this.outline(roadmap);
+    });
   }
 
   addStep(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    const milestone = this.milestone(roadmap, fields.milestone);
-    milestone.steps.push(this.step(fields, "the step"));
-    return this.outline(roadmap);
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      const milestone = this.milestone(roadmap, fields.milestone);
+      milestone.steps.push(this.step(fields, "the step"));
+      return this.outline(roadmap);
+    });
   }
 
-  /** Changes a step's amount (and, if given, its activity or title). */
+  /** Changes a step: its amount, its activity, or what a session of it consists of. */
   setStep(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    const milestone = this.milestone(roadmap, fields.milestone);
-    const index = this.stepIndex(milestone, fields.step);
-    const current = milestone.steps[index];
-    const amountGiven = ["sessions", "times", "total_minutes", "minutes"].some(
-      (name) => fields[name] !== undefined
-    );
-    milestone.steps[index] = this.step(
-      {
-        ...fields,
-        activity: text(fields.activity) || current.activity,
-        ...(amountGiven
-          ? {}
-          : { [current.unit === "times" ? "sessions" : "total_minutes"]: current.amount }),
-      },
-      "the step"
-    );
-    return this.outline(roadmap);
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      const milestone = this.milestone(roadmap, fields.milestone);
+      const index = this.stepIndex(milestone, fields.step);
+      const current = milestone.steps[index];
+      const amountGiven = ["sessions", "times", "total_minutes", "minutes"].some(
+        (name) => fields[name] !== undefined
+      );
+      milestone.steps[index] = this.step(
+        {
+          ...fields,
+          activity: text(fields.activity) || current.activity,
+          notes: fields.notes ?? current.notes,
+          session_minutes: fields.session_minutes ?? current.minutes,
+          ...(amountGiven
+            ? {}
+            : { [current.unit === "times" ? "sessions" : "total_minutes"]: current.amount }),
+        },
+        "the step"
+      );
+      return this.outline(roadmap);
+    });
   }
 
   removeStep(fields: Fields) {
-    const roadmap = this.roadmap(fields.roadmap);
-    const milestone = this.milestone(roadmap, fields.milestone);
-    const index = this.stepIndex(milestone, fields.step);
-    if (milestone.steps.length === 1) {
-      throw new DraftError(
-        "last-step",
-        "a milestone needs at least one step; remove the milestone instead, or add another step first"
-      );
-    }
-    milestone.steps.splice(index, 1);
-    return this.outline(roadmap);
+    return this.edit(() => {
+      const roadmap = this.roadmap(fields.roadmap);
+      const milestone = this.milestone(roadmap, fields.milestone);
+      const index = this.stepIndex(milestone, fields.step);
+      if (milestone.steps.length === 1) {
+        throw new DraftError(
+          "last-step",
+          "a milestone needs at least one step; remove the milestone instead, or add another step first"
+        );
+      }
+      milestone.steps.splice(index, 1);
+      return this.outline(roadmap);
+    });
   }
 
   // ---------------------------------------------------------------- reading it back
 
+  /**
+   * Where the sessions of a roadmap that starts from nothing would fall:
+   * milestone after milestone, on its days. (The core lays out the real ones
+   * when it is saved, counting what was already done.)
+   */
+  private layout(roadmap: DraftRoadmap) {
+    const schedule = roadmap.schedule;
+    if (!schedule) return [];
+    const today = localDate(this.now);
+    let cursor = schedule.start > today ? schedule.start : today;
+    return roadmap.milestones.map((milestone) => {
+      let first = "";
+      let last = "";
+      let sessions = 0;
+      for (const step of milestone.steps) {
+        const dates = sessionDates(schedule.weekdays, cursor, this.sessionsOf(step));
+        sessions += dates.length;
+        if (dates.length === 0) continue;
+        if (!first || dates[0] < first) first = dates[0];
+        if (dates[dates.length - 1] > last) last = dates[dates.length - 1];
+      }
+      if (last) cursor = dayAfter(last);
+      return { sessions, first, last };
+    });
+  }
+
   /** The roadmap as the planner sees it after an edit: numbers to refer to, nothing more. */
   private outline(roadmap: DraftRoadmap) {
+    const layout = roadmap.id ? [] : this.layout(roadmap);
     return {
       ok: true,
+      next: "Done, in the draft. If nothing else has to change, call finish now; do not send this call again.",
       roadmap: roadmap.title,
       status: roadmap.status,
+      rules: roadmap.rules ? "yes" : "none",
+      schedule: roadmap.schedule
+        ? `${roadmap.schedule.weekdays.map((weekday) => WEEKDAYS[weekday]).join(", ")}${
+            roadmap.schedule.time !== undefined
+              ? ` at ${formatDayMinutes(roadmap.schedule.time)}`
+              : ""
+          }, from ${roadmap.schedule.start}`
+        : "none",
       milestones: roadmap.milestones.map((milestone, index) => ({
         n: index + 1,
         title: milestone.title,
         steps: milestone.steps.map(
-          (step, i) => `${i + 1}. ${step.activity}: ${step.amount} ${step.unit}`
+          (step, i) =>
+            `${i + 1}. ${step.activity}: ${step.amount} ${step.unit}${step.notes ? "" : " (no notes)"}`
         ),
+        ...(layout[index]?.last ? { ends: layout[index].last } : {}),
       })),
     };
   }
@@ -378,43 +712,66 @@ export class RoadmapDraft {
   /** What the person is shown before saying yes, in their language. */
   describe(): { text: string; details: string[] } {
     const touched = this.touched();
-    const details: string[] = [];
+    const details: string[] = [...this.warnings];
     for (const roadmap of touched) {
       if (touched.length > 1) details.push(`«${roadmap.title}»`);
+      // A new roadmap starts from nothing, so its dates can be shown before it exists
+      const layout = roadmap.id ? [] : this.layout(roadmap);
+      if (roadmap.schedule && roadmap.status !== "paused") {
+        const when = `${weekdayNames(roadmap.schedule.weekdays)}${
+          roadmap.schedule.time !== undefined ? ` · ${formatDayMinutes(roadmap.schedule.time)}` : ""
+        }`;
+        const dated = layout.filter((entry) => entry.last);
+        details.push(
+          dated.length > 0
+            ? t("roadmap.card.sessions", {
+                when,
+                count: layout.reduce((sum, entry) => sum + entry.sessions, 0),
+                from: dayLabel(dated[0].first),
+                to: dayLabel(dated[dated.length - 1].last),
+              })
+            : t("roadmap.card.when", { when })
+        );
+      }
       roadmap.milestones.forEach((milestone, index) => {
+        const dates = layout[index]?.last
+          ? ` (${dayLabel(layout[index].first)} → ${dayLabel(layout[index].last)})`
+          : "";
         details.push(
           `${index + 1}. ${milestone.title}: ${milestone.steps
-            .map((step) =>
-              t(step.unit === "times" ? "roadmap.step.times" : "roadmap.step.minutes", {
-                activity: step.activity,
-                amount: step.amount,
-              })
+            .map(
+              (step) =>
+                t(step.unit === "times" ? "roadmap.step.times" : "roadmap.step.minutes", {
+                  activity: step.activity,
+                  amount: step.amount,
+                }) + (step.minutes ? ` (~${step.minutes} min)` : "")
             )
-            .join("; ")}`
+            .join("; ")}${dates}`
         );
       });
     }
     for (const gone of this.deleted) details.push(t("roadmap.card.deleted", { title: gone.title }));
     for (const activity of this.newActivities.values()) {
-      details.push(t("roadmap.card.newActivity", { ...activity }));
+      if (this.uses(activity.title)) details.push(t("roadmap.card.newActivity", { ...activity }));
     }
     const first = touched[0];
     const text = !first
       ? t("roadmap.card.delete", { title: this.deleted[0]?.title ?? "" })
       : t(first.id ? "roadmap.card.update" : "roadmap.card.create", { title: first.title });
-    return { text, details: details.slice(0, 14) };
+    return { text, details: details.slice(0, 16) };
   }
 
   // ---------------------------------------------------------------- saving it
 
-  /** Writes the draft to the core: new activities first, then each roadmap, whole. */
-  commit(): { saved: string[]; deleted: string[]; created: string[] } {
+  /**
+   * Writes the draft to the core: new activities first, then each roadmap,
+   * whole. The core plans each roadmap's sessions as it is saved; what it
+   * planned comes back in words the coach can say as they are.
+   */
+  commit(): { saved: string[]; deleted: string[]; created: string[]; sessions: PlannedSessions[] } {
     const created: string[] = [];
     for (const activity of this.newActivities.values()) {
-      const used = this.roadmaps.some((roadmap) =>
-        roadmap.milestones.some((m) => m.steps.some((step) => same(step.activity, activity.title)))
-      );
-      if (!used) continue;
+      if (!this.uses(activity.title)) continue;
       this.core.createActivityTemplate({
         title: activity.title,
         description: "",
@@ -424,17 +781,19 @@ export class RoadmapDraft {
       });
       created.push(activity.title);
     }
-    const ids = new Map(
-      this.core.getActivityTemplates().map((tpl) => [tpl.title.toLocaleLowerCase(), tpl.id])
-    );
+    const templates = this.core.getActivityTemplates();
+    const ids = new Map(templates.map((tpl) => [tpl.title.toLocaleLowerCase(), tpl.id]));
     for (const gone of this.deleted) this.core.deleteRoadmap(gone.id);
+    const sessions: PlannedSessions[] = [];
     const saved = this.touched().map((roadmap) => {
-      this.core.saveRoadmap({
+      const stored = this.core.saveRoadmap({
         id: roadmap.id,
         title: roadmap.title,
         why: roadmap.why,
         targetDate: roadmap.targetDate,
         status: roadmap.status,
+        schedule: roadmap.schedule ?? null,
+        rules: roadmap.rules ?? "",
         milestones: roadmap.milestones.map((milestone) => ({
           title: milestone.title,
           note: milestone.note,
@@ -442,11 +801,42 @@ export class RoadmapDraft {
             templateId: ids.get(step.activity.toLocaleLowerCase()) ?? "",
             unit: step.unit,
             amount: step.amount,
+            notes: step.notes,
+            sessionMinutes: step.minutes,
           })),
         })),
       });
+      if (stored.schedule && stored.status !== "paused") {
+        const planned = this.core.getRoadmapSessions(stored.id);
+        const dated = planned.filter((entry) => entry.first);
+        const mine = new Set(stored.milestones.flatMap((m) => m.steps.map((s) => s.templateId)));
+        const today = (this.core.getState().currentDay?.activityInstances ?? [])
+          .filter((instance) => mine.has(instance.templateId))
+          .map((instance) => templates.find((tpl) => tpl.id === instance.templateId)?.title ?? "");
+        sessions.push({
+          roadmap: stored.title,
+          days: weekdayNames(stored.schedule.weekdays),
+          ...(stored.schedule.time !== undefined
+            ? { time: formatDayMinutes(stored.schedule.time) }
+            : {}),
+          total: planned.reduce((sum, entry) => sum + entry.sessions, 0),
+          ...(dated.length > 0
+            ? {
+                first: dayLabel(dated[0].first!),
+                first_is: this.howFar(dated[0].first!),
+                last: dayLabel(dated[dated.length - 1].last!),
+              }
+            : {}),
+          milestones: planned.map((entry) => ({
+            milestone: entry.milestone,
+            sessions: entry.sessions,
+            ...(entry.first ? { from: dayLabel(entry.first), to: dayLabel(entry.last!) } : {}),
+          })),
+          ...(today.length > 0 ? { in_todays_plan: [...new Set(today)] } : {}),
+        });
+      }
       return roadmap.title;
     });
-    return { saved, deleted: this.deleted.map((gone) => gone.title), created };
+    return { saved, deleted: this.deleted.map((gone) => gone.title), created, sessions };
   }
 }

@@ -155,6 +155,8 @@ export function AgentProvider({
       vision: () => visionRef.current,
       // A title costs one more call: only a model loaded for real is asked for it
       titles: () => loadedRef.current,
+      // The coach's notes cost one more short call: as with titles, only with a real model
+      notes: () => loadedRef.current,
       reasoning: getReasoning,
       web: {
         setting: getWebSetting,

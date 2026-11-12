@@ -204,3 +204,50 @@ describe("a model that cannot see", () => {
     expect(String(sent.content)).toContain("image the loaded model cannot read");
   });
 });
+
+describe("a tool that keeps failing", () => {
+  it("is not run a third time in the same turn, and the model is told to stop", async () => {
+    const core = newCore();
+    core.startDay();
+    const seen: ChatMessage[][] = [];
+    const again = (): ModelReply => ({
+      content: "",
+      toolCalls: [
+        {
+          id: `c-${Math.random()}`,
+          type: "function",
+          function: {
+            name: "schedule",
+            arguments: JSON.stringify({ item: "nada", time: "15:00" }),
+          },
+        },
+      ],
+    });
+    const replies = [again(), again(), again(), say("No pude moverlo.")];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      chat: async (messages) => {
+        seen.push(messages);
+        return replies.shift()!;
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("mueve eso a las 15");
+    const results = seen
+      .at(-1)!
+      .filter((message) => message.role === "tool")
+      .map((message) => String(message.content));
+    expect(results).toHaveLength(3);
+    expect(results[0]).toContain("item-not-found");
+    expect(results[1]).toContain("item-not-found");
+    // The third call never reached the tool
+    expect(results[2]).toContain("stop-trying");
+    expect(results[2]).toContain("without naming tools");
+
+    // A new message starts the count again
+    replies.push(again(), say("Sigue sin estar."));
+    await agent.send("prueba otra vez");
+    expect(String(seen.at(-1)!.at(-1)!.content)).toContain("item-not-found");
+  });
+});
