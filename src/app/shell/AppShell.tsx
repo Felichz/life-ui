@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { BarChart3, CalendarCheck2, Library, MessageSquare, Search, Settings } from "lucide-react";
+import {
+  BarChart3,
+  CalendarCheck2,
+  Library,
+  MessageSquare,
+  Milestone,
+  Search,
+  Settings,
+} from "lucide-react";
 import { ChatPanel } from "../agent/ChatPanel";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/Dialog";
 import { Kbd } from "../components/ui/Kbd";
@@ -18,6 +26,7 @@ import { useShell } from "./ShellContext";
 
 const NAV: { to: string; label: MessageKey; icon: typeof Library; end: boolean; key: string }[] = [
   { to: "/", label: "nav.today", icon: CalendarCheck2, end: true, key: "h" },
+  { to: "/goals", label: "nav.goals", icon: Milestone, end: false, key: "m" },
   { to: "/library", label: "nav.library", icon: Library, end: false, key: "b" },
   { to: "/review", label: "nav.review", icon: BarChart3, end: false, key: "r" },
   { to: "/settings", label: "nav.settings", icon: Settings, end: false, key: "a" },
@@ -237,7 +246,7 @@ function MobileNav() {
       aria-label={t("nav.main")}
       className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 backdrop-blur-md lg:hidden"
     >
-      <div className="mx-auto grid h-16 max-w-md grid-cols-4">
+      <div className="mx-auto grid h-16 max-w-md grid-cols-5">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}

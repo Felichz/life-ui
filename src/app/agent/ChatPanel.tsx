@@ -925,6 +925,14 @@ function EntryView({
         {entry.summary}
         {entry.tempos !== undefined && <TempoBadge tempos={entry.tempos} />}
       </p>
+      {/* A change made of parts (a roadmap) shows them before the yes */}
+      {entry.details && entry.details.length > 0 && (
+        <ul className="mt-1.5 flex flex-col gap-0.5 text-sm text-ink-2">
+          {entry.details.map((line, index) => (
+            <li key={index}>{line}</li>
+          ))}
+        </ul>
+      )}
       {/* The first search asks: what leaves the machine, and where it goes */}
       {entry.external && <p className="mt-1 text-xs text-ink-2">{t("agent.web.ask")}</p>}
       <div className="mt-2.5 flex items-center justify-between gap-2">

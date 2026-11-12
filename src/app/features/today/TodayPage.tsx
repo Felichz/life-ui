@@ -10,6 +10,7 @@ import { FocusPanel } from "./FocusPanel";
 import { Plan, planGroups } from "./Plan";
 import { StartDay } from "./StartDay";
 import { Upcoming } from "./Upcoming";
+import { GoalsStrip } from "../goals/GoalsStrip";
 import { t, tp } from "../../i18n";
 
 export function TodayPage() {
@@ -80,6 +81,7 @@ function Today() {
           <FocusPanel active={active} suggestions={suggestions} />
           <Plan groups={groups} total={total} nowMinutes={nowMinutes} />
           <Upcoming />
+          <GoalsStrip />
           <div className="2xl:hidden">{log}</div>
         </div>
         <aside className="hidden flex-col gap-8 2xl:flex">
