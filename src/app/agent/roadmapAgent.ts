@@ -16,7 +16,7 @@ import { DraftError, RoadmapDraft } from "./roadmapDraft";
  */
 
 const PROMPT = (language: string) =>
-  `You are the roadmap planner inside LifeUI, an app where a person plans and runs their days. You own their roadmaps. You never talk to the person: their coach sends you a request, you carry it out with your tools, and you answer the coach in one or two sentences.
+  `You are the roadmap planner inside LifeUI, an app where a person plans and runs their days. You own their roadmaps. You never talk to the person: their coach sends you a request and you carry it out with your tools. Every move you make is one tool call, and the last one is finish.
 
 ## What a roadmap is
 
@@ -32,7 +32,7 @@ const PROMPT = (language: string) =>
 - 1 to 3 steps per milestone. Amounts a real person would finish.
 - Every step needs an activity. Use one from the library below when it fits. When the plan needs a new one, give it a short name that can be told apart ("Train: base phase") and session_minutes: how long one session lasts.
 - What a phase is for goes in the milestone's note, in one line. A step has no text of its own.
-- When the request leaves a number out, choose a modest one and say so in your answer.
+- When the request leaves a number out, choose a modest one and say so when you finish.
 - Create or rewrite a whole roadmap with save_roadmap, in one call. Use the small tools only for small changes to a roadmap that exists.
 - Titles, notes and the why are written in ${language}.
 
@@ -42,26 +42,40 @@ Read it: it says what is wrong and how to fix it. Fix the call. Never send the s
 
 ## When you are done
 
-Answer the coach in plain words: what you created or changed, any number you had to choose yourself, and anything you could not do. No lists of tools.`;
+Call finish with one or two sentences for the coach: what you created or changed and any number you had to choose yourself. finish only reports: it creates nothing, so the roadmap has to be saved first. When the request cannot be carried out at all, call cannot_do and say exactly what is missing.`;
 
 // The names say what each number is: with "times" and "minutes" a 9B model
 // gave both, reading "minutes" as the length of a session
-const STEP = {
-  type: "object",
-  properties: {
-    activity: { type: "string", description: "Title of the library activity" },
-    sessions: { type: "integer", description: "How many sessions to close. This OR total_minutes" },
-    total_minutes: {
-      type: "integer",
-      description: "Minutes to add up over all sessions. This OR sessions, never both",
-    },
-    session_minutes: {
-      type: "integer",
-      description:
-        "Only for an activity that is not in the library yet: how long one session lasts",
-    },
+const STEP_FIELDS = {
+  activity: { type: "string", description: "Title of the library activity" },
+  sessions: { type: "integer", description: "How many sessions to close. This OR total_minutes" },
+  total_minutes: {
+    type: "integer",
+    description: "Minutes to add up over all sessions. This OR sessions, never both",
   },
-  required: ["activity"],
+  session_minutes: {
+    type: "integer",
+    description: "Only for an activity that is not in the library yet: how long one session lasts",
+  },
+};
+const { activity, sessions, total_minutes, session_minutes } = STEP_FIELDS;
+// A step is one of two shapes, so a move held to this schema cannot carry
+// both amounts or neither: counted in sessions, or in minutes
+const STEP = {
+  anyOf: [
+    {
+      type: "object",
+      properties: { activity, sessions, session_minutes },
+      required: ["activity", "sessions"],
+      additionalProperties: false,
+    },
+    {
+      type: "object",
+      properties: { activity, total_minutes, session_minutes },
+      required: ["activity", "total_minutes"],
+      additionalProperties: false,
+    },
+  ],
 };
 const ROADMAP = {
   type: "string",
@@ -85,8 +99,15 @@ const TOOLS: Array<{
     parameters: {
       type: "object",
       properties: {
-        title: { type: "string", description: "The goal, in a few words" },
-        why: { type: "string", description: "Why it matters to the person" },
+        title: {
+          type: "string",
+          description: "The goal alone, in a few words. The reason goes in why",
+        },
+        why: {
+          type: "string",
+          description:
+            "Why it matters to the person, as the request says it. Empty when it does not say",
+        },
         target_date: { type: "string", description: "YYYY-MM-DD, only if the person gave one" },
         milestones: {
           type: "array",
@@ -101,7 +122,7 @@ const TOOLS: Array<{
           },
         },
       },
-      required: ["title", "milestones"],
+      required: ["title", "why", "milestones"],
     },
     run: (draft, args) => draft.saveRoadmap(args),
   },
@@ -157,21 +178,21 @@ const TOOLS: Array<{
     description: "Add a step to a milestone.",
     parameters: {
       type: "object",
-      properties: { roadmap: ROADMAP, milestone: MILESTONE, ...STEP.properties },
+      properties: { roadmap: ROADMAP, milestone: MILESTONE, ...STEP_FIELDS },
       required: ["milestone", "activity"],
     },
     run: (draft, args) => draft.addStep(args),
   },
   {
     name: "set_step",
-    description: "Change a step: its amount, its activity or its name.",
+    description: "Change a step: its amount or its activity.",
     parameters: {
       type: "object",
       properties: {
         roadmap: ROADMAP,
         milestone: MILESTONE,
         step: { type: "string", description: "The step's number or its activity" },
-        ...STEP.properties,
+        ...STEP_FIELDS,
       },
       required: ["milestone", "step"],
     },
@@ -193,7 +214,42 @@ const TOOLS: Array<{
   },
 ];
 
-const schemas = TOOLS.map((tool) => ({
+/**
+ * The two ways out. Every move of the planner is a tool call, so ending is one
+ * too: a model held to a schema has no other way to say it is done.
+ */
+const FINISH = "finish";
+const CANNOT = "cannot_do";
+const ENDINGS = [
+  {
+    name: FINISH,
+    description:
+      "You are done: the roadmap is saved as the coach asked. It creates nothing by itself.",
+    parameters: {
+      type: "object",
+      properties: {
+        message: {
+          type: "string",
+          description: "One or two sentences for the coach: what changed, any number you chose",
+        },
+      },
+      required: ["message"],
+    },
+  },
+  {
+    name: CANNOT,
+    description: "The request cannot be carried out at all. Nothing is created or changed.",
+    parameters: {
+      type: "object",
+      properties: {
+        missing: { type: "string", description: "Exactly what is missing or wrong, in a sentence" },
+      },
+      required: ["missing"],
+    },
+  },
+];
+
+const schemas = [...TOOLS, ...ENDINGS].map((tool) => ({
   type: "function" as const,
   function: { name: tool.name, description: tool.description, parameters: tool.parameters },
 }));
@@ -253,10 +309,12 @@ export interface PlannerRun {
 const MAX_STEPS = 8;
 /** A whole roadmap in one call is about 400 tokens; this leaves room and bounds a runaway. */
 const MAX_CALL_TOKENS = 1500;
+/** Times the planner is told that nothing exists yet before its word is taken as it is. */
+const MAX_NUDGES = 2;
 
 /**
- * Runs the planner on one request. It ends when the planner answers in words
- * instead of calling a tool, or when it runs out of steps.
+ * Runs the planner on one request. It ends when the planner calls finish or
+ * cannot_do, or when it runs out of steps.
  */
 export async function runRoadmapPlanner(options: {
   core: ISystemCore;
@@ -279,34 +337,39 @@ export async function runRoadmapPlanner(options: {
   let reply = "";
   let lastError: string | undefined;
   let nudges = 0;
-  let nudged = false;
+  let failures = 0;
 
-  for (let step = 0; step < MAX_STEPS; step++) {
-    // Its first move, and the one after being told that words change nothing,
-    // has to be a tool call. After a call that failed it is free again, so it
-    // can say what is missing instead of inventing a roadmap.
-    const mustAct = step === 0 || nudged;
-    nudged = false;
-    const answer = await chat(messages, schemas, signal, {
-      reasoning: options.reasoning,
-      // A forced tool call once ran away for 5,700 tokens (eight minutes): never again
-      maxTokens: MAX_CALL_TOKENS,
-      ...(mustAct ? { toolChoice: "required" as const } : {}),
-    });
+  run: for (let step = 0; step < MAX_STEPS; step++) {
+    // Every move has to be a tool call: a planner that only talks has planned
+    // nothing, and with Qwen3.5 9B it did just that ("I have created the
+    // roadmap", or the call written out as prose until the limit)
+    let answer: ModelReply;
+    try {
+      answer = await chat(messages, schemas, signal, {
+        reasoning: options.reasoning,
+        // A whole roadmap fits several times over; a runaway answer does not
+        maxTokens: MAX_CALL_TOKENS,
+        toolChoice: "required",
+      });
+    } catch (caught) {
+      // One call that fails does not throw away the moves already made: it is
+      // asked once more. A second failure is the server's, and is said as it is.
+      if (signal?.aborted || failures++ > 0) throw caught;
+      continue;
+    }
     if (signal?.aborted) throw new Error("aborted");
     if (answer.toolCalls.length === 0) {
-      // Seen with Qwen3.5 9B: "I have created the roadmap", without one call.
-      // Words change nothing, so it is told so and asked again.
-      if (!draft.changed && nudges < 2) {
+      // A server that holds the model to nothing, or a move cut short by the
+      // limit. Words change nothing, so it is told so and asked again.
+      if (!draft.changed && nudges < MAX_NUDGES) {
         nudges++;
-        nudged = true;
         messages.push(
           // Cut short: a runaway answer must not fill the context of the next try
           { role: "assistant", content: (answer.content || "…").slice(0, 300) },
           {
             role: "user",
             content:
-              "Nothing exists yet: you answered in words and called no tool. Call save_roadmap now with the whole roadmap (title, why, milestones with their steps). If the request truly cannot be carried out, say exactly what is missing.",
+              "Nothing exists yet: you answered in words and called no tool. Call the save_roadmap tool now with the whole roadmap. If the request truly cannot be carried out, call cannot_do.",
           }
         );
         continue;
@@ -320,12 +383,42 @@ export async function runRoadmapPlanner(options: {
       tool_calls: answer.toolCalls,
     });
     for (const call of answer.toolCalls) {
+      const name = call.function.name;
+      if (name === FINISH || name === CANNOT) {
+        const said = wordsOf(call);
+        // "Done", with nothing done: the same claim as before, now as a call.
+        // It gets the error a tool gives, and another move.
+        if (name === FINISH && !draft.changed && nudges < MAX_NUDGES) {
+          nudges++;
+          const result = {
+            error: "nothing-to-finish",
+            detail:
+              "No tool has created or changed anything yet, so there is nothing to report. Call save_roadmap now with the whole roadmap, or call cannot_do and say what is missing.",
+          };
+          lastError = `${result.error}: ${result.detail}`;
+          messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+          continue;
+        }
+        reply = said;
+        break run;
+      }
       const result = runOne(draft, call);
       lastError = "error" in result ? `${result.error}: ${result.detail}` : undefined;
       messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
     }
   }
   return { draft, reply, ...(lastError ? { lastError } : {}) };
+}
+
+/** What a closing call says, whatever the argument was called. */
+function wordsOf(call: ToolCall): string {
+  try {
+    const args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+    const said = args.message ?? args.missing ?? Object.values(args)[0];
+    return typeof said === "string" ? said.trim() : "";
+  } catch {
+    return "";
+  }
 }
 
 function runOne(draft: RoadmapDraft, call: ToolCall): Record<string, unknown> {
