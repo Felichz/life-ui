@@ -65,6 +65,8 @@ export type Entry =
       tempos?: number;
       /** A search on the web rather than a change to the day. */
       external?: boolean;
+      /** What the change consists of, line by line (a roadmap's milestones). */
+      details?: string[];
     }
   | {
       id: string;
@@ -153,6 +155,8 @@ export interface AgentOptions {
   };
 }
 
+/** How much of the ideal life goes in every request: about 450 tokens. */
+const IDEAL_LIFE_CHARS = 1500;
 /** Entries kept on screen and on disk per conversation; older ones fall off the top. */
 const MAX_ENTRIES = 400;
 /** Past this share of the context the conversation is compacted before the next call. */
@@ -594,6 +598,23 @@ export class Agent {
       .replace(/\n{3,}/g, "\n\n");
   }
 
+  /**
+   * What the person wants from their life, in their words (ADR-010). It is in
+   * every request, so advice can be tied to it; a long one is cut, and the
+   * agent can read the rest.
+   */
+  private direction(): string {
+    const text = this.options.core.getIdealLife()?.text ?? "";
+    if (!text) {
+      return "\n\n## Their ideal life\n\nNothing is written yet. When they tell you something lasting about the life they want, offer to note it.";
+    }
+    const shown =
+      text.length > IDEAL_LIFE_CHARS
+        ? `${text.slice(0, IDEAL_LIFE_CHARS)}…\n[cut: read the rest with get_ideal_life]`
+        : text;
+    return `\n\n## Their ideal life\n\n${shown}`;
+  }
+
   private languageName(): string {
     return this.options.language?.() === "es" ? "Spanish" : "English";
   }
@@ -610,7 +631,7 @@ export class Agent {
         this.webSetting() === "off"
           ? "Web search is turned off: you cannot look things up. Say when an answer is unchecked; the person can turn web research on in Settings."
           : "You can look things up with web_search."
-      }\n\n${JSON.stringify(day)}${earlier}`,
+      }\n\n${JSON.stringify(day)}${this.direction()}${earlier}`,
     };
   }
 
@@ -671,14 +692,20 @@ export class Agent {
           "The person did not give a time. Do not invent one: ask them in words, or make the change without a time.",
       };
     }
-    const ctx = {
+    const ctx: ToolContext = {
       core: this.options.core,
       now: this.options.now ?? (() => new Date()),
       http: this.options.web?.http,
       signal: this.abort?.signal,
+      delegate: {
+        chat: this.options.chat,
+        language: this.languageName(),
+        reasoning: this.options.reasoning?.(),
+      },
     };
 
     if (tool.external) return this.runExternal(tool, ctx, args);
+    if (tool.prepare) return this.runPrepared(tool, ctx, args);
 
     if (!tool.mutates) {
       try {
@@ -731,6 +758,63 @@ export class Agent {
     } catch (caught) {
       // A change that fails halfway leaves nothing behind (an activity created
       // for a start the core then refused, for example)
+      if (this.options.core.exportData() !== snapshot) this.options.core.importData(snapshot);
+      const result = failure(caught);
+      this.patch(entry.id, { status: "error", error: String(result.error) });
+      return result;
+    }
+  }
+
+  /**
+   * A tool that works before it asks (the roadmap planner). While it works a
+   * line says so; what it proposes is then confirmed, run and undone like any
+   * other change. When it proposes nothing, the line goes away.
+   */
+  private async runPrepared(tool: Tool, ctx: ToolContext, args: Record<string, unknown>) {
+    const entry = this.add({
+      id: nextId(),
+      kind: "tool",
+      name: tool.name,
+      summary: tool.working?.() ?? tool.name,
+      status: "running",
+    });
+    let prepared;
+    try {
+      prepared = await tool.prepare!(ctx, args);
+    } catch (caught) {
+      const result = failure(caught);
+      this.patch(entry.id, { status: "error", error: String(result.error) });
+      return result;
+    }
+    const proposal = prepared.proposal;
+    if (!proposal) {
+      if (prepared.failed) this.patch(entry.id, { status: "error" });
+      else {
+        this.entries = this.entries.filter((e) => e.id !== entry.id);
+        this.emit();
+      }
+      return prepared.result ?? { changed: false };
+    }
+    this.patch(entry.id, {
+      summary: proposal.text,
+      details: proposal.details,
+      status: "pending",
+    });
+    if (this.mode === "confirm" || proposal.alwaysConfirm || this.webThisTurn) {
+      const yes = await new Promise<boolean>((resolve) => this.decisions.set(entry.id, resolve));
+      if (!yes) {
+        this.patch(entry.id, { status: "rejected" });
+        return { rejected: true, note: "The person said no. Ask what they want instead." };
+      }
+    }
+    this.patch(entry.id, { status: "running" });
+    const snapshot = this.options.core.exportData();
+    try {
+      const result = proposal.commit();
+      this.lastUndo = { entryId: entry.id, snapshot };
+      this.patch(entry.id, { status: "done" });
+      return result ?? { ok: true };
+    } catch (caught) {
       if (this.options.core.exportData() !== snapshot) this.options.core.importData(snapshot);
       const result = failure(caught);
       this.patch(entry.id, { status: "error", error: String(result.error) });

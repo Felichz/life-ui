@@ -133,14 +133,14 @@ describe("a conversation that outgrows the model", () => {
     const agent = new Agent({
       core: newCore(),
       prompt: "p",
-      context: () => 4096,
+      context: () => 12288,
       chat: async (messages) => {
         if (isSummaryCall(messages)) return say("La persona habló de varios temas.");
         seen.push(messages);
         return say(`ok ${filler}`);
       },
     });
-    for (let turn = 0; turn < 6; turn++) await agent.send(`tema ${turn} ${filler}`);
+    for (let turn = 0; turn < 14; turn++) await agent.send(`tema ${turn} ${filler}`);
 
     const note = agent.entries.find((entry) => entry.kind === "compact");
     if (note?.kind !== "compact") throw new Error("no compaction happened");
@@ -149,7 +149,8 @@ describe("a conversation that outgrows the model", () => {
     expect(note.after).toBeLessThan(note.before);
     // From then on the model reads the notes instead of the old messages
     expect(String(seen.at(-1)![0].content)).toContain("La persona habló de varios temas.");
-    expect(seen.at(-1)!.length).toBeLessThan(13);
+    // 14 turns would be 29 messages; the old ones are gone
+    expect(seen.at(-1)!.length).toBeLessThan(20);
     expect(agent.usage().overflow).toBe(false);
   });
 
@@ -164,7 +165,7 @@ describe("a conversation that outgrows the model", () => {
     for (let turn = 0; turn < 8; turn++) await agent.send(`tema ${turn} ${filler}`);
     expect(agent.usage().overflow).toBe(false);
 
-    context = 4096;
+    context = 8192;
     expect(agent.usage()).toMatchObject({ overflow: true, canCompact: true });
     await agent.compact();
     expect(agent.usage().overflow).toBe(false);

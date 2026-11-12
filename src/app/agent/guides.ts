@@ -74,6 +74,17 @@ Never: a list of ten tips; a plan nobody asked for; motivation speeches; pretend
 4. Do not fill empty time. Do not add things they did not ask for.
 5. Say the plan back in one or two short lines.`,
 
+  roadmap: `A roadmap for a goal that takes weeks. Its point is that the person sees the whole way and where they stand on it.
+
+1. Coach the goal first (coach guide). A roadmap comes after you agree what they want, why, and the shape of the way there.
+2. Agree the phases in words: two to five, in order, the first one small enough to finish in a week or two. For each phase: which activity, how long a session lasts, how many sessions (or how many minutes in total).
+3. Tie it to their ideal life: the why of the roadmap is what they wrote, or said, about the life they want. If it is not noted there yet, offer to note it.
+4. Hand it to the planner in ONE request with everything: "Goal: … Why: … Phase 1 (name): activity X, N minutes a session, M sessions. Phase 2: …". The planner cannot ask questions; what you leave out it will have to guess.
+5. The person is shown the roadmap and confirms it. If the planner says it chose a number itself, tell the person which.
+6. Then offer to plan the first phase's sessions on real dates (plan-ahead guide), with the routine in their notes. A roadmap without dates stays a wish.
+7. Progress counts only what they really close. Read the roadmaps before you say where they stand, and say it as what was reached ("4 of 6 sessions of the first phase"), never as what is missing.
+8. When they finish a phase, say so, and offer to plan the next one. When the plan no longer fits (too hard, too easy, life changed), offer to change the roadmap; changing it is not failing it.`,
+
   "plan-ahead": `Planning days ahead (a routine, a habit, something on a date):
 1. Read get_agenda first, so nothing is planned twice.
 2. Agree the shape in words before planning anything: which days, what time (only if they give one), for how long, and what each session contains. Do not plan ahead what they did not ask for.

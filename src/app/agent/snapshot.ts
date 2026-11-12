@@ -50,6 +50,23 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
     date: localDate(now),
     weekday: WEEKDAY_NAMES[now.getDay()],
     planned_ahead: core.getPlannedActivities().length,
+    // One line per roadmap: the detail is a tool call away
+    ...(core.getRoadmaps().length > 0
+      ? {
+          roadmaps: core.getRoadmapProgress().map((progress) => ({
+            title: progress.roadmap.title,
+            percent: Math.round(progress.fraction * 100),
+            ...(progress.complete
+              ? { reached: true }
+              : {
+                  milestone: `${(progress.current ?? 0) + 1}/${progress.milestones.length} ${
+                    progress.milestones[progress.current ?? 0]?.milestone.title ?? ""
+                  }`,
+                }),
+            ...(progress.roadmap.status === "paused" ? { paused: true } : {}),
+          })),
+        }
+      : {}),
     blocks: blocks.map((b) => ({
       name: blockLabel(b),
       ...(b.isDefault
