@@ -114,7 +114,7 @@ export function ChatPanel({ className }: { className?: string }) {
   // The day's snapshot is part of what is sent, so the count follows the day too
   const usage = useMemo(
     () => agent.usage(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [agent, entries, busy, endpoint?.context, state]
   );
   const blocked = usage.overflow && !busy;

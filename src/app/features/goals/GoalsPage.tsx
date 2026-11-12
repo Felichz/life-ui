@@ -109,7 +109,7 @@ function Roadmaps() {
   const { core, state } = useSystem();
   const progress = useMemo(
     () => core.getRoadmapProgress(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [core, state]
   );
   return (

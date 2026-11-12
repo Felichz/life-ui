@@ -22,7 +22,7 @@ export function Upcoming({ className }: { className?: string }) {
   const { state, core } = useSystem();
   const planned = useMemo(
     () => core.getPlannedActivities(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [core, state.global.plannedActivities]
   );
   const templates = useMemo(() => templateMap(state), [state]);
