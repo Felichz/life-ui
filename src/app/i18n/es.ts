@@ -465,6 +465,10 @@ export const es = {
   "coreError.block-name-empty": "Ponle un nombre al bloque.",
   "coreError.invalid-date": "La fecha no es válida.",
   "coreError.too-many-planned": "Hay demasiadas actividades programadas. Cancela algunas primero.",
+  "coreError.roadmap-not-found": "Esa hoja de ruta ya no existe.",
+  "coreError.roadmap-invalid": "La hoja de ruta no es válida.",
+  "coreError.activity-in-roadmap":
+    "Una hoja de ruta se apoya en esta actividad. Cambia primero la hoja de ruta.",
   "coreError.minutes-out-of-range": "Las horas deben estar dentro del día (00:00–23:59).",
   "coreError.block-start-after-end": "La hora de inicio tiene que ser anterior a la de fin.",
   "coreError.block-overlap": "Se cruza con otro bloque. Ajusta las horas para que no se solapen.",
@@ -623,6 +627,10 @@ export const es = {
   "agent.edit": "Editar y volver a enviar",
   "agent.branch": "Seguir desde aquí en otra conversación",
   "agent.branchTitle": "{title} (rama)",
+  "agent.reasoning": "Razonar antes de responder",
+  "agent.reasoning.on":
+    "Razonando antes de responder: más lento, a veces mejor. Clic para desactivar.",
+  "agent.reasoning.off": "Responde directo, sin razonar antes. Clic para que razone (más lento).",
   "agent.attach": "Adjuntar archivo",
   "agent.attach.any": "Adjuntar imágenes o archivos de texto",
   "agent.attach.text": "Adjuntar archivos de texto (este modelo no lee imágenes)",
