@@ -129,6 +129,80 @@ export interface ActivityInstance {
 }
 
 /**
+ * The life the person wants, in their own words (ADR-010). Written by them,
+ * and added to by the agent as they talk; it travels with every request.
+ */
+export interface IdealLife {
+  /** Markdown. */
+  text: string;
+  updatedAt: ISODateTimeString;
+}
+
+/**
+ * One thing to do on the way to a goal: an amount of a real activity of the
+ * library. Its progress is counted from the closes of that activity.
+ */
+export interface RoadmapStep {
+  id: UUID;
+  title: string;
+  templateId: UUID;
+  /** times: sessions closed. minutes: minutes of closed sessions. */
+  unit: "times" | "minutes";
+  amount: number;
+}
+
+export interface RoadmapMilestone {
+  id: UUID;
+  title: string;
+  note?: string;
+  steps: RoadmapStep[];
+}
+
+/** The explicit way from here to one goal of the ideal life, in milestones (ADR-010). */
+export interface Roadmap {
+  id: UUID;
+  title: string;
+  /** Why it matters to the person: the part of their ideal life it serves. */
+  why?: string;
+  /** "YYYY-MM-DD", when the person wants to be there. A hope, never a deadline to fail. */
+  targetDate?: string;
+  status: "active" | "paused";
+  milestones: RoadmapMilestone[];
+  createdAt: ISODateTimeString;
+  updatedAt: ISODateTimeString;
+}
+
+export interface StepProgress {
+  step: RoadmapStep;
+  /** Sessions or minutes counted so far, capped at the amount. */
+  done: number;
+  complete: boolean;
+  /** 0 to 1. */
+  fraction: number;
+  /** Sessions of this activity planned for days ahead, and the next one. */
+  plannedAhead: number;
+  next?: { date: string; time?: DayMinutes };
+  inPlanToday: boolean;
+}
+
+export interface RoadmapProgress {
+  roadmap: Roadmap;
+  milestones: Array<{
+    milestone: RoadmapMilestone;
+    status: "done" | "current" | "upcoming";
+    steps: StepProgress[];
+    reachedAt?: ISODateTimeString;
+  }>;
+  /** 0 to 1: the mean of every step's fraction. */
+  fraction: number;
+  doneSteps: number;
+  totalSteps: number;
+  complete: boolean;
+  /** Index of the milestone being worked on. */
+  current?: number;
+}
+
+/**
  * A library activity planned for a day ahead (ADR-008). It becomes an
  * ActivityInstance in the plan of the day when its date comes.
  */
@@ -299,6 +373,10 @@ export interface GlobalState {
 
   /** Activities planned for days ahead, waiting for their date (ADR-008). */
   plannedActivities?: PlannedActivity[];
+
+  /** The life the person wants, and the roadmaps that lead there (ADR-010). */
+  idealLife?: IdealLife;
+  roadmaps?: Roadmap[];
 
   // Version of the persisted schema (for migrations). Default 3.
   schemaVersion?: number;
@@ -536,6 +614,25 @@ export interface ISystemCore {
   cancelPlannedActivities(ids: UUID[]): number;
   /** Moves what is due into the running day's plan; safe to call at any time. */
   bringPlannedActivities(now?: Date): ActivityInstance[];
+
+  // DirectionManager methods (ADR-010)
+  getIdealLife(): IdealLife | null;
+  setIdealLife(text: string): IdealLife;
+  getRoadmaps(): Roadmap[];
+  saveRoadmap(input: {
+    id?: UUID;
+    title: string;
+    why?: string;
+    targetDate?: string;
+    status?: Roadmap["status"];
+    milestones: Array<{
+      title: string;
+      note?: string;
+      steps: Array<{ title?: string; templateId: UUID; unit: "times" | "minutes"; amount: number }>;
+    }>;
+  }): Roadmap;
+  deleteRoadmap(id: UUID): void;
+  getRoadmapProgress(): RoadmapProgress[];
   interruptActivity(activityId: UUID): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 

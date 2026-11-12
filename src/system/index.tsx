@@ -7,6 +7,9 @@ import type {
   ActivityTemplate,
   ActivityInstance,
   PlannedActivity,
+  IdealLife,
+  Roadmap,
+  RoadmapProgress,
   CompletedActivityRecord,
   TimeBlock,
   DayMinutes,
@@ -26,6 +29,7 @@ import type {
 import { PersistenceManager } from "./persistenceManager";
 import { DayManager } from "./dayManager";
 import { AgendaManager } from "./agendaManager";
+import { DirectionManager, type RoadmapInput } from "./directionManager";
 import { ActivityManager } from "./activityManager";
 import { TimeBlockManager } from "./timeBlockManager";
 import { EventManager } from "./eventManager";
@@ -50,6 +54,7 @@ export class SystemCore implements ISystemCore {
   // System modules
   private dayManager: DayManager;
   private agendaManager: AgendaManager;
+  private directionManager: DirectionManager;
   private activityManager: ActivityManager;
   private timeBlockManager: TimeBlockManager;
   private eventManager: EventManager;
@@ -70,6 +75,7 @@ export class SystemCore implements ISystemCore {
     // Initialize modules with a reference to this
     this.dayManager = new DayManager(this);
     this.agendaManager = new AgendaManager(this);
+    this.directionManager = new DirectionManager(this);
     this.activityManager = new ActivityManager(this);
     this.timeBlockManager = new TimeBlockManager(this);
     this.eventManager = new EventManager(this);
@@ -209,8 +215,34 @@ export class SystemCore implements ISystemCore {
    * Deletes an activity template
    */
   public deleteActivityTemplate(id: UUID): void {
+    // An activity a roadmap is built on stays until the roadmap lets go of it
+    this.directionManager.assertTemplateFree(id);
     this.activityManager.deleteActivityTemplate(id);
     this.agendaManager.forgetTemplate(id);
+  }
+
+  public getIdealLife(): IdealLife | null {
+    return this.directionManager.getIdealLife();
+  }
+
+  public setIdealLife(text: string): IdealLife {
+    return this.directionManager.setIdealLife(text);
+  }
+
+  public getRoadmaps(): Roadmap[] {
+    return this.directionManager.getRoadmaps();
+  }
+
+  public saveRoadmap(input: RoadmapInput): Roadmap {
+    return this.directionManager.saveRoadmap(input);
+  }
+
+  public deleteRoadmap(id: UUID): void {
+    this.directionManager.deleteRoadmap(id);
+  }
+
+  public getRoadmapProgress(): RoadmapProgress[] {
+    return this.directionManager.getRoadmapProgress();
   }
 
   /**
