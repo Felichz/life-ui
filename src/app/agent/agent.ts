@@ -189,6 +189,20 @@ const JUST_ANSWER = {
   },
 };
 
+/** The tools that need a request or a yes: they plan days ahead, delete, or write in the ideal life. */
+const HELD_BACK = new Set([
+  "plan_ahead",
+  "plan_roadmap",
+  "cancel_planned",
+  "remove_from_plan",
+  "delete_from_library",
+  "start_day",
+  "end_day",
+  // A marker of something that happened: chosen, wrongly, for a habit the person only spoke of
+  "log_event",
+  "note_ideal_life",
+  "edit_ideal_life",
+]);
 /** The tools that put a plan on the calendar. */
 const PLANNING_TOOLS = new Set(["plan_roadmap", "plan_ahead"]);
 /** Failures of one tool in one turn before it is not run again. */
@@ -431,23 +445,33 @@ export class Agent {
 
   /** The tools the model is offered now: web search only while the person allows it. */
   /**
-   * The tools offered in this turn. Those that change something are offered
-   * when the person told the app to do something, or said yes to what was
-   * proposed (the notes say which, ADR-012); otherwise only those that read
-   * and search. Rule 0 of the prompt ("act only on a request"), held by
-   * construction: made to choose a tool, a 9B model told a time of day
-   * planned 63 sessions, and told of a bad habit tried to delete an activity.
+   * The tools offered in this turn. Those that plan days ahead, delete, or
+   * write in the person's ideal life are offered only when the person told
+   * the app to do something or said yes to what was proposed (the notes say
+   * which, ADR-012). Rule 0 of the prompt ("act only on a request"), held by
+   * construction where a mistake costs most: made to choose a tool, a 9B
+   * model told a time of day planned 63 sessions, and told of a bad habit
+   * tried to delete an activity.
+   *
+   * The tools of the day itself (add, start, finish, move) are always there.
+   * Holding them back as well was tried: the notes take "I have started
+   * reading" for talk, and the day could no longer be run.
    */
   private schemas() {
     const all = toolSchemas(this.webSetting() !== "off");
     // The notes do not speak of this message (too short, or the call failed): nothing is held back
     if (!this.notesRead || this.brief?.instruction) return all;
+    const plan = this.brief?.plan;
     if (this.brief?.agreed) {
       // A plan they said yes to goes in as a roadmap, which puts its own sessions on the calendar
-      const plan = this.brief.plan;
       return plan && !plan.built ? all.filter((tool) => tool.function.name !== "plan_ahead") : all;
     }
-    return all.filter((tool) => !toolByName(tool.function.name)?.mutates);
+    return all.filter(
+      (tool) =>
+        !HELD_BACK.has(tool.function.name) ||
+        // A roadmap that exists can be changed on a plain request ("move it to Saturdays")
+        (tool.function.name === "plan_roadmap" && plan?.built)
+    );
   }
 
   /** What every request carries before the conversation: the prompt, the day and the tools. */
@@ -948,7 +972,11 @@ export class Agent {
       http: this.options.web?.http,
       signal: this.abort?.signal,
       said: saidIn(this.brief),
-      private: this.brief?.unsure ?? [],
+      // Their guesses about themselves, and their own measures ("80kg", "180cm")
+      private: [
+        ...(this.brief?.unsure ?? []),
+        ...(this.brief?.has ?? []).flatMap((fact) => fact.match(/\d+\s?[a-zA-Z]+/g) ?? []),
+      ],
       conversation: this.recentConversation(),
       ...(this.brief?.plan
         ? {

@@ -474,7 +474,8 @@ describe("notes in the conversation", () => {
     expect(offered(0)).toContain("just_answer");
     expect(offered(0)).not.toContain("plan_roadmap");
     expect(offered(0)).not.toContain("plan_ahead");
-    expect(offered(0)).not.toContain("add_to_plan");
+    // The day itself can always be run
+    expect(offered(0)).toContain("add_to_plan");
 
     await agent.send("antes quiero que lo pienses mejor");
     expect(lastTool()).toContain("not-yet");
@@ -576,7 +577,7 @@ describe("notes in the conversation", () => {
     });
   });
 
-  it("offer the tools that change something only for an instruction or a yes", async () => {
+  it("offer the tools that plan, delete or write in the ideal life only for an instruction or a yes", async () => {
     const core = new SystemCore();
     core.clearState();
     core.startDay();
@@ -606,7 +607,9 @@ describe("notes in the conversation", () => {
     expect(offered[0]).toContain("get_day");
     expect(offered[0]).toContain("just_answer");
     expect(offered[0]).not.toContain("delete_from_library");
-    expect(offered[0]).not.toContain("add_to_plan");
+    expect(offered[0]).not.toContain("plan_ahead");
+    // The tools of the day itself are always there
+    expect(offered[0]).toContain("add_to_plan");
     expect(offered[0]).not.toContain("note_ideal_life");
 
     await agent.send("agrega una actividad para dejar el celular fuera a las 23");
@@ -626,7 +629,8 @@ describe("notes in the conversation", () => {
     }) as typeof fetch;
     const seen: ChatMessage[][] = [];
     const coach = [
-      call("web_search", { query: "home strength training beginners and TDAH guidelines" }),
+      // Their guess about themselves and their own measures, in the query
+      call("web_search", { query: "home strength training 80kg beginners and TDAH guidelines" }),
       call("web_search", { query: "home strength training beginners guidelines" }),
       say("Esto encontré."),
     ];
@@ -637,7 +641,11 @@ describe("notes in the conversation", () => {
       web: { setting: () => "on", allow: () => {}, http },
       chat: async (messages) => {
         if (isNotes(messages)) {
-          return notes({ unsure: ["quizá tengo TDAH o algo"], research: true });
+          return notes({
+            unsure: ["quizá tengo TDAH o algo"],
+            has: ["yo peso 80kg", "mido 180cm"],
+            research: true,
+          });
         }
         seen.push(messages);
         return coach.shift()!;
@@ -651,9 +659,10 @@ describe("notes in the conversation", () => {
       .map((message) => String(message.content));
     expect(results[0]).toContain("about-the-person");
     expect(results[0]).toContain("tdah");
+    expect(results[0]).toContain("80kg");
     // Only the query about the topic left the machine
     expect(sent).toHaveLength(1);
-    expect(sent[0]).not.toMatch(/tdah/i);
+    expect(sent[0]).not.toMatch(/tdah|80kg/i);
   });
 
   it("are off unless asked for", async () => {

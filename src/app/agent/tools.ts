@@ -302,7 +302,8 @@ function personalWords(guesses: string[]): string[] {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .split(/[^a-z0-9]+/)
-    .filter((word) => word.length >= 4 && !COMMON.has(word));
+    // A measure ("80kg") gives a person away however short it is
+    .filter((word) => (word.length >= 4 || /\d/.test(word)) && !COMMON.has(word));
   return [...new Set(words)];
 }
 
@@ -492,7 +493,7 @@ export const TOOLS: Tool[] = [
   {
     name: "add_to_plan",
     description:
-      "Add an activity to today's plan. Uses the library activity with that title, or creates it.",
+      'Add something to do to today\'s plan ("agrega…", "add…", "hoy quiero…"). Uses the library activity with that title, or creates it.',
     parameters: {
       type: "object",
       properties: {
@@ -693,7 +694,8 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "log_event",
-    description: 'Log a one-off event now, like "Coffee". Creates the event name if it is new.',
+    description:
+      'Mark something that just happened, in one tap, like "Coffee". Never for something to do: that is add_to_plan. Creates the event name if it is new.',
     parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
     mutates: true,
     run: ({ core }, args) => {
@@ -1102,7 +1104,7 @@ export const TOOLS: Tool[] = [
       if (personal.length > 0) {
         throw new ToolError(
           "about-the-person",
-          `the query names something the person said about themselves (${personal.join(", ")}). Search the topic only: the method and who it is for in general, nothing about them.`
+          `the query names something the person said about themselves (${personal.join(", ")}). Search the topic only: the method and who it is for in general, nothing about them, no measures of theirs.`
         );
       }
       const results = await searchWeb(query, http, signal);
