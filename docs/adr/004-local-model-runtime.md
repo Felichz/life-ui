@@ -81,6 +81,15 @@ The context was fixed at 16K. Now the load dialog has a slider (4K, 8K, 12K, 16K
 
 After a load, and when a loaded model is found at launch, the app asks the model for one token to wake it up and then for a short text, and divides the tokens written by the time taken. The result shows in the "ready" step ("56 tokens per second · it answers right away") and next to the model's name. It is timed from outside, so it includes the wait before the first token: a rough figure, good enough to tell fast from slow.
 
+### 11. Closing what holds the GPU, from the dialog (2026-11-11)
+
+The list of programs using the GPU said what to close; now each one has a "Close" button, so the memory can be freed without leaving the dialog.
+
+- **The program, not the process.** Chrome's GPU memory sits in a child process that Chrome starts again when it dies. Closing means the whole program: the topmost process with the same name, and everything under it.
+- **Asked first, forced only on a second yes.** The first step asks the program to close, the way its own window would; it may ask about unsaved work and stay open. Only if it stays does the dialog offer "Force close", which ends it and loses what was not saved. Each step is confirmed in the row itself.
+- **Never Windows, never LifeUI.** Windows' own processes have no button, and the command refuses them whatever the interface sends. LifeUI's own window is a WebView2 process that also uses the GPU: it is shown as "LifeUI (this window)", without a button, and refused too.
+- **The figures follow.** After a close the memory is read again, so the bar, the verdict and the automatic context update at once.
+
 ## Consequences
 
 - The load dialog is the first screen of each session when no model is loaded.

@@ -29,6 +29,7 @@ pub fn run() {
             state::clear_state,
             resources::system_resources,
             gpu_processes::gpu_processes,
+            gpu_processes::close_process,
             runtimes::runtime_status,
             runtimes::lmstudio_models,
             runtimes::lmstudio_loaded,

@@ -541,6 +541,15 @@ export const es = {
   "model.continue": "Continuar",
   "model.gpu.title": "Usando la GPU ahora",
   "model.gpu.windows": "Windows",
+  "model.gpu.close": "Cerrar",
+  "model.gpu.closeConfirm":
+    "Se le pide a {name} que se cierre. Si tiene algo sin guardar, puede preguntarte antes.",
+  "model.gpu.closeYes": "Cerrar {name}",
+  "model.gpu.closeStayed":
+    "{name} sigue abierto. Forzar el cierre lo termina ya; lo que no esté guardado se pierde.",
+  "model.gpu.closeFailed": "No se pudo cerrar {name}. Se puede intentar forzando el cierre.",
+  "model.gpu.force": "Forzar cierre",
+  "model.gpu.own": "LifeUI (esta ventana)",
   "model.gpu.enough": "Basta con cerrarlo",
   "model.gpu.loading": "Viendo qué usa la GPU…",
   "model.gpu.unavailable": "No se puede ver qué programas usan la GPU.",

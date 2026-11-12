@@ -73,10 +73,20 @@ export interface GpuProcess {
   bytes: number;
   /** Part of Windows: it can't be closed. */
   system: boolean;
+  /** Part of LifeUI itself (its own window): closing it would close the app. */
+  own?: boolean;
 }
 
 /** Programs holding the GPU's memory now, biggest first (Windows only). */
 export const gpuProcesses = () => invoke<GpuProcess[]>("gpu_processes");
+
+/**
+ * Closes the program a GPU process belongs to. Without `force` the program is
+ * asked to close and may stay open (a "save?" dialog); with it, it is ended
+ * and unsaved work is lost. Resolves to whether it is gone.
+ */
+export const closeProcess = (pid: number, force = false) =>
+  invoke<boolean>("close_process", { pid, force });
 
 /** Margin kept free on the GPU when deciding whether a model fits. */
 export const GPU_MARGIN = 0.25 * GIB;
