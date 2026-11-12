@@ -201,6 +201,8 @@ const IDEAL_LIFE_CHARS = 1500;
 const MAX_ENTRIES = 400;
 /** Past this share of the context the conversation is compacted before the next call. */
 const AUTO_COMPACT_AT = 0.85;
+/** Tokens kept free beyond the longest answer, for what the estimate misses. */
+const REPLY_MARGIN = 400;
 
 let counter = 0;
 const nextId = (prefix = "e") => `${prefix}${Date.now().toString(36)}-${++counter}`;
@@ -1272,7 +1274,13 @@ export class Agent {
       let recovered = false;
       for (let step = 0; step < maxSteps; step++) {
         // Before the model is asked, the conversation has to fit in its context
-        if (!compacted && this.promptTokens() > this.context * AUTO_COMPACT_AT) {
+        // Room has to be left for the answer too: a request that fits and an
+        // answer that does not end in "context size has been exceeded" half way
+        const room = Math.min(
+          this.context * AUTO_COMPACT_AT,
+          this.context - MAX_REPLY_TOKENS - REPLY_MARGIN
+        );
+        if (!compacted && this.promptTokens() > room) {
           compacted = true;
           await this.compactNow(abort.signal);
           if (abort.signal.aborted) return;

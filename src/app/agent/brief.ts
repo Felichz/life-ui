@@ -424,7 +424,9 @@ export async function updateBrief(options: {
     if (notes.instruction === true) next.instruction = true;
     options.onRead?.();
     const total = LISTS.reduce((sum, name) => sum + next[name].length, 0);
-    return total === 0 && !next.plan ? unagreed(brief) : next;
+    // Empty notes still say what this message is: an instruction, a yes, a request to look something up
+    const speaks = next.agreed || next.research || next.instruction;
+    return total === 0 && !next.plan && !speaks ? unagreed(brief) : next;
   } catch {
     return unagreed(brief);
   }
