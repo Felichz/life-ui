@@ -79,7 +79,7 @@ The lists:
 
 agrees: true only when this message says yes to what the coach proposed, or tells the coach to go ahead ("sí", "dale", "ok, hazlo", "sounds good, do it"). Asking for something else, or answering a question, is not a yes.
 
-instruction: true only when this message tells the app to do something right now: add, move, schedule, start, finish, stop or delete something, or write something down. Wanting a plan, or agreeing to one, is not an instruction.
+instruction: true when this message tells the app to do or change something (add, move, schedule, delete, write down; "move my sessions to Saturday"), or reports something the app has to record: that they started, finished or stopped something. Wanting a plan made, or agreeing to one, is not an instruction.
 
 research: true only when this message asks the coach to look something up, search the internet or check what is known about it.
 
