@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
 import { weekdaysIn, weeksUntil } from "./when";
+import { t } from "../i18n";
 
 /**
  * The coach's notes on what the person has told it (ADR-012).
@@ -655,6 +656,9 @@ export function briefLines(brief: Brief | null): string {
  */
 export function nextMove(brief: Brief | null, personAsked: boolean): string {
   if (!brief) return "";
+  // Notes with nothing in them are of someone running their day ("I have
+  // started reading"): there is no advice to prepare, and nothing to ask for
+  if (!brief.plan && LISTS.every((name) => brief[name].length === 0)) return "";
   const missing = missingFrom(brief);
   const answer = personAsked
     ? "They asked you something: answer it first, directly, with the number if it has one. "
@@ -675,7 +679,7 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
     return `${answer}If you are about to propose a routine or a plan, do not lay it out yet unless the notes say how long a session can be and on which days: ask for those first, two questions at most. Never give a duration, days or an hour of your own as if they were theirs.`;
   }
   if (brief.plan.built) {
-    return `${answer}The plan is DONE: it is in the app as a roadmap, with every session on the calendar. If they ask for the roadmap or the plan, tell them it is already made and that they can see it on the Goals page. Do not build it again, do not ask for a yes to it, and ask them nothing more about it. Every session already carries what to do in it: never offer to add tasks, activities or days for it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change.`;
+    return `${answer}The plan is DONE: it is in the app as a roadmap, with every session on the calendar. If they ask for the roadmap or the plan, tell them it is already made and that they can see it on the page called "${t("nav.goals")}" (use that name as it is). Do not build it again, do not ask for a yes to it, and ask them nothing more about it. Every session already carries what to do in it: never offer to add tasks, activities or days for it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change.`;
   }
   if (brief.plan.given) {
     const keep =

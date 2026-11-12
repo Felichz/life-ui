@@ -824,7 +824,7 @@ export class Agent {
             .map((roadmap) => `"${roadmap.title}"`)
             .join(
               ", "
-            )}), with its sessions on the calendar: if they ask for it, say it is done and that they can see it on the Goals page.`
+            )}), with its sessions on the calendar: if they ask for it, say it is done and that they can see it on the page called "${t("nav.goals")}" (use that name as it is).`
         );
       }
       return notes;

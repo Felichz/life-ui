@@ -332,6 +332,18 @@ describe("the roadmap draft", () => {
       later.commit();
       expect(core2.getPlannedActivities()[0].date).toBe("2026-11-16");
 
+      // Much shorter than asked: the sessions of a phase were counted short. Sent back once
+      const brief = new RoadmapDraft(setup(), new Date(), { weeks: 13 });
+      const few = {
+        ...ROADMAP,
+        milestones: [{ title: "Fase", sessions: 18, notes: "- algo" }],
+      };
+      expect(() => brief.saveRoadmap(few)).toThrow(
+        /shorter-than-asked.*18 sessions on 3 days a week run only 6.*13 weeks are 39 in all/
+      );
+      brief.saveRoadmap(few);
+      expect(brief.changed).toBe(true);
+
       // Other days than the conversation names: sent back once, with the line they were read from
       const core3 = setup();
       const other = new RoadmapDraft(core3, new Date(), {
