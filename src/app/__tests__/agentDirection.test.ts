@@ -295,12 +295,18 @@ describe("the roadmap draft", () => {
       ).toThrow(/session-too-long.*20 minutes/);
       expect(draft.changed).toBe(false);
 
-      // Much longer than the plan they asked for: not refused, but said on the card
-      draft.saveRoadmap({
+      // Much longer than the plan they asked for: sent back once, with the numbers
+      const long = {
         ...ROADMAP,
         schedule: theirs,
         milestones: [{ title: "Fase", sessions: 40, notes: "- algo" }],
-      });
+      };
+      expect(() => draft.saveRoadmap(long)).toThrow(
+        /longer-than-asked.*40 sessions on 2 days a week run 20 weeks.*8 weeks, 2 days a week is 16 sessions/
+      );
+      expect(draft.changed).toBe(false);
+      // Sent again, it stands: the person is told on the card, and decides
+      draft.saveRoadmap(long);
       expect(draft.warnings).toEqual(["Ojo: pediste unas 8 semanas y esta dura 20."]);
       expect(draft.describe().details[0]).toBe("Ojo: pediste unas 8 semanas y esta dura 20.");
 
@@ -315,6 +321,16 @@ describe("the roadmap draft", () => {
       const planned = core.getPlannedActivities();
       expect(planned).toHaveLength(16);
       expect(planned[0]).toMatchObject({ date: "2026-11-17", time: 19 * 60 });
+
+      // "Starting on Monday": the first session is not before that Monday
+      const core2 = setup();
+      const later = new RoadmapDraft(core2, new Date(), { startOn: 1 });
+      later.saveRoadmap({
+        ...ROADMAP,
+        schedule: { weekdays: ["mon", "wed", "fri"], start: "today" },
+      });
+      later.commit();
+      expect(core2.getPlannedActivities()[0].date).toBe("2026-11-16");
     } finally {
       jest.useRealTimers();
     }
