@@ -331,6 +331,24 @@ describe("the roadmap draft", () => {
       });
       later.commit();
       expect(core2.getPlannedActivities()[0].date).toBe("2026-11-16");
+
+      // Other days than the conversation names: sent back once, with the line they were read from
+      const core3 = setup();
+      const other = new RoadmapDraft(core3, new Date(), {
+        days: [2, 4, 6],
+        daysQuote: "Frecuencia: martes, jueves y sábado",
+      });
+      expect(() => other.saveRoadmap(ROADMAP)).toThrow(
+        /other-days: your schedule is on mon, wed, fri.*"Frecuencia: martes, jueves y sábado" \(read as tue, thu, sat\)/
+      );
+      expect(other.changed).toBe(false);
+      // The reading of a sentence can be the wrong one: sent again, it stands
+      other.saveRoadmap(ROADMAP);
+      expect(other.changed).toBe(true);
+      // The same days go through at once
+      const same = new RoadmapDraft(setup(), new Date(), { days: [1, 3, 5] });
+      same.saveRoadmap(ROADMAP);
+      expect(same.changed).toBe(true);
     } finally {
       jest.useRealTimers();
     }

@@ -1,5 +1,5 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
-import { weekdaysIn } from "./when";
+import { weekdaysIn, weeksUntil } from "./when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012).
@@ -48,6 +48,11 @@ export interface Brief {
    * goes into the app on the coach's own reading of the mood.
    */
   agreed?: boolean;
+  /**
+   * What their yes came with: a wish or a limit said in the same message
+   * ("yes, and I also want…"). It goes into the plan before it is saved.
+   */
+  added?: string[];
   /** Whether their latest message asks for something to be looked up. */
   research?: boolean;
   /** Whether their latest message tells the app to do something now. */
@@ -230,6 +235,12 @@ export interface Said {
   time?: number;
   /** The weekday they said it starts on ("empezando el lunes"), 0 for Sunday. */
   startOn?: number;
+  /**
+   * The days of the week as the conversation last stated them, with the line
+   * that does. They bind nothing: a roadmap on other days is sent back once.
+   */
+  days?: number[];
+  daysQuote?: string;
 }
 
 export function saidIn(brief: Brief | null): Said {
@@ -327,8 +338,14 @@ const clockText = (minutes: number) =>
  * said in: they do not carry over to the next.
  */
 export function unagreed(brief: Brief | null): Brief | null {
-  if (!brief?.agreed && !brief?.research && !brief?.instruction) return brief;
-  const { agreed: _agreed, research: _research, instruction: _instruction, ...rest } = brief;
+  if (!brief?.agreed && !brief?.research && !brief?.instruction && !brief?.added) return brief;
+  const {
+    agreed: _agreed,
+    research: _research,
+    instruction: _instruction,
+    added: _added,
+    ...rest
+  } = brief;
   return rest;
 }
 
@@ -365,6 +382,8 @@ export async function updateBrief(options: {
   person: string;
   language: string;
   signal?: AbortSignal;
+  /** Today, to count the weeks to an end named by the calendar. */
+  now?: Date;
   /** Called when the message was read: the notes now speak of it. */
   onRead?: () => void;
 }): Promise<Brief | null> {
@@ -402,6 +421,19 @@ export async function updateBrief(options: {
     // An instruction about the day ("add reading, 20 minutes") says nothing lasting
     // about the person: whatever the model listed for it is not kept
     const lasting = notes.instruction === true && plan.wanted !== true ? {} : notes;
+    // An end named by the calendar is counted from today, not from whole months
+    const weeks =
+      weeksUntil(options.person, options.now ?? new Date()) ||
+      weeksOf(plan.months, plan.weeks) ||
+      brief?.plan?.weeks;
+    const known = new Set(
+      [...(brief?.wants ?? []), ...(brief?.limits ?? [])].map((phrase) =>
+        phrase.toLocaleLowerCase()
+      )
+    );
+    const added = [...strings(lasting.wants), ...strings(lasting.limits)].filter(
+      (phrase) => !known.has(phrase.toLocaleLowerCase())
+    );
     const next: Brief = {
       wants: merge(brief?.wants ?? [], strings(lasting.wants)),
       has: merge(brief?.has ?? [], strings(lasting.has)),
@@ -419,9 +451,7 @@ export async function updateBrief(options: {
                 brief?.plan?.time ||
                 timeIn(options.person),
               start: text(plan.start) || brief?.plan?.start || "",
-              ...(weeksOf(plan.months, plan.weeks) || brief?.plan?.weeks
-                ? { weeks: weeksOf(plan.months, plan.weeks) || brief?.plan?.weeks }
-                : {}),
+              ...(weeks ? { weeks } : {}),
               exact,
               ...(brief?.plan?.given ? { given: true } : {}),
               ...(brief?.plan?.built ? { built: true } : {}),
@@ -432,6 +462,10 @@ export async function updateBrief(options: {
     if (brief?.asked) next.asked = brief.asked;
     // (agreed and research are of this message alone: they are set below, never carried)
     if (notes.agrees === true) next.agreed = true;
+    // A yes that comes with something new: the plan takes it in before it is saved
+    if (next.agreed && brief?.plan?.given && !brief.plan.built && added.length > 0) {
+      next.added = added.slice(0, 4);
+    }
     if (notes.research === true) next.research = true;
     if (notes.instruction === true) next.instruction = true;
     options.onRead?.();
@@ -441,6 +475,135 @@ export async function updateBrief(options: {
     return total === 0 && !next.plan && !speaks ? unagreed(brief) : next;
   } catch {
     return unagreed(brief);
+  }
+}
+
+const CHECK_PLAN = {
+  type: "function" as const,
+  function: {
+    name: "check_plan",
+    description: "What a plan leaves out of what the person said.",
+    parameters: {
+      type: "object",
+      properties: {
+        not_used: {
+          type: "array",
+          maxItems: 4,
+          items: said(
+            "A thing from THEY HAVE (equipment, a tool, a place, a skill) that the plan could use and never mentions. Copied as it is written there."
+          ),
+        },
+        not_given: {
+          type: "array",
+          maxItems: 4,
+          items: said(
+            "A thing from THEY ASKED FOR that the plan does not give: a part they asked every session to have, a number they asked for. Copied as it is written there."
+          ),
+        },
+        breaks: {
+          type: "array",
+          maxItems: 3,
+          items: said(
+            "A limit from IT HAS TO RESPECT that a line of the plan goes against, with that line."
+          ),
+        },
+      },
+      required: ["not_used", "not_given", "breaks"],
+    },
+  },
+};
+
+const bare = (words: string) =>
+  words
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+/** Whether the plan names this thing: one of its longer words, or its stem, is in it. */
+function named(thing: string, plan: string): boolean {
+  const words = bare(thing)
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 5);
+  if (words.length === 0) return true;
+  return words.some((word) => plan.includes(word.slice(0, Math.max(5, word.length - 2))));
+}
+
+/**
+ * What a plan the coach has just written leaves out of the notes (ADR-012):
+ * something they have and it never uses, something they asked it to contain
+ * and it does not. A 9B model writes a plan with the notes in front of it and
+ * still forgets the dumbbells it was told about; asked afterwards to compare
+ * the two, it sees it. Two readings again: a thing "not used" counts only if
+ * the code does not find it in the plan either. Empty when nothing is missing,
+ * and on any failure: the check improves a plan, it is not needed for one.
+ */
+export async function planGaps(options: {
+  chat: Chat;
+  brief: Brief;
+  plan: string;
+  signal?: AbortSignal;
+}): Promise<string[]> {
+  const { brief, plan } = options;
+  // Counted here, not asked of a model: a session written longer than the one they have
+  const theirs = brief.plan?.exact?.minutes;
+  const longest = Math.max(
+    0,
+    ...[...plan.matchAll(/(\d{1,3})\s*(?:min\b|minutos?\b|minutes?\b)/gi)].map((found) =>
+      Number(found[1])
+    )
+  );
+  const over =
+    theirs && longest > theirs * 1.1
+      ? [
+          `it names ${longest} minutes, and one session is ${theirs} minutes in every phase unless they asked for longer ones`,
+        ]
+      : [];
+  if (brief.has.length + brief.wants.length + brief.limits.length === 0) return over;
+  try {
+    const reply = await options.chat(
+      [
+        {
+          role: "system",
+          content:
+            "You compare a plan with what a person said, and list only what is plainly left out. Most plans leave out little: empty lists are a good answer. Copy each thing as it is written; add nothing of your own.",
+        },
+        {
+          role: "user",
+          content: `THEY HAVE:\n${brief.has.map((one) => `- ${one}`).join("\n") || "-"}\n\nTHEY ASKED FOR:\n${
+            brief.wants.map((one) => `- ${one}`).join("\n") || "-"
+          }\n\nIT HAS TO RESPECT:\n${
+            [...brief.limits, brief.plan?.length ? `one session: ${brief.plan.length}` : ""]
+              .filter(Boolean)
+              .map((one) => `- ${one}`)
+              .join("\n") || "-"
+          }\n\nTHE PLAN:\n"""\n${plan.slice(0, 5000)}\n"""`,
+        },
+      ],
+      [CHECK_PLAN],
+      options.signal,
+      { reasoning: false, maxTokens: 300, toolChoice: "required" }
+    );
+    const call = reply.toolCalls.find((one) => one.function.name === "check_plan");
+    if (!call) return over;
+    const found = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+    const text = bare(plan);
+    const theirs = (list: string[], from: string[]) =>
+      list.filter((one) =>
+        from.some((item) => bare(item).includes(bare(one)) || bare(one).includes(bare(item)))
+      );
+    const unused = theirs(strings(found.not_used), brief.has).filter(
+      (thing) => !named(thing, text)
+    );
+    const missing = theirs(strings(found.not_given), brief.wants);
+    const breaks = strings(found.breaks);
+    return [
+      ...over,
+      ...(unused.length ? [`it never uses what they have: ${unused.join("; ")}`] : []),
+      ...(missing.length ? [`it does not give what they asked for: ${missing.join("; ")}`] : []),
+      ...(breaks.length ? [`it goes against a limit: ${breaks.join("; ")}`] : []),
+    ];
+  } catch {
+    return over;
   }
 }
 
@@ -499,7 +662,11 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
   if (missing.length > 0 && (brief.asked ?? 0) < 2 && !personAsked) {
     return `If they want advice or a plan: do not give it yet. In one short message, ask only for what they have not told you, two things at most: ${missing
       .slice(0, 2)
-      .join("; ")}. Ask nothing else.`;
+      .join("; ")}. Ask nothing else.${
+      brief.plan
+        ? " One exception: if the numbers of the plan will depend on exactly what they have or where they start from (how much, which sizes, what level) and they did not say it, you may ask that too, in the same message."
+        : ""
+    }`;
   }
   if (!brief.plan) {
     // No plan was asked for. If the coach is about to propose one anyway, it
@@ -508,18 +675,23 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
     return `${answer}If you are about to propose a routine or a plan, do not lay it out yet unless the notes say how long a session can be and on which days: ask for those first, two questions at most. Never give a duration, days or an hour of your own as if they were theirs.`;
   }
   if (brief.plan.built) {
-    return `${answer}The plan is DONE: it is in the app as a roadmap, with every session on the calendar. If they ask for the roadmap or the plan, tell them it is already made and that they can see it on the Goals page. Do not build it again, do not ask for a yes to it, and ask them nothing more about it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change.`;
+    return `${answer}The plan is DONE: it is in the app as a roadmap, with every session on the calendar. If they ask for the roadmap or the plan, tell them it is already made and that they can see it on the Goals page. Do not build it again, do not ask for a yes to it, and ask them nothing more about it. Every session already carries what to do in it: never offer to add tasks, activities or days for it. If they ask to change something in it (the days, the time, how many sessions, what a session contains), hand the planner only that change.`;
   }
   if (brief.plan.given) {
     const keep =
       "You have already given them the plan: it is in the conversation. Do not write it out again, and do not change its length, its days or its phases unless they ask for that; if they ask for a change, say only what changes.";
+    const more = brief.added?.length
+      ? ` With their yes they added: ${brief.added.join("; ")}. The plan in the conversation does not have it yet: in your request to the planner say in words how the plan takes it in (what changes, in which phase, with its numbers), and after it is saved tell them in one or two lines what changed for it.`
+      : "";
     return brief.agreed
-      ? `${answer}${keep} They have said yes: put the plan in the app now, in this reply. Read the roadmap guide, then call the tool before you say anything about it; never say something is saved before the tool has answered.`
+      ? `${answer}${keep} They have said yes: put the plan in the app now, in this reply. Read the roadmap guide, then call the tool before you say anything about it; never say something is saved before the tool has answered.${more}`
       : `${answer}${keep} They have not said yes to it yet: put nothing in the app in this reply, and end by asking for their yes.`;
   }
   const open =
     missing.length > 0
-      ? ` If they still have not said ${missing.join(" or ")}, say what you assume and ask them to confirm it; never ask again for something that is in the notes or in the conversation.`
+      ? ` They have NOT told you ${missing.join(
+          " or "
+        )}: whatever the plan shows for it is your proposal, not their word. So the last line of your reply says which one you chose yourself and asks whether it works for them or which they prefer, together with the yes. Never ask again for something that is in the notes or in the conversation.`
       : "";
-  return `${answer}Give them the plan now, whole, built on the notes above, in 350 words at most: the phases, what one session contains in each, how it progresses.${open} Close it with two or three lines on how it fits the time and the limits they gave (add up the minutes of what a session contains), and ask for their yes. Do not read these notes back to them, and put nothing in the app before their yes.`;
+  return `${answer}Give them the plan now, whole, built on the notes above, in 350 words at most: the phases, what one session contains in each, how it progresses. Everything they asked the plan to contain (the "They want" line) is there for every phase, with its number. A number that depends on something they have not told you is not left out and not invented: give the rule they use to choose it on the day, in one line. Close it with two or three lines on how it fits the time and the limits they gave (add up the minutes of what a session contains, rests included), and ask for their yes. Do not read these notes back to them, and put nothing in the app before their yes.${open}`;
 }

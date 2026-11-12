@@ -298,6 +298,31 @@ function inTheirWords(note: string, spoken: string): boolean {
   return found.length / words.length >= 2 / 3;
 }
 
+/** A note for the ideal life, or the reason it cannot be one. */
+function idealNote(core: ISystemCore, spoken: string | undefined, args: Args): string {
+  const note = str(args.text);
+  if (!note) throw new ToolError("missing-text");
+  if (note.length > MAX_NOTE) {
+    throw new ToolError(
+      "too-long",
+      `one idea per note, in at most ${MAX_NOTE} characters: the one thing they said about the life they want. Requests for today, for a plan or for a search are not it.`
+    );
+  }
+  // Their ideal life is written in their words. A model asked to note a wish
+  // wrote a nicer one of its own ("because I value my voice…").
+  if (spoken !== undefined && !inTheirWords(note, spoken)) {
+    throw new ToolError(
+      "not-their-words",
+      "most of this note is not something the person wrote. Note what they said, with their own words copied from their messages, or ask them how they would put it."
+    );
+  }
+  const current = core.getIdealLife()?.text ?? "";
+  if (current.toLocaleLowerCase().includes(note.toLocaleLowerCase())) {
+    throw new ToolError("already-noted", "that is already written there");
+  }
+  return note;
+}
+
 /** Words too common to say anything about a person. */
 const COMMON = new Set([
   "quiza",
@@ -437,9 +462,9 @@ function previewTempos(core: ISystemCore, score: number, now: Date): number {
 
 const runningTitle = (core: ISystemCore) => {
   const active = core.getActiveActivity();
-  return active
-    ? (core.getActivityTemplates().find((tpl) => tpl.id === active.templateId)?.title ?? "")
-    : "";
+  // Refused here, before a card with no name on it is shown
+  if (!active) throw new ToolError("nothing-running", NOTHING_RUNNING);
+  return core.getActivityTemplates().find((tpl) => tpl.id === active.templateId)?.title ?? "";
 };
 
 // The kind of duration follows from which fields are given (see settingsFrom)
@@ -945,30 +970,14 @@ export const TOOLS: Tool[] = [
     // Their own document: nothing is written in it without their yes, in any mode
     alwaysConfirm: true,
     run: ({ core, spoken }, args) => {
-      const note = str(args.text);
-      if (!note) throw new ToolError("missing-text");
-      if (note.length > MAX_NOTE) {
-        throw new ToolError(
-          "too-long",
-          `one idea per note, in at most ${MAX_NOTE} characters: the one thing they said about the life they want. Requests for today, for a plan or for a search are not it.`
-        );
-      }
-      // Their ideal life is written in their words. A model asked to note a wish
-      // wrote a nicer one of its own ("because I value my voice…").
-      if (spoken !== undefined && !inTheirWords(note, spoken)) {
-        throw new ToolError(
-          "not-their-words",
-          "most of this note is not something the person wrote. Note what they said, with their own words copied from their messages, or ask them how they would put it."
-        );
-      }
+      const note = idealNote(core, spoken, args);
       const current = core.getIdealLife()?.text ?? "";
-      if (current.toLocaleLowerCase().includes(note.toLocaleLowerCase())) {
-        throw new ToolError("already-noted", "that is already written there");
-      }
       core.setIdealLife(addNote(current, note, str(args.section) || t("direction.notes")));
       return { noted: note };
     },
-    describe: (_ctx, args) => t("agent.tool.idealNote", { text: str(args.text) }),
+    // Checked before the card too: a card they say yes to is a note that gets written
+    describe: ({ core, spoken }, args) =>
+      t("agent.tool.idealNote", { text: idealNote(core, spoken, args) }),
   },
   {
     name: "edit_ideal_life",

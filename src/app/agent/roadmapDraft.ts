@@ -102,6 +102,8 @@ export class RoadmapDraft {
   private readonly lengths = new Map<string, number>();
   /** A roadmap longer than asked was sent back to the planner already. */
   private sentBack = false;
+  /** A roadmap on other days than the conversation names was sent back already. */
+  private daysSentBack = false;
   /** Each stored roadmap as it was when the draft began, to tell what changed. */
   private readonly original = new Map<UUID, string>();
 
@@ -362,6 +364,27 @@ export class RoadmapDraft {
     return localDate(day);
   }
 
+  /**
+   * The days of a new roadmap are the ones the conversation last stated. Not
+   * bound: the reading of a sentence is wrong often enough. Sent back once,
+   * with the line they were read from, and the planner decides.
+   */
+  private onTheirDays(roadmap: DraftRoadmap) {
+    const { days, daysQuote } = this.said;
+    const mine = roadmap.schedule?.weekdays;
+    if (!days?.length || !mine || this.daysSentBack) return;
+    if (days.length === mine.length && days.every((day) => mine.includes(day))) return;
+    this.daysSentBack = true;
+    throw new DraftError(
+      "other-days",
+      `your schedule is on ${mine.map((day) => WEEKDAYS[day]).join(", ")}; the conversation last named the days in this line: "${daysQuote ?? ""}" (read as ${days
+        .map((day) => WEEKDAYS[day])
+        .join(
+          ", "
+        )}). Use the days the person agreed to. If your days are what they agreed to, send the same call again.`
+    );
+  }
+
   /** A new roadmap keeps to what the person said: how long a session is, how long the plan runs. */
   private keepsTo(roadmap: DraftRoadmap) {
     const first = roadmap.milestones[0]?.steps[0];
@@ -513,6 +536,7 @@ export class RoadmapDraft {
       };
       if (!existing) {
         this.keepsTo(roadmap);
+        this.onTheirDays(roadmap);
         // Sent back once: most often the days or a count were copied wrong, and
         // the numbers show which. A second time it stands, and the card says so.
         const longer = this.longerThanAsked(roadmap);
