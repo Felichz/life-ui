@@ -66,6 +66,14 @@ describe("a duration and a time, read from the person's own words", () => {
   });
 });
 
+describe("notes with nothing in them", () => {
+  it("ask for no coaching: the person is running their day", () => {
+    const empty = { wants: [], has: [], limits: [], unsure: [], instruction: true };
+    expect(nextMove(empty, false)).toBe("");
+    expect(nextMove({ ...empty, has: ["mancuernas"] }, false)).toContain("do not give it yet");
+  });
+});
+
 describe("what a message states about a plan's days and its end", () => {
   it("reads the days with the line that names them, and nothing from a 'no'", () => {
     expect(

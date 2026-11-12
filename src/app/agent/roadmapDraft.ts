@@ -417,6 +417,19 @@ export class RoadmapDraft {
       : null;
   }
 
+  /** The weeks a new roadmap runs when that is well short of what the person asked for. */
+  private shorterThanAsked(roadmap: DraftRoadmap): number | null {
+    if (roadmap.id || !this.said.weeks) return null;
+    const layout = this.layout(roadmap).filter((entry) => entry.last);
+    if (layout.length === 0) return null;
+    const days =
+      (new Date(`${layout[layout.length - 1].last}T12:00:00`).getTime() -
+        new Date(`${layout[0].first}T12:00:00`).getTime()) /
+      86_400_000;
+    const weeks = Math.ceil((days + 1) / 7);
+    return weeks < this.said.weeks - Math.max(1, Math.round(this.said.weeks * 0.2)) ? weeks : null;
+  }
+
   /** What the person should look at before saying yes. */
   get warnings(): string[] {
     return this.touched().flatMap((roadmap) => {
@@ -539,6 +552,18 @@ export class RoadmapDraft {
         this.onTheirDays(roadmap);
         // Sent back once: most often the days or a count were copied wrong, and
         // the numbers show which. A second time it stands, and the card says so.
+        const shorter = this.shorterThanAsked(roadmap);
+        if (shorter && !this.sentBack) {
+          this.sentBack = true;
+          const total = roadmap.milestones
+            .flatMap((milestone) => milestone.steps)
+            .reduce((sum, step) => sum + this.sessionsOf(step), 0);
+          const perWeek = roadmap.schedule?.weekdays.length ?? 1;
+          throw new DraftError(
+            "shorter-than-asked",
+            `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run only ${shorter}. Count the sessions of each phase again from the plan in the conversation: a phase of N weeks is N x ${perWeek} sessions, and ${this.said.weeks} weeks are ${this.said.weeks! * perWeek} in all. If the plan they agreed to really is this short, send the same call again.`
+          );
+        }
         const longer = this.longerThanAsked(roadmap);
         if (longer && !this.sentBack) {
           this.sentBack = true;

@@ -78,6 +78,25 @@ Three more things are held by the code, each after a run in which a rule in the 
 - **A short message can ask for a whole plan** ("armame un plan"), and it is too short to be worth the notes. When the model reaches for a planning tool and the notes do not speak of the message yet, they are taken then, before the tool runs.
 - **A tool that failed twice in a turn is not run a third time.** The model is told to stop and say so plainly. It had tried the same call eight times.
 
+### 4b. A first plan is compared with the notes before it stands
+
+The model writes a plan with the notes in front of it and still leaves things out: told about dumbbells, it built a plan on a barbell alone; given 15 minutes, it wrote a phase of 20. Asked afterwards to compare the two, it sees it. So the first plan of a conversation goes through `planGaps` before the person keeps it:
+
+- **Counted by the code:** a session written longer than the minutes the person gave.
+- **Asked of the model, held to a schema (`check_plan`):** what they have that the plan never uses, what they asked it to contain that it does not give, a limit it goes against. As with the notes, two readings: a thing "not used" counts only if it is one of theirs and the code does not find it in the plan either.
+
+When something is missing the plan is written once more, with the list. Once: the check improves a plan, it is not a gate. It costs a short call on the turn a plan is laid out, and one rewrite when it finds something.
+
+The same rule, "sent back once, with the numbers", now covers three things a planner copies wrong (ADR-011): a roadmap much longer than asked, one much shorter (the sessions of a phase counted short), and one on other days than the conversation last named, with the line the days were read from. None of them binds: sent again, it stands, and the person sees it on the card.
+
+### 4c. Small readings the code does itself
+
+- **An end named by the calendar** ("this month and the next", "until the end of the year") is counted from today: on the 12th that is seven weeks, not the nine of two whole months.
+- **What a yes comes with** ("yes, and I also want…") is kept apart for that turn, and the coach is told to put it into the plan before it is saved.
+- **Notes with nothing in them** ask for no coaching: "I have started reading" is someone running their day.
+- **A plan on days nobody gave** is the coach's proposal, and its last line says so and asks.
+- **A note for the ideal life** is one idea, in the person's words, and it is checked before the card is shown: a card they say yes to is a note that gets written.
+
 ### 5. What stays the model's
 
 What to recommend, in which words, and what a session should contain. The notes and the move decide when to ask, what to ask for, and when to stop asking.
