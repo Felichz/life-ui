@@ -42,6 +42,16 @@ ADR-004 says everything stays on the machine. Research cannot: a search has to l
 
 **No page fetching.** OpenCode also has a tool that downloads any URL. It is left out: a whole page does not fit a small context, the highlights already carry the content, and a tool that requests arbitrary addresses is a wider door than this needs.
 
+**When to search, and when to propose it.** "Look it up when you can" was not enough for a small model, so the prompt says it outright:
+
+- **Search when** the person asks what is known; before building a plan on a number or a method the agent is not sure of; before a plan of several weeks; for safety with a beginner; when the person doubts the advice; for a method or a term the agent does not know.
+- **Do not search for** plain instructions, small talk, matters of taste or of the person's own schedule, something already searched in the conversation, or to avoid answering.
+- **How:** one search, two at most in a turn; one sentence first saying what will be checked and why; in English, about the topic, with "review" or "guidelines". Research the person did not ask for is proposed first.
+- **When it cannot search** (turned off, or the person said no): answer, say plainly that it was not checked, and mention once that web research can be turned on.
+- **What to do with the results** (lead with the finding, link one or two sources, say how solid they are, mark its own suggestion as such, take numbers from the source) is not in the prompt: it comes back with the results, where it is needed and costs nothing until a search happens.
+
+The section is sent only while searching is allowed. Turned off, the prompt is about 650 tokens shorter.
+
 ### 3. What is read on the web cannot act
 
 A page can contain text written to steer a model. Two guards:

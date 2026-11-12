@@ -163,3 +163,36 @@ describe("searching the web from the chat", () => {
     expect(core.getState().currentDay!.activityInstances).toHaveLength(1);
   });
 });
+
+describe("the research section of the prompt", () => {
+  const prompt =
+    "Intro.\n\n<!-- web:start -->\n\n## Looking things up\n\nWhen to search.\n\n<!-- web:end -->\n\n## Your rules";
+  const promptSent = async (setting: WebSetting) => {
+    const core = new SystemCore();
+    core.clearState();
+    let sent = "";
+    const agent = new Agent({
+      core,
+      prompt,
+      web: { setting: () => setting, allow: () => {}, http: fakeWeb().http },
+      chat: async (messages) => {
+        sent = String(messages[0].content);
+        return say("ok");
+      },
+    });
+    await agent.send("hola");
+    return sent;
+  };
+
+  it("is sent while searching is allowed, without its markers", async () => {
+    const sent = await promptSent("ask");
+    expect(sent).toContain("## Looking things up");
+    expect(sent).not.toContain("web:start");
+  });
+
+  it("is left out when searching is off, so it costs no context", async () => {
+    const sent = await promptSent("off");
+    expect(sent).not.toContain("Looking things up");
+    expect(sent).toContain("Intro.\n\n## Your rules");
+  });
+});
