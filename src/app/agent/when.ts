@@ -89,6 +89,50 @@ export function weekdaysIn(text: string): number[] {
   return [...days].sort();
 }
 
+const NOT = /\b(no|not|never|nunca|ni|salvo|excepto|except|menos|sin|without)\b|n't\b/;
+
+/**
+ * The days of a plan as a message states them, with the line that names
+ * them; null when it names none, or says them with a "no" nearby ("los
+ * viernes no puedo" names Friday and means the opposite).
+ */
+export function daysStated(message: string): { days: number[]; quote: string } | null {
+  const lines = message
+    .split(/\n+/)
+    .map((line) => line.replace(/[*_#>|]/g, "").trim())
+    .filter((line) => weekdaysIn(line).length > 0);
+  if (lines.length === 0) return null;
+  if (lines.some((line) => NOT.test(line.toLocaleLowerCase()))) return null;
+  const days = weekdaysIn(lines.join(" "));
+  // The line that says the most of them is the one worth showing
+  const quote = [...lines].sort(
+    (one, other) => weekdaysIn(other).length - weekdaysIn(one).length
+  )[0];
+  return { days, quote: quote.slice(0, 160) };
+}
+
+const THIS_AND_NEXT_MONTH =
+  /\b(este mes y (el |la )?(pr[oó]ximo|que viene|siguiente)|this month and (the )?next)\b/;
+const END_OF_YEAR =
+  /\b((hasta|para) (el )?fin(al|es)? de(l)? a[nñ]o|(until|by|through) the end of the year)\b/;
+
+/**
+ * The weeks from today to the end a message names by the calendar: "this
+ * month and the next" is to the last day of next month, which on the 12th is
+ * seven weeks and not the nine of two whole months. 0 when it names none.
+ */
+export function weeksUntil(message: string, now: Date): number {
+  const lower = message.toLocaleLowerCase();
+  const end = THIS_AND_NEXT_MONTH.test(lower)
+    ? new Date(now.getFullYear(), now.getMonth() + 2, 0, 12)
+    : END_OF_YEAR.test(lower)
+      ? new Date(now.getFullYear(), 11, 31, 12)
+      : null;
+  if (!end) return 0;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+  return Math.max(1, Math.round((end.getTime() - today.getTime()) / 86_400_000 / 7));
+}
+
 /** The weekdays a list of words names, in order; null when one is not a weekday. */
 export function weekdayNumbers(words: unknown): number[] | null {
   if (!Array.isArray(words) || words.length === 0) return null;

@@ -13,7 +13,7 @@ import {
   type Brief,
 } from "../agent/brief";
 import type { ChatMessage, ModelReply } from "../agent/llm";
-import { weekdaysIn } from "../agent/when";
+import { daysStated, weekdaysIn, weeksUntil } from "../agent/when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012): kept by a short
@@ -39,6 +39,12 @@ const notes = (fields: Partial<Record<string, unknown>>) =>
 const isNotes = (messages: ChatMessage[]) =>
   String(messages[0].content).startsWith("You keep a coach's notes");
 
+const isCheck = (messages: ChatMessage[]) =>
+  String(messages[0].content).startsWith("You compare a plan");
+
+const gaps = (fields: Partial<Record<string, string[]>> = {}) =>
+  call("check_plan", { not_used: [], not_given: [], breaks: [], ...fields });
+
 describe("a duration and a time, read from the person's own words", () => {
   it("finds them however they are said", () => {
     expect(durationIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("15 min");
@@ -57,6 +63,29 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(clockIn("a las 7pm")).toEqual({ time: "19:00", sure: true });
     expect(durationIn("no tengo idea")).toBe("");
     expect(timeIn("peso 80kg y mido 180cm")).toBe("");
+  });
+});
+
+describe("what a message states about a plan's days and its end", () => {
+  it("reads the days with the line that names them, and nothing from a 'no'", () => {
+    expect(
+      daysStated(
+        "### Fase 1\n* **Frecuencia:** Lunes, Miércoles, Viernes (3 veces)\n* Flexiones: 8"
+      )
+    ).toEqual({ days: [1, 3, 5], quote: "Frecuencia: Lunes, Miércoles, Viernes (3 veces)" });
+    expect(daysStated("mejor martes, jueves y sábado")?.days).toEqual([2, 4, 6]);
+    // Friday is named, and it is the day they cannot
+    expect(daysStated("los viernes no voy a poder")).toBeNull();
+    expect(daysStated("quince minutos a las 7")).toBeNull();
+  });
+
+  it("counts an end named by the calendar from today", () => {
+    const today = new Date(2026, 10, 12, 9);
+    // To the last day of December: seven weeks, not the nine of two whole months
+    expect(weeksUntil("un plan completo para este mes y el proximo", today)).toBe(7);
+    expect(weeksUntil("a plan for this month and the next", today)).toBe(7);
+    expect(weeksUntil("hasta fin de año", today)).toBe(7);
+    expect(weeksUntil("dos meses", today)).toBe(0);
   });
 });
 
@@ -295,7 +324,7 @@ describe("the coach's next move", () => {
   it("is to recommend once it has asked twice, saying what it assumes", () => {
     const move = nextMove({ ...brief, asked: 2 }, false);
     expect(move).toContain("Give them the plan now");
-    expect(move).toContain("say what you assume");
+    expect(move).toContain("is your proposal, not their word");
     expect(move).toContain("put nothing in the app before their yes");
     expect(move).not.toContain("do not give it yet");
   });
@@ -450,6 +479,7 @@ describe("notes in the conversation", () => {
       notes: () => true,
       chat: async (messages, offeredNow) => {
         if (isNotes(messages)) return noted.shift() ?? notes({});
+        if (isCheck(messages)) return gaps();
         if (String(messages[0].content).startsWith("You are the roadmap planner")) {
           planner++;
           return call("save_roadmap", roadmap);
@@ -664,6 +694,57 @@ describe("notes in the conversation", () => {
     // Only the query about the topic left the machine
     expect(sent).toHaveLength(1);
     expect(sent[0]).not.toMatch(/tdah|80kg/i);
+  });
+
+  it("send a first plan back once when it leaves out what the person has", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const first = `Plan de ocho semanas. ${"Sentadillas con la barra, tres series de diez. ".repeat(20)}`;
+    const second = `Plan de ocho semanas. ${"Remo con mancuernas y sentadillas con la barra. ".repeat(20)}`;
+    const coach = [say(first), say(second)];
+    const checks: string[] = [];
+    const seen: ChatMessage[][] = [];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages) => {
+        if (isNotes(messages)) {
+          return notes({
+            wants: ["un plan con repeticiones"],
+            has: ["mancuernas", "una barra"],
+            plan: {
+              wanted: true,
+              session_length: "15 minutos",
+              days: "lunes y jueves",
+              time: "19:00",
+            },
+          });
+        }
+        if (isCheck(messages)) {
+          checks.push(String(messages[1].content));
+          // The barbell is in the plan: the model's word alone does not send it back.
+          // "kettlebell" is nothing they said they have.
+          return gaps({ not_used: ["mancuernas", "una barra", "kettlebell"] });
+        }
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    await agent.send(
+      "quiero un plan con repeticiones, tengo mancuernas y una barra, lunes y jueves 15 minutos a las 19"
+    );
+    expect(checks).toHaveLength(1);
+    expect(checks[0]).toContain("THEY HAVE:\n- mancuernas\n- una barra");
+    const note = String(seen.at(-1)!.at(-1)!.content);
+    expect(note).toContain("it never uses what they have: mancuernas.");
+    expect(note).not.toContain("barra;");
+    expect(note).not.toContain("kettlebell");
+    // The person sees one plan, the second
+    const shown = agent.entries.filter((entry) => entry.kind === "assistant");
+    expect(shown).toHaveLength(1);
+    expect(shown[0].kind === "assistant" && shown[0].text).toBe(second);
   });
 
   it("keep the ideal life in the person's own words", async () => {

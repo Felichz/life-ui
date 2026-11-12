@@ -15,9 +15,11 @@ import {
 } from "./context";
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
 import type { WebSetting } from "./web";
+import { daysStated } from "./when";
 import {
   briefLines,
   nextMove,
+  planGaps,
   saidIn,
   unagreed,
   updateBrief,
@@ -761,6 +763,7 @@ export class Agent {
       person,
       language: this.languageName(),
       signal,
+      now: this.options.now?.(),
       onRead: () => {
         this.notesRead = true;
       },
@@ -812,7 +815,7 @@ export class Agent {
     // Something was changed in this turn already: what is left is to say so
     if (this.changedThisTurn()) {
       notes.push(
-        "The change is made. Tell them what was done, from the tool's answer as it is, in a few lines. Do not ask for a yes to what is already saved, and do not plan it again."
+        "The change is made. Tell them what was done, from the tool's answer as it is, in a few lines. It is saved whole: do not ask for a yes to it, do not plan it again, and do not offer to add tasks or sessions for it. End there."
       );
       const made = this.options.core.getRoadmaps();
       if (this.brief?.plan && made.length > 0) {
@@ -906,6 +909,28 @@ export class Agent {
     return lines.join("\n\n");
   }
 
+  /**
+   * The days of the week as the conversation last stated them: in the plan
+   * the coach laid out, or in a later message of the person's that lists them.
+   */
+  private daysSaid(): { days?: number[]; daysQuote?: string } {
+    if (!this.brief?.plan) return {};
+    for (const message of [...this.history].reverse()) {
+      const words = textOf(message.content ?? "");
+      const stated =
+        message.role === "assistant" && !message.tool_calls?.length && words.length >= PLAN_LENGTH
+          ? daysStated(words)
+          : message.role === "user"
+            ? daysStated(words)
+            : null;
+      // One day alone in the person's words is as often the start as the plan
+      if (stated && (message.role === "assistant" || stated.days.length >= 2)) {
+        return { days: stated.days, daysQuote: stated.quote };
+      }
+    }
+    return {};
+  }
+
   /** What the person wrote lately, to check a change against their own words. */
   private recentUserText(count = 3): string {
     return this.history
@@ -981,7 +1006,7 @@ export class Agent {
       now: this.options.now ?? (() => new Date()),
       http: this.options.web?.http,
       signal: this.abort?.signal,
-      said: saidIn(this.brief),
+      said: { ...saidIn(this.brief), ...this.daysSaid() },
       // What the person has written in this conversation, and what was noted of it
       spoken: [
         ...this.history
@@ -1319,6 +1344,7 @@ export class Agent {
       if (abort.signal.aborted) return;
       const maxSteps = this.options.maxSteps ?? 8;
       let corrected = false;
+      let planChecked = false;
       let searchOwed = false;
       let chosen = false;
       let compacted = false;
@@ -1421,6 +1447,36 @@ export class Agent {
                 "[Automatic note, not from the person: that reply was not shown. They asked you to look this up and you made no search. Call web_search now, with a query that names the exact question; then answer from what it finds.]",
             });
             continue;
+          }
+          // A plan laid out for the first time is compared with the notes before
+          // it stands: what it leaves out is named, and it is written once more
+          if (
+            !planChecked &&
+            this.notesRead &&
+            this.brief?.plan &&
+            !this.brief.plan.given &&
+            !this.brief.plan.built &&
+            reply.content.length >= PLAN_LENGTH
+          ) {
+            planChecked = true;
+            const gaps = await planGaps({
+              chat: this.options.chat,
+              brief: this.brief,
+              plan: reply.content,
+              signal: abort.signal,
+            });
+            if (abort.signal.aborted) return;
+            if (gaps.length > 0) {
+              discard();
+              this.history.push({ role: "assistant", content: reply.content });
+              this.history.push({
+                role: "user",
+                content: `[Automatic note, not from the person: that plan was not shown to them yet. Compared with what they told you, ${gaps.join(
+                  ". Also, "
+                )}. Write the plan again, whole, with that put right in every phase it touches; keep the rest as it was, and keep to the minutes of a session. Do not mention this note.]`,
+              });
+              continue;
+            }
           }
           const answer = reply.content || "…";
           this.history.push({ role: "assistant", content: answer });
