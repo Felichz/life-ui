@@ -826,8 +826,12 @@ export class Agent {
       (this.brief.asked ?? 0) < 2 &&
       !signal.aborted
     ) {
-      const needs = await planNeeds({ chat: this.options.chat, brief: this.brief, signal });
-      if (this.brief) this.brief = { ...this.brief, needs };
+      const { needs, use } = await planNeeds({
+        chat: this.options.chat,
+        brief: this.brief,
+        signal,
+      });
+      if (this.brief) this.brief = { ...this.brief, needs, use };
     }
   }
 
