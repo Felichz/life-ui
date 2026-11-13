@@ -439,6 +439,13 @@ describe("the roadmap draft", () => {
       expect(() => ruled.saveRoadmap(days)).toThrow(/rules-about-days.*Elige un día a la semana/);
       ruled.saveRoadmap({ ...ROADMAP, rules: "- Día malo: una serie de cada ejercicio" });
       expect(ruled.changed).toBe(true);
+      // The calendar's own days in the rules are not a second schedule
+      const same = new RoadmapDraft(setup(), new Date());
+      same.saveRoadmap({
+        ...ROADMAP,
+        rules: "- Cada lunes, miércoles y viernes, el circuito entero",
+      });
+      expect(same.changed).toBe(true);
 
       // What they have is used by no session: sent back once, and the same call stands
       const used = new RoadmapDraft(setup(), new Date(), {
