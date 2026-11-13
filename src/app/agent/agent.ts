@@ -16,6 +16,7 @@ import {
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
 import type { WebSetting } from "./web";
 import { daysStated, phaseWeeks, whenLabel } from "./when";
+import { describeFacts, disagreements, savedFacts } from "./saved";
 import {
   briefLines,
   nextMove,
@@ -1446,6 +1447,7 @@ export class Agent {
       const maxSteps = this.options.maxSteps ?? 8;
       let corrected = false;
       let planChecked = false;
+      let numbersChecked = false;
       let searchOwed = false;
       let chosen = false;
       let compacted = false;
@@ -1575,6 +1577,26 @@ export class Agent {
                 content: `[Automatic note, not from the person: that plan was not shown to them yet. Compared with what they told you, ${gaps.join(
                   ". Also, "
                 )}. Write the plan again, whole, with that put right in every phase it touches; keep the rest as it was, and keep to the minutes of a session. Do not mention this note.]`,
+              });
+              continue;
+            }
+          }
+          // What was just saved is said with the numbers it was saved with: the
+          // card has them right, and a reply that quotes others is sent back once
+          if (!numbersChecked) {
+            const facts = savedFacts(this.history);
+            const wrong = facts ? disagreements(reply.content, facts) : [];
+            if (facts && wrong.length > 0) {
+              numbersChecked = true;
+              discard();
+              this.history.push({ role: "assistant", content: reply.content });
+              this.history.push({
+                role: "user",
+                content: `[Automatic note, not from the person: that reply was not shown. It says ${wrong.join(
+                  ", "
+                )}, and that is not what was saved (${describeFacts(
+                  facts
+                )}). Say it again with the numbers and dates of the tool's answer exactly, and nothing about them from memory.]`,
               });
               continue;
             }
