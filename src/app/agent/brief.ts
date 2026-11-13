@@ -1,5 +1,5 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
-import { weekdaysIn, weeksUntil } from "./when";
+import { daysStated, weekdaysIn, weeksUntil } from "./when";
 import { t } from "../i18n";
 
 /**
@@ -569,6 +569,12 @@ export async function planGaps(options: {
           `it names ${longest} minutes, and one session is ${theirs} minutes in every phase unless they asked for longer ones`,
         ]
       : [];
+  const count = miscounted(plan, brief.plan?.weeks);
+  if (count) {
+    over.push(
+      `it says ${count.said} sessions, and ${count.weeks} weeks on ${count.perWeek} day${count.perWeek === 1 ? "" : "s"} a week are ${count.expected}`
+    );
+  }
   const full = theirs ? overfull(plan, theirs) : null;
   if (full) {
     over.push(
@@ -731,6 +737,25 @@ export async function planNeeds(options: {
   } catch {
     return [];
   }
+}
+
+/**
+ * A total of sessions a plan states that its own weeks and days do not give:
+ * seven weeks on three days a week, and a 9B model wrote "49 sessions". The
+ * days are the ones the plan names; with none named there is nothing to count.
+ */
+export function miscounted(
+  plan: string,
+  weeks: number | undefined
+): { said: number; weeks: number; perWeek: number; expected: number } | null {
+  const perWeek = daysStated(plan)?.days.length;
+  if (!weeks || !perWeek) return null;
+  const expected = weeks * perWeek;
+  const said = Math.max(
+    0,
+    ...[...plan.matchAll(/(\d{1,3})\s*(?:sesiones|sessions)\b/gi)].map((found) => Number(found[1]))
+  );
+  return said > expected * 1.15 ? { said, weeks, perWeek, expected } : null;
 }
 
 /**
