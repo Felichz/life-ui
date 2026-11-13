@@ -17,7 +17,7 @@ import {
   type Brief,
 } from "../agent/brief";
 import type { ChatMessage, ModelReply } from "../agent/llm";
-import { daysStated, weekdaysIn, weeksUntil } from "../agent/when";
+import { daysStated, phaseWeeks, weekdaysIn, weeksUntil } from "../agent/when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012): kept by a short
@@ -73,6 +73,22 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(clockIn("a las 7pm")).toEqual({ time: "19:00", sure: true });
     expect(durationIn("no tengo idea")).toBe("");
     expect(timeIn("peso 80kg y mido 180cm")).toBe("");
+  });
+});
+
+describe("the weeks of a plan's phases", () => {
+  it("are read from the plan's own headings, in order", () => {
+    const plan = [
+      "**Fase 1: Romper el hielo (Semanas 1-4)**",
+      "**Fase 2: Estructura (Semanas 5-9)**",
+      "**Fase 3: Integración (Semanas 10-13)**",
+    ].join("\n");
+    expect(phaseWeeks(plan)).toEqual([4, 5, 4]);
+    expect(phaseWeeks("Phase 1 (weeks 1 to 2)\nPhase 2 (weeks 3 to 7)")).toEqual([2, 5]);
+    // Not a plan's phases: one alone, not from week one, or with a gap
+    expect(phaseWeeks("Semanas 1-4 y nada más")).toBeNull();
+    expect(phaseWeeks("Semanas 3-4\nSemanas 5-6")).toBeNull();
+    expect(phaseWeeks("Semanas 1-2\nSemanas 4-6")).toBeNull();
   });
 });
 

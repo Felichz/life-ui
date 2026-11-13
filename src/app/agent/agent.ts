@@ -15,7 +15,7 @@ import {
 } from "./context";
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
 import type { WebSetting } from "./web";
-import { daysStated, whenLabel } from "./when";
+import { daysStated, phaseWeeks, whenLabel } from "./when";
 import {
   briefLines,
   nextMove,
@@ -1019,6 +1019,19 @@ export class Agent {
     return {};
   }
 
+  /** The weeks of each phase in the plan the coach last laid out: read from its own text. */
+  private phasesSaid(): { phaseWeeks?: number[] } {
+    if (!this.brief?.plan) return {};
+    for (const message of [...this.history].reverse()) {
+      if (message.role !== "assistant" || message.tool_calls?.length) continue;
+      const words = textOf(message.content ?? "");
+      if (words.length < PLAN_LENGTH) continue;
+      const weeks = phaseWeeks(words);
+      if (weeks) return { phaseWeeks: weeks };
+    }
+    return {};
+  }
+
   /** What the person wrote lately, to check a change against their own words. */
   private recentUserText(count = 3): string {
     return this.history
@@ -1094,7 +1107,7 @@ export class Agent {
       now: this.options.now ?? (() => new Date()),
       http: this.options.web?.http,
       signal: this.abort?.signal,
-      said: { ...saidIn(this.brief), ...this.daysSaid() },
+      said: { ...saidIn(this.brief), ...this.daysSaid(), ...this.phasesSaid() },
       // What the person has written in this conversation, and what was noted of it
       spoken: [
         ...this.history

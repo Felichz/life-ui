@@ -250,6 +250,8 @@ export interface Said {
    */
   days?: number[];
   daysQuote?: string;
+  /** The weeks of each phase of the plan they agreed to, when it names them. */
+  phaseWeeks?: number[];
 }
 
 export function saidIn(brief: Brief | null): Said {

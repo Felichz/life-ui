@@ -104,6 +104,8 @@ export class RoadmapDraft {
   private sentBack = false;
   /** A roadmap on other days than the conversation names was sent back already. */
   private daysSentBack = false;
+  /** A roadmap whose phases do not hold their weeks' sessions was sent back already. */
+  private phasesSentBack = false;
   /** A roadmap without what the person added with their yes was sent back already. */
   private addedSentBack = false;
   /** Each stored roadmap as it was when the draft began, to tell what changed. */
@@ -394,6 +396,29 @@ export class RoadmapDraft {
   }
 
   /**
+   * The phases of a new roadmap hold the sessions their weeks give: a plan of
+   * phases of 2, 2, 2, 2 and 5 weeks at five days a week is 10, 10, 10, 10 and
+   * 25 sessions, and a 9B model wrote 26 for the last. Sent back once, with the
+   * count; a second time it stands.
+   */
+  private onTheirPhases(roadmap: DraftRoadmap) {
+    const weeks = this.said.phaseWeeks;
+    const perWeek = roadmap.schedule?.weekdays.length;
+    if (!weeks || !perWeek || this.phasesSentBack) return;
+    if (weeks.length !== roadmap.milestones.length) return;
+    const expected = weeks.map((each) => each * perWeek);
+    const mine = roadmap.milestones.map((milestone) =>
+      milestone.steps.reduce((sum, step) => sum + this.sessionsOf(step), 0)
+    );
+    if (expected.every((count, index) => count === mine[index])) return;
+    this.phasesSentBack = true;
+    throw new DraftError(
+      "phases-off-count",
+      `the plan the person agreed to has phases of ${weeks.join(", ")} weeks; at ${perWeek} sessions a week that is ${expected.join(", ")} sessions, in that order, and yours are ${mine.join(", ")}. Use those counts. If the plan they agreed to really has these, send the same call again.`
+    );
+  }
+
+  /**
    * What the person added with their yes is somewhere in the roadmap: in a
    * session's notes or in the rules. Sent back once when no word of it is.
    */
@@ -607,6 +632,7 @@ export class RoadmapDraft {
       if (!existing) {
         this.keepsTo(roadmap);
         this.onTheirDays(roadmap);
+        this.onTheirPhases(roadmap);
         this.carriesWhatWasAdded(roadmap);
         // Sent back once: most often the days or a count were copied wrong, and
         // the numbers show which. A second time it stands, and the card says so.
