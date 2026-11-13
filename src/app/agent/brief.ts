@@ -571,6 +571,12 @@ export async function planGaps(options: {
           `it names ${longest} minutes, and one session is ${theirs} minutes in every phase unless they asked for longer ones`,
         ]
       : [];
+  const choice = openChoice(plan);
+  if (choice) {
+    over.push(
+      `it leaves a number as a choice ("${choice}"): give one value for each phase, the one they start with, and say what goes up in the next phase and by how much`
+    );
+  }
   const count = miscounted(plan, brief.plan?.weeks);
   if (count) {
     over.push(
@@ -830,6 +836,22 @@ export async function sessionTakes(options: {
   } catch {
     return null;
   }
+}
+
+/**
+ * A quantity the plan leaves as a choice between two values ("5 kg o 10 kg",
+ * "20 or 30 min"): the person asked for the number, and a plan that gives
+ * two gives none. Written with the same unit, or the unit after the second.
+ */
+export function openChoice(plan: string): string | null {
+  const found =
+    /(\d+(?:[.,]\d+)?)\s*(kg|kilos?|lbs?|libras?|min|minutos?|minutes?|seg|segundos?|km)?\s+(?:o|or)\s+(\d+(?:[.,]\d+)?)\s*(kg|kilos?|lbs?|libras?|min|minutos?|minutes?|seg|segundos?|km|reps?|repeticiones|series)\b/i.exec(
+      plan
+    );
+  if (!found) return null;
+  // "10 o 12 repeticiones" is a range people write for reps; the weight and the time are the ones to settle
+  if (/^(reps?|repeticiones|series)$/i.test(found[4])) return null;
+  return `${found[1]}${found[2] ? ` ${found[2]}` : ""} or ${found[3]} ${found[4]}`;
 }
 
 /**

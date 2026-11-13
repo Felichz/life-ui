@@ -7,6 +7,7 @@ import {
   miscounted,
   missingFrom,
   nextMove,
+  openChoice,
   overfull,
   planNeeds,
   saidIn,
@@ -120,6 +121,15 @@ describe("the minutes a session really takes", () => {
         minutes: 15,
       })
     ).toBeNull();
+  });
+});
+
+describe("a quantity left as a choice", () => {
+  it("is found whatever the unit, and ranges of reps are left alone", () => {
+    expect(openChoice("Mancuernas de 5kg o 10kg.")).toBe("5 kg or 10 kg");
+    expect(openChoice("Descansa 30 o 45 segundos")).toBe("30 or 45 segundos");
+    expect(openChoice("Remo con 8 o 10 repeticiones")).toBeNull();
+    expect(openChoice("Mancuernas de 5 kg en la fase 1 y de 10 kg en la 2")).toBeNull();
   });
 });
 
