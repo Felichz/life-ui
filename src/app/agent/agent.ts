@@ -1016,8 +1016,9 @@ export class Agent {
           : message.role === "user"
             ? daysStated(words)
             : null;
-      // One day alone in the person's words is as often the start as the plan
-      if (stated && (message.role === "assistant" || stated.days.length >= 2)) {
+      // One day alone is as often the start ("para el próximo martes") as the plan:
+      // in the person's words or in the coach's, it is not the plan's days
+      if (stated && stated.days.length >= 2) {
         return { days: stated.days, daysQuote: stated.quote };
       }
     }
