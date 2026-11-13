@@ -852,17 +852,20 @@ export function miscounted(
 }
 
 /**
- * The parts of a session as a plan times them ("warm-up (3 min)", "circuit
- * (10 min)"), added up phase by phase: the first phase whose parts come to
- * more than the session has. A label with the whole session's minutes is
- * not a part.
+ * The parts of a session as a plan times them ("warm-up (3 min)", "20 min of
+ * free talk"), added up phase by phase: the first phase whose parts come to
+ * more than the session has. A label with the whole session's minutes is not
+ * a part, and neither is a line that speaks of progress or of a goal ("by
+ * week 4, talk for 3-4 minutes").
  */
 export function overfull(plan: string, minutes: number): { phase: string; sum: number } | null {
   const blocks = plan.split(/\n(?=[#*\s]*(?:fase|phase|etapa|stage|semanas?|weeks?)\b)/i);
   for (const block of blocks) {
-    const parts = [...block.matchAll(/\((\d{1,3})\s*(?:min|minutos?|minutes?)\b[^)]*\)/gi)].map(
-      (found) => Number(found[1])
-    );
+    const parts = block
+      .split("\n")
+      .filter((line) => !/^[\s*#>\-\d.)]*(progres|objetiv|meta\b|goal|nota\b|note\b)/i.test(line))
+      .flatMap((line) => [...line.matchAll(/(\d{1,3})\s*(?:min|minutos?|minutes?)\b/gi)])
+      .map((found) => Number(found[1]));
     const whole = parts.indexOf(minutes);
     if (whole >= 0) parts.splice(whole, 1);
     const sum = parts.reduce((total, part) => total + part, 0);
