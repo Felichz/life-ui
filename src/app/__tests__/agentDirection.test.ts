@@ -445,7 +445,7 @@ describe("the roadmap draft", () => {
         ...ROADMAP,
         rules: "- Cada lunes, miércoles y viernes, el circuito entero",
       });
-      expect(same.changed).toBe(true);
+      expect(calendarDays.changed).toBe(true);
 
       // What they have is used by no session: sent back once, and the same call stands
       const used = new RoadmapDraft(setup(), new Date(), {
