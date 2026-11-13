@@ -3,7 +3,15 @@ import { localDate } from "../../system/agendaManager";
 import { dayAfter, sessionDates, sessionMinutes } from "../../system/directionManager";
 import { formatDayMinutes } from "../lib/format";
 import { t } from "../i18n";
-import { WEEKDAYS, dayLabel, startDate, timeOfDay, weekdayNames, weekdayNumbers } from "./when";
+import {
+  WEEKDAYS,
+  dayLabel,
+  startDate,
+  timeOfDay,
+  weekdayNames,
+  weekdayNumbers,
+  weekdaysIn,
+} from "./when";
 import type { Said } from "./brief";
 
 /**
@@ -104,6 +112,8 @@ export class RoadmapDraft {
   private sentBack = false;
   /** A roadmap on other days than the conversation names was sent back already. */
   private daysSentBack = false;
+  /** A roadmap whose rules spoke of days was sent back already. */
+  private rulesSentBack = false;
   /** A roadmap whose phases do not hold their weeks' sessions was sent back already. */
   private phasesSentBack = false;
   /** A roadmap without what the person added with their yes was sent back already. */
@@ -375,6 +385,25 @@ export class RoadmapDraft {
   }
 
   /**
+   * The rules are what holds in every session. Told "choose one day a week
+   * (Tuesday or Thursday)", a person would have two schedules: the calendar's
+   * and the rules'. Sent back once; the days live in the schedule.
+   */
+  private rulesAreNotTheSchedule(roadmap: DraftRoadmap) {
+    if (!roadmap.rules || this.rulesSentBack || !roadmap.schedule) return;
+    const named = weekdaysIn(roadmap.rules);
+    const chooses = /\b(elige|elegir|escoge|choose|pick)\b[^.\n]{0,40}\b(d[ií]a|day)\b/i.test(
+      roadmap.rules
+    );
+    if (named.length === 0 && !chooses) return;
+    this.rulesSentBack = true;
+    throw new DraftError(
+      "rules-about-days",
+      `the rules say something about days ("${roadmap.rules.slice(0, 120).replace(/\n/g, " ")}"), and the days are in the schedule (${weekdayNames(roadmap.schedule.weekdays)}). Rules are what holds in every session: how to progress, what counts on a bad day. Send the call again without the days.`
+    );
+  }
+
+  /**
    * The days of a new roadmap are the ones the conversation last stated. Not
    * bound: the reading of a sentence is wrong often enough. Sent back once,
    * with the line they were read from, and the planner decides.
@@ -631,6 +660,7 @@ export class RoadmapDraft {
       };
       if (!existing) {
         this.keepsTo(roadmap);
+        this.rulesAreNotTheSchedule(roadmap);
         this.onTheirDays(roadmap);
         this.onTheirPhases(roadmap);
         this.carriesWhatWasAdded(roadmap);

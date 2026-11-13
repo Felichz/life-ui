@@ -433,6 +433,13 @@ describe("the roadmap draft", () => {
       expect(saved.milestones[0].sessions).toBe(4);
       expect(saved.in_todays_plan).toHaveLength(1);
 
+      // Rules that speak of days contradict the calendar: sent back once
+      const ruled = new RoadmapDraft(setup(), new Date());
+      const days = { ...ROADMAP, rules: "- Elige un día a la semana (martes o jueves) y entrena" };
+      expect(() => ruled.saveRoadmap(days)).toThrow(/rules-about-days.*Elige un día a la semana/);
+      ruled.saveRoadmap({ ...ROADMAP, rules: "- Día malo: una serie de cada ejercicio" });
+      expect(ruled.changed).toBe(true);
+
       // Other days than the conversation names: sent back once, with the line they were read from
       const core3 = setup();
       const other = new RoadmapDraft(core3, new Date(), {
