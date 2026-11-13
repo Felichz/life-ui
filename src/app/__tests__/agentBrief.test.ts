@@ -7,6 +7,7 @@ import {
   miscounted,
   missingFrom,
   nextMove,
+  isRequestToCoach,
   openChoice,
   overfull,
   planNeeds,
@@ -121,6 +122,15 @@ describe("the minutes a session really takes", () => {
         minutes: 15,
       })
     ).toBeNull();
+  });
+});
+
+describe("what is a request to the coach", () => {
+  it("is not something the person added", () => {
+    expect(isRequestToCoach("armarlo así; empezando el sábado")).toBe(true);
+    expect(isRequestToCoach("si dale, hazlo")).toBe(true);
+    expect(isRequestToCoach("estirar la espalda al final de cada sesión")).toBe(false);
+    expect(isRequestToCoach("me duele la rodilla izquierda")).toBe(false);
   });
 });
 
@@ -282,6 +292,18 @@ describe("what a message states about a plan's days and its end", () => {
     // Alone, "todos los días" still means every day.
     expect(daysStated("todos los días a las 7")?.days).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(daysStated("de lunes a viernes\n(todos los días)")?.days).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("takes the assumption of a sentence, not the alternative it offers", () => {
+    expect(
+      daysStated(
+        "Asumí que puedes practicar todos los días, pero si prefieres lunes, miércoles y viernes, dímelo."
+      )?.days
+    ).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    // The plural of a weekday is the weekday
+    expect(daysStated("lo pondré para los martes, jueves y sábados a las 7")?.days).toEqual([
+      2, 4, 6,
+    ]);
   });
 
   it("counts an end named by the calendar from today", () => {

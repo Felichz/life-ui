@@ -13,9 +13,13 @@ const plain = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 /** Weekdays named in a text, by their Spanish abbreviations or full names. */
 function weekdays(text) {
   const days = new Set();
+  // "Todos los días" is the seven
+  if (/(todos los dias|cada dia|a diario)/.test(plain(text)))
+    for (let d = 0; d < 7; d++) days.add(d);
   const words = plain(text).split(/[^a-z]+/);
   const dayOf = (word) =>
-    word && DAY[word.slice(0, 3)] !== undefined &&
+    word &&
+    DAY[word.slice(0, 3)] !== undefined &&
     (word.length === 3 || /^(lunes|martes|miercoles|jueves|viernes|sabado|domingo)$/.test(word))
       ? DAY[word.slice(0, 3)]
       : undefined;
@@ -40,9 +44,16 @@ function parts(text) {
   const [head, state = ""] = text.split("=====STATE");
   const turns = head.split(/^### TÚ$/m).slice(1);
   const person = turns.map((turn) => turn.split(/\n\s*\n/)[0].trim());
-  const coach = [...head.matchAll(/^### COACH[^\n]*\n([\s\S]*?)(?=\n--- llamadas|\n### TÚ|$)/gm)].map((m) => m[1]);
+  const coach = [
+    ...head.matchAll(/^### COACH[^\n]*\n([\s\S]*?)(?=\n--- llamadas|\n### TÚ|$)/gm),
+  ].map((m) => m[1]);
   const card = /^> \*\*plan_roadmap\*\* \[done[^\n]*\n((?:> {3}- [^\n]*\n?)+)/m.exec(head);
-  const lines = card ? card[1].split("\n").filter(Boolean).map((l) => l.replace(/^> {3}- /, "")) : [];
+  const lines = card
+    ? card[1]
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => l.replace(/^> {3}- /, ""))
+    : [];
   return { person, coach, lines, state, head };
 }
 
@@ -59,7 +70,11 @@ function score(file) {
   add("roadmap saved", lines.length > 0, lines.length ? "" : "no plan_roadmap card");
   if (lines.length === 0) return results;
 
-  add("phases add up to the total", counts.reduce((a, b) => a + b, 0) === total, `${counts.join("+")} vs ${total}`);
+  add(
+    "phases add up to the total",
+    counts.reduce((a, b) => a + b, 0) === total,
+    `${counts.join("+")} vs ${total}`
+  );
 
   const cardDays = weekdays(summary.split("·")[0]);
   const askedDays = weekdays(said);
@@ -73,29 +88,48 @@ function score(file) {
   const perWeek = cardDays.size;
   if (weeks && perWeek) {
     const w = weeks[1] ? Number(weeks[1]) : Math.round(Number(weeks[2]) * 4.35);
-    add("length near what was asked", Math.abs(total - w * perWeek) <= perWeek * 2, `${total} vs about ${w * perWeek}`);
+    add(
+      "length near what was asked",
+      Math.abs(total - w * perWeek) <= perWeek * 2,
+      `${total} vs about ${w * perWeek}`
+    );
   } else add("length near what was asked", true, "n/a");
 
   const last = coach.at(-1) ?? "";
-  const stated = [...last.matchAll(/(\d{1,3})\s*sesiones/gi)].map((m) => Number(m[1])).filter((n) => n > 7);
+  const stated = [...last.matchAll(/(\d{1,3})\s*sesiones/gi)]
+    .map((m) => Number(m[1]))
+    .filter((n) => n > 7);
   const right = new Set([total, ...counts]);
-  add("coach quotes the saved counts", stated.every((n) => right.has(n)), stated.filter((n) => !right.has(n)).join(", "));
+  add(
+    "coach quotes the saved counts",
+    stated.every((n) => right.has(n)),
+    stated.filter((n) => !right.has(n)).join(", ")
+  );
 
   const minutesAsked = /(\d+)\s*minutos/.exec(said)?.[1];
   const notes = state.split("\n").filter((l) => l.startsWith("- desde"));
   if (minutesAsked && notes.length) {
     const bad = notes.filter((n) => {
-      const mins = [...n.matchAll(/\((\d+)\s*min\)|(\d+)\s*min\b/g)].map((m) => Number(m[1] ?? m[2]));
+      const mins = [...n.matchAll(/\((\d+)\s*min\)|(\d+)\s*min\b/g)].map((m) =>
+        Number(m[1] ?? m[2])
+      );
       return mins.length >= 2 && mins.reduce((a, b) => a + b, 0) > Number(minutesAsked) * 1.4;
     });
-    add("a session fits its minutes", bad.length === 0, bad.length ? `${bad.length} phase(s) over ${minutesAsked}` : "");
+    add(
+      "a session fits its minutes",
+      bad.length === 0,
+      bad.length ? `${bad.length} phase(s) over ${minutesAsked}` : ""
+    );
   } else add("a session fits its minutes", true, "n/a");
 
   const noteText = notes.join("\n");
   add("no load left as a choice", !/\d\s*kg\s+o\s+\d+\s*kg/i.test(noteText), "");
   if (/\d\s*kg/i.test(said)) add("loads are concrete", /\d\s*kg/i.test(noteText), "");
 
-  const afterNotes = noteText.split("⏎").filter((l) => /(^|\s)(cada|elige|escoge)\b/i.test(l)).join(" ");
+  const afterNotes = noteText
+    .split("⏎")
+    .filter((l) => /(^|\s)(cada|elige|escoge)\b/i.test(l))
+    .join(" ");
   const stray = [...weekdays(afterNotes)].filter((d) => !cardDays.has(d));
   add("rules do not name other days", stray.length === 0, stray.join(","));
 
@@ -115,6 +149,7 @@ for (const file of process.argv.slice(2)) {
   const bad = results.filter((r) => !r.ok);
   failed += bad.length;
   console.log(`\n${file.split(/[\\/]/).pop()}: ${results.length - bad.length}/${results.length}`);
-  for (const r of results) console.log(`  ${r.ok ? "ok  " : "FAIL"} ${r.name}${r.detail ? `  (${r.detail})` : ""}`);
+  for (const r of results)
+    console.log(`  ${r.ok ? "ok  " : "FAIL"} ${r.name}${r.detail ? `  (${r.detail})` : ""}`);
 }
 process.exit(failed > 0 ? 1 : 0);

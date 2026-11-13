@@ -77,6 +77,20 @@ export interface Brief {
 }
 
 const LISTS = ["wants", "has", "limits", "unsure"] as const;
+
+/** Words that ask the coach to do something, not words about the person or the life wanted. */
+const REQUEST_TO_COACH =
+  /\b(roadmap|hoja de ruta|anota|anotalo|agrega|agregalo|investiga|investigues|busca|haz el|hacer el|tendrias que|tambien tendrias|si dale|dale|arma|armalo|armarlo|armar|empezando|empieza|guarda|guardalo|guardarlo|hazlo)\b/;
+
+/** Whether a phrase is a request to the coach (to note, to build, to start on a day), not something about the person. */
+export function isRequestToCoach(phrase: string): boolean {
+  return REQUEST_TO_COACH.test(
+    phrase
+      .toLocaleLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+  );
+}
 const MAX_ITEMS = 10;
 
 const PROMPT = (language: string) =>
@@ -452,7 +466,8 @@ export async function updateBrief(options: {
       )
     );
     const added = [...strings(lasting.wants), ...strings(lasting.limits)].filter(
-      (phrase) => !known.has(phrase.toLocaleLowerCase())
+      // "Armarlo así, empezando el sábado" is what their yes asks for, not something they added
+      (phrase) => !known.has(phrase.toLocaleLowerCase()) && !isRequestToCoach(phrase)
     );
     const next: Brief = {
       wants: merge(brief?.wants ?? [], strings(lasting.wants)),
