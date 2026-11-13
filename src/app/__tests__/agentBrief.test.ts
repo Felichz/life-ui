@@ -4,6 +4,7 @@ import {
   briefLines,
   clockIn,
   durationIn,
+  miscounted,
   missingFrom,
   nextMove,
   overfull,
@@ -68,6 +69,19 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(clockIn("a las 7pm")).toEqual({ time: "19:00", sure: true });
     expect(durationIn("no tengo idea")).toBe("");
     expect(timeIn("peso 80kg y mido 180cm")).toBe("");
+  });
+});
+
+describe("the sessions a plan says it has", () => {
+  it("are counted from its own weeks and days", () => {
+    const plan = "Plan de 7 semanas.\nDías: lunes, miércoles y viernes.\nEn total son 49 sesiones.";
+    expect(miscounted(plan, 7)).toEqual({ said: 49, weeks: 7, perWeek: 3, expected: 21 });
+    expect(miscounted(plan.replace("49", "21"), 7)).toBeNull();
+    // The sessions of one phase are fewer than the whole: nothing to say
+    expect(miscounted("Lunes y jueves.\nFase 1: 4 sesiones.", 8)).toBeNull();
+    // No days named, or no length asked for: nothing to count
+    expect(miscounted("Son 49 sesiones.", 7)).toBeNull();
+    expect(miscounted(plan, undefined)).toBeNull();
   });
 });
 
@@ -951,6 +965,12 @@ describe("notes in the conversation", () => {
       .filter((message) => message.role === "tool")
       .map((message) => String(message.content));
     expect(results[0]).toContain("not-their-words");
+    // The refusal is said again next to the message: a change that did not happen is not told as done
+    const reminders = seen.map((messages) =>
+      String([...messages].reverse().find((message) => message.role === "user")!.content)
+    );
+    expect(reminders.some((text) => text.includes("Your last change did NOT happen"))).toBe(true);
+    expect(reminders.at(-1)).not.toContain("Your last change did NOT happen");
     expect(core.getIdealLife()?.text).toContain(
       "Quiero participar en las reuniones del trabajo sin quedarme callado."
     );

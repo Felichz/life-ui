@@ -1,4 +1,4 @@
-import type { ISystemCore } from "../../types";
+import type { ISystemCore, Roadmap } from "../../types";
 import { isCoreError } from "../../system";
 import { daySnapshot } from "./snapshot";
 import { ToolError, TOOLS, toolByName, toolSchemas, type Tool, type ToolContext } from "./tools";
@@ -15,7 +15,7 @@ import {
 } from "./context";
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
 import type { WebSetting } from "./web";
-import { daysStated } from "./when";
+import { daysStated, whenLabel } from "./when";
 import {
   briefLines,
   nextMove,
@@ -208,6 +208,9 @@ const HELD_BACK = new Set([
 ]);
 /** The tools that put a plan on the calendar. */
 const PLANNING_TOOLS = new Set(["plan_roadmap", "plan_ahead"]);
+/** Tools that act on what is running: offered only while something is. */
+const NEEDS_RUNNING = new Set(["finish_activity", "stop_activity"]);
+
 /**
  * The tools that change the day itself. While a plan is still being shaped
  * they wait for a request: told to build a plan, a 9B model once created and
@@ -478,7 +481,13 @@ export class Agent {
    * the moment the person asks for a change to the day.
    */
   private schemas() {
-    const all = toolSchemas(this.webSetting() !== "off");
+    // A tool that cannot apply is not on the table: with nothing running there
+    // is nothing to close or to stop. Told "I have started reading", a 9B
+    // model picked "finish" when it was offered, and "start" when it was not.
+    const running = this.somethingRuns();
+    const all = toolSchemas(this.webSetting() !== "off").filter(
+      (tool) => running || !NEEDS_RUNNING.has(tool.function.name)
+    );
     // The notes do not speak of this message (too short, or the call failed): nothing is held back
     if (!this.notesRead || this.brief?.instruction) return all;
     const plan = this.brief?.plan;
@@ -490,10 +499,25 @@ export class Agent {
         : all.filter(
             (tool) =>
               !HELD_BACK.has(tool.function.name) ||
-              // A roadmap that exists can be changed on a plain request ("move it to Saturdays")
-              (tool.function.name === "plan_roadmap" && plan?.built)
+              // A roadmap that exists can be changed on a plain request ("move it to
+              // Saturdays"). A yes is not one: "yes, and you should make the roadmap
+              // too", said of one already made, had the planner build it over.
+              (tool.function.name === "plan_roadmap" && plan?.built && !this.brief?.agreed) ||
+              // A yes to "shall I note it in your ideal life?" has to be able to do it:
+              // held back, the model said it had noted it and noted nothing. The
+              // note still waits for their yes on the card, in their own words.
+              (tool.function.name === "note_ideal_life" && this.brief?.agreed)
           );
     return shaping ? offered.filter((tool) => !DAY_TOOLS.has(tool.function.name)) : offered;
+  }
+
+  /** Whether an activity is running; taken as yes when the core cannot say. */
+  private somethingRuns(): boolean {
+    try {
+      return Boolean(this.options.core.getActiveActivity());
+    } catch {
+      return true;
+    }
   }
 
   /** What every request carries before the conversation: the prompt, the day and the tools. */
@@ -827,6 +851,26 @@ export class Agent {
   }
 
   /**
+   * The change asked for last in this turn, when it was refused or failed and
+   * nothing was changed after it: the reason, as the tool gave it.
+   */
+  private refusedThisTurn(): string | null {
+    const from = this.history.map((message) => message.role).lastIndexOf("user");
+    const calls = new Map<string, string>();
+    let refused: string | null = null;
+    for (const message of this.history.slice(from + 1)) {
+      if (message.role === "assistant") {
+        message.tool_calls?.forEach((call) => calls.set(call.id, call.function.name));
+      } else if (message.role === "tool") {
+        const tool = toolByName(calls.get(message.tool_call_id) ?? "");
+        if (!tool?.mutates) continue;
+        refused = /"(error|rejected)"/.test(message.content) ? message.content.slice(0, 300) : null;
+      }
+    }
+    return refused;
+  }
+
+  /**
    * What this turn calls for, read from the conversation itself. A small model
    * keeps asking the same questions and walks past the one it was asked: a
    * rule in the prompt does not hold it, a line next to the message does.
@@ -847,6 +891,14 @@ export class Agent {
       if (message.role !== "assistant") continue;
       if (!/[?¿]/.test(textOf(message.content))) break;
       asked++;
+    }
+    // A change that did not happen is never told as done: a 9B model whose
+    // note was refused wrote "I have noted it in your ideal life" all the same
+    const refused = this.refusedThisTurn();
+    if (refused) {
+      notes.push(
+        `Your last change did NOT happen: ${refused} Nothing was saved by it. Never say it was done. Either make it again the way that answer asks, or tell them plainly that it was not done and ask them for what is missing.`
+      );
     }
     // Something was changed in this turn already: what is left is to say so
     if (this.changedThisTurn()) {
@@ -878,10 +930,10 @@ export class Agent {
     if (this.brief?.plan && roadmaps.length > 0) {
       notes.push(
         `Roadmaps that exist already, with their sessions on the calendar: ${roadmaps
-          .map((roadmap) => `"${roadmap.title}"`)
+          .map(roadmapFacts)
           .join(
-            ", "
-          )}. If the plan is one of these it is done: say so, and never build it again. To change one, hand the planner only the change.`
+            "; "
+          )}. Take any number about them from here, never from memory. If the plan is one of these it is done: say so, and never build it again. To change one, hand the planner only the change.`
       );
     } else if (personAsked) {
       notes.push(
@@ -1645,6 +1697,20 @@ const TOOL_NAMES = new RegExp(
     .filter((name) => name.includes("_"))
     .join("|")})\\b`
 );
+
+/** A roadmap in one line, with its numbers counted here: a model asked later said 20 sessions of 21. */
+function roadmapFacts(roadmap: Roadmap): string {
+  const steps = roadmap.milestones.flatMap((milestone) => milestone.steps);
+  const sessions = steps
+    .filter((step) => step.unit === "times")
+    .reduce((sum, step) => sum + step.amount, 0);
+  const when = roadmap.schedule
+    ? `, ${whenLabel(roadmap.schedule.weekdays, roadmap.schedule.time)}`
+    : "";
+  return `"${roadmap.title}" (${roadmap.milestones.length} phases${
+    sessions > 0 ? `, ${sessions} sessions in all` : ""
+  }${when})`;
+}
 
 /** True when a reply meant for the person mentions a tool by name. */
 export function leaksTools(text: string): boolean {
