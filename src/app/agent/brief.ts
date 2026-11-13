@@ -60,6 +60,11 @@ export interface Brief {
    * wanted. Asked for once, with the rest; emptied when they have been.
    */
   needs?: string[];
+  /**
+   * What they have that a plan can use (equipment, a place, a skill), read
+   * once with the needs. The roadmap has to use it somewhere.
+   */
+  use?: string[];
   /** Whether their latest message asks for something to be looked up. */
   research?: boolean;
   /** Whether their latest message tells the app to do something now. */
@@ -244,6 +249,8 @@ export interface Said {
   startOn?: number;
   /** What their yes came with: the roadmap has to carry it. */
   added?: string[];
+  /** What they have that the roadmap's sessions can use. */
+  use?: string[];
   /**
    * The days of the week as the conversation last stated them, with the line
    * that does. They bind nothing: a roadmap on other days is sent back once.
@@ -264,6 +271,7 @@ export function saidIn(brief: Brief | null): Said {
     ...(plan.weeks ? { weeks: plan.weeks } : {}),
     ...(start.length === 1 ? { startOn: start[0] } : {}),
     ...(brief?.added?.length ? { added: brief.added } : {}),
+    ...(brief?.use?.length ? { use: brief.use } : {}),
   };
 }
 
@@ -473,6 +481,7 @@ export async function updateBrief(options: {
     };
     if (brief?.asked) next.asked = brief.asked;
     if (brief?.needs) next.needs = brief.needs;
+    if (brief?.use) next.use = brief.use;
     // (agreed and research are of this message alone: they are set below, never carried)
     if (notes.agrees === true) next.agreed = true;
     // A yes that comes with something new: the plan takes it in before it is saved
@@ -677,8 +686,9 @@ const whatToAsk = (things: string[]) => ({
               properties: {
                 plan_needs_its_measure: { type: "boolean" },
                 measure_was_said: { type: "boolean" },
+                plan_could_use: { type: "boolean" },
               },
-              required: ["plan_needs_its_measure", "measure_was_said"],
+              required: ["plan_needs_its_measure", "measure_was_said", "plan_could_use"],
             },
           ])
         ),
@@ -714,7 +724,7 @@ export async function planNeeds(options: {
   chat: Chat;
   brief: Brief;
   signal?: AbortSignal;
-}): Promise<string[]> {
+}): Promise<{ needs: string[]; use: string[] }> {
   const { brief } = options;
   const things = brief.has.slice(-MAX_THINGS);
   try {
@@ -723,7 +733,7 @@ export async function planNeeds(options: {
         {
           role: "system",
           content:
-            "A coach is about to write a plan for a person, with the numbers they asked for. For each thing listed under THEY HAVE, answer two questions. plan_needs_its_measure: would the coach need to know how much of it, how big, how heavy or how advanced it is, to set a number in the plan? measure_was_said: did the person already give that measure, as a number, anywhere in their words? Then, under other, at most one more fact a number of the plan depends on and they did not give; leave it empty when there is none.",
+            "A coach is about to write a plan for a person, with the numbers they asked for. For each thing listed under THEY HAVE, answer two questions. plan_needs_its_measure: would the coach need to know how much of it, how big, how heavy or how advanced it is, to set a number in the plan? measure_was_said: did the person already give that measure, as a number, anywhere in their words? plan_could_use: is it something a plan can use in what it asks the person to do (equipment, a tool, a place, a skill they have)? Their body measures, their past and the time they have are not. Then, under other, at most one more fact a number of the plan depends on and they did not give; leave it empty when there is none.",
         },
         {
           role: "user",
@@ -737,8 +747,13 @@ export async function planNeeds(options: {
       { reasoning: false, maxTokens: 300, toolChoice: "required" }
     );
     const call = reply.toolCalls.find((one) => one.function.name === "what_to_ask");
-    if (!call) return [];
+    if (!call) return { needs: [], use: [] };
     const found = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+    const use = things.filter(
+      (_, index) =>
+        (found[`thing_${index + 1}`] as Record<string, unknown> | undefined)?.plan_could_use ===
+        true
+    );
     const unmeasured = things.filter((thing, index) => {
       const answer = found[`thing_${index + 1}`] as Record<string, unknown> | undefined;
       return (
@@ -752,16 +767,19 @@ export async function planNeeds(options: {
       .map((fact) => fact.trim())
       .filter((fact) => fact.length > 0 && fact.length <= 120)
       .slice(0, 1);
-    return [
-      ...(unmeasured.length > 0
-        ? [
-            `the measure of what they have, if they know it (how much, how heavy, what size or what level): ${unmeasured.join("; ")}`,
-          ]
-        : []),
-      ...other,
-    ];
+    return {
+      needs: [
+        ...(unmeasured.length > 0
+          ? [
+              `the measure of what they have, if they know it (how much, how heavy, what size or what level): ${unmeasured.join("; ")}`,
+            ]
+          : []),
+        ...other,
+      ],
+      use,
+    };
   } catch {
-    return [];
+    return { needs: [], use: [] };
   }
 }
 

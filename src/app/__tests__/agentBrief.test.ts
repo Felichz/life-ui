@@ -209,26 +209,32 @@ describe("what a plan's numbers depend on", () => {
         seen.push(String(messages[1].content));
         seen.push(JSON.stringify(tools));
         return call("what_to_ask", {
-          thing_1: { plan_needs_its_measure: true, measure_was_said: false },
+          thing_1: { plan_needs_its_measure: true, measure_was_said: false, plan_could_use: true },
           // The model's word alone: the number is in the thing itself
-          thing_2: { plan_needs_its_measure: true, measure_was_said: false },
-          thing_3: { plan_needs_its_measure: false, measure_was_said: false },
+          thing_2: { plan_needs_its_measure: true, measure_was_said: false, plan_could_use: true },
+          thing_3: {
+            plan_needs_its_measure: false,
+            measure_was_said: false,
+            plan_could_use: false,
+          },
           other: ["how many push-ups they can do today"],
         });
       },
     });
     expect(seen[0]).toContain("thing_1: mancuernas\nthing_2: una barra de 8kg\nthing_3: un patio");
     expect(seen[1]).toContain('"thing_3"');
-    expect(facts).toEqual([
+    expect(facts.needs).toEqual([
       "the measure of what they have, if they know it (how much, how heavy, what size or what level): mancuernas",
       "how many push-ups they can do today",
     ]);
+    // What a plan can use is read in the same call: the patio is not something to train with
+    expect(facts.use).toEqual(["mancuernas", "una barra de 8kg"]);
   });
 
   it("asks for nothing when the call comes back empty or fails", async () => {
     expect(
       await planNeeds({ brief: wantsWeight, chat: async () => call("what_to_ask", { facts: [] }) })
-    ).toEqual([]);
+    ).toEqual({ needs: [], use: [] });
     expect(
       await planNeeds({
         brief: wantsWeight,
@@ -236,7 +242,7 @@ describe("what a plan's numbers depend on", () => {
           throw new Error("down");
         },
       })
-    ).toEqual([]);
+    ).toEqual({ needs: [], use: [] });
   });
 });
 

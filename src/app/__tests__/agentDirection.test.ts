@@ -440,6 +440,19 @@ describe("the roadmap draft", () => {
       ruled.saveRoadmap({ ...ROADMAP, rules: "- Día malo: una serie de cada ejercicio" });
       expect(ruled.changed).toBe(true);
 
+      // What they have is used by no session: sent back once, and the same call stands
+      const used = new RoadmapDraft(setup(), new Date(), {
+        use: ["mancuernas de 5kg", "la barra"],
+      });
+      expect(() => used.saveRoadmap(ROADMAP)).toThrow(
+        /unused-things: the person has: mancuernas de 5kg/
+      );
+      used.saveRoadmap({
+        ...ROADMAP,
+        milestones: [{ title: "Fase", sessions: 6, notes: "- Remo con mancuernas de 5kg 3x10" }],
+      });
+      expect(used.changed).toBe(true);
+
       // Other days than the conversation names: sent back once, with the line they were read from
       const core3 = setup();
       const other = new RoadmapDraft(core3, new Date(), {
