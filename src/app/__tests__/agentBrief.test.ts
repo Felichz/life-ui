@@ -5,8 +5,10 @@ import {
   clockIn,
   durationIn,
   missingFrom,
+  needsFromNotes,
   nextMove,
   overfull,
+  planNeeds,
   saidIn,
   timeIn,
   updateBrief,
@@ -90,13 +92,17 @@ describe("the parts of a session, added up", () => {
 });
 
 describe("what a plan's numbers depend on", () => {
+  const wantsWeight = {
+    wants: ["un plan con el peso de cada ejercicio"],
+    has: ["mancuernas", "barra", "discos", "yo peso 80kg"],
+    limits: [],
+    unsure: [],
+    plan: { length: "", days: "", time: "", start: "" },
+  };
+
   it("is asked for once, with the days and the length", () => {
     const brief = {
-      wants: ["un plan con el peso de cada ejercicio"],
-      has: ["mancuernas"],
-      limits: [],
-      unsure: [],
-      plan: { length: "", days: "", time: "", start: "" },
+      ...wantsWeight,
       needs: ["how heavy their dumbbells are"],
     };
     const move = nextMove(brief, false);
@@ -108,6 +114,23 @@ describe("what a plan's numbers depend on", () => {
     const later = nextMove({ ...brief, needs: [], asked: 2 }, false);
     expect(later).toContain("Give them the plan now");
     expect(later).not.toContain("dumbbells");
+  });
+
+  it("finds the load the plan needs even when the model answers with nothing", () => {
+    // The person's own 80 kg is not the load of their equipment
+    expect(needsFromNotes(wantsWeight)).toEqual(["how heavy their weights are"]);
+    // They said how heavy it is: nothing is left to ask
+    expect(needsFromNotes({ ...wantsWeight, has: ["mancuernas de 5 kg", "barra"] })).toEqual([]);
+    // A plan that gives no weight has no load to ask for
+    expect(needsFromNotes({ ...wantsWeight, wants: ["un plan para entrenar"] })).toEqual([]);
+  });
+
+  it("keeps what it found when the question call comes back empty", async () => {
+    const facts = await planNeeds({
+      brief: wantsWeight,
+      chat: async () => call("what_to_ask", { facts: [] }),
+    });
+    expect(facts).toEqual(["how heavy their weights are"]);
   });
 });
 
@@ -560,8 +583,10 @@ describe("notes in the conversation", () => {
     expect(offered(0)).toContain("just_answer");
     expect(offered(0)).not.toContain("plan_roadmap");
     expect(offered(0)).not.toContain("plan_ahead");
-    // The day itself can always be run
-    expect(offered(0)).toContain("add_to_plan");
+    // A plan being shaped is not the day: nothing that changes it is offered
+    expect(offered(0)).not.toContain("add_to_plan");
+    expect(offered(0)).not.toContain("start_activity");
+    expect(offered(0)).not.toContain("finish_activity");
 
     await agent.send("antes quiero que lo pienses mejor");
     expect(lastTool()).toContain("not-yet");
@@ -753,6 +778,46 @@ describe("notes in the conversation", () => {
     // Only the query about the topic left the machine
     expect(sent).toHaveLength(1);
     expect(sent[0]).not.toMatch(/tdah|80kg/i);
+  });
+
+  it("does not take a number inside another for a personal measure", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const sent: string[] = [];
+    const http = (async (_url: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(String(init?.body));
+      const body = `event: message\ndata: ${JSON.stringify({ result: { content: [{ type: "text", text: "Title: Warm-up\nURL: https://example.org/warmup\nPublished: N/A\nText:\nx" }] } })}\n\n`;
+      return { ok: true, status: 200, text: async () => body } as Response;
+    }) as typeof fetch;
+    const seen: ChatMessage[][] = [];
+    const coach = [call("web_search", { query: "15 minutes warmup guidelines" }), say("Listo.")];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      web: { setting: () => "on", allow: () => {}, http },
+      chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
+        if (isNotes(messages)) {
+          return notes({
+            has: ["discos de 5 kg", "barra"],
+            research: true,
+          });
+        }
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    await agent.send("investigá cómo calentar antes de entrenar");
+
+    // "5 kg" is their measure; the 5 inside "15 minutes" is not
+    expect(sent).toHaveLength(1);
+    const results = seen
+      .at(-1)!
+      .filter((message) => message.role === "tool")
+      .map((message) => String(message.content));
+    expect(results[0]).not.toContain("about-the-person");
   });
 
   it("send a first plan back once when it leaves out what the person has", async () => {

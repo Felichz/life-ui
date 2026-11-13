@@ -346,17 +346,31 @@ const COMMON = new Set([
   "little",
 ]);
 
-/** The words of what the person guessed about themselves that would give it away in a search. */
+/**
+ * The words and measures of what the person guessed about themselves that
+ * would give it away in a search. A measure stays whole ("5 kg"): a number
+ * that is only part of another ("15 minutes") is not their measure.
+ */
 function personalWords(guesses: string[]): string[] {
-  const words = guesses
-    .join(" ")
-    .toLocaleLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .split(/[^a-z0-9]+/)
-    // A measure ("80kg") gives a person away however short it is
-    .filter((word) => (word.length >= 4 || /\d/.test(word)) && !COMMON.has(word));
-  return [...new Set(words)];
+  const found = new Set<string>();
+  for (const guess of guesses) {
+    const text = plain(guess);
+    const measures = text.match(/\d+(?:[.,]\d+)?\s*[a-z%]+/g) ?? [];
+    const rest = measures.length > 0 ? text.replace(/\d+(?:[.,]\d+)?\s*[a-z%]+/g, " ") : text;
+    for (const measure of measures) found.add(measure.replace(/\s+/g, " ").trim());
+    for (const word of rest.split(/[^a-z0-9]+/)) {
+      // A word has to be long enough to say something; a guess can be short
+      if ((word.length >= 4 || /\d/.test(word)) && !COMMON.has(word)) found.add(word);
+    }
+  }
+  return [...found];
+}
+
+/** Whether a word or measure appears in the query as a whole, not inside another number. */
+function names(query: string, phrase: string): boolean {
+  const text = plain(query);
+  const wanted = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*");
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${wanted}([^\\p{L}\\p{N}]|$)`, "iu").test(text);
 }
 
 /** What to do when a close is asked for and nothing runs: the usual cause is a start that was never made. */
@@ -1148,9 +1162,7 @@ export const TOOLS: Tool[] = [
       if (!query) throw new ToolError("missing-query");
       if (!http) throw new ToolError("web-unavailable");
       // A guess about their own health or character is theirs: the query is about the topic
-      const personal = personalWords(guesses ?? []).filter((word) =>
-        new RegExp(`(^|[^\\p{L}])${word}([^\\p{L}]|$)`, "iu").test(query)
-      );
+      const personal = personalWords(guesses ?? []).filter((word) => names(query, word));
       if (personal.length > 0) {
         throw new ToolError(
           "about-the-person",
