@@ -645,12 +645,44 @@ const WHAT_TO_ASK = {
   },
 };
 
+/** A plan whose numbers need a load ("the weight for each exercise"). */
+const ASKS_FOR_LOAD =
+  /\b(peso|pesos|carga|cargas|weight|weights|load|loading)\b[\s\S]{0,80}\b(ejercicio|ejercicios|serie|series|repetici[oó]n|repeticiones|reps?|exercise|exercises|sets?|fuerza|strength|entrenamiento|training|rutina|routine)\b|\b(ejercicio|ejercicios|serie|series|repetici[oó]n|repeticiones|reps?|exercise|exercises|sets?|fuerza|strength|entrenamiento|training|rutina|routine)\b[\s\S]{0,80}\b(peso|pesos|carga|cargas|weight|weights|load|loading)\b/i;
+/** Weights, bars and plates: things whose load matters and a person may name without its number. */
+const HAS_LOAD_EQUIPMENT =
+  /\b(mancuernas?|pesas?|barra|barras?|discos?|kettlebells?|dumbbells?|barbells?|weight\s?plates?|plates?)\b/i;
+/** A load in the same clause as the equipment ("mancuernas de 5 kg"), not the person's own weight. */
+function writesLoad(has: string): boolean {
+  return has
+    .split(/[.,;\n]/)
+    .some(
+      (clause) =>
+        HAS_LOAD_EQUIPMENT.test(clause) &&
+        /\b\d+(?:[.,]\d+)?\s*(?:kg|kilos?|libras?|lbs?|pounds?)\b/i.test(clause)
+    );
+}
+
+/**
+ * What a plan's numbers need and the person has not said, read here and not
+ * left to the model: asked for "the weight for each exercise", the coach has
+ * to know how heavy the equipment is. A 9B model asked this on its own often
+ * answers that there is nothing to ask.
+ */
+export function needsFromNotes(brief: Brief): string[] {
+  const asked = [...brief.wants, ...brief.limits].join(" ");
+  const has = brief.has.join(". ");
+  if (!ASKS_FOR_LOAD.test(asked) || !HAS_LOAD_EQUIPMENT.test(has)) return [];
+  if (writesLoad(has)) return [];
+  return ["how heavy their weights are"];
+}
+
 /**
  * What the numbers of a plan depend on and the person has not said (ADR-012):
  * asked for a plan "with the weight for each exercise", a coach has to know
  * how heavy their weights are, and a 9B model writing the plan does not stop
- * to ask. Asked this one question on its own, it finds it. Worked out once,
- * when a plan is first wanted; empty on any failure.
+ * to ask. Asked this one question on its own, it finds some of it; what the
+ * notes already show is added here, so a wrong empty answer costs nothing.
+ * Worked out once, when a plan is first wanted; empty on any failure.
  */
 export async function planNeeds(options: {
   chat: Chat;
@@ -658,13 +690,14 @@ export async function planNeeds(options: {
   signal?: AbortSignal;
 }): Promise<string[]> {
   const { brief } = options;
+  const known = needsFromNotes(brief);
   try {
     const reply = await options.chat(
       [
         {
           role: "system",
           content:
-            "A coach is about to write a plan for a person. You say which facts about the person the numbers of that plan depend on and are still unknown. Often there is none: an empty list is a good answer. English, a few words each.",
+            "A coach is about to write a plan for a person. You say which facts about the person the numbers of that plan depend on and are still unknown. Look at every number the plan will have to give (weight, resistance, distance, pace, level, amount): name the fact it depends on that is not in their notes. If they named equipment whose load or size matters and did not say it, that is one. Often there is none: an empty list is a good answer. Never ask for the days, the time or the length of a session. English, a few words each.",
         },
         {
           role: "user",
@@ -678,13 +711,14 @@ export async function planNeeds(options: {
       { reasoning: false, maxTokens: 150, toolChoice: "required" }
     );
     const call = reply.toolCalls.find((one) => one.function.name === "what_to_ask");
-    if (!call) return [];
+    if (!call) return known;
     const found = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-    return strings(found.facts)
-      .filter((fact) => fact.length <= 120)
-      .slice(0, 2);
+    const facts = [...known, ...strings(found.facts)]
+      .map((fact) => fact.trim())
+      .filter((fact) => fact.length > 0 && fact.length <= 120);
+    return [...new Set(facts)].slice(0, 2);
   } catch {
-    return [];
+    return known;
   }
 }
 

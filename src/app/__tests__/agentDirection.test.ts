@@ -158,6 +158,31 @@ describe("the roadmap draft", () => {
     expect(draft.changed).toBe(false);
   });
 
+  it("keeps the roadmap's session length when a phase names its activity again", () => {
+    const core = setup();
+    const draft = new RoadmapDraft(core);
+    draft.saveRoadmap({
+      title: "Fuerza en casa",
+      activity: "Circuito de fuerza",
+      session_minutes: 15,
+      schedule: SCHEDULE,
+      milestones: [
+        {
+          title: "Fase 1",
+          // Named in the phase as well, as a 9B model did, with no minutes of its own
+          activity: "Circuito de fuerza",
+          sessions: 6,
+          notes: "- Sentadilla 2x10",
+        },
+      ],
+    });
+    expect(draft.changed).toBe(true);
+    draft.commit();
+    const template = core.getActivityTemplates().find((one) => one.title === "Circuito de fuerza");
+    expect(template?.clearObjectiveSettings?.estimatedDurationMinutes).toBe(15);
+    expect(core.getPlannedActivities()).toHaveLength(6);
+  });
+
   it("cannot be created without the days its sessions happen on", () => {
     const draft = new RoadmapDraft(setup());
     const { schedule: _schedule, ...withoutDays } = ROADMAP;
@@ -343,6 +368,14 @@ describe("the roadmap draft", () => {
       );
       brief.saveRoadmap(few);
       expect(brief.changed).toBe(true);
+
+      // A shortfall that is only one week still has a count: 7 weeks at 3 days is 21, not 18
+      const weekly = new RoadmapDraft(setup(), new Date(), { weeks: 7 });
+      expect(() => weekly.saveRoadmap(few)).toThrow(
+        /shorter-than-asked.*18 sessions on 3 days a week run only 6.*7 weeks are 21 in all/
+      );
+      weekly.saveRoadmap(few);
+      expect(weekly.changed).toBe(true);
 
       // What they added with their yes is in no session and no rule: sent back once
       const more = new RoadmapDraft(setup(), new Date(), {

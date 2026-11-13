@@ -303,17 +303,23 @@ export class RoadmapDraft {
       return milestone.steps as Fields[];
     }
     const own = text(milestone.activity);
-    const activity = own || text(roadmap.activity);
+    const usual = text(roadmap.activity);
+    const activity = own || usual;
     if (!activity) {
       throw new DraftError(
         "roadmap-needs-activity",
         'give "activity": the one thing the person does in every session of this roadmap'
       );
     }
+    // A phase that repeats the roadmap's activity keeps the roadmap's session
+    // length: a 9B model named it in every phase and left session_minutes at
+    // the top, and the new activity was never created.
+    const different = Boolean(own && usual && !same(own, usual));
     return [
       {
         activity,
-        session_minutes: milestone.session_minutes ?? (own ? undefined : roadmap.session_minutes),
+        session_minutes:
+          milestone.session_minutes ?? (different ? undefined : roadmap.session_minutes),
         sessions: milestone.sessions,
         total_minutes: milestone.total_minutes,
         notes: milestone.notes,
@@ -457,17 +463,27 @@ export class RoadmapDraft {
       : null;
   }
 
-  /** The weeks a new roadmap runs when that is well short of what the person asked for. */
-  private shorterThanAsked(roadmap: DraftRoadmap): number | null {
+  /**
+   * The weeks a new roadmap runs and the sessions it still owes when it is
+   * short of what the person asked for. Counted, not read from the calendar:
+   * "weeks 5-7" at three days a week is nine sessions, and a 9B model wrote
+   * six. The count it owes goes back to it once.
+   */
+  private shorterThanAsked(roadmap: DraftRoadmap): { weeks: number; expected: number } | null {
     if (roadmap.id || !this.said.weeks) return null;
     const layout = this.layout(roadmap).filter((entry) => entry.last);
     if (layout.length === 0) return null;
+    const perWeek = roadmap.schedule?.weekdays.length ?? 1;
+    const expected = this.said.weeks * perWeek;
+    const total = roadmap.milestones
+      .flatMap((milestone) => milestone.steps)
+      .reduce((sum, step) => sum + this.sessionsOf(step), 0);
+    if (total >= expected) return null;
     const days =
       (new Date(`${layout[layout.length - 1].last}T12:00:00`).getTime() -
         new Date(`${layout[0].first}T12:00:00`).getTime()) /
       86_400_000;
-    const weeks = Math.ceil((days + 1) / 7);
-    return weeks < this.said.weeks - Math.max(1, Math.round(this.said.weeks * 0.2)) ? weeks : null;
+    return { weeks: Math.ceil((days + 1) / 7), expected };
   }
 
   /** What the person should look at before saying yes. */
@@ -602,7 +618,7 @@ export class RoadmapDraft {
           const perWeek = roadmap.schedule?.weekdays.length ?? 1;
           throw new DraftError(
             "shorter-than-asked",
-            `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run only ${shorter}. Count the sessions of each phase again from the plan in the conversation: a phase of N weeks is N x ${perWeek} sessions, and ${this.said.weeks} weeks are ${this.said.weeks! * perWeek} in all. If the plan they agreed to really is this short, send the same call again.`
+            `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run only ${shorter.weeks}. ${this.said.weeks} weeks are ${shorter.expected} in all. Count the sessions of each phase again from the plan in the conversation: a phase of N weeks is N x ${perWeek} sessions. If the plan they agreed to really is this short, send the same call again.`
           );
         }
         const longer = this.longerThanAsked(roadmap);

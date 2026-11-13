@@ -208,6 +208,22 @@ const HELD_BACK = new Set([
 ]);
 /** The tools that put a plan on the calendar. */
 const PLANNING_TOOLS = new Set(["plan_roadmap", "plan_ahead"]);
+/**
+ * The tools that change the day itself. While a plan is still being shaped
+ * they wait for a request: told to build a plan, a 9B model once created and
+ * started an activity named after it.
+ */
+const DAY_TOOLS = new Set([
+  "add_to_plan",
+  "set_notes",
+  "schedule",
+  "move_to_block",
+  "remove_from_plan",
+  "start_activity",
+  "finish_activity",
+  "stop_activity",
+  "log_event",
+]);
 /** Failures of one tool in one turn before it is not run again. */
 const MAX_FAILURES = 2;
 /** A reply this long, to someone who wants a plan, is taken to be the plan (ADR-012). */
@@ -456,25 +472,28 @@ export class Agent {
    * model told a time of day planned 63 sessions, and told of a bad habit
    * tried to delete an activity.
    *
-   * The tools of the day itself (add, start, finish, move) are always there.
-   * Holding them back as well was tried: the notes take "I have started
-   * reading" for talk, and the day could no longer be run.
+   * The tools of the day itself (add, start, finish, move) are there in a
+   * normal turn, but a plan being shaped is not a day: a 9B model told to
+   * build one created and started an activity named after it. They come back
+   * the moment the person asks for a change to the day.
    */
   private schemas() {
     const all = toolSchemas(this.webSetting() !== "off");
     // The notes do not speak of this message (too short, or the call failed): nothing is held back
     if (!this.notesRead || this.brief?.instruction) return all;
     const plan = this.brief?.plan;
-    if (this.brief?.agreed) {
-      // A plan they said yes to goes in as a roadmap, which puts its own sessions on the calendar
-      return plan && !plan.built ? all.filter((tool) => tool.function.name !== "plan_ahead") : all;
-    }
-    return all.filter(
-      (tool) =>
-        !HELD_BACK.has(tool.function.name) ||
-        // A roadmap that exists can be changed on a plain request ("move it to Saturdays")
-        (tool.function.name === "plan_roadmap" && plan?.built)
-    );
+    const shaping = Boolean(plan && !plan.built);
+    const offered =
+      this.brief?.agreed && shaping
+        ? // A plan they said yes to goes in as a roadmap, which puts its own sessions on the calendar
+          all.filter((tool) => tool.function.name !== "plan_ahead")
+        : all.filter(
+            (tool) =>
+              !HELD_BACK.has(tool.function.name) ||
+              // A roadmap that exists can be changed on a plain request ("move it to Saturdays")
+              (tool.function.name === "plan_roadmap" && plan?.built)
+          );
+    return shaping ? offered.filter((tool) => !DAY_TOOLS.has(tool.function.name)) : offered;
   }
 
   /** What every request carries before the conversation: the prompt, the day and the tools. */

@@ -4,7 +4,7 @@ import { contractOf } from "../lib/domain";
 import type { ChatMessage, ChatOptions, ModelReply, ToolCall } from "./llm";
 import { DraftError, RoadmapDraft } from "./roadmapDraft";
 import { formatDayMinutes } from "../lib/format";
-import { WEEKDAYS, WEEKDAY_NAMES } from "./when";
+import { WEEKDAYS, WEEKDAY_NAMES, weekdayNames } from "./when";
 import type { Said } from "./brief";
 
 /**
@@ -445,10 +445,17 @@ export async function runRoadmapPlanner(options: {
   const { core, chat, signal } = options;
   const said = options.said ?? {};
   const draft = new RoadmapDraft(core, options.now, said);
+  const perWeek = said.days?.length;
   const theirs = [
     said.minutes && `one session can be ${said.minutes} minutes`,
     said.time !== undefined && `the time is ${formatDayMinutes(said.time)}`,
     said.weeks && `the plan runs about ${said.weeks} weeks`,
+    perWeek && `the sessions happen on ${weekdayNames(said.days!)} (${perWeek} a week)`,
+    said.weeks &&
+      perWeek &&
+      `the count is already made: one week is ${perWeek} sessions, ${said.weeks} weeks are ${
+        said.weeks * perWeek
+      } in all, and a phase of N weeks is N x ${perWeek} sessions`,
   ].filter(Boolean);
   const messages: ChatMessage[] = [
     {
