@@ -152,6 +152,17 @@ describe("the parts of a session, added up", () => {
     expect(overfull(plan, 15)).toEqual({ phase: "Fase 2 (Semanas 3-5)", sum: 19 });
     expect(overfull(plan, 30)).toBeNull();
     expect(overfull("Sin tiempos escritos", 15)).toBeNull();
+    // Minutes written in the sentence, not in parentheses; the progress line is not a part
+    const prose = [
+      "**Fase 2 (Semanas 5-8): Enfoque en reuniones**",
+      "*   **Qué haces:** 5 min de vocabulario, 15 min simulando situaciones, 10 min hablando de un tema, 5 min repasando.",
+      "*   **Progreso:** Para la semana 8 hablas durante 3-4 minutos seguidos.",
+    ].join("\n");
+    expect(overfull(prose, 30)).toEqual({
+      phase: "Fase 2 (Semanas 5-8): Enfoque en reuniones",
+      sum: 35,
+    });
+    expect(overfull(prose.replace("10 min hablando de un tema, ", ""), 30)).toBeNull();
   });
 });
 
