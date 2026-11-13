@@ -398,6 +398,8 @@ export class RoadmapDraft {
       roadmap.rules
     );
     if (named.length === 0 && !chooses) return;
+    // The same days as the calendar's say nothing against it
+    if (!chooses && named.every((day) => roadmap.schedule!.weekdays.includes(day))) return;
     this.rulesSentBack = true;
     throw new DraftError(
       "rules-about-days",
