@@ -61,16 +61,13 @@ const WORKDAYS = /\b(entre semana|d[ií]as h[aá]biles|d[ií]as laborables|weekd
 const THROUGH = new Set(["a", "al", "hasta", "to", "through", "thru"]);
 
 /**
- * The weekdays a sentence names, in order: one by one ("lunes, miércoles y
- * viernes"), as a stretch ("de lunes a viernes" is five days, not two), or
- * together ("todos los días", "weekends").
+ * The weekdays a sentence names one by one ("lunes, miércoles y viernes") or
+ * as a stretch ("de lunes a viernes" is five days, not two). "Todos los días"
+ * and the like are not named here: they can describe what a session contains,
+ * not when the sessions happen.
  */
-export function weekdaysIn(text: string): number[] {
-  const lower = text.toLocaleLowerCase();
+function namedWeekdays(lower: string): number[] {
   const days = new Set<number>();
-  if (EVERY_DAY.test(lower)) for (let day = 0; day < 7; day++) days.add(day);
-  if (WEEKEND.test(lower)) [6, 0].forEach((day) => days.add(day));
-  if (WORKDAYS.test(lower)) [1, 2, 3, 4, 5].forEach((day) => days.add(day));
   const words = lower.replace(/\s*[-–—]\s*/g, " to ").split(/[^a-záéíóúñ]+/);
   for (let index = 0; index < words.length; index++) {
     const from = WEEKDAY_WORDS[words[index]];
@@ -89,6 +86,20 @@ export function weekdaysIn(text: string): number[] {
   return [...days].sort();
 }
 
+/**
+ * The weekdays a sentence names, in order: one by one ("lunes, miércoles y
+ * viernes"), as a stretch ("de lunes a viernes" is five days, not two), or
+ * together ("todos los días", "weekends").
+ */
+export function weekdaysIn(text: string): number[] {
+  const lower = text.toLocaleLowerCase();
+  const days = new Set<number>(namedWeekdays(lower));
+  if (EVERY_DAY.test(lower)) for (let day = 0; day < 7; day++) days.add(day);
+  if (WEEKEND.test(lower)) [6, 0].forEach((day) => days.add(day));
+  if (WORKDAYS.test(lower)) [1, 2, 3, 4, 5].forEach((day) => days.add(day));
+  return [...days].sort();
+}
+
 const NOT = /\b(no|not|never|nunca|ni|salvo|excepto|except|menos|sin|without)\b|n't\b/;
 
 /**
@@ -103,11 +114,20 @@ export function daysStated(message: string): { days: number[]; quote: string } |
     .filter((line) => weekdaysIn(line).length > 0);
   if (lines.length === 0) return null;
   if (lines.some((line) => NOT.test(line.toLocaleLowerCase()))) return null;
-  const days = weekdaysIn(lines.join(" "));
+  // A schedule that names its days ("lunes, miércoles y viernes") is not
+  // turned into every day by a later line about what a session contains
+  // ("todos los días").
+  const named = lines.map((line) => ({
+    line,
+    days: namedWeekdays(line.toLocaleLowerCase()),
+  }));
+  const namedDays = new Set(named.flatMap((entry) => entry.days));
+  const explicit = namedDays.size >= 2;
+  const days = explicit ? [...namedDays].sort() : weekdaysIn(lines.join(" "));
   // The line that says the most of them is the one worth showing
-  const quote = [...lines].sort(
-    (one, other) => weekdaysIn(other).length - weekdaysIn(one).length
-  )[0];
+  const quote = [
+    ...(explicit ? named : lines.map((line) => ({ line, days: weekdaysIn(line) }))),
+  ].sort((one, other) => other.days.length - one.days.length)[0].line;
   return { days, quote: quote.slice(0, 160) };
 }
 

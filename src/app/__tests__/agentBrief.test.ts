@@ -155,6 +155,23 @@ describe("what a message states about a plan's days and its end", () => {
     expect(daysStated("quince minutos a las 7")).toBeNull();
   });
 
+  it("keeps the days of the schedule when a later line says 'todos los días' of a session", () => {
+    expect(
+      daysStated(
+        [
+          "**Frecuencia:** Lunes, Miércoles y Viernes a las 19:00.",
+          "**Estructura de la sesión (todos los días):** calentamiento, fuerza, core.",
+        ].join("\n")
+      )
+    ).toEqual({
+      days: [1, 3, 5],
+      quote: "Frecuencia: Lunes, Miércoles y Viernes a las 19:00.",
+    });
+    // Alone, "todos los días" still means every day.
+    expect(daysStated("todos los días a las 7")?.days).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(daysStated("de lunes a viernes\n(todos los días)")?.days).toEqual([1, 2, 3, 4, 5]);
+  });
+
   it("counts an end named by the calendar from today", () => {
     const today = new Date(2026, 10, 12, 9);
     // To the last day of December: seven weeks, not the nine of two whole months

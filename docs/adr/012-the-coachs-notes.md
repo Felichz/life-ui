@@ -87,7 +87,7 @@ The model writes a plan with the notes in front of it and still leaves things ou
 
 When something is missing the plan is written once more, with the list. Once: the check improves a plan, it is not a gate. It costs a short call on the turn a plan is laid out, and one rewrite when it finds something.
 
-The same rule, "sent back once, with the numbers", now covers three things a planner copies wrong (ADR-011): a roadmap much longer than asked, one much shorter (the sessions of a phase counted short), and one on other days than the conversation last named, with the line the days were read from. The short count is made from the weeks asked for and the days a week, not from the span on the calendar: seven weeks at three days is 21 sessions, and a plan with 18 is sent back once with "7 weeks are 21 in all". None of them binds: sent again, it stands, and the person sees it on the card.
+The same rule, "sent back once, with the numbers", now covers three things a planner copies wrong (ADR-011): a roadmap much longer than asked, one much shorter (the sessions of a phase counted short), and one on other days than the conversation last named, with the line the days were read from. The short count is made from the weeks asked for and the days a week, not from the span on the calendar: seven weeks at three days is 21 sessions, and a plan with 18 is sent back once with "7 weeks are 21 in all". When a plan names its days in a schedule line and also says "todos los días" about what a session contains, the named days are the ones read: the phrase describes the session, not the calendar. None of them binds: sent again, it stands, and the person sees it on the card.
 
 ### 4c. Small readings the code does itself
 
