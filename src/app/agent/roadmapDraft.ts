@@ -114,6 +114,8 @@ export class RoadmapDraft {
   private daysSentBack = false;
   /** A roadmap whose rules spoke of days was sent back already. */
   private rulesSentBack = false;
+  /** A roadmap with a phase longer than the person's session was sent back already. */
+  private phaseLongSentBack = false;
   /** A roadmap whose phases do not hold their weeks' sessions was sent back already. */
   private phasesSentBack = false;
   /** A roadmap without what the person added with their yes was sent back already. */
@@ -384,6 +386,37 @@ export class RoadmapDraft {
     const day = new Date(`${localDate(this.now)}T12:00:00`);
     while (day.getDay() !== weekday) day.setDate(day.getDate() + 1);
     return localDate(day);
+  }
+
+  /**
+   * No phase asks, in what a session contains, for more minutes than the
+   * person's session has: "run the 5 km (about 40-45 min)" in a session of 30.
+   * Sent back once with the line; the first phase has its own, stricter check.
+   */
+  private everyPhaseFits(roadmap: DraftRoadmap) {
+    const minutes = this.said.minutes;
+    if (!minutes || this.phaseLongSentBack) return;
+    const limit = minutes * 1.2;
+    for (const milestone of roadmap.milestones) {
+      for (const step of milestone.steps) {
+        for (const line of (step.notes ?? "").split(String.fromCharCode(10))) {
+          if (/^[\s*#>\-\d.)]*(progres|objetiv|meta\b|goal|nota\b|note\b)/i.test(line)) continue;
+          const longest = Math.max(
+            0,
+            ...[...line.matchAll(/(\d{1,3})\s*(?:min|minutos?|minutes?)\b/gi)].map((found) =>
+              Number(found[1])
+            )
+          );
+          if (longest > limit) {
+            this.phaseLongSentBack = true;
+            throw new DraftError(
+              "phase-too-long",
+              `in "${milestone.title}" a session asks for ${longest} minutes ("${line.trim().slice(0, 100)}"), and the person's session is ${minutes}. Cut it down to what fits in ${minutes} minutes: a later phase builds up to the goal by steps, it does not ask for it all in one session.`
+            );
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -688,6 +721,7 @@ export class RoadmapDraft {
       if (!existing) {
         this.keepsTo(roadmap);
         this.rulesAreNotTheSchedule(roadmap);
+        this.everyPhaseFits(roadmap);
         this.onTheirDays(roadmap);
         this.onTheirPhases(roadmap);
         this.carriesWhatWasAdded(roadmap);

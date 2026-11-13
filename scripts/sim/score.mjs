@@ -84,6 +84,16 @@ function score(file) {
     askedDays.size < 2 ? "n/a (none given)" : `${[...cardDays]} vs ${[...askedDays]}`
   );
 
+  const given =
+    /a las (\d{1,2})/.exec(plain(said)) ??
+    /(\d{1,2}) de la (?:manana|tarde|noche)/.exec(plain(said));
+  const shown = /· (\d{2}):\d{2}/.exec(summary);
+  add(
+    "the hour is the one the person gave",
+    !given || (shown !== null && Number(shown[1]) % 12 === Number(given[1]) % 12),
+    given ? `said ${given[1]}, card ${shown ? shown[1] : "none"}` : "n/a"
+  );
+
   const weeks = /(\d+)\s*semanas|(\d+)\s*meses/i.exec(said);
   const perWeek = cardDays.size;
   if (weeks && perWeek) {

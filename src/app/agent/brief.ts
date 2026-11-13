@@ -223,7 +223,16 @@ export function clockIn(message: string): { time: string; sure: boolean } | null
     return null;
   }
   let hour = Number(clock[1]);
-  const suffix = (clock[3] ?? "").toLowerCase();
+  let suffix = (clock[3] ?? "").toLowerCase();
+  // "Por la mañana a las 7": the part of the day is said apart from the hour
+  if (!suffix) {
+    if (/\b(por|en|de) la (ma[ñn]ana)\b|\bin the morning\b/i.test(message)) suffix = "mañana";
+    else if (
+      /\b(por|en|de) la (tarde|noche)\b|\bin the (afternoon|evening)\b|\bat night\b/i.test(message)
+    ) {
+      suffix = "tarde";
+    }
+  }
   const morning = /^a|mañana|manana|morning/.test(suffix);
   const later = /^p|tarde|noche|afternoon|evening|night/.test(suffix);
   if (later && hour < 12) hour += 12;

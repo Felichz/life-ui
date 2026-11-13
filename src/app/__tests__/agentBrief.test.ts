@@ -58,6 +58,16 @@ const gaps = (fields: Partial<Record<string, string[]>> = {}) =>
   call("check_plan", { not_used: [], not_given: [], breaks: [], ...fields });
 
 describe("a duration and a time, read from the person's own words", () => {
+  it("reads the part of the day said apart from the hour", () => {
+    expect(clockIn("martes, jueves y sabado por la mañana a las 7")).toEqual({
+      time: "07:00",
+      sure: true,
+    });
+    expect(clockIn("a las 8 por la noche")?.time).toBe("20:00");
+    // No part of the day: still a guess
+    expect(clockIn("a las 7")).toEqual({ time: "07:00", sure: false });
+  });
+
   it("finds them however they are said", () => {
     expect(durationIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("15 min");
     expect(timeIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("19:00");
