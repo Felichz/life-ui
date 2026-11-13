@@ -581,7 +581,23 @@ export async function planGaps(options: {
       `in "${full.phase}" the timed parts of one session add up to ${full.sum} minutes, and a session is ${theirs}`
     );
   }
-  if (brief.has.length + brief.wants.length + brief.limits.length === 0) return over;
+  // Timed while the comparison is made: one more short call, not one more wait
+  const session = theirs ?? minutesOf(brief.plan?.length ?? "");
+  const timing = session
+    ? sessionTakes({ chat: options.chat, plan, minutes: session, signal: options.signal }).then(
+        (takes) => {
+          if (takes) {
+            over.push(
+              `done as written, with every set and every rest, one session of the first phase takes about ${takes} minutes, and a session is ${session}: cut exercises, sets or rounds in every phase until one session really fits, and give each part its minutes`
+            );
+          }
+        }
+      )
+    : Promise.resolve();
+  if (brief.has.length + brief.wants.length + brief.limits.length === 0) {
+    await timing;
+    return over;
+  }
   try {
     const reply = await options.chat(
       [
@@ -607,6 +623,7 @@ export async function planGaps(options: {
       { reasoning: false, maxTokens: 300, toolChoice: "required" }
     );
     const call = reply.toolCalls.find((one) => one.function.name === "check_plan");
+    await timing;
     if (!call) return over;
     const found = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
     const text = bare(plan);
@@ -626,6 +643,7 @@ export async function planGaps(options: {
       ...(breaks.length ? [`it goes against a limit: ${breaks.join("; ")}`] : []),
     ];
   } catch {
+    await timing;
     return over;
   }
 }
@@ -736,6 +754,79 @@ export async function planNeeds(options: {
     ];
   } catch {
     return [];
+  }
+}
+
+const TIME_SESSION = {
+  type: "function" as const,
+  function: {
+    name: "time_session",
+    description:
+      "The parts of one session of the first phase, each with the minutes it really takes.",
+    parameters: {
+      type: "object",
+      properties: {
+        parts: {
+          type: "array",
+          maxItems: 14,
+          items: {
+            type: "object",
+            properties: {
+              part: { type: "string" },
+              sets_or_rounds: { type: "number" },
+              minutes: { type: "number" },
+            },
+            required: ["part", "sets_or_rounds", "minutes"],
+          },
+        },
+      },
+      required: ["parts"],
+    },
+  },
+};
+
+/** How far over the session an estimate has to be before it is said: the estimate is rough. */
+const OVER = 1.4;
+
+/**
+ * The minutes one session of the first phase really takes, done as written
+ * (ADR-012). A 9B model fits eight exercises of three sets into "15 minutes"
+ * and says it adds up. Asked to time the same session part by part, sets and
+ * rests included, it comes to thirty or forty; a session that does fit, it
+ * times at or under its length. The parts are the model's, the sum is the
+ * code's. Null when it fits, when nothing was timed, and on any failure.
+ */
+export async function sessionTakes(options: {
+  chat: Chat;
+  plan: string;
+  minutes: number;
+  signal?: AbortSignal;
+}): Promise<number | null> {
+  try {
+    const reply = await options.chat(
+      [
+        {
+          role: "system",
+          content:
+            "You time one session of a plan as a person would really do it. List every part of ONE session of the FIRST phase, in order, and for each the minutes it really takes when done as written: every repetition, every set or round, and the rests between them. Do not copy the minutes the plan claims: work them out from what has to be done.",
+        },
+        { role: "user", content: `THE PLAN:\n"""\n${options.plan.slice(0, 5000)}\n"""` },
+      ],
+      [TIME_SESSION],
+      options.signal,
+      { reasoning: false, maxTokens: 1000, toolChoice: "required" }
+    );
+    const call = reply.toolCalls.find((one) => one.function.name === "time_session");
+    if (!call) return null;
+    const found = JSON.parse(call.function.arguments || "{}") as { parts?: unknown };
+    const parts = Array.isArray(found.parts) ? found.parts : [];
+    const sum = parts.reduce((total: number, part) => {
+      const minutes = (part as { minutes?: unknown } | null)?.minutes;
+      return total + (typeof minutes === "number" && minutes > 0 && minutes < 600 ? minutes : 0);
+    }, 0);
+    return parts.length >= 2 && sum > options.minutes * OVER ? Math.round(sum) : null;
+  } catch {
+    return null;
   }
 }
 

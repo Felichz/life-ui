@@ -10,6 +10,7 @@ import {
   overfull,
   planNeeds,
   saidIn,
+  sessionTakes,
   timeIn,
   updateBrief,
   worthNoting,
@@ -45,6 +46,9 @@ const isNotes = (messages: ChatMessage[]) =>
 const isNeeds = (messages: ChatMessage[]) =>
   String(messages[0].content).startsWith("A coach is about to write");
 
+const isTiming = (messages: ChatMessage[]) =>
+  String(messages[0].content).startsWith("You time one session");
+
 const isCheck = (messages: ChatMessage[]) =>
   String(messages[0].content).startsWith("You compare a plan");
 
@@ -69,6 +73,37 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(clockIn("a las 7pm")).toEqual({ time: "19:00", sure: true });
     expect(durationIn("no tengo idea")).toBe("");
     expect(timeIn("peso 80kg y mido 180cm")).toBe("");
+  });
+});
+
+describe("the minutes a session really takes", () => {
+  const timed = (minutes: number[]) => async () =>
+    call("time_session", {
+      parts: minutes.map((each, index) => ({
+        part: `p${index}`,
+        sets_or_rounds: 3,
+        minutes: each,
+      })),
+    });
+
+  it("are summed here, and said only when well over the session", async () => {
+    const plan = "Fase 1: ocho ejercicios de tres series";
+    // Eight exercises of three sets in "15 minutes"
+    expect(
+      await sessionTakes({ chat: timed([2.7, 4.5, 4.5, 4.5, 4.5, 2.7, 4.5, 3]), plan, minutes: 15 })
+    ).toBe(31);
+    // A rough estimate a little over is not worth a rewrite
+    expect(await sessionTakes({ chat: timed([3, 12, 3]), plan, minutes: 15 })).toBeNull();
+    expect(await sessionTakes({ chat: timed([]), plan, minutes: 15 })).toBeNull();
+    expect(
+      await sessionTakes({
+        chat: async () => {
+          throw new Error("down");
+        },
+        plan,
+        minutes: 15,
+      })
+    ).toBeNull();
   });
 });
 
@@ -505,6 +540,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           seen.notes++;
@@ -606,6 +642,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages, offeredNow) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) return noted.shift() ?? notes({});
         if (isCheck(messages)) return gaps();
@@ -673,6 +710,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({ agrees: true, plan: { ...NO_PLAN, wanted: true } });
@@ -719,6 +757,7 @@ describe("notes in the conversation", () => {
       notes: () => true,
       web: { setting: () => "on", allow: () => {}, http },
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages))
           return notes({ wants: ["saber cuántos días entrenar"], research: true });
@@ -758,6 +797,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages, tools) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) return noted.shift()!;
         offered.push(
@@ -805,6 +845,7 @@ describe("notes in the conversation", () => {
       notes: () => true,
       web: { setting: () => "on", allow: () => {}, http },
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({
@@ -849,6 +890,7 @@ describe("notes in the conversation", () => {
       notes: () => true,
       web: { setting: () => "on", allow: () => {}, http },
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({
@@ -885,6 +927,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) {
           return notes({
@@ -923,6 +966,41 @@ describe("notes in the conversation", () => {
     expect(shown[0].kind === "assistant" && shown[0].text).toBe(second);
   });
 
+  it("do not take a request to the coach for a wish", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const seen: ChatMessage[][] = [];
+    const coach = [
+      call("note_ideal_life", {
+        text: "Quiero un plan completo para este mes y el próximo; también tendrías que hacer el roadmap.",
+      }),
+      say("No lo anoté."),
+    ];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages) => {
+        if (isNotes(messages)) return notes({ instruction: true });
+        seen.push(messages);
+        return coach.shift()!;
+      },
+    });
+    agent.subscribe(() => {
+      for (const entry of agent.entries) {
+        if (entry.kind === "tool" && entry.status === "pending") agent.decide(entry.id, true);
+      }
+    });
+    await agent.send("si dale, tambien tendrias que hacer el roadmap");
+    const results = seen
+      .at(-1)!
+      .filter((message) => message.role === "tool")
+      .map((message) => String(message.content));
+    expect(results[0]).toContain("request-not-wish");
+    expect(core.getIdealLife()?.text ?? "").not.toContain("roadmap");
+  });
+
   it("keep the ideal life in the person's own words", async () => {
     const core = new SystemCore();
     core.clearState();
@@ -943,6 +1021,7 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
         if (isNotes(messages)) return notes({ instruction: true });
         seen.push(messages);

@@ -298,6 +298,10 @@ function inTheirWords(note: string, spoken: string): boolean {
   return found.length / words.length >= 2 / 3;
 }
 
+/** Words that ask the coach to do something, not words about the life wanted. */
+const REQUEST_TO_COACH =
+  /\b(roadmap|hoja de ruta|anota|anotalo|agrega|agregalo|investiga|investigues|busca|haz el|hacer el|tendrias que|tambien tendrias|si dale|dale)\b/;
+
 /** A note for the ideal life, or the reason it cannot be one. */
 function idealNote(core: ISystemCore, spoken: string | undefined, args: Args): string {
   const note = str(args.text);
@@ -306,6 +310,14 @@ function idealNote(core: ISystemCore, spoken: string | undefined, args: Args): s
     throw new ToolError(
       "too-long",
       `one idea per note, in at most ${MAX_NOTE} characters: the one thing they said about the life they want. Requests for today, for a plan or for a search are not it.`
+    );
+  }
+  // A request to the coach is not a wish: "anota…", "haz el roadmap" copied
+  // into the ideal life is the request itself, and was saved as a wish once.
+  if (REQUEST_TO_COACH.test(plain(note))) {
+    throw new ToolError(
+      "request-not-wish",
+      "this reads as a request to you (to note, to plan, to make a roadmap, to look something up), not as something they want for their life. Note only what they wish for, in their own words."
     );
   }
   // Their ideal life is written in their words. A model asked to note a wish

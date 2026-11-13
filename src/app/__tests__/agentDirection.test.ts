@@ -369,10 +369,20 @@ describe("the roadmap draft", () => {
       brief.saveRoadmap(few);
       expect(brief.changed).toBe(true);
 
-      // A shortfall that is only one week still has a count: 7 weeks at 3 days is 21, not 18
+      // A few sessions short is not worth a send-back: 7 weeks at 3 days is 21, and 18 is close
+      const close = new RoadmapDraft(setup(), new Date(), { weeks: 7 });
+      close.saveRoadmap(few);
+      expect(close.changed).toBe(true);
+
+      // Well short still has its count: 7 weeks at 3 days is 21, not 12
       const weekly = new RoadmapDraft(setup(), new Date(), { weeks: 7 });
-      expect(() => weekly.saveRoadmap(few)).toThrow(
-        /shorter-than-asked.*18 sessions on 3 days a week run only 6.*7 weeks are 21 in all/
+      expect(() =>
+        weekly.saveRoadmap({
+          ...few,
+          milestones: [{ title: "Fase", sessions: 12, notes: "- algo" }],
+        })
+      ).toThrow(
+        /shorter-than-asked.*12 sessions on 3 days a week run only 4.*7 weeks are 21 in all/
       );
       weekly.saveRoadmap(few);
       expect(weekly.changed).toBe(true);
