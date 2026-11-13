@@ -624,64 +624,58 @@ export async function planGaps(options: {
   }
 }
 
-const WHAT_TO_ASK = {
+/** How many of the things they have are looked at: the latest, which are the ones a plan is about. */
+const MAX_THINGS = 8;
+
+/** One yes-or-no pair per thing they have, and room for one fact that is none of them. */
+const whatToAsk = (things: string[]) => ({
   type: "function" as const,
   function: {
     name: "what_to_ask",
-    description: "Facts a plan's numbers depend on that the person has not given.",
+    description: "For each thing the person has: does the plan need its measure, and was it said.",
     parameters: {
       type: "object",
       properties: {
-        facts: {
+        ...Object.fromEntries(
+          things.map((thing, index) => [
+            `thing_${index + 1}`,
+            {
+              type: "object",
+              description: thing,
+              properties: {
+                plan_needs_its_measure: { type: "boolean" },
+                measure_was_said: { type: "boolean" },
+              },
+              required: ["plan_needs_its_measure", "measure_was_said"],
+            },
+          ])
+        ),
+        other: {
           type: "array",
-          maxItems: 2,
+          maxItems: 1,
           items: said(
-            "One fact about what they have or where they start from, that a number they asked the plan to give depends on, and that is NOT in what they said. Written as what to ask for, in a few words. Never the days, the time of day or the length of a session."
+            "One more fact a number of the plan depends on, that is none of the things above and that they did not say. Written as what to ask for, in a few words. Never the days, the time of day or the length of a session."
           ),
         },
       },
-      required: ["facts"],
+      required: [...things.map((_, index) => `thing_${index + 1}`), "other"],
     },
   },
-};
-
-/** A plan whose numbers need a load ("the weight for each exercise"). */
-const ASKS_FOR_LOAD =
-  /\b(peso|pesos|carga|cargas|weight|weights|load|loading)\b[\s\S]{0,80}\b(ejercicio|ejercicios|serie|series|repetici[oó]n|repeticiones|reps?|exercise|exercises|sets?|fuerza|strength|entrenamiento|training|rutina|routine)\b|\b(ejercicio|ejercicios|serie|series|repetici[oó]n|repeticiones|reps?|exercise|exercises|sets?|fuerza|strength|entrenamiento|training|rutina|routine)\b[\s\S]{0,80}\b(peso|pesos|carga|cargas|weight|weights|load|loading)\b/i;
-/** Weights, bars and plates: things whose load matters and a person may name without its number. */
-const HAS_LOAD_EQUIPMENT =
-  /\b(mancuernas?|pesas?|barra|barras?|discos?|kettlebells?|dumbbells?|barbells?|weight\s?plates?|plates?)\b/i;
-/** A load in the same clause as the equipment ("mancuernas de 5 kg"), not the person's own weight. */
-function writesLoad(has: string): boolean {
-  return has
-    .split(/[.,;\n]/)
-    .some(
-      (clause) =>
-        HAS_LOAD_EQUIPMENT.test(clause) &&
-        /\b\d+(?:[.,]\d+)?\s*(?:kg|kilos?|libras?|lbs?|pounds?)\b/i.test(clause)
-    );
-}
-
-/**
- * What a plan's numbers need and the person has not said, read here and not
- * left to the model: asked for "the weight for each exercise", the coach has
- * to know how heavy the equipment is. A 9B model asked this on its own often
- * answers that there is nothing to ask.
- */
-export function needsFromNotes(brief: Brief): string[] {
-  const asked = [...brief.wants, ...brief.limits].join(" ");
-  const has = brief.has.join(". ");
-  if (!ASKS_FOR_LOAD.test(asked) || !HAS_LOAD_EQUIPMENT.test(has)) return [];
-  if (writesLoad(has)) return [];
-  return ["how heavy their weights are"];
-}
+});
 
 /**
  * What the numbers of a plan depend on and the person has not said (ADR-012):
- * asked for a plan "with the weight for each exercise", a coach has to know
- * how heavy their weights are, and a 9B model writing the plan does not stop
- * to ask. Asked this one question on its own, it finds some of it; what the
- * notes already show is added here, so a wrong empty answer costs nothing.
+ * asked for a plan "with the weight for each exercise" by someone who has
+ * "dumbbells", a coach has to know how heavy they are, and a 9B model writing
+ * the plan does not stop to ask.
+ *
+ * Asked in the open ("what is missing?") the same model answered "nothing"
+ * for that case, two times out of two. Asked thing by thing, yes or no, it
+ * got it right both times, and right again once the weights had been said.
+ * So the question is put thing by thing, about whatever they have: nothing
+ * here knows what a dumbbell is. Two readings, as with the notes: a thing
+ * written with a number in it has its measure, whatever the model says.
+ *
  * Worked out once, when a plan is first wanted; empty on any failure.
  */
 export async function planNeeds(options: {
@@ -690,35 +684,52 @@ export async function planNeeds(options: {
   signal?: AbortSignal;
 }): Promise<string[]> {
   const { brief } = options;
-  const known = needsFromNotes(brief);
+  const things = brief.has.slice(-MAX_THINGS);
   try {
     const reply = await options.chat(
       [
         {
           role: "system",
           content:
-            "A coach is about to write a plan for a person. You say which facts about the person the numbers of that plan depend on and are still unknown. Look at every number the plan will have to give (weight, resistance, distance, pace, level, amount): name the fact it depends on that is not in their notes. If they named equipment whose load or size matters and did not say it, that is one. Often there is none: an empty list is a good answer. Never ask for the days, the time or the length of a session. English, a few words each.",
+            "A coach is about to write a plan for a person, with the numbers they asked for. For each thing listed under THEY HAVE, answer two questions. plan_needs_its_measure: would the coach need to know how much of it, how big, how heavy or how advanced it is, to set a number in the plan? measure_was_said: did the person already give that measure, as a number, anywhere in their words? Then, under other, at most one more fact a number of the plan depends on and they did not give; leave it empty when there is none.",
         },
         {
           role: "user",
-          content: `THEY ASKED FOR:\n${brief.wants.map((one) => `- ${one}`).join("\n") || "-"}\n\nTHEY HAVE / THEY ARE:\n${
-            brief.has.map((one) => `- ${one}`).join("\n") || "-"
+          content: `THEY ASKED FOR:\n${brief.wants.map((one) => `- ${one}`).join("\n") || "-"}\n\nTHEY HAVE:\n${
+            things.map((thing, index) => `thing_${index + 1}: ${thing}`).join("\n") || "-"
           }\n\nLIMITS:\n${brief.limits.map((one) => `- ${one}`).join("\n") || "-"}`,
         },
       ],
-      [WHAT_TO_ASK],
+      [whatToAsk(things)],
       options.signal,
-      { reasoning: false, maxTokens: 150, toolChoice: "required" }
+      { reasoning: false, maxTokens: 300, toolChoice: "required" }
     );
     const call = reply.toolCalls.find((one) => one.function.name === "what_to_ask");
-    if (!call) return known;
+    if (!call) return [];
     const found = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-    const facts = [...known, ...strings(found.facts)]
+    const unmeasured = things.filter((thing, index) => {
+      const answer = found[`thing_${index + 1}`] as Record<string, unknown> | undefined;
+      return (
+        answer?.plan_needs_its_measure === true &&
+        answer.measure_was_said !== true &&
+        // Written with a number: the measure is there
+        !/\d/.test(thing)
+      );
+    });
+    const other = strings(found.other)
       .map((fact) => fact.trim())
-      .filter((fact) => fact.length > 0 && fact.length <= 120);
-    return [...new Set(facts)].slice(0, 2);
+      .filter((fact) => fact.length > 0 && fact.length <= 120)
+      .slice(0, 1);
+    return [
+      ...(unmeasured.length > 0
+        ? [
+            `the measure of what they have, if they know it (how much, how heavy, what size or what level): ${unmeasured.join("; ")}`,
+          ]
+        : []),
+      ...other,
+    ];
   } catch {
-    return known;
+    return [];
   }
 }
 

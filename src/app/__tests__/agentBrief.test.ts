@@ -5,7 +5,6 @@ import {
   clockIn,
   durationIn,
   missingFrom,
-  needsFromNotes,
   nextMove,
   overfull,
   planNeeds,
@@ -116,21 +115,42 @@ describe("what a plan's numbers depend on", () => {
     expect(later).not.toContain("dumbbells");
   });
 
-  it("finds the load the plan needs even when the model answers with nothing", () => {
-    // The person's own 80 kg is not the load of their equipment
-    expect(needsFromNotes(wantsWeight)).toEqual(["how heavy their weights are"]);
-    // They said how heavy it is: nothing is left to ask
-    expect(needsFromNotes({ ...wantsWeight, has: ["mancuernas de 5 kg", "barra"] })).toEqual([]);
-    // A plan that gives no weight has no load to ask for
-    expect(needsFromNotes({ ...wantsWeight, wants: ["un plan para entrenar"] })).toEqual([]);
+  it("is read thing by thing, and a thing written with a number has its measure", async () => {
+    const seen: string[] = [];
+    const facts = await planNeeds({
+      brief: { ...wantsWeight, has: ["mancuernas", "una barra de 8kg", "un patio"] },
+      chat: async (messages, tools) => {
+        seen.push(String(messages[1].content));
+        seen.push(JSON.stringify(tools));
+        return call("what_to_ask", {
+          thing_1: { plan_needs_its_measure: true, measure_was_said: false },
+          // The model's word alone: the number is in the thing itself
+          thing_2: { plan_needs_its_measure: true, measure_was_said: false },
+          thing_3: { plan_needs_its_measure: false, measure_was_said: false },
+          other: ["how many push-ups they can do today"],
+        });
+      },
+    });
+    expect(seen[0]).toContain("thing_1: mancuernas\nthing_2: una barra de 8kg\nthing_3: un patio");
+    expect(seen[1]).toContain('"thing_3"');
+    expect(facts).toEqual([
+      "the measure of what they have, if they know it (how much, how heavy, what size or what level): mancuernas",
+      "how many push-ups they can do today",
+    ]);
   });
 
-  it("keeps what it found when the question call comes back empty", async () => {
-    const facts = await planNeeds({
-      brief: wantsWeight,
-      chat: async () => call("what_to_ask", { facts: [] }),
-    });
-    expect(facts).toEqual(["how heavy their weights are"]);
+  it("asks for nothing when the call comes back empty or fails", async () => {
+    expect(
+      await planNeeds({ brief: wantsWeight, chat: async () => call("what_to_ask", { facts: [] }) })
+    ).toEqual([]);
+    expect(
+      await planNeeds({
+        brief: wantsWeight,
+        chat: async () => {
+          throw new Error("down");
+        },
+      })
+    ).toEqual([]);
   });
 });
 
