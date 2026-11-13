@@ -433,6 +433,27 @@ describe("the roadmap draft", () => {
       expect(saved.milestones[0].sessions).toBe(4);
       expect(saved.in_todays_plan).toHaveLength(1);
 
+      // A later phase asks for more minutes than the session has: sent back once
+      const long30 = new RoadmapDraft(setup(), new Date(), { minutes: 30 });
+      const tooMuch = {
+        ...ROADMAP,
+        session_minutes: 30,
+        milestones: [
+          { title: "Uno", sessions: 6, notes: "- Caminar 5 min, correr 1 min" },
+          {
+            title: "Tres",
+            sessions: 6,
+            activity: "Entrenar: base",
+            notes: "- Semana 9: correr los 5 km completos (aprox. 40-45 min)",
+          },
+        ],
+      };
+      expect(() => long30.saveRoadmap(tooMuch)).toThrow(
+        /phase-too-long: in "Tres" a session asks for 45 minutes/
+      );
+      long30.saveRoadmap(tooMuch);
+      expect(long30.changed).toBe(true);
+
       // Rules that speak of days contradict the calendar: sent back once
       const ruled = new RoadmapDraft(setup(), new Date());
       const days = { ...ROADMAP, rules: "- Elige un día a la semana (martes o jueves) y entrena" };
