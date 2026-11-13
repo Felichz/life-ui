@@ -27,7 +27,7 @@ const PROMPT = (language: string) =>
 - The activity is what the person sits down to do in every session: a workout, a study session, a writing session. One session is one sitting, whatever it contains.
 - A milestone is a phase the person passes before the next one. It says how many sessions it takes (or how many minutes in all) and, in "notes", what ONE session of that phase consists of.
 - What happens inside a session (its exercises, its pages, its sub-tasks, how many of each) is never an activity and never a count of sessions. It is the text of "notes", a short Markdown list the person reads while they do the session.
-- "rules" is what holds in every session of every phase: how to progress, what counts on a bad day. The app shows them under each session's notes, so do not repeat them in the notes.
+- "rules" is what holds in every session of every phase: how to progress, what counts on a bad day. The app shows them under each session's notes, so do not repeat them in the notes. Never put days, hours or how to schedule in them: the schedule has those, and a rule that names other days contradicts the calendar.
 - The schedule says which weekdays the sessions happen on, at what time if the person gave one, and from when. The app itself puts every session on the calendar, milestone after milestone, and counts progress from the sessions the person really closes. You never write dates or progress.
 
 ## How to build one
