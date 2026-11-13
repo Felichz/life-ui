@@ -153,6 +153,29 @@ export function weeksUntil(message: string, now: Date): number {
   return Math.max(1, Math.round((end.getTime() - today.getTime()) / 86_400_000 / 7));
 }
 
+/**
+ * The weeks each phase of a plan runs, as the plan names them: "Semanas 1-4",
+ * "weeks 5 to 9", in order. Only when they follow each other from week one
+ * (each starts the week after the one before) and there are at least two:
+ * anything else is not a plan's phases, and nothing is read from it.
+ */
+export function phaseWeeks(plan: string): number[] | null {
+  const found: Array<[number, number]> = [];
+  for (const line of plan.split(/\n+/)) {
+    const match = /(?:semanas?|weeks?)\s*(\d{1,2})\s*(?:[-–—]|a|al|to|through)\s*(\d{1,2})\b/i.exec(
+      line
+    );
+    if (match) found.push([Number(match[1]), Number(match[2])]);
+  }
+  if (found.length < 2 || found[0][0] !== 1) return null;
+  for (let index = 0; index < found.length; index++) {
+    const [from, to] = found[index];
+    if (to < from) return null;
+    if (index > 0 && from !== found[index - 1][1] + 1) return null;
+  }
+  return found.map(([from, to]) => to - from + 1);
+}
+
 /** The weekdays a list of words names, in order; null when one is not a weekday. */
 export function weekdayNumbers(words: unknown): number[] | null {
   if (!Array.isArray(words) || words.length === 0) return null;

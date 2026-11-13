@@ -401,6 +401,22 @@ describe("the roadmap draft", () => {
       more.saveRoadmap({ ...ROADMAP, rules: "- Estirar dos minutos al final" });
       expect(more.changed).toBe(true);
 
+      // Phases that do not hold their weeks' sessions: 2, 2 and 5 weeks at 3 days are 6, 6 and 15
+      const phased = new RoadmapDraft(setup(), new Date(), { phaseWeeks: [2, 2, 5] });
+      const uneven = {
+        ...ROADMAP,
+        milestones: [
+          { title: "Uno", sessions: 6, notes: "- a" },
+          { title: "Dos", sessions: 6, notes: "- b" },
+          { title: "Tres", sessions: 16, notes: "- c" },
+        ],
+      };
+      expect(() => phased.saveRoadmap(uneven)).toThrow(
+        /phases-off-count: .*2, 2, 5 weeks; at 3 sessions a week that is 6, 6, 15 sessions.*yours are 6, 6, 16/
+      );
+      phased.saveRoadmap(uneven);
+      expect(phased.changed).toBe(true);
+
       // Other days than the conversation names: sent back once, with the line they were read from
       const core3 = setup();
       const other = new RoadmapDraft(core3, new Date(), {

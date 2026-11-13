@@ -456,6 +456,11 @@ export async function runRoadmapPlanner(options: {
       `the count is already made: one week is ${perWeek} sessions, ${said.weeks} weeks are ${
         said.weeks * perWeek
       } in all, and a phase of N weeks is N x ${perWeek} sessions`,
+    perWeek &&
+      said.phaseWeeks &&
+      `the phases of the plan they agreed to run ${said.phaseWeeks.join(", ")} weeks, which are ${said.phaseWeeks
+        .map((weeks) => weeks * perWeek)
+        .join(", ")} sessions in the same order: use exactly those counts`,
   ].filter(Boolean);
   const messages: ChatMessage[] = [
     {
