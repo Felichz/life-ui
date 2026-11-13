@@ -1,5 +1,5 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
-import { daysStated, weekdaysIn, weeksUntil } from "./when";
+import { daysStated, weekdayNames, weekdaysIn, weeksUntil } from "./when";
 import { t } from "../i18n";
 
 /**
@@ -488,7 +488,15 @@ export async function updateBrief(options: {
             plan: {
               // What they said later replaces what they said before
               length: noted.length || durationIn(options.person) || brief?.plan?.length || "",
-              days: noted.days || brief?.plan?.days || "",
+              // The days they gave, even when the model did not note them as days ("todos los días")
+              days:
+                noted.days ||
+                (() => {
+                  const given = daysStated(options.person);
+                  return given ? weekdayNames(given.days) : "";
+                })() ||
+                brief?.plan?.days ||
+                "",
               time:
                 (exact.time !== undefined ? clockText(exact.time) : "") ||
                 noted.time ||

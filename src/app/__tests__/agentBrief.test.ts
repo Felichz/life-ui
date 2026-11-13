@@ -135,6 +135,24 @@ describe("the minutes a session really takes", () => {
   });
 });
 
+describe("the days the person gave", () => {
+  it("are in the notes even when the model did not note them as days", async () => {
+    const brief = await updateBrief({
+      brief: null,
+      person:
+        "quiero poder tocar tres canciones en tres meses, tengo 20 minutos todos los dias a las 8 de la noche",
+      language: "Spanish",
+      chat: async () =>
+        notes({
+          wants: ["tocar tres canciones"],
+          plan: { wanted: true, session_length: "20 minutos", days: "", time: "8 de la noche" },
+        }),
+    });
+    expect(brief?.plan?.days).not.toBe("");
+    expect(missingFrom(brief!)).not.toContain("which days of the week");
+  });
+});
+
 describe("what is a request to the coach", () => {
   it("is not something the person added", () => {
     expect(isRequestToCoach("armarlo así; empezando el sábado")).toBe(true);
@@ -302,6 +320,20 @@ describe("what a message states about a plan's days and its end", () => {
     // Alone, "todos los días" still means every day.
     expect(daysStated("todos los días a las 7")?.days).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(daysStated("de lunes a viernes\n(todos los días)")?.days).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("turns a day around only with a negation next to it", () => {
+    // "sin parar" is far from the days: they are the days
+    expect(
+      daysStated(
+        "quiero correr 5 kilometros sin parar en dos meses, puedo 30 minutos por salida, martes, jueves y sabado por la mañana a las 7"
+      )?.days
+    ).toEqual([2, 4, 6]);
+    expect(daysStated("los viernes no voy a poder, pero lunes y miércoles sí")).toBeNull();
+    // An example of the coach's is not a statement
+    expect(
+      daysStated("los días que tú elijas (por ejemplo, lunes, miércoles y viernes)")
+    ).toBeNull();
   });
 
   it("takes the assumption of a sentence, not the alternative it offers", () => {

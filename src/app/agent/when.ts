@@ -110,9 +110,30 @@ const NOT = /\b(no|not|never|nunca|ni|salvo|excepto|except|menos|sin|without)\b|
  * them; null when it names none, or says them with a "no" nearby ("los
  * viernes no puedo" names Friday and means the opposite).
  */
-/** Where a sentence turns to an alternative to what it just assumed: what follows is not stated. */
+/**
+ * Where a sentence turns to an alternative or an example of what it just
+ * assumed: what follows is not stated ("…todos los días, pero si prefieres
+ * lunes…", "los días que elijas (por ejemplo, lunes y jueves)").
+ */
 const ALTERNATIVE =
-  /\b(pero si|si prefieres|si lo prefieres|si quieres otros|o solo|o prefieres|but if|if you prefer|or only)\b/i;
+  /\b(pero si|si prefieres|si lo prefieres|si quieres otros|o solo|o prefieres|por ejemplo|for example|but if|if you prefer|or only)\b|\be\.g\.|\bej\./i;
+
+const WEEKDAY_WORD = new RegExp(`(${Object.keys(WEEKDAY_WORDS).join("|")})`, "gi");
+
+/**
+ * The part of a line a negation has to be in to turn it around: a few words
+ * around the weekdays. "Quiero correr 5 km sin parar, martes y jueves" says
+ * Tuesday and Thursday; "los viernes no voy a poder" does not say Friday.
+ */
+function nearTheDays(line: string): string {
+  const hits = [...line.matchAll(WEEKDAY_WORD)];
+  if (hits.length === 0) return line;
+  const last = hits[hits.length - 1];
+  return line.slice(
+    Math.max(0, (hits[0].index ?? 0) - 30),
+    Math.min(line.length, (last.index ?? 0) + last[0].length + 25)
+  );
+}
 
 export function daysStated(message: string): { days: number[]; quote: string } | null {
   const lines = message
@@ -126,7 +147,7 @@ export function daysStated(message: string): { days: number[]; quote: string } |
     )
     .filter((line) => weekdaysIn(line).length > 0);
   if (lines.length === 0) return null;
-  if (lines.some((line) => NOT.test(line.toLocaleLowerCase()))) return null;
+  if (lines.some((line) => NOT.test(nearTheDays(line).toLocaleLowerCase()))) return null;
   // A schedule that names its days ("lunes, miércoles y viernes") is not
   // turned into every day by a later line about what a session contains
   // ("todos los días").
