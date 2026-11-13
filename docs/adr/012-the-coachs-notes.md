@@ -97,6 +97,21 @@ The same rule, "sent back once, with the numbers", now covers three things a pla
 - **A plan on days nobody gave** is the coach's proposal, and its last line says so and asks.
 - **A note for the ideal life** is one idea, in the person's words, and it is checked before the card is shown: a card they say yes to is a note that gets written.
 
+### 4d. What the roadmap is checked against, and how it is measured
+
+The planner is a second 9B call, and the roadmap it saves has to agree with the conversation. Each check below is made by code on the draft, sent back to the planner **once** with the numbers or the line it came from, and stands the second time (the reading of a sentence can be the wrong one, so none of them binds):
+
+- **Days** the plan last named, read from the plan or from the person (a sentence's alternative, "or if you prefer…", is not stated; one day alone is the start and not the plan's days; the plural of a weekday is the weekday).
+- **Phases:** the sessions of each phase are its weeks times the days a week, read from the plan's own headings ("Semanas 1-4"), and the planner is given those counts. A roadmap a whole week of sessions short, or much longer than asked, is sent back.
+- **Minutes:** no phase asks, in what a session contains, for more minutes than the person's session has.
+- **What they have:** what the plan can use (equipment, a place, a skill; read once, thing by thing) is used in some session; what their yes came with is somewhere in the sessions or the rules.
+- **Rules** are what holds in every session; they never name days other than the calendar's.
+- **The hour:** "por la mañana a las 7" is 07:00; an hour with no part of the day stays a guess.
+
+What the coach tells the person after saving is checked against the tool's own answer (session counts and dates), and a session that landed in today's plan is counted in that answer.
+
+`npm run sim:score` measures a conversation written by the simulator on the same lines (what was saved against what the person said). It is consistency and not taste: a conversation can pass every check and still be a worse plan than a good coach would write. What a session contains, and whether the progression makes sense, stay the model's.
+
 ### 5. What stays the model's
 
 What to recommend, in which words, and what a session should contain. The notes and the move decide when to ask, what to ask for, and when to stop asking.
