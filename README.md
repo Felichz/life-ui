@@ -110,6 +110,8 @@ npm run dev          # http://localhost:5174
 | `npm run test:e2e`  | End-to-end run in Cypress (needs `npm run dev` running)                               |
 | `npm run sim`       | Talk to the real agent and a local model from the terminal (see `scripts/sim/sim.ts`) |
 
+`npm run sim:score -- <transcript.txt>` scores a transcript the runner wrote: the saved roadmap against what the person said (days, session counts, phases, minutes, loads, rules, the coach's numbers). It judges nothing by taste, and passing it is not the same as a good coach.
+
 Keyboard: `Ctrl/⌘ K` command palette · `N` add activity · `E` log event · `T` finish the running activity · `G` then `H`/`B`/`R`/`A` to navigate · `0` to `9` to score in the closing ritual.
 
 ## Testing
