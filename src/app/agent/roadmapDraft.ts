@@ -478,7 +478,8 @@ export class RoadmapDraft {
     const total = roadmap.milestones
       .flatMap((milestone) => milestone.steps)
       .reduce((sum, step) => sum + this.sessionsOf(step), 0);
-    if (total >= expected) return null;
+    // A few sessions short is a phase counted a little short, not a plan that is too small
+    if (total >= expected * 0.85) return null;
     const days =
       (new Date(`${layout[layout.length - 1].last}T12:00:00`).getTime() -
         new Date(`${layout[0].first}T12:00:00`).getTime()) /
