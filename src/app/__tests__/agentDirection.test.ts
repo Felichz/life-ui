@@ -440,8 +440,8 @@ describe("the roadmap draft", () => {
       ruled.saveRoadmap({ ...ROADMAP, rules: "- Día malo: una serie de cada ejercicio" });
       expect(ruled.changed).toBe(true);
       // The calendar's own days in the rules are not a second schedule
-      const same = new RoadmapDraft(setup(), new Date());
-      same.saveRoadmap({
+      const calendarDays = new RoadmapDraft(setup(), new Date());
+      calendarDays.saveRoadmap({
         ...ROADMAP,
         rules: "- Cada lunes, miércoles y viernes, el circuito entero",
       });
