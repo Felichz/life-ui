@@ -44,6 +44,9 @@ const WEEKDAY_WORDS: Record<string, number> = {
   sab: 6,
   sáb: 6,
   sabado: 6,
+  sabados: 6,
+  sábados: 6,
+  domingos: 0,
   sábado: 6,
 };
 
@@ -107,10 +110,20 @@ const NOT = /\b(no|not|never|nunca|ni|salvo|excepto|except|menos|sin|without)\b|
  * them; null when it names none, or says them with a "no" nearby ("los
  * viernes no puedo" names Friday and means the opposite).
  */
+/** Where a sentence turns to an alternative to what it just assumed: what follows is not stated. */
+const ALTERNATIVE =
+  /\b(pero si|si prefieres|si lo prefieres|si quieres otros|o solo|o prefieres|but if|if you prefer|or only)\b/i;
+
 export function daysStated(message: string): { days: number[]; quote: string } | null {
   const lines = message
     .split(/\n+/)
-    .map((line) => line.replace(/[*_#>|]/g, "").trim())
+    // "Todos los días, pero si prefieres lunes, miércoles y viernes…" states the first
+    .map((line) =>
+      line
+        .replace(/[*_#>|]/g, "")
+        .split(ALTERNATIVE)[0]
+        .trim()
+    )
     .filter((line) => weekdaysIn(line).length > 0);
   if (lines.length === 0) return null;
   if (lines.some((line) => NOT.test(line.toLocaleLowerCase()))) return null;
