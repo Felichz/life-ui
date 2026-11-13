@@ -958,26 +958,44 @@ export class RoadmapDraft {
       });
       if (stored.schedule && stored.status !== "paused") {
         const planned = this.core.getRoadmapSessions(stored.id);
-        const dated = planned.filter((entry) => entry.first);
         const mine = new Set(stored.milestones.flatMap((m) => m.steps.map((s) => s.templateId)));
-        const today = (this.core.getState().currentDay?.activityInstances ?? [])
-          .filter((instance) => mine.has(instance.templateId))
-          .map((instance) => templates.find((tpl) => tpl.id === instance.templateId)?.title ?? "");
+        const todays = (this.core.getState().currentDay?.activityInstances ?? []).filter(
+          (instance) => mine.has(instance.templateId)
+        );
+        const today = todays.map(
+          (instance) => templates.find((tpl) => tpl.id === instance.templateId)?.title ?? ""
+        );
+        // A session that went into today's plan is a session of the roadmap too: the
+        // count, the first day and its phase include it (a coach told "23, from Monday"
+        // for 24 starting today said exactly that)
+        const todayDate = localDate(this.now);
+        const phases = planned.map((entry) => ({ ...entry }));
+        for (const instance of todays) {
+          const owner = stored.milestones.findIndex((milestone) =>
+            milestone.steps.some((step) => step.templateId === instance.templateId)
+          );
+          const phase = owner >= 0 ? phases[owner] : undefined;
+          if (!phase) continue;
+          phase.sessions += 1;
+          if (!phase.first || todayDate < phase.first) phase.first = todayDate;
+          if (!phase.last) phase.last = todayDate;
+        }
+        const withToday = phases.filter((entry) => entry.first);
         sessions.push({
           roadmap: stored.title,
           days: weekdayNames(stored.schedule.weekdays),
           ...(stored.schedule.time !== undefined
             ? { time: formatDayMinutes(stored.schedule.time) }
             : {}),
-          total: planned.reduce((sum, entry) => sum + entry.sessions, 0),
-          ...(dated.length > 0
+          total: phases.reduce((sum, entry) => sum + entry.sessions, 0),
+          ...(withToday.length > 0
             ? {
-                first: dayLabel(dated[0].first!),
-                first_is: this.howFar(dated[0].first!),
-                last: dayLabel(dated[dated.length - 1].last!),
+                first: dayLabel(withToday[0].first!),
+                first_is: this.howFar(withToday[0].first!),
+                last: dayLabel(withToday[withToday.length - 1].last!),
               }
             : {}),
-          milestones: planned.map((entry) => ({
+          milestones: phases.map((entry) => ({
             milestone: entry.milestone,
             sessions: entry.sessions,
             ...(entry.first ? { from: dayLabel(entry.first), to: dayLabel(entry.last!) } : {}),

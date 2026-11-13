@@ -417,6 +417,22 @@ describe("the roadmap draft", () => {
       phased.saveRoadmap(uneven);
       expect(phased.changed).toBe(true);
 
+      // A session that lands in today's plan is counted and dated: first today, not "Monday"
+      const core4 = setup();
+      core4.startDay();
+      const today = new RoadmapDraft(core4, new Date());
+      today.saveRoadmap({
+        ...ROADMAP,
+        schedule: { weekdays: ["thu", "mon"], time: "19:00", start: "today" },
+        milestones: [{ title: "Fase", sessions: 4, notes: "- algo" }],
+      });
+      const saved = today.commit().sessions[0];
+      expect(saved.total).toBe(4);
+      expect(saved.first_is).toBe("today");
+      expect(saved.first).toMatch(/12/);
+      expect(saved.milestones[0].sessions).toBe(4);
+      expect(saved.in_todays_plan).toHaveLength(1);
+
       // Other days than the conversation names: sent back once, with the line they were read from
       const core3 = setup();
       const other = new RoadmapDraft(core3, new Date(), {
