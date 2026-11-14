@@ -646,6 +646,12 @@ export async function planGaps(options: {
       );
     }
   }
+  const totals = wrongTotals(plan);
+  if (totals.length > 0) {
+    over.push(
+      `its arithmetic is wrong: ${totals.join("; ")}. Change the numbers so each line adds up to the total it states, within the minutes of a session`
+    );
+  }
   const count = miscounted(plan, brief.plan?.weeks);
   if (count) {
     over.push(
@@ -793,7 +799,7 @@ export async function planNeeds(options: {
         {
           role: "system",
           content:
-            "A coach is about to write a plan for a person, with the numbers they asked for. For each thing listed under THEY HAVE, answer two questions. plan_needs_its_measure: would the coach need to know how much of it, how big, how heavy or how advanced it is, to set a number in the plan? measure_was_said: did the person already give that measure, as a number, anywhere in their words? plan_could_use: is it something a plan can use in what it asks the person to do (equipment, a tool, a place, a skill they have)? Their body measures, their past and the time they have are not. Then, under other, at most one more fact a number of the plan depends on and they did not give; leave it empty when there is none.",
+            "A coach is about to write a plan for a person, with the numbers they asked for. For each thing listed under THEY HAVE, answer two questions. plan_needs_its_measure: would the coach need to know how much of it, how big, how heavy or how advanced it is, to set a number in the plan? measure_was_said: did the person already give that measure, as a number, anywhere in their words? plan_could_use: is it something a plan can use in what it asks the person to do (equipment, a tool, a place, a skill they have)? Their body measures, their past and the time they have are not. Then, under other, at most one more fact a number of the plan depends on and they did not give, in any words: 'I have never run' already says how much they run. Leave it empty when there is none.",
         },
         {
           role: "user",
@@ -930,6 +936,42 @@ export function openChoice(plan: string): string | null {
   // "10 o 12 repeticiones" is a range people write for reps; the weight and the time are the ones to settle
   if (/^(reps?|repeticiones|series)$/i.test(found[4])) return null;
   return `${found[1]}${found[2] ? ` ${found[2]}` : ""} or ${found[3]} ${found[4]}`;
+}
+
+/**
+ * Lines of a plan that repeat a block a number of times and state the total
+ * ("run 5 min, walk 2 min, repeat 3 times + 5 min = 30 min") when the numbers
+ * do not give that total: 3 x (5 + 2) + 5 is 26. Each found line is given back
+ * with what it really adds up to. Lines that do not state both are left alone.
+ */
+export function wrongTotals(plan: string): string[] {
+  const found: string[] = [];
+  for (const line of plan.split("\n")) {
+    const stated = /=\s*(\d{1,3})\s*min/i.exec(line);
+    const times =
+      /(?:repet\w*|repeat\w*|x|×)\s*(\d{1,2})\s*(?:veces|times|rondas|rounds)?|(\d{1,2})\s*(?:veces|times|rondas|rounds)/i.exec(
+        line
+      );
+    if (!stated || !times) continue;
+    const before = line.slice(0, times.index);
+    const after = line.slice(times.index + times[0].length, stated.index);
+    const block = [...before.matchAll(/(\d{1,3})\s*(?:min|minutos?|minutes?)\b/gi)].map((m) =>
+      Number(m[1])
+    );
+    const extra = [...after.matchAll(/(\d{1,3})\s*(?:min|minutos?|minutes?)\b/gi)].map((m) =>
+      Number(m[1])
+    );
+    if (block.length === 0) continue;
+    const count = Number(times[1] ?? times[2]);
+    const total = block.reduce((a, b) => a + b, 0) * count + extra.reduce((a, b) => a + b, 0);
+    const claimed = Number(stated[1]);
+    if (Math.abs(total - claimed) > Math.max(1, claimed * 0.05)) {
+      found.push(
+        `"${line.replace(/[*_#]/g, "").trim().slice(0, 90)}" says ${claimed} min and adds up to ${total}`
+      );
+    }
+  }
+  return found.slice(0, 3);
 }
 
 /**

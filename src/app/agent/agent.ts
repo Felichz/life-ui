@@ -1622,7 +1622,7 @@ export class Agent {
                 role: "user",
                 content: `[Automatic note, not from the person: that plan was not shown to them yet. Compared with what they told you, ${gaps.join(
                   ". Also, "
-                )}. Write the plan again, whole, with that put right in every phase it touches; keep the rest as it was, and keep to the minutes of a session. Do not mention this note.]`,
+                )}. Write the plan again, whole, with that put right in every phase it touches; keep the rest as it was, and keep to the minutes of a session. Do not mention this note If you looked something up for this plan, say again in one line which source it rests on.]`,
               });
               continue;
             }
