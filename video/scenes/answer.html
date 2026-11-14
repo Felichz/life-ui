@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="answer" data-composition-id="answer" data-width="1920" data-height="1200">
+        <div class="f-win">
+          <div id="answer-cam" class="f-cam">
+            <!-- snap:c02-answer -->
+          </div>
+        </div>
+        <p id="answer-cap1" class="f-cap">
+          <span>It <em>looks it up</em></span>
+        </p>
+        <p id="answer-cap2" class="f-cap">
+          <span>and lays out <em>a plan</em></span>
+        </p>
+
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const tl = gsap.timeline({ paused: true });
+          const cam = document.querySelector("#answer-cam");
+          const snaps = [...document.querySelectorAll("#answer-cam .snap")];
+          if (snaps.length > 1) tl.set(snaps.slice(1), { opacity: 0 }, 0);
+          const [s] = snaps;
+          F.chat(tl, s, "c02-answer");
+          const chat = F.r("c02-answer", "chat");
+          const vTop = F.view({ x: chat.x, y: 120, w: chat.w, h: 280 }, 2.35, 0.5, 0.42);
+          const vBottom = F.view({ x: chat.x, y: 860, w: chat.w, h: 220 }, 2.35, 0.5, 0.5);
+          tl.set(cam, vTop, 0);
+          F.cap(tl, "#answer-cap1", 0.3, 3.0);
+          tl.to(cam, { x: vBottom.x, y: vBottom.y, scale: vBottom.scale, duration: 3.6, ease: "power1.inOut" }, 3.2);
+          F.cap(tl, "#answer-cap2", 4.0);
+          window.__timelines["answer"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

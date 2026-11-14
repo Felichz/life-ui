@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="run" data-composition-id="run" data-width="1920" data-height="1200">
+        <div class="f-win">
+          <div id="run-cam" class="f-cam">
+            <!-- snap:c07-running -->
+          </div>
+        </div>
+        <p id="run-cap1" class="f-cap">
+          <span><em>9:00</em>. The first session</span>
+        </p>
+
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const tl = gsap.timeline({ paused: true });
+          const cam = document.querySelector("#run-cam");
+          const snaps = [...document.querySelectorAll("#run-cam .snap")];
+          if (snaps.length > 1) tl.set(snaps.slice(1), { opacity: 0 }, 0);
+          const [s] = snaps;
+          F.chat(tl, s, "c07-running");
+          const card = F.r("c07-running", "card");
+          const input = F.r("c07-running", "input");
+          const vCard = F.view(card, 1.75, 0.5, 0.46);
+          const vInput = F.view({ x: input.x, y: input.y - 60, w: input.w, h: input.h + 60 }, 2.3, 0.5, 0.45);
+          tl.set(cam, vCard, 0);
+          F.cap(tl, "#run-cap1", 0.3, 2.6);
+          F.move(tl, cam, vInput, 2.8, 0.7);
+          F.typeIn(tl, s, 3.4, 1.4);
+          window.__timelines["run"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

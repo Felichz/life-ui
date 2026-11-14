@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #root {
+          position: absolute;
+          inset: 0;
+        }
+      </style>
+      <div id="goals" data-composition-id="goals" data-width="1920" data-height="1200">
+        <div class="f-win">
+          <div id="goals-cam" class="f-cam">
+            <!-- snap:c05-goals -->
+            <!-- snap:c06-notes -->
+          </div>
+        </div>
+        <p id="goals-cap1" class="f-cap">
+          <span>Each one <em>says what to do</em></span>
+        </p>
+        <div id="goals-click" class="f-click"></div>
+        <div id="goals-cursor" class="f-cursor">
+          <svg viewBox="0 0 28 28" width="56" height="56" aria-hidden="true">
+            <path
+              d="M4 3l17 9.5-7.4 1.6L10 21.6z"
+              fill="#fff"
+              stroke="#16161a"
+              stroke-width="1.6"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+      <script>
+        (() => {
+          const F = FILM;
+          F.theme();
+          const tl = gsap.timeline({ paused: true });
+          const cam = document.querySelector("#goals-cam");
+          const snaps = [...document.querySelectorAll("#goals-cam .snap")];
+          if (snaps.length > 1) tl.set(snaps.slice(1), { opacity: 0 }, 0);
+          const [plain, open] = snaps;
+          F.chat(tl, plain, "c05-goals");
+          F.chat(tl, open, "c06-notes");
+          const roadmap = F.r("c05-goals", "roadmap");
+          const toggle = F.r("c05-goals", "toggle");
+          const link = F.r("c06-notes", "links");
+          const vRoad = F.view(roadmap, 1.65, 0.5, 0.48);
+          const vNotes = F.view({ x: 272, y: link.y - 90, w: 728, h: 220 }, 2.0, 0.5, 0.5);
+          tl.set(cam, F.home, 0);
+          F.move(tl, cam, vRoad, 0.3, 0.7);
+          const pToggle = F.aim(vRoad, toggle, 0.5, 0.5);
+          tl.fromTo("#goals-cursor", { x: 1960, y: 1240 }, { x: pToggle.x, y: pToggle.y, duration: 1.1, ease: "power2.inOut" }, 1.4);
+          F.click(tl, "#goals-cursor", "#goals-click", pToggle, 3.2);
+          tl.set(open, { opacity: 1 }, 3.28);
+          tl.to("#goals-cursor", { opacity: 0, duration: 0.2 }, 3.5);
+          F.move(tl, cam, vNotes, 3.6, 0.7);
+          F.cap(tl, "#goals-cap1", 4.2);
+          window.__timelines["goals"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>
