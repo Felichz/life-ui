@@ -15,7 +15,8 @@ import {
 } from "./context";
 import type { ChatMessage, ChatOptions, ContentPart, ModelReply, ToolCall } from "./llm";
 import type { WebSetting } from "./web";
-import { daysStated, phaseWeeks, whenLabel } from "./when";
+import { dayLabel, daysStated, phaseWeeks, whenLabel } from "./when";
+import { localDate } from "../../system/agendaManager";
 import { describeFacts, disagreements, savedFacts } from "./saved";
 import {
   briefLines,
@@ -970,6 +971,7 @@ export class Agent {
     // The notes first, the move last: a small model acts on the last thing it reads
     const reminder = `\n\n[${brief ? `${brief}\n\n` : ""}${[
       ...this.turnNotes(),
+      ...this.todayNote(),
       `Reply in ${this.languageName()}.`,
     ].join(" ")}]`;
     const copy = [...messages];
@@ -981,6 +983,20 @@ export class Agent {
           : [...message.content, { type: "text", text: reminder }],
     };
     return copy;
+  }
+
+  /**
+   * Today and tomorrow, while a plan is talked about: a small model asked
+   * "do you want to start tomorrow, Tuesday?" on a Friday.
+   */
+  private todayNote(): string[] {
+    if (!this.brief?.plan) return [];
+    const now = this.options.now?.() ?? new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    return [
+      `Today is ${dayLabel(localDate(now))}, tomorrow is ${dayLabel(localDate(tomorrow))}: name a weekday only from these or from a tool's answer.`,
+    ];
   }
 
   private request(): ChatMessage[] {

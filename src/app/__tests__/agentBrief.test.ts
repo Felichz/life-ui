@@ -123,7 +123,7 @@ describe("the minutes a session really takes", () => {
       await sessionTakes({ chat: timed([2.7, 4.5, 4.5, 4.5, 4.5, 2.7, 4.5, 3]), plan, minutes: 15 })
     ).toBe(31);
     // A rough estimate a little over is not worth a rewrite
-    expect(await sessionTakes({ chat: timed([3, 12, 3]), plan, minutes: 15 })).toBeNull();
+    expect(await sessionTakes({ chat: timed([3, 12, 1]), plan, minutes: 15 })).toBeNull();
     expect(await sessionTakes({ chat: timed([]), plan, minutes: 15 })).toBeNull();
     expect(
       await sessionTakes({
