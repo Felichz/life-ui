@@ -41,6 +41,20 @@ describe("what a reply says about a saved roadmap", () => {
     expect(describeFacts(facts)).toContain("session counts 21, 6, 15");
   });
 
+  it("checks the days a week the reply says", () => {
+    const daily = savedFacts(
+      history({ sessions: [{ total: 91, days: "todos los días", first: "lun 16 nov" }] })
+    )!;
+    // A roadmap of every day said to be three days a week
+    expect(
+      disagreements("Son 91 sesiones, tres días a la semana, desde el lunes 16 nov.", daily)
+    ).toEqual(["3 days a week"]);
+    const three = savedFacts(
+      history({ sessions: [{ total: 21, days: "lun, mié, vie", first: "lun 16 nov" }] })
+    )!;
+    expect(disagreements("Tres días a la semana: 21 sesiones.", three)).toEqual([]);
+  });
+
   it("has nothing to check when no roadmap was saved in the turn", () => {
     expect(savedFacts(history({ ok: true }))).toBeNull();
     // A roadmap saved before the person's last message is not this turn's

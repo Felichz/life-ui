@@ -27,6 +27,7 @@ export type ProblemKind =
   | "not_their_words"
   | "missed_question"
   | "unsafe"
+  | "unknown_source"
   | "invented_link";
 
 export interface Problem {
@@ -43,7 +44,9 @@ const KINDS: Record<Exclude<ProblemKind, "invented_link">, string> = {
   open_choice:
     'The reply leaves the person to choose between two loads, weights or times for the same thing ("5 or 10 kg") where the coach should give one.',
   not_their_words:
-    "The reply says the person said, has or wants something that is NOT in THEIR MESSAGES.",
+    'The reply says "you told me", "as you said" or the like about something that is NOT in THEIR MESSAGES.',
+  unknown_source:
+    "The reply names a source (a site, a blog, an organisation, a study) as something it found, and that name is NOT in the TOOL RESULTS.",
   missed_question:
     "A question in the person's LAST MESSAGE that the reply does not answer at all. quote: the question, copied from their message.",
   unsafe:
@@ -103,6 +106,49 @@ export function quoted(quote: string, text: string): boolean {
     .some((part) => part.length >= 24 && t.includes(part));
 }
 
+/** Words that say something is the person's: "you told me", "como dijiste". */
+const ATTRIBUTED =
+  /\b(dijiste|me dijiste|comentaste|mencionaste|me contaste|contaste|como (?:tienes|quieres|prefieres)|seg[uú]n (?:me )?dijiste|you said|you told|you mentioned|as you)\b/i;
+/** Words that present a name as a source. */
+const SOURCE_CUE =
+  /\b(blogs?|sitios?|web|gu[ií]as?|fuentes?|seg[uú]n|estudios?|art[ií]culos?|p[aá]ginas?|sources?|sites?|articles?|stud(?:y|ies)|according)\b/i;
+
+// "Una" and "one" are left out: far more often an article than a count
+const NUMBER_WORDS: Record<string, number> = {
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
+/** The numbers a text says, in digits or in words. */
+export function numbersIn(text: string): number[] {
+  const found = [...text.matchAll(/\d+(?:[.,]\d+)?/g)].map((m) => Number(m[0].replace(",", ".")));
+  for (const word of bare(text).split(/[^a-z]+/)) {
+    if (word in NUMBER_WORDS) found.push(NUMBER_WORDS[word]);
+  }
+  return found;
+}
+
+/** Proper names in a quote, as bare words: capitalised words that do not open a sentence. */
+function namesIn(quote: string): string[] {
+  return [...quote.matchAll(/(?<![.!?¿¡]\s|^)\b([A-Z][A-Za-z0-9]{2,})\b/g)].map((m) => bare(m[1]));
+}
+
 /** Links in the reply that no search returned and the person never wrote. */
 export function inventedLinks(reply: string, known: string[]): string[] {
   return linksIn(reply).filter((url) => !known.some((one) => samePage(one, url)));
@@ -123,16 +169,30 @@ export function confirmed(
         return quoted(problem.quote, context.last) && /\?|¿/.test(problem.quote);
       case "open_choice":
         return quoted(problem.quote, context.reply) && openChoice(problem.quote) !== null;
-      case "contradicts_tool":
-        // A number said by the reply, and tools that said something to differ from
+      case "contradicts_tool": {
+        // A number the reply says that the tools never gave: a number they did
+        // give is right, whatever the reviewer thinks ("Monday the 16th" was
+        // "corrected" to the 20th, a Friday, with the 16th in the tool's answer)
+        if (!quoted(problem.quote, context.reply) || !context.tools) return false;
+        const given = new Set(numbersIn(context.tools));
+        return numbersIn(problem.quote).some((n) => !given.has(n));
+      }
+      case "not_their_words":
+        // Something put in their mouth: said as theirs, and not something they wrote
         return (
           quoted(problem.quote, context.reply) &&
-          /\d/.test(problem.quote) &&
-          context.tools.length > 0
+          ATTRIBUTED.test(problem.quote) &&
+          !quoted(problem.quote, context.theirs)
         );
-      case "not_their_words":
-        // Copied from the reply, and not something they wrote themselves
-        return quoted(problem.quote, context.reply) && !quoted(problem.quote, context.theirs);
+      case "unknown_source":
+        // A name given as a source, in none of the results nor in their messages
+        return (
+          quoted(problem.quote, context.reply) &&
+          SOURCE_CUE.test(problem.quote) &&
+          namesIn(problem.quote).some(
+            (name) => !bare(context.tools).includes(name) && !bare(context.theirs).includes(name)
+          )
+        );
       case "unsafe":
         return quoted(problem.quote, context.reply);
       default:
@@ -171,12 +231,16 @@ export async function reviewReply(options: {
     .slice(-3000);
   // What the tools answered in this turn: the facts the reply has to agree with
   const turnStart = history.lastIndexOf(lastUser as ChatMessage);
-  const tools = history
+  const toolTexts = history
     .slice(Math.max(0, turnStart))
     .filter((m) => m.role === "tool")
-    .map((m) => textOf(m.content).slice(0, 900))
+    .map((m) => textOf(m.content));
+  // The reviewer reads a part; the code checks against all of it
+  const tools = toolTexts
+    .map((text) => text.slice(0, 900))
     .join("\n")
     .slice(0, 2500);
+  const allTools = toolTexts.join("\n");
 
   const problems: Problem[] = inventedLinks(reply, options.links).map((url) => ({
     kind: "invented_link" as const,
@@ -219,7 +283,7 @@ export async function reviewReply(options: {
           typeof (one as Problem).fix === "string"
       )
       .slice(0, 3);
-    return [...problems, ...confirmed(found, { reply, last, theirs, tools })];
+    return [...problems, ...confirmed(found, { reply, last, theirs, tools: allTools })];
   } catch {
     return problems;
   }
@@ -241,9 +305,17 @@ export async function writeCorrection(options: {
     [
       {
         role: "system",
-        content: `You are the coach. You just sent the reply below, and found these mistakes in it. Write a short follow-up message to the person, in ${options.language}: one to three sentences that put each mistake right, plainly (for a question you did not answer, answer it). Start with "${
+        content: `You are the coach. You just sent the reply below, and found these mistakes in it. Write a short follow-up message to the person, in ${options.language}: one to three sentences that put right the mistakes listed, plainly (for a question you did not answer, answer it), and nothing else. Start with "${
           /^span/i.test(options.language) ? "Una corrección:" : "A correction:"
-        }". No apology beyond that, no repeating the whole reply, no new plan, no mention of a review. A link that may not exist: say it may not work and give no other.`,
+        }". No apology beyond that, no repeating the whole reply, no new plan, no question to them, no mention of a review.${
+          options.problems.some((p) => p.kind === "invented_link")
+            ? " A link that did not come from a search: say it may not work and give no other."
+            : ""
+        }${
+          options.problems.some((p) => p.kind === "unknown_source")
+            ? " A source you named that was not among what you found: say so, and that what you said rests only on the sources you did find."
+            : ""
+        }`,
       },
       {
         role: "user",

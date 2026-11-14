@@ -12,6 +12,8 @@ export interface SavedFacts {
   counts: Set<number>;
   /** The dates that are right to say, as "13-nov". */
   dates: Set<string>;
+  /** Sessions a week, when the roadmaps say their days. */
+  perWeek: Set<number>;
 }
 
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -50,6 +52,7 @@ export function savedFacts(history: ChatMessage[]): SavedFacts | null {
   const from = history.map((message) => message.role).lastIndexOf("user");
   const counts = new Set<number>();
   const dates = new Set<string>();
+  const perWeek = new Set<number>();
   for (const message of history.slice(from + 1)) {
     if (message.role !== "tool" || typeof message.content !== "string") continue;
     let answer: { sessions?: unknown };
@@ -61,6 +64,14 @@ export function savedFacts(history: ChatMessage[]): SavedFacts | null {
     if (!Array.isArray(answer.sessions)) continue;
     for (const roadmap of answer.sessions as Array<Record<string, unknown>>) {
       if (typeof roadmap.total === "number") counts.add(roadmap.total);
+      if (typeof roadmap.days === "string" && roadmap.days.trim()) {
+        const days = roadmap.days.trim();
+        perWeek.add(
+          /todos los d[ií]as|every day|cada d[ií]a|diario|daily/i.test(days)
+            ? 7
+            : days.split(/\s*,\s*|\s+y\s+|\s+and\s+/).filter(Boolean).length
+        );
+      }
       for (const key of ["first", "last"]) {
         const date = dateOf(roadmap[key]);
         if (date) dates.add(date);
@@ -77,7 +88,7 @@ export function savedFacts(history: ChatMessage[]): SavedFacts | null {
       }
     }
   }
-  return counts.size > 0 || dates.size > 0 ? { counts, dates } : null;
+  return counts.size > 0 || dates.size > 0 ? { counts, dates, perWeek } : null;
 }
 
 /**
@@ -90,6 +101,36 @@ export function disagreements(reply: string, facts: SavedFacts): string[] {
   for (const found of reply.matchAll(/(\d{1,3})\s*(?:sesiones|sessions)\b/gi)) {
     const count = Number(found[1]);
     if (count > 7 && !facts.counts.has(count)) wrong.push(`${count} sessions`);
+  }
+  // "Three days a week" for a roadmap of every day: a 9B model said just that
+  if (facts.perWeek.size > 0) {
+    const WORDS: Record<string, number> = {
+      un: 1,
+      una: 1,
+      uno: 1,
+      dos: 2,
+      tres: 3,
+      cuatro: 4,
+      cinco: 5,
+      seis: 6,
+      siete: 7,
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      once: 1,
+      twice: 2,
+    };
+    for (const found of reply.matchAll(
+      /\b(\d|un|una|uno|dos|tres|cuatro|cinco|seis|siete|one|two|three|four|five|six|seven|once|twice)\s+(?:d[ií]as?|veces|vez|days?|times?)?\s*(?:a la|por|a|per|a|each)\s+(?:semana|week)\b/gi
+    )) {
+      const word = found[1].toLowerCase();
+      const n = /^\d$/.test(word) ? Number(word) : WORDS[word];
+      if (n && !facts.perWeek.has(n)) wrong.push(`${n} days a week`);
+    }
   }
   if (facts.dates.size > 0) {
     for (const found of reply.matchAll(/(\d{1,2})\s+(?:de\s+)?([a-záéíóú]{3,10})\.?/gi)) {
@@ -104,5 +145,7 @@ export function disagreements(reply: string, facts: SavedFacts): string[] {
 
 /** The right numbers, for the correction. */
 export function describeFacts(facts: SavedFacts): string {
-  return `session counts ${[...facts.counts].join(", ")}; dates ${[...facts.dates].join(", ")}`;
+  return `session counts ${[...facts.counts].join(", ")}; dates ${[...facts.dates].join(", ")}${
+    facts.perWeek.size > 0 ? `; sessions a week ${[...facts.perWeek].join(", ")}` : ""
+  }`;
 }

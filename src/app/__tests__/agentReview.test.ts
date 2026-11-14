@@ -193,3 +193,67 @@ describe("the second reading in a conversation", () => {
     expect(kinds).toEqual(["user", "assistant", "user", "assistant", "correction"]);
   });
 });
+
+describe("the findings of a real run", () => {
+  const TOOLS =
+    '{"saved":["De Escucha a Acción"],"sessions":[{"days":"lun, mar, mié, jue, vie","time":"12:00","total":65,"first":"lun 16 nov"}]} {"results":[{"title":"Cómo empezar a tocar guitarra desde cero | Blog Rockshop"},{"title":"NHS Couch to 5K: 9 weeks, 30 minutes, 5 km"}]}';
+  const reply = (text: string) => ({ reply: text, last: "dale", theirs: "dale", tools: TOOLS });
+
+  it("drops what the tools themselves say, and what is not put in their mouth", () => {
+    // The 16th is in the tool's answer: "corrected" to the 20th, a Friday
+    expect(
+      confirmed(
+        [{ kind: "contradicts_tool", quote: "Comienza el lunes 16 de noviembre", fix: "20" }],
+        reply("Listo. Comienza el lunes 16 de noviembre a las 12:00.")
+      )
+    ).toEqual([]);
+    // No number to differ: "the plan is already created" is not the reviewer's to deny
+    expect(
+      confirmed(
+        [{ kind: "contradicts_tool", quote: "El plan ya está creado en tu agenda", fix: "" }],
+        reply("El plan ya está creado en tu agenda.")
+      )
+    ).toEqual([]);
+    // Every number of the sentence is the source's
+    expect(
+      confirmed(
+        [
+          {
+            kind: "contradicts_tool",
+            quote: "El NHS confirma que 9 semanas bastan para correr 30 minutos (~5 km).",
+            fix: "",
+          },
+        ],
+        reply("El NHS confirma que 9 semanas bastan para correr 30 minutos (~5 km).")
+      )
+    ).toEqual([]);
+    // Something the coach did, not something said to be theirs
+    expect(
+      confirmed(
+        [{ kind: "not_their_words", quote: "He guardado tu nota en la vida ideal.", fix: "" }],
+        reply("He guardado tu nota en la vida ideal.")
+      )
+    ).toEqual([]);
+  });
+
+  it("keeps a number no tool gave, and a source no search returned", () => {
+    expect(
+      confirmed(
+        [{ kind: "contradicts_tool", quote: "Son 60 sesiones en total", fix: "65" }],
+        reply("Son 60 sesiones en total.")
+      )
+    ).toHaveLength(1);
+    const blogs =
+      "Los blogs de Rockshop y SixStrings coinciden: el error número uno es presionar con el dedo acostado.";
+    expect(
+      confirmed([{ kind: "unknown_source", quote: blogs, fix: "" }], reply(blogs))
+    ).toHaveLength(1);
+    // Both found: nothing to say
+    expect(
+      confirmed(
+        [{ kind: "unknown_source", quote: "Según el Blog Rockshop, empieza despacio.", fix: "" }],
+        reply("Según el Blog Rockshop, empieza despacio.")
+      )
+    ).toEqual([]);
+  });
+});
