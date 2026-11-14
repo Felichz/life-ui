@@ -802,6 +802,7 @@ export class Agent {
     if (this.brief?.plan && !this.brief.plan.given && said.length >= PLAN_LENGTH) {
       this.brief = { ...this.brief, plan: { ...this.brief.plan, given: true } };
     }
+    this.keepStated(said, person);
     if (!late && !worthNoting(person, this.brief)) {
       this.brief = unagreed(this.brief);
       return;
@@ -1006,8 +1007,34 @@ export class Agent {
    * The days of the week as the conversation last stated them: in the plan
    * the coach laid out, or in a later message of the person's that lists them.
    */
+  /**
+   * The days and the phases' weeks, kept in the notes when they are said: the
+   * coach's latest plan, or the person's own message naming two days or more.
+   */
+  private keepStated(coach: string, person: string) {
+    const plan = this.brief?.plan;
+    if (!plan || plan.built) return;
+    const stated = { ...plan.stated };
+    if (coach.length >= PLAN_LENGTH) {
+      const days = daysStated(coach);
+      if (days && days.days.length >= 2) {
+        stated.days = days.days;
+        stated.daysQuote = days.quote;
+      }
+      const weeks = phaseWeeks(coach);
+      if (weeks) stated.phaseWeeks = weeks;
+    }
+    const theirs = daysStated(person);
+    if (theirs && theirs.days.length >= 2) {
+      stated.days = theirs.days;
+      stated.daysQuote = theirs.quote;
+    }
+    if (this.brief?.plan) this.brief = { ...this.brief, plan: { ...this.brief.plan, stated } };
+  }
+
   private daysSaid(): { days?: number[]; daysQuote?: string } {
     if (!this.brief?.plan) return {};
+    const kept = this.brief.plan.stated;
     for (const message of [...this.history].reverse()) {
       const words = textOf(message.content ?? "");
       const stated =
@@ -1022,12 +1049,14 @@ export class Agent {
         return { days: stated.days, daysQuote: stated.quote };
       }
     }
-    return {};
+    // A compaction took the messages: what was kept when they were said
+    return kept?.days ? { days: kept.days, daysQuote: kept.daysQuote } : {};
   }
 
   /** The weeks of each phase in the plan the coach last laid out: read from its own text. */
   private phasesSaid(): { phaseWeeks?: number[] } {
     if (!this.brief?.plan) return {};
+    const kept = this.brief.plan.stated?.phaseWeeks;
     for (const message of [...this.history].reverse()) {
       if (message.role !== "assistant" || message.tool_calls?.length) continue;
       const words = textOf(message.content ?? "");
@@ -1035,7 +1064,7 @@ export class Agent {
       const weeks = phaseWeeks(words);
       if (weeks) return { phaseWeeks: weeks };
     }
-    return {};
+    return kept ? { phaseWeeks: kept } : {};
   }
 
   /** What the person wrote lately, to check a change against their own words. */

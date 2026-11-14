@@ -66,7 +66,14 @@ function score(file) {
   const summary = lines.find((l) => /\d+ sesiones/.test(l)) ?? "";
   const phases = lines.filter((l) => /^\d+\. /.test(l));
   const total = Number(/(\d+) sesiones/.exec(summary)?.[1] ?? NaN);
-  const counts = phases.map((l) => Number(/× (\d+)/.exec(l)?.[1] ?? NaN));
+  // A phase of one sitting is shown without "× N"
+  const counts = phases.map((l) => Number(/× (\d+)/.exec(l)?.[1] ?? 1));
+  // A conversation that never tried to build a roadmap has nothing of one to check
+  if (lines.length === 0 && !/plan_roadmap/.test(head)) {
+    add("roadmap saved", true, "n/a (no roadmap was asked for)");
+    add("no error in the conversation", !/^> ERROR/m.test(head), "");
+    return results;
+  }
   add("roadmap saved", lines.length > 0, lines.length ? "" : "no plan_roadmap card");
   if (lines.length === 0) return results;
 
@@ -119,11 +126,23 @@ function score(file) {
   const minutesAsked = /(\d+)\s*minutos/.exec(said)?.[1];
   const notes = state.split("\n").filter((l) => l.startsWith("- desde"));
   if (minutesAsked && notes.length) {
+    // Line by line: a line that gives its own total ("x 4 = 16 min") counts that
+    // total; an interval ("1 min run / 4 min walk") without one is not summed
+    const minutesOf = (line) => {
+      if (/^[\s*-]*(total|regla|rule|progres|objetiv|si |if )/i.test(line.trim())) return 0;
+      const total = /=\s*(\d+)\s*min/.exec(line);
+      if (total) return Number(total[1]);
+      if (/\d\s*min[^/]*\/[^/]*\d\s*min/.test(line)) return 0;
+      return [...line.matchAll(/(\d+)\s*min\b/g)].reduce((sum, m) => sum + Number(m[1]), 0);
+    };
     const bad = notes.filter((n) => {
-      const mins = [...n.matchAll(/\((\d+)\s*min\)|(\d+)\s*min\b/g)].map((m) =>
-        Number(m[1] ?? m[2])
+      const session = n.split("⏎  ⏎")[0];
+      const lines = session.split("⏎");
+      const timed = lines.filter((l) => minutesOf(l) > 0);
+      return (
+        timed.length >= 2 &&
+        lines.reduce((sum, l) => sum + minutesOf(l), 0) > Number(minutesAsked) * 1.1
       );
-      return mins.length >= 2 && mins.reduce((a, b) => a + b, 0) > Number(minutesAsked) * 1.4;
     });
     add(
       "a session fits its minutes",
@@ -139,7 +158,9 @@ function score(file) {
   const afterNotes = noteText
     .split("⏎")
     .filter((l) => /(^|\s)(cada|elige|escoge)\b/i.test(l))
-    .join(" ");
+    .join(" ")
+    // "Cada día…" in a rule says what holds every session, not a schedule
+    .replace(/cada d[ií]a|todos los d[ií]as/gi, "");
   const stray = [...weekdays(afterNotes)].filter((d) => !cardDays.has(d));
   add("rules do not name other days", stray.length === 0, stray.join(","));
 
