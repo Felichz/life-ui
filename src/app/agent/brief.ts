@@ -578,8 +578,15 @@ const CHECK_PLAN = {
             "A limit from IT HAS TO RESPECT that a line of the plan goes against, with that line."
           ),
         },
+        out_of_reach: {
+          type: "array",
+          maxItems: 1,
+          items: said(
+            "A goal the plan says it reaches that its own numbers do not reach (a distance, an amount or a level that does not fit in the time the plan gives), with the numbers. Empty when the plan's numbers reach what it promises."
+          ),
+        },
       },
-      required: ["not_used", "not_given", "breaks"],
+      required: ["not_used", "not_given", "breaks", "out_of_reach"],
     },
   },
 };
@@ -719,11 +726,17 @@ export async function planGaps(options: {
     );
     const missing = theirs(strings(found.not_given), brief.wants);
     const breaks = strings(found.breaks);
+    const unreachable = strings(found.out_of_reach).slice(0, 1);
     return [
       ...over,
       ...(unused.length ? [`it never uses what they have: ${unused.join("; ")}`] : []),
       ...(missing.length ? [`it does not give what they asked for: ${missing.join("; ")}`] : []),
       ...(breaks.length ? [`it goes against a limit: ${breaks.join("; ")}`] : []),
+      ...(unreachable.length
+        ? [
+            `it promises what its numbers do not reach (${unreachable[0]}): say so plainly before the plan, with the numbers, and offer the two ways out (more time per session, or a goal that fits); do not promise it`,
+          ]
+        : []),
     ];
   } catch {
     await timing;
@@ -878,7 +891,7 @@ const TIME_SESSION = {
 };
 
 /** How far over the session an estimate has to be before it is said: the estimate is rough. */
-const OVER = 1.4;
+const OVER = 1.1;
 
 /**
  * The minutes one session of the first phase really takes, done as written
