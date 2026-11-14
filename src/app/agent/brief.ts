@@ -49,7 +49,12 @@ export interface Brief {
      * read from, and a roadmap saved after it lost them (a plan for every day
      * was saved on Mondays only, read from "starting on Monday").
      */
-    stated?: { days?: number[]; daysQuote?: string; phaseWeeks?: number[] };
+    stated?: {
+      days?: number[];
+      daysQuote?: string;
+      daysBy?: "person" | "coach";
+      phaseWeeks?: number[];
+    };
   };
   /**
    * Whether their latest message says yes to what the coach proposed. Nothing
@@ -287,6 +292,8 @@ export interface Said {
    */
   days?: number[];
   daysQuote?: string;
+  /** Who named them: the person's own words, or a plan the coach proposed. */
+  daysBy?: "person" | "coach";
   /** The weeks of each phase of the plan they agreed to, when it names them. */
   phaseWeeks?: number[];
 }

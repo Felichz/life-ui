@@ -401,6 +401,29 @@ describe("the roadmap draft", () => {
       more.saveRoadmap({ ...ROADMAP, rules: "- Estirar dos minutos al final" });
       expect(more.changed).toBe(true);
 
+      // Days the person named are theirs: sent back once, then put right
+      const everyDay = new RoadmapDraft(setup(), new Date(), {
+        days: [0, 1, 2, 3, 4, 5, 6],
+        daysQuote: "tengo 20 minutos todos los dias",
+        daysBy: "person",
+      });
+      const mondays = {
+        ...ROADMAP,
+        schedule: { weekdays: ["lun"], time: "20:00", start: "today" },
+      };
+      expect(() => everyDay.saveRoadmap(mondays)).toThrow(/other-days/);
+      everyDay.saveRoadmap(mondays);
+      expect(everyDay.describe().details.join(" ")).toMatch(/todos los días|every day/);
+      // A proposal of the coach's stands the second time
+      const proposal = new RoadmapDraft(setup(), new Date(), {
+        days: [1, 3, 5],
+        daysQuote: "te propongo lunes, miércoles y viernes",
+        daysBy: "coach",
+      });
+      expect(() => proposal.saveRoadmap(mondays)).toThrow(/other-days/);
+      proposal.saveRoadmap(mondays);
+      expect(proposal.describe().details.join(" ")).not.toMatch(/mié/);
+
       // Phases that do not hold their weeks' sessions: 2, 2 and 5 weeks at 3 days are 6, 6 and 15
       const phased = new RoadmapDraft(setup(), new Date(), { phaseWeeks: [2, 2, 5] });
       const uneven = {
