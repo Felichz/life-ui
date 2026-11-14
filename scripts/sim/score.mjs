@@ -101,7 +101,27 @@ function score(file) {
     given ? `said ${given[1]}, card ${shown ? shown[1] : "none"}` : "n/a"
   );
 
-  const weeks = /(\d+)\s*semanas|(\d+)\s*meses/i.exec(said);
+  // Numbers said in words count too: "en tres meses", "dos semanas"
+  const WORDS = {
+    un: 1,
+    una: 1,
+    uno: 1,
+    dos: 2,
+    tres: 3,
+    cuatro: 4,
+    cinco: 5,
+    seis: 6,
+    siete: 7,
+    ocho: 8,
+    nueve: 9,
+    diez: 10,
+    doce: 12,
+  };
+  const numbered = plain(said).replace(
+    /\b(un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce)\s+(semanas?|mes(?:es)?)\b/g,
+    (_, n, unit) => `${WORDS[n]} ${unit}`
+  );
+  const weeks = /(\d+)\s*semanas?\b|(\d+)\s*mes(?:es)?\b/i.exec(numbered);
   const perWeek = cardDays.size;
   if (weeks && perWeek) {
     const w = weeks[1] ? Number(weeks[1]) : Math.round(Number(weeks[2]) * 4.35);

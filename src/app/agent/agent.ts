@@ -802,9 +802,10 @@ export class Agent {
     if (this.brief?.plan && !this.brief.plan.given && said.length >= PLAN_LENGTH) {
       this.brief = { ...this.brief, plan: { ...this.brief.plan, given: true } };
     }
-    this.keepStated(said, person);
     if (!late && !worthNoting(person, this.brief)) {
       this.brief = unagreed(this.brief);
+      // A short "yes" still follows a plan whose days and phases are worth keeping
+      this.keepStated(said, person);
       return;
     }
     this.brief = await updateBrief({
@@ -834,6 +835,8 @@ export class Agent {
       });
       if (this.brief) this.brief = { ...this.brief, needs, use };
     }
+    // After the notes: the plan they read this message into has to exist to keep anything in
+    this.keepStated(said, person);
   }
 
   /** The person asked for something to be looked up, searching is allowed, and no search was made yet. */
