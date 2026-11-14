@@ -583,6 +583,27 @@ describe("the roadmap draft", () => {
       expect(savedNotes).not.toContain("example_stretch");
       expect(savedNotes).toContain("85220advice.pdf");
 
+      // With guides to link, a phase without one is sent back once
+      const unlinked = new RoadmapDraft(setup(), new Date(), {
+        links: ["https://www.ouh.nhs.uk/media/lsjlro5o/85220advice.pdf"],
+      });
+      const oneLinked = {
+        ...ROADMAP,
+        milestones: [
+          {
+            title: "Uno",
+            sessions: 6,
+            notes: "- Isométrico [guía](https://www.ouh.nhs.uk/media/lsjlro5o/85220advice.pdf)",
+          },
+          { title: "Dos", sessions: 6, notes: "- Excéntrico 3x15" },
+        ],
+      };
+      expect(() => unlinked.saveRoadmap(oneLinked)).toThrow(
+        /phase-without-link: the notes of "Dos" link no guide/
+      );
+      unlinked.saveRoadmap(oneLinked);
+      expect(unlinked.changed).toBe(true);
+
       // What they have is told to the planner, never a reason to refuse the roadmap
       const used = new RoadmapDraft(setup(), new Date(), { use: ["mancuernas de 5kg"] });
       used.saveRoadmap(ROADMAP);

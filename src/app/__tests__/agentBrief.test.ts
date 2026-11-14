@@ -5,6 +5,7 @@ import {
   clockIn,
   durationIn,
   asksForPlan,
+  speaksOfPain,
   measuredGoal,
   miscounted,
   missingFrom,
@@ -227,6 +228,12 @@ describe("links", () => {
     expect(gaps.join(" ")).not.toContain("85220advice.pdf)");
   });
 
+  it("pain is read in the person's words", () => {
+    expect(speaksOfPain("me duele el codo")).toBe(true);
+    expect(speaksOfPain("tengo algunos dolores de espalda")).toBe(true);
+    expect(speaksOfPain("quiero aprender guitarra")).toBe(false);
+  });
+
   it("asking for a plan is read as one", () => {
     expect(asksForPlan("que me recomiendas como plan a corto y largo plazo?")).toBe(true);
     expect(asksForPlan("arma una rutina para la espalda")).toBe(true);
@@ -419,7 +426,9 @@ describe("notes with nothing in them", () => {
   it("ask for no coaching: the person is running their day", () => {
     const empty = { wants: [], has: [], limits: [], unsure: [], instruction: true };
     expect(nextMove(empty, false)).toBe("");
-    expect(nextMove({ ...empty, has: ["mancuernas"] }, false)).toContain("do not give it yet");
+    expect(nextMove({ ...empty, has: ["mancuernas"] }, false)).toContain(
+      "do not give the whole plan yet"
+    );
   });
 });
 
@@ -716,7 +725,7 @@ describe("the coach's next move", () => {
       "at what time of day, if they want a fixed one",
     ]);
     const move = nextMove(brief, false);
-    expect(move).toContain("do not give it yet");
+    expect(move).toContain("do not give the whole plan yet");
     expect(move).toContain("how long one session can be; which days of the week");
     expect(move).not.toContain("at what time");
   });
@@ -726,7 +735,7 @@ describe("the coach's next move", () => {
     expect(move).toContain("Give them the plan now");
     expect(move).toContain("is your proposal, not their word");
     expect(move).toContain("put nothing in the app before their yes");
-    expect(move).not.toContain("do not give it yet");
+    expect(move).not.toContain("do not give the whole plan yet");
   });
 
   it("is to recommend when nothing is missing", () => {
@@ -752,7 +761,7 @@ describe("the coach's next move", () => {
 
   it("puts a question of the person's first", () => {
     expect(nextMove(brief, true)).toMatch(/^They asked you something: answer it first/);
-    expect(nextMove(brief, true)).not.toContain("do not give it yet");
+    expect(nextMove(brief, true)).not.toContain("do not give the whole plan yet");
   });
 
   it("is left to the model when there are no notes", () => {

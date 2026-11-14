@@ -36,6 +36,8 @@ const PROMPT = (language: string) =>
 - Use an activity of the library when one fits. For a new one, give a short plain name for the whole session and session_minutes: how long one session lasts.
 - "sessions" is how many times the person does the whole session during that phase: three days a week for four weeks is 12 sessions. It is never a number from inside a session.
 - 2 to 5 milestones. The first one small: a week or two.
+- A phase with no end in the plan ("long term", "maintenance", "from then on") gets 4 weeks of sessions: say so when you finish, and that it can be extended.
+- When the plan gives links to guides, each phase's notes carry the link of the guide for its exercises, next to them.
 - When the request leaves a number out, choose a modest one and say so when you finish. When it does not say which days of the week, do not choose them: call cannot_do and say that the days are missing.
 - When the roadmap the request asks for already exists as asked (see "What exists now"), change nothing: call cannot_do and say that it exists already.
 - Create or rewrite a whole roadmap with save_roadmap, in one call, and end it with then: "finish". Use the small tools only for small changes to a roadmap that exists.
@@ -334,6 +336,7 @@ const FIXABLE = new Set([
   "left-out",
   "shorter-than-asked",
   "longer-than-asked",
+  "phase-without-link",
 ]);
 const ENDINGS = [
   {

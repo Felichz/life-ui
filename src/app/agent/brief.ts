@@ -432,6 +432,20 @@ function questionsIn(reply: string): string {
 }
 
 /**
+ * Whether the person speaks of pain or an injury: then the coach says once
+ * that it is not a doctor, what is safe to change now, and when to see one.
+ */
+export function speaksOfPain(text: string): boolean {
+  const plain = text
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return /\b(dolor(es)?|duele|me duelen?|lesion|lastim\w*|molestia|hurts?|pain(ful)?|injur\w*|sore)\b/.test(
+    plain
+  );
+}
+
+/**
  * Whether a message asks for a plan, a routine or a programme: "¿qué me
  * recomiendas como plan a corto y largo plazo?" was noted by a 9B model as
  * no plan wanted, and the coach never got to one. Read here as well.
@@ -1155,7 +1169,11 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
   if (missing.length > 0 && (brief.asked ?? 0) < 2 && !personAsked) {
     // A plan is asked about in one message: when, how long, and what its numbers hang on
     const most = brief.plan && brief.needs?.length ? 3 : 2;
-    return `If they want advice or a plan: do not give it yet. In one short message, ask only for what they have not told you, ${most === 3 ? "three" : "two"} things at most: ${missing
+    // Asked to look it up: what was found is theirs now, the questions come after
+    const found = brief.research
+      ? "They asked you to look it up: first, in a few lines, say what you found that they can use now, with its source. Then "
+      : "";
+    return `If they want advice or a plan: do not give the whole plan yet. ${found}${found ? "in" : "In"} one short message, ask only for what they have not told you, ${most === 3 ? "three" : "two"} things at most: ${missing
       .slice(0, most)
       .join("; ")}. Ask nothing else.`;
   }

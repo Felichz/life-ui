@@ -24,6 +24,7 @@ import {
   linksIn,
   missingFrom,
   planGaps,
+  speaksOfPain,
   samePage,
   planNeeds,
   saidIn,
@@ -944,6 +945,16 @@ export class Agent {
     if (this.owesSearch()) {
       notes.push(
         "They asked you to look this up: call web_search now, before you say anything about what is known. Never say you looked something up without a search in this reply."
+      );
+    }
+    // Pain: told it plainly, a 9B model gave exercises and never said when to see a professional
+    const spoken = this.history
+      .filter((message) => message.role === "user")
+      .map((message) => textOf(message.content))
+      .join(" ");
+    if (speaksOfPain(spoken) && !this.brief?.plan?.built) {
+      notes.push(
+        "They speak of pain: in this reply say once, briefly, that you are not a doctor and this is not a diagnosis; what is safe to change now; and the signs that mean seeing a professional now (numbness or tingling, pain at night, swelling, no better in two or three weeks)."
       );
     }
     // The links it may give: a 9B model wrote "youtube.com/watch?v=example_stretch"
