@@ -414,6 +414,25 @@ describe("the roadmap draft", () => {
       many.saveRoadmap(ROADMAP);
       expect(many.changed).toBe(true);
 
+      // The counts of the phases follow from the weeks of the plan: sent back once, then set
+      const fromWeeks = new RoadmapDraft(setup(), new Date(), { weeks: 13, phaseWeeks: [4, 4, 5] });
+      const asWeeks = {
+        ...ROADMAP,
+        schedule: {
+          weekdays: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+          time: "20:00",
+          start: "today",
+        },
+        milestones: [
+          { title: "Uno", sessions: 4, notes: "- a" },
+          { title: "Dos", sessions: 4, notes: "- b" },
+          { title: "Tres", sessions: 5, notes: "- c" },
+        ],
+      };
+      expect(() => fromWeeks.saveRoadmap(asWeeks)).toThrow(/phases-off-count|several/);
+      fromWeeks.saveRoadmap(asWeeks);
+      expect(fromWeeks.describe().details.join(" ")).toMatch(/91/);
+
       // Days the person named are theirs: sent back once, then put right
       const everyDay = new RoadmapDraft(setup(), new Date(), {
         days: [0, 1, 2, 3, 4, 5, 6],

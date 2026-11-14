@@ -521,13 +521,23 @@ export class RoadmapDraft {
   private onTheirPhases(roadmap: DraftRoadmap) {
     const weeks = this.said.phaseWeeks;
     const perWeek = roadmap.schedule?.weekdays.length;
-    if (!weeks || !perWeek || this.phasesSentBack) return;
+    if (!weeks || !perWeek) return;
     if (weeks.length !== roadmap.milestones.length) return;
     const expected = weeks.map((each) => each * perWeek);
     const mine = roadmap.milestones.map((milestone) =>
       milestone.steps.reduce((sum, step) => sum + this.sessionsOf(step), 0)
     );
     if (expected.every((count, index) => count === mine[index])) return;
+    if (this.phasesSentBack) {
+      // Sent back once and sent the same: the counts follow from the weeks of
+      // the plan they agreed to and the days, so they are set here. A planner
+      // wrote the weeks themselves (4, 4, 5) as sessions of a daily plan, twice.
+      roadmap.milestones.forEach((milestone, index) => {
+        const [only] = milestone.steps;
+        if (milestone.steps.length === 1 && only.unit === "times") only.amount = expected[index];
+      });
+      return;
+    }
     this.phasesSentBack = true;
     throw new DraftError(
       "phases-off-count",
@@ -656,8 +666,12 @@ export class RoadmapDraft {
   get warnings(): string[] {
     return this.touched().flatMap((roadmap) => {
       const longer = this.longerThanAsked(roadmap);
-      return longer
-        ? [t("roadmap.card.longer", { asked: this.said.weeks!, weeks: longer.weeks })]
+      if (longer)
+        return [t("roadmap.card.longer", { asked: this.said.weeks!, weeks: longer.weeks })];
+      // Shorter than asked is said on the card too: the person decides
+      const shorter = this.shorterThanAsked(roadmap);
+      return shorter
+        ? [t("roadmap.card.longer", { asked: this.said.weeks!, weeks: shorter.weeks })]
         : [];
     });
   }
