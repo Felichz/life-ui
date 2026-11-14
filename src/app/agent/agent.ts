@@ -1020,6 +1020,7 @@ export class Agent {
       if (days && days.days.length >= 2) {
         stated.days = days.days;
         stated.daysQuote = days.quote;
+        stated.daysBy = "coach";
       }
       const weeks = phaseWeeks(coach);
       if (weeks) stated.phaseWeeks = weeks;
@@ -1028,11 +1029,12 @@ export class Agent {
     if (theirs && theirs.days.length >= 2) {
       stated.days = theirs.days;
       stated.daysQuote = theirs.quote;
+      stated.daysBy = "person";
     }
     if (this.brief?.plan) this.brief = { ...this.brief, plan: { ...this.brief.plan, stated } };
   }
 
-  private daysSaid(): { days?: number[]; daysQuote?: string } {
+  private daysSaid(): { days?: number[]; daysQuote?: string; daysBy?: "person" | "coach" } {
     if (!this.brief?.plan) return {};
     const kept = this.brief.plan.stated;
     for (const message of [...this.history].reverse()) {
@@ -1046,11 +1048,15 @@ export class Agent {
       // One day alone is as often the start ("para el próximo martes") as the plan:
       // in the person's words or in the coach's, it is not the plan's days
       if (stated && stated.days.length >= 2) {
-        return { days: stated.days, daysQuote: stated.quote };
+        return {
+          days: stated.days,
+          daysQuote: stated.quote,
+          daysBy: message.role === "user" ? "person" : "coach",
+        };
       }
     }
     // A compaction took the messages: what was kept when they were said
-    return kept?.days ? { days: kept.days, daysQuote: kept.daysQuote } : {};
+    return kept?.days ? { days: kept.days, daysQuote: kept.daysQuote, daysBy: kept.daysBy } : {};
   }
 
   /** The weeks of each phase in the plan the coach last laid out: read from its own text. */

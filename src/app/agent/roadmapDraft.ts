@@ -489,10 +489,18 @@ export class RoadmapDraft {
    * with the line they were read from, and the planner decides.
    */
   private onTheirDays(roadmap: DraftRoadmap) {
-    const { days, daysQuote } = this.said;
+    const { days, daysQuote, daysBy } = this.said;
     const mine = roadmap.schedule?.weekdays;
-    if (!days?.length || !mine || this.daysSentBack) return;
+    if (!days?.length || !mine || !roadmap.schedule) return;
     if (days.length === mine.length && days.every((day) => mine.includes(day))) return;
+    if (this.daysSentBack) {
+      // Sent back once and sent again: a reading of the coach's proposal may be
+      // the wrong one, and it stands. Days the person named in their own words
+      // are theirs: the planner kept "Monday" from "starting on Monday" for a
+      // plan of every day, twice, and 91 Mondays were saved.
+      if (daysBy === "person") roadmap.schedule = { ...roadmap.schedule, weekdays: [...days] };
+      return;
+    }
     this.daysSentBack = true;
     throw new DraftError(
       "other-days",
