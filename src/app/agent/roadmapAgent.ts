@@ -322,6 +322,19 @@ const TOOLS: Array<{
  */
 const FINISH = "finish";
 const CANNOT = "cannot_do";
+
+/** What the draft sends back about a roadmap it would otherwise save: all of it fixable. */
+const FIXABLE = new Set([
+  "several",
+  "other-days",
+  "phases-off-count",
+  "phase-too-long",
+  "session-too-long",
+  "rules-about-days",
+  "left-out",
+  "shorter-than-asked",
+  "longer-than-asked",
+]);
 const ENDINGS = [
   {
     name: FINISH,
@@ -485,6 +498,7 @@ export async function runRoadmapPlanner(options: {
   let failures = 0;
   let refused = 0;
 
+  let fixable = false;
   run: for (let step = 0; step < MAX_STEPS; step++) {
     // Every move has to be a tool call: a planner that only talks has planned
     // nothing, and with Qwen3.5 9B it did just that ("I have created the
@@ -545,11 +559,26 @@ export async function runRoadmapPlanner(options: {
           messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
           continue;
         }
+        // Giving up right after the draft sent the roadmap back: what it sent back
+        // is the planner's to fix, not something the request lacks. A 9B model
+        // handed three problems at once called cannot_do, and nothing was saved.
+        if (name === CANNOT && fixable && nudges < MAX_NUDGES) {
+          nudges++;
+          const result = {
+            error: "fix-it-instead",
+            detail:
+              "What was sent back can be fixed by you: call save_roadmap again with each of those problems fixed, or send the same call again if the plan the person agreed to really is so. cannot_do is only for something the request does not say.",
+          };
+          messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+          continue;
+        }
         reply = said;
         break run;
       }
       const result = runOne(draft, call);
       lastError = "error" in result ? `${result.error}: ${result.detail}` : undefined;
+      // The draft's own checks send back what the planner can put right
+      fixable = "error" in result && FIXABLE.has(String(result.error));
       messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       // Three refusals in a row: it is not going to get there, and each try
       // writes the whole roadmap again. The coach is told what stood in the way.

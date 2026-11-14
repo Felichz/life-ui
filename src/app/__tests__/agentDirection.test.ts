@@ -762,6 +762,32 @@ describe("the roadmap planner", () => {
     expect(core.getRoadmaps().map((roadmap) => roadmap.title)).toEqual(["Entrenar"]);
   });
 
+  it("does not give up right after a roadmap it can fix was sent back", async () => {
+    const core = setup();
+    const roadmap = {
+      title: "Entrenar",
+      why: "",
+      activity: "Entrenar: base",
+      schedule: SCHEDULE,
+      milestones: [{ title: "Fase 1", sessions: 6, notes: "- Sentadilla 2x10" }],
+    };
+    const { agent, seen } = agentWith(
+      core,
+      [call("plan_roadmap", { request: "Meta: entrenar. Fase 1: 6 sesiones." }), say("Listo.")],
+      [
+        // Rules that name other days than the schedule: sent back
+        call("save_roadmap", { ...roadmap, rules: "- Elige un día a la semana (martes o jueves)" }),
+        call("cannot_do", { missing: "El plan tiene errores." }),
+        call("save_roadmap", { ...roadmap, rules: "- Día malo: una serie" }),
+        call("finish", { message: "Creé «Entrenar»." }),
+      ]
+    );
+    agent.mode = "auto";
+    await agent.send("armame la hoja de ruta");
+    expect(JSON.stringify(seen.planner)).toContain("fix-it-instead");
+    expect(core.getRoadmaps().map((one) => one.title)).toEqual(["Entrenar"]);
+  });
+
   it("can say that a request cannot be carried out, and nothing is saved", async () => {
     const core = setup();
     const { agent, seen } = agentWith(
