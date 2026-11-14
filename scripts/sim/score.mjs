@@ -149,7 +149,7 @@ function score(file) {
     // Line by line: a line that gives its own total ("x 4 = 16 min") counts that
     // total; an interval ("1 min run / 4 min walk") without one is not summed
     const minutesOf = (line) => {
-      if (/^[\s*-]*(total|regla|rule|progres|objetiv|si |if )/i.test(line.trim())) return 0;
+      if (/^[\s*-]*(total|regla|rule|progres|objetiv|nota|note|si |if )/i.test(line.trim())) return 0;
       const total = /=\s*(\d+)\s*min/.exec(line);
       if (total) return Number(total[1]);
       if (/\d\s*min[^/]*\/[^/]*\d\s*min/.test(line)) return 0;
