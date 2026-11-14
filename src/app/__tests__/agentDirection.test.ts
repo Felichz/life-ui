@@ -406,11 +406,10 @@ describe("the roadmap draft", () => {
         days: [2, 4, 6],
         daysQuote: "martes, jueves y sábado",
         daysBy: "coach",
-        use: ["mancuernas de 5kg"],
       });
-      expect(() => many.saveRoadmap(ROADMAP)).toThrow(
-        /several: fix all of these in one call: \(1\) other-days.*\(2\) unused-things/
-      );
+      expect(() =>
+        many.saveRoadmap({ ...ROADMAP, rules: "- Elige un día a la semana (martes o jueves)" })
+      ).toThrow(/several: fix all of these in one call: \(1\) rules-about-days.*\(2\) other-days/);
       many.saveRoadmap(ROADMAP);
       expect(many.changed).toBe(true);
 
@@ -553,17 +552,9 @@ describe("the roadmap draft", () => {
       });
       expect(calendarDays.changed).toBe(true);
 
-      // What they have is used by no session: sent back once, and the same call stands
-      const used = new RoadmapDraft(setup(), new Date(), {
-        use: ["mancuernas de 5kg", "la barra"],
-      });
-      expect(() => used.saveRoadmap(ROADMAP)).toThrow(
-        /unused-things: the person has: mancuernas de 5kg/
-      );
-      used.saveRoadmap({
-        ...ROADMAP,
-        milestones: [{ title: "Fase", sessions: 6, notes: "- Remo con mancuernas de 5kg 3x10" }],
-      });
+      // What they have is told to the planner, never a reason to refuse the roadmap
+      const used = new RoadmapDraft(setup(), new Date(), { use: ["mancuernas de 5kg"] });
+      used.saveRoadmap(ROADMAP);
       expect(used.changed).toBe(true);
 
       // Other days than the conversation names: sent back once, with the line they were read from

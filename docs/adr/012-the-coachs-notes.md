@@ -99,12 +99,12 @@ The same rule, "sent back once, with the numbers", now covers three things a pla
 
 ### 4d. What the roadmap is checked against, and how it is measured
 
-The planner is a second 9B call, and the roadmap it saves has to agree with the conversation. Each check below is made by code on the draft, sent back to the planner **once** with the numbers or the line it came from, and stands the second time (the reading of a sentence can be the wrong one, so none of them binds):
+The planner is a second 9B call, and the roadmap it saves has to agree with the conversation. Each check below is made by code on the draft. All the problems of a draft come back to the planner **in one answer** (one at a time, three of them used up its tries). Each is sent back **once** and stands the second time, because the reading of a sentence can be the wrong one, with two exceptions where nothing is left to read: days the person named in their own words, and phase counts that follow from the weeks the agreed plan wrote. Those are set by the code when the planner insists. The days and the phases' weeks are kept in the notes when they are said, so a compaction does not lose them:
 
 - **Days** the plan last named, read from the plan or from the person (a sentence's alternative, "or if you prefer…", is not stated; one day alone is the start and not the plan's days; the plural of a weekday is the weekday).
 - **Phases:** the sessions of each phase are its weeks times the days a week, read from the plan's own headings ("Semanas 1-4"), and the planner is given those counts. A roadmap a whole week of sessions short, or much longer than asked, is sent back.
 - **Minutes:** no phase asks, in what a session contains, for more minutes than the person's session has.
-- **What they have:** what the plan can use (equipment, a place, a skill; read once, thing by thing) is used in some session; what their yes came with is somewhere in the sessions or the rules.
+- **What they have:** what the plan can use (equipment, a place, a skill; read once, thing by thing) is *told* to the planner, not checked: that reading took "20 minutes every day" for something to train with and refused a guitar written as "guitar", until nothing was saved. What their yes came with is checked: it is somewhere in the sessions or the rules.
 - **Rules** are what holds in every session; they never name days other than the calendar's.
 - **The hour:** "por la mañana a las 7" is 07:00; an hour with no part of the day stays a guess.
 

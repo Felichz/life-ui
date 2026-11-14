@@ -120,8 +120,6 @@ export class RoadmapDraft {
   private phasesSentBack = false;
   /** A roadmap without what the person added with their yes was sent back already. */
   private addedSentBack = false;
-  /** A roadmap that uses nothing of what the person has was sent back already. */
-  private useSentBack = false;
   /** Each stored roadmap as it was when the draft began, to tell what changed. */
   private readonly original = new Map<UUID, string>();
 
@@ -561,26 +559,8 @@ export class RoadmapDraft {
     );
   }
 
-  /**
-   * What the person has, that a plan can use, is used in some session. A
-   * roadmap written with dumbbells in the notes of the person and none in the
-   * sessions was saved once. Sent back once: the planner puts it in, or says
-   * by sending the same call that it does not fit.
-   */
-  private usesWhatTheyHave(roadmap: DraftRoadmap) {
-    const use = this.said.use ?? [];
-    if (use.length === 0 || this.useSentBack) return;
-    const absent = this.absentFrom(use, roadmap, 5);
-    if (absent.length === 0) return;
-    this.useSentBack = true;
-    throw new DraftError(
-      "unused-things",
-      `the person has: ${absent.join("; ")}, and no session or rule uses it. Use it where it fits (in the notes of the phases, with its load or number), or send the same call again if it does not fit this plan.`
-    );
-  }
-
   /** The things none of whose longer words is in what the roadmap's sessions say. */
-  private absentFrom(things: string[], roadmap: DraftRoadmap, shortest = 6): string[] {
+  private absentFrom(things: string[], roadmap: DraftRoadmap): string[] {
     const bare = (words: string) =>
       words
         .toLocaleLowerCase()
@@ -598,7 +578,7 @@ export class RoadmapDraft {
     return things.filter((thing) => {
       const words = bare(thing)
         .split(/[^a-z0-9]+/)
-        .filter((word) => word.length >= shortest);
+        .filter((word) => word.length >= 6);
       return (
         words.length > 0 &&
         !words.some((word) => written.includes(word.slice(0, Math.max(5, word.length - 2))))
@@ -802,7 +782,10 @@ export class RoadmapDraft {
         check(() => this.onTheirDays(roadmap));
         check(() => this.onTheirPhases(roadmap));
         check(() => this.carriesWhatWasAdded(roadmap));
-        check(() => this.usesWhatTheyHave(roadmap));
+        // What they have is told to the planner, not checked: read thing by thing
+        // it took "20 minutes every day" for something to train with, and a
+        // guitar written "guitar" for the "acoustic" they have was refused, until
+        // nothing was saved
         check(() => {
           // Sent back once: most often the days or a count were copied wrong, and
           // the numbers show which. A second time it stands, and the card says so.
