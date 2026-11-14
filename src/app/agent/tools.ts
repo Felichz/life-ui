@@ -1107,8 +1107,11 @@ export const TOOLS: Tool[] = [
           result: {
             error: "nothing-saved",
             detail:
-              "No roadmap was created or changed. Do NOT tell the person it was. Say it did not work this time, and offer to try again.",
-            ...(run.reply ? { planner_said_but_did_not_do: run.reply.slice(0, 300) } : {}),
+              "No roadmap was created or changed. Do NOT tell the person it was. Say only that it did not work this time and offer to try again; give no reason for it, the reasons below are for you and may be wrong.",
+            // The planner's own account can be made up ("a roadmap with that name
+            // exists already" when none did): for the coach to fix the request,
+            // never to be repeated to the person
+            ...(run.reply ? { planner_said_not_for_the_person: run.reply.slice(0, 300) } : {}),
             ...(run.lastError ? { last_error: run.lastError } : {}),
           },
         };
