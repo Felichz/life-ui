@@ -562,6 +562,27 @@ describe("the roadmap draft", () => {
       });
       expect(calendarDays.changed).toBe(true);
 
+      // A link no search returned is not saved; a real one is
+      const coreLinked = setup();
+      const linked = new RoadmapDraft(coreLinked, new Date(), {
+        links: ["https://www.ouh.nhs.uk/media/lsjlro5o/85220advice.pdf"],
+      });
+      linked.saveRoadmap({
+        ...ROADMAP,
+        milestones: [
+          {
+            title: "Fase",
+            sessions: 6,
+            notes:
+              "- Isométrico: [guía](https://www.ouh.nhs.uk/media/lsjlro5o/85220advice.pdf)\n- Estiramiento: [video](https://www.youtube.com/watch?v=example_stretch)",
+          },
+        ],
+      });
+      linked.commit();
+      const savedNotes = JSON.stringify(coreLinked.getRoadmaps());
+      expect(savedNotes).not.toContain("example_stretch");
+      expect(savedNotes).toContain("85220advice.pdf");
+
       // What they have is told to the planner, never a reason to refuse the roadmap
       const used = new RoadmapDraft(setup(), new Date(), { use: ["mancuernas de 5kg"] });
       used.saveRoadmap(ROADMAP);

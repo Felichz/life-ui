@@ -179,6 +179,15 @@ function score(file) {
   const noteText = notes.join("\n");
   add("no load left as a choice", !/\d\s*kg\s+o\s+\d+\s*kg/i.test(noteText), "");
   if (/\d\s*kg/i.test(said)) add("loads are concrete", /\d\s*kg/i.test(noteText), "");
+  // Asked for links to guides: every phase's notes carry one
+  if (/\b(link|enlace|guia|guide|video)s?\b/i.test(plain(said))) {
+    const without = notes.filter((n) => !/https?:\/\//.test(n.split("⏎  ⏎")[0]));
+    add(
+      "sessions carry the guide links asked for",
+      notes.length > 0 && without.length === 0,
+      without.length ? `${without.length} of ${notes.length} phase(s) without a link` : ""
+    );
+  }
 
   const afterNotes = noteText
     .split("⏎")

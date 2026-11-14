@@ -4,6 +4,7 @@ import {
   briefLines,
   clockIn,
   durationIn,
+  asksForPlan,
   measuredGoal,
   miscounted,
   missingFrom,
@@ -209,6 +210,27 @@ describe("the arithmetic of a repeated block", () => {
       '"Semana 1: Correr 1 minuto, caminar 2 minutos (repetir 6 veces = 30 min)." says 30 min and adds up to 18',
       '"Semana 4: Correr 5 minutos, caminar 2 minutos (repetir 3 veces + 1 bloque de correr 5 min " says 30 min and adds up to 26',
     ]);
+  });
+});
+
+describe("links", () => {
+  it("are only the ones a search returned or the person wrote", async () => {
+    const plan = `${"Fase 1: isométrico 5 x 30 s. ".repeat(30)} Guía: [video](https://www.youtube.com/watch?v=example_stretch) y https://www.ouh.nhs.uk/media/lsjlro5o/85220advice.pdf`;
+    const gaps = await planGaps({
+      brief: { wants: [], has: [], limits: [], unsure: [] },
+      plan,
+      links: ["https://www.ouh.nhs.uk/media/lsjlro5o/85220advice.pdf"],
+      chat: async () =>
+        call("check_plan", { not_used: [], not_given: [], breaks: [], out_of_reach: [] }),
+    });
+    expect(gaps.join(" ")).toContain("youtube.com/watch?v=example_stretch");
+    expect(gaps.join(" ")).not.toContain("85220advice.pdf)");
+  });
+
+  it("asking for a plan is read as one", () => {
+    expect(asksForPlan("que me recomiendas como plan a corto y largo plazo?")).toBe(true);
+    expect(asksForPlan("arma una rutina para la espalda")).toBe(true);
+    expect(asksForPlan("me duele el codo")).toBe(false);
   });
 });
 
@@ -1198,6 +1220,8 @@ describe("notes in the conversation", () => {
       prompt: "p",
       notes: () => true,
       chat: async (messages) => {
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
+        if (isTiming(messages)) return call("time_session", { parts: [] });
         if (isNotes(messages)) return notes({ instruction: true });
         seen.push(messages);
         return coach.shift()!;
