@@ -9,6 +9,7 @@ import {
   nextMove,
   isRequestToCoach,
   openChoice,
+  wrongTotals,
   overfull,
   planGaps,
   planNeeds,
@@ -190,6 +191,23 @@ describe("what is a request to the coach", () => {
     expect(isRequestToCoach("si dale, hazlo")).toBe(true);
     expect(isRequestToCoach("estirar la espalda al final de cada sesión")).toBe(false);
     expect(isRequestToCoach("me duele la rodilla izquierda")).toBe(false);
+  });
+});
+
+describe("the arithmetic of a repeated block", () => {
+  it("is checked against the total the line states", () => {
+    expect(
+      wrongTotals(
+        [
+          "*   **Semana 1:** Correr 1 minuto, caminar 2 minutos (repetir 6 veces = 30 min).",
+          "*   **Semana 4:** Correr 5 minutos, caminar 2 minutos (repetir 3 veces + 1 bloque de correr 5 min = 30 min).",
+          "- Circuito: 3 rondas de 10 min = 30 min",
+        ].join("\n")
+      )
+    ).toEqual([
+      '"Semana 1: Correr 1 minuto, caminar 2 minutos (repetir 6 veces = 30 min)." says 30 min and adds up to 18',
+      '"Semana 4: Correr 5 minutos, caminar 2 minutos (repetir 3 veces + 1 bloque de correr 5 min " says 30 min and adds up to 26',
+    ]);
   });
 });
 
