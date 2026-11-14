@@ -114,6 +114,8 @@ export class RoadmapDraft {
   private daysSentBack = false;
   /** A roadmap whose rules spoke of days was sent back already. */
   private rulesSentBack = false;
+  /** A roadmap whose phases did not link their guides was sent back already. */
+  private linksSentBack = false;
   /** A roadmap with a phase longer than the person's session was sent back already. */
   private phaseLongSentBack = false;
   /** A roadmap whose phases do not hold their weeks' sessions was sent back already. */
@@ -496,6 +498,31 @@ export class RoadmapDraft {
   }
 
   /**
+   * When there are guides to link (from the searches) and the roadmap links
+   * some, every phase's notes link one: a planner put all of them in a note
+   * of the rules, and no session showed how its exercises are done. Sent
+   * back once.
+   */
+  private everyPhaseLinked(roadmap: DraftRoadmap) {
+    const known = this.said.links;
+    if (!known?.length || this.linksSentBack) return;
+    const linked = (text: string | undefined) => /https?:\/\//.test(text ?? "");
+    const all = [roadmap.rules, ...roadmap.milestones.flatMap((m) => m.steps.map((s) => s.notes))];
+    if (!all.some(linked)) return;
+    const without = roadmap.milestones.filter(
+      (milestone) => !milestone.steps.some((step) => linked(step.notes))
+    );
+    if (without.length === 0) return;
+    this.linksSentBack = true;
+    throw new DraftError(
+      "phase-without-link",
+      `the notes of ${without.map((m) => `"${m.title}"`).join(", ")} link no guide, and the person reads them while doing the session: put next to each exercise the link of the guide that shows it, from these: ${known
+        .slice(0, 8)
+        .join(", ")}`
+    );
+  }
+
+  /**
    * The rules are what holds in every session. Told "choose one day a week
    * (Tuesday or Thursday)", a person would have two schedules: the calendar's
    * and the rules'. Sent back once; the days live in the schedule.
@@ -818,6 +845,7 @@ export class RoadmapDraft {
         check(() => this.onTheirDays(roadmap));
         check(() => this.onTheirPhases(roadmap));
         check(() => this.carriesWhatWasAdded(roadmap));
+        check(() => this.everyPhaseLinked(roadmap));
         // What they have is told to the planner, not checked: read thing by thing
         // it took "20 minutes every day" for something to train with, and a
         // guitar written "guitar" for the "acoustic" they have was refused, until
