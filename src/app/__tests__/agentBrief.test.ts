@@ -4,6 +4,7 @@ import {
   briefLines,
   clockIn,
   durationIn,
+  measuredGoal,
   miscounted,
   missingFrom,
   nextMove,
@@ -208,6 +209,40 @@ describe("the arithmetic of a repeated block", () => {
       '"Semana 1: Correr 1 minuto, caminar 2 minutos (repetir 6 veces = 30 min)." says 30 min and adds up to 18',
       '"Semana 4: Correr 5 minutos, caminar 2 minutos (repetir 3 veces + 1 bloque de correr 5 min " says 30 min and adds up to 26',
     ]);
+  });
+});
+
+describe("a measured goal", () => {
+  const base = { has: [], limits: [], unsure: [] };
+  it("is found in what they want, whatever it measures", () => {
+    expect(measuredGoal({ ...base, wants: ["llegar a correr 5 kilometros sin parar"] })).toBe(
+      "llegar a correr 5 kilometros sin parar"
+    );
+    expect(measuredGoal({ ...base, wants: ["poder tocar tres canciones sencillas"] })).toBe(
+      "poder tocar tres canciones sencillas"
+    );
+    expect(measuredGoal({ ...base, wants: ["read 12 books this year"] })).toBe(
+      "read 12 books this year"
+    );
+    expect(
+      measuredGoal({ ...base, wants: ["participar en las reuniones sin quedarme callado"] })
+    ).toBeNull();
+  });
+
+  it("is checked against the time before the plan is given", () => {
+    const move = nextMove(
+      {
+        ...base,
+        wants: ["llegar a correr 5 kilometros sin parar"],
+        plan: { length: "30 min", days: "mar, jue, sáb", time: "07:00", start: "", weeks: 9 },
+      },
+      false
+    );
+    expect(move).toContain(
+      'Their goal is a measured result ("llegar a correr 5 kilometros sin parar")'
+    );
+    expect(move).toContain("whether that fits in 30 min over 9 weeks");
+    expect(move).toContain("Give them the plan now");
   });
 });
 

@@ -1078,6 +1078,29 @@ export function briefLines(brief: Brief | null): string {
  * model: ask for what is missing (in two replies at most), or recommend.
  * A question of the person's always comes first.
  */
+const COUNT_WORDS =
+  "un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|quince|veinte|cien|mil|one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|hundred|thousand";
+
+/**
+ * A result the person wants that can be measured: a distance, a weight, a
+ * count of pages, songs, words or things, with its number ("correr 5 km",
+ * "tocar tres canciones", "leer 12 libros"). Such a goal can be out of reach
+ * of the time they have, and a 9B model promised "5 km without stopping" from
+ * 22 minutes of jogging without noticing. Null when no such goal was said.
+ */
+export function measuredGoal(brief: Brief): string | null {
+  const unit =
+    "km|kil[oó]metros?|millas?|miles?|metros?|kg|kilos?|libras?|pounds?|p[aá]ginas?|pages?|libros?|books?|canciones?|songs?|palabras?|words?|cap[ií]tulos?|chapters?|repeticiones|reps|flexiones|lagartijas|push-?ups|dominadas|pull-?ups|niveles?|levels?|notas?|grades?";
+  const found = new RegExp(
+    `(\\d+(?:[.,]\\d+)?|\\b(?:${COUNT_WORDS}))\\s+(?:\\w+\\s+){0,2}?(?:${unit})\\b`,
+    "i"
+  );
+  for (const want of brief.wants) {
+    if (found.test(want)) return want;
+  }
+  return null;
+}
+
 export function nextMove(brief: Brief | null, personAsked: boolean): string {
   if (!brief) return "";
   // Notes with nothing in them are of someone running their day ("I have
@@ -1119,5 +1142,14 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
           " or "
         )}: whatever the plan shows for it is your proposal, not their word. So the last line of your reply says which one you chose yourself and asks whether it works for them or which they prefer, together with the yes. Never ask again for something that is in the notes or in the conversation.`
       : "";
-  return `${answer}Give them the plan now, whole, built on the notes above, in 350 words at most: the phases, what one session contains in each, how it progresses. Everything they asked the plan to contain (the "They want" line) is there for every phase, with its number. A number that depends on something they have not told you is not left out and not invented: give the rule they use to choose it on the day, in one line. Close it with two or three lines on how it fits the time and the limits they gave (add up the minutes of what a session contains, rests included), and ask for their yes. Do not read these notes back to them, and put nothing in the app before their yes.${open}`;
+  // A measured goal is checked against the time before it is promised
+  const goal = measuredGoal(brief);
+  const reach = goal
+    ? ` Their goal is a measured result ("${goal}"). Before you promise it, work out what reaching it takes for someone at their level, and whether that fits in ${
+        brief.plan.length || "the time of a session"
+      }${
+        brief.plan.weeks ? ` over ${brief.plan.weeks} weeks` : ""
+      }: if you are not sure of the number, look it up first. If it does not fit, the first lines of your reply say so with the numbers and offer the two ways out (more time, or a goal that fits), and the plan does not promise it.`
+    : "";
+  return `${answer}${reach.trim() ? `${reach.trim()} ` : ""}Give them the plan now, whole, built on the notes above, in 350 words at most: the phases, what one session contains in each, how it progresses. Everything they asked the plan to contain (the "They want" line) is there for every phase, with its number. A number that depends on something they have not told you is not left out and not invented: give the rule they use to choose it on the day, in one line. Close it with two or three lines on how it fits the time and the limits they gave (add up the minutes of what a session contains, rests included), and ask for their yes. Do not read these notes back to them, and put nothing in the app before their yes.${open}`;
 }
