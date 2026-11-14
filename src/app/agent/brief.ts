@@ -240,7 +240,13 @@ export function clockIn(message: string): { time: string; sure: boolean } | null
   let suffix = (clock[3] ?? "").toLowerCase();
   // "Por la mañana a las 7": the part of the day is said apart from the hour
   if (!suffix) {
-    if (/\b(por|en|de) la (ma[ñn]ana)\b|\bin the morning\b/i.test(message)) suffix = "mañana";
+    // "Antes de trabajar": a day that starts with work is a morning
+    if (
+      /\b(por|en|de) la (ma[ñn]ana)\b|\bin the morning\b|\bantes de (empezar a |ir a )?trabajar\b|\bbefore (starting )?work\b/i.test(
+        message
+      )
+    )
+      suffix = "mañana";
     else if (
       /\b(por|en|de) la (tarde|noche)\b|\bin the (afternoon|evening)\b|\bat night\b/i.test(message)
     ) {

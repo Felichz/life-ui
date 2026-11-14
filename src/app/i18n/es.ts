@@ -679,6 +679,12 @@ export const es = {
   "agent.reasoning.on":
     "Razonando antes de responder: más lento, a veces mejor. Clic para desactivar.",
   "agent.reasoning.off": "Responde directo, sin razonar antes. Clic para que razone (más lento).",
+  "agent.review": "Revisar cada respuesta",
+  "agent.review.label": "Segunda lectura",
+  "agent.review.on":
+    "Revisa cada respuesta mientras la lees y agrega una corrección si encuentra un error. Clic para desactivar.",
+  "agent.review.off":
+    "Sin segunda lectura. Clic para que revise cada respuesta mientras la lees (una llamada más al modelo).",
   "agent.attach": "Adjuntar archivo",
   "agent.attach.any": "Adjuntar imágenes o archivos de texto",
   "agent.attach.text": "Adjuntar archivos de texto (este modelo no lee imágenes)",

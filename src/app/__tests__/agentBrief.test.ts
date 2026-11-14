@@ -24,7 +24,7 @@ import {
   type Brief,
 } from "../agent/brief";
 import type { ChatMessage, ModelReply } from "../agent/llm";
-import { daysStated, phaseWeeks, weekdaysIn, weeksUntil } from "../agent/when";
+import { daysStated, phasesOffClock, phaseWeeks, weekdaysIn, weeksUntil } from "../agent/when";
 
 /**
  * The coach's notes on what the person has told it (ADR-012): kept by a short
@@ -102,6 +102,19 @@ describe("the weeks of a plan's phases", () => {
     ].join("\n");
     expect(phaseWeeks(plan)).toEqual([4, 5, 4]);
     expect(phaseWeeks("Phase 1 (weeks 1 to 2)\nPhase 2 (weeks 3 to 7)")).toEqual([2, 5]);
+    // Phases on two clocks that overlap: sent back to the coach
+    expect(
+      phasesOffClock("Fase 1 (semanas 1-4): diaria. Fase 2 (meses 1-2): más. Fase 3 (meses 3+)")
+    ).toBe('"semanas 1-4" and then "meses 1-2", which starts again at week 1');
+    expect(
+      phasesOffClock("Fase 1 (semanas 1-2). Fase 2 (semanas 3-6): en la semana 4 sube")
+    ).toBeNull();
+    expect(phasesOffClock("Fase 1 (mes 1): base. Fase 2 (meses 2-3): más.")).toBeNull();
+    // "Antes de trabajar" is a morning
+    expect(clockIn("de lunes a viernes a las 9, antes de empezar a trabajar")).toEqual({
+      time: "09:00",
+      sure: true,
+    });
     // A phase with no end is four weeks, as the planner gives it
     expect(
       phaseWeeks(

@@ -22,6 +22,7 @@ import { DEFAULT_CONTEXT } from "./context";
 import { desktopFetch, isDesktop } from "../platform/desktop";
 import { getWebSetting, setWebSetting } from "./web";
 import { getReasoning } from "./reasoning";
+import { getReview } from "./review";
 import { chat, type ChatMessage, type ModelEndpoint } from "./llm";
 import prompt from "./prompt";
 import { getLocale } from "../i18n";
@@ -168,6 +169,8 @@ export function AgentProvider({
       // The coach's notes cost one more short call: as with titles, only with a real model
       notes: () => loadedRef.current || devNotes(),
       reasoning: getReasoning,
+      // A second reading costs one call more per answer: only with a real model
+      review: () => loadedRef.current && getReview(),
       web: {
         setting: getWebSetting,
         allow: () => setWebSetting("on"),

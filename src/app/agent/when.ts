@@ -222,6 +222,42 @@ export function phaseWeeks(plan: string): number[] | null {
   return found.map(([from, to]) => to - from + 1);
 }
 
+/**
+ * Phases of a request put on two clocks that do not meet: "phase 1 (weeks
+ * 1-4)", then "phase 2 (months 1-2)", which starts again at week 1. The
+ * planner cannot tell how many sessions such a phase holds (a 9B planner gave
+ * a phase of four weeks four sessions). The spans that clash, or null.
+ */
+export function phasesOffClock(request: string): string | null {
+  const spans: Array<{ from: number; to: number; text: string }> = [];
+  const pattern =
+    /(semanas?|weeks?|mes(?:es)?|months?)\s*(\d{1,2})\s*(?:(?:[-–—]|a|al|to|through)\s*(\d{1,2})|(\+|en adelante|onwards?))?/gi;
+  for (const found of request.matchAll(pattern)) {
+    const months = /^m/i.test(found[1]);
+    const from = Number(found[2]);
+    // A single "week 2" inside a phase says when something changes, not a phase
+    if (!found[3] && !found[4] && !months) continue;
+    const start = months ? (from - 1) * 4 + 1 : from;
+    const end = found[3]
+      ? months
+        ? Number(found[3]) * 4
+        : Number(found[3])
+      : found[4]
+        ? start + 3
+        : months
+          ? from * 4
+          : from;
+    spans.push({ from: start, to: end, text: found[0].trim() });
+  }
+  for (let index = 1; index < spans.length; index++) {
+    const before = spans[index - 1];
+    const span = spans[index];
+    if (span.from <= before.to)
+      return `"${before.text}" and then "${span.text}", which starts again at week ${span.from}`;
+  }
+  return null;
+}
+
 /** The weekdays a list of words names, in order; null when one is not a weekday. */
 export function weekdayNumbers(words: unknown): number[] | null {
   if (!Array.isArray(words) || words.length === 0) return null;

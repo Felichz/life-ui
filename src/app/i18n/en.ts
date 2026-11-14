@@ -682,6 +682,12 @@ export const en: Record<MessageKey, string> = {
   "agent.reasoning.on": "Thinking before it answers: slower, sometimes better. Click to turn off.",
   "agent.reasoning.off":
     "Answers straight away, without thinking first. Click to make it think (slower).",
+  "agent.review": "Check every answer",
+  "agent.review.label": "Second reading",
+  "agent.review.on":
+    "Reads every answer again while you read it, and adds a correction if it finds a mistake. Click to turn off.",
+  "agent.review.off":
+    "No second reading. Click to have every answer checked while you read it (one more call to the model).",
   "agent.attach": "Attach a file",
   "agent.attach.any": "Attach images or text files",
   "agent.attach.text": "Attach text files (this model does not read images)",

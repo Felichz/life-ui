@@ -29,6 +29,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  ShieldCheck,
   Square,
   SquarePen,
   Trash2,
@@ -57,6 +58,7 @@ import { ModelBadge } from "../runtime/ModelBadge";
 import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
 import { getReasoning, onReasoning, setReasoning } from "./reasoning";
+import { getReview, onReview, setReview } from "./review";
 import { Markdown } from "./Markdown";
 import type { Attachment, ContextUsage, Entry, Mode } from "./agent";
 
@@ -85,6 +87,7 @@ export function ChatPanel({ className }: { className?: string }) {
   const { state } = useSystem();
   const toast = useToast();
   const reasoning = useSyncExternalStore(onReasoning, getReasoning);
+  const review = useSyncExternalStore(onReview, getReview);
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const [view, setView] = useState<"chat" | "list">("chat");
@@ -401,6 +404,17 @@ export function ChatPanel({ className }: { className?: string }) {
                     className={cn(reasoning && "bg-accent/10 text-accent-ink hover:bg-accent/15")}
                   >
                     <Brain />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip content={t(review ? "agent.review.on" : "agent.review.off")}>
+                  <IconButton
+                    label={t("agent.review")}
+                    aria-pressed={review}
+                    disabled={!available}
+                    onClick={() => setReview(!review)}
+                    className={cn(review && "bg-accent/10 text-accent-ink hover:bg-accent/15")}
+                  >
+                    <ShieldCheck />
                   </IconButton>
                 </Tooltip>
                 <Tooltip content={t(vision ? "agent.attach.any" : "agent.attach.text")}>
@@ -903,6 +917,12 @@ function EntryView({
   if (entry.kind === "assistant") {
     return (
       <div className={cn("group/message flex flex-col gap-1 pr-2", entrance)}>
+        {entry.correction && (
+          <span className="flex items-center gap-1 text-xs text-ink-3 [&_svg]:size-3">
+            <ShieldCheck aria-hidden="true" />
+            {t("agent.review.label")}
+          </span>
+        )}
         <Markdown>{entry.text}</Markdown>
         {/* While it is being written there is nothing to act on yet */}
         {!entry.writing && (

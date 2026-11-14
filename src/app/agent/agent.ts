@@ -18,6 +18,7 @@ import type { WebSetting } from "./web";
 import { dayLabel, daysStated, phaseWeeks, whenLabel } from "./when";
 import { localDate } from "../../system/agendaManager";
 import { describeFacts, disagreements, savedFacts } from "./saved";
+import { reviewReply, writeCorrection } from "./review";
 import {
   briefLines,
   nextMove,
@@ -71,6 +72,8 @@ export type Entry =
       writing?: boolean;
       /** Tokens of the answer and how fast they came, when the runtime says. */
       stats?: { tokens: number; speed?: number };
+      /** A correction of the answer before it, from a second reading (ADR-012, 4e). */
+      correction?: boolean;
     }
   | {
       id: string;
@@ -173,6 +176,11 @@ export interface AgentOptions {
    * short call more per message that says something; off unless asked for.
    */
   notes?: () => boolean;
+  /**
+   * Whether the coach reads its answer again while the person reads it, and
+   * adds a short correction when it finds a mistake it can show (ADR-012, 4e).
+   */
+  review?: () => boolean;
   /** Research on the web (ADR-009): the person's setting, and how to reach out. */
   web?: {
     setting: () => WebSetting;
@@ -303,6 +311,8 @@ export class Agent {
   private notesRead = false;
   /** Tool calls that failed in this turn, by tool. */
   private failures = new Map<string, number>();
+  /** The second reading of the last answer, while it runs: the person's next message stops it. */
+  private reviewing: { abort: AbortController; done: Promise<void> } | null = null;
 
   constructor(private readonly options: AgentOptions) {
     const saved = options.store?.load();
@@ -1534,6 +1544,8 @@ export class Agent {
 
   /** One turn of the model: it answers, or calls tools and is asked again. */
   private async run() {
+    this.reviewing?.abort.abort();
+    this.reviewing = null;
     this.busy = true;
     this.webThisTurn = false;
     this.failures.clear();
@@ -1734,6 +1746,7 @@ export class Agent {
           this.measure(reply);
           settle(answer, { h: this.dropped + this.history.length, ...stats });
           this.makeTitle();
+          this.review(answer);
           return;
         }
         if (reply.content) settle(reply.content);
@@ -1799,6 +1812,70 @@ export class Agent {
     this.measured = reply.usage?.prompt
       ? { tokens: reply.usage.prompt + reply.usage.completion, at: this.history.length }
       : null;
+  }
+
+  /**
+   * The answer read again while the person reads it (ADR-012, 4e): closed
+   * questions to the model, each one backed by a sentence the code finds; what
+   * stands becomes a short correction after the answer. A new message from the
+   * person stops it, and so does anything that fails.
+   */
+  private review(answer: string) {
+    if (!this.options.review?.() || answer.length < 160) return;
+    const abort = new AbortController();
+    const chatId = this.chatId;
+    const at = this.history.length;
+    const history = this.history.slice();
+    const done = (async () => {
+      try {
+        const problems = await reviewReply({
+          chat: this.options.chat,
+          history,
+          reply: answer,
+          links: this.knownLinks().map((one) => one.url),
+          signal: abort.signal,
+        });
+        if (problems.length === 0 || abort.signal.aborted) return;
+        const lastUser = [...history].reverse().find((m) => m.role === "user");
+        const correction = await writeCorrection({
+          chat: this.options.chat,
+          reply: answer,
+          last: lastUser ? textOf(lastUser.content) : "",
+          problems,
+          language: this.languageName(),
+          signal: abort.signal,
+        });
+        // Only onto the answer it is about: nothing was said since, in this conversation
+        if (
+          !correction ||
+          abort.signal.aborted ||
+          this.busy ||
+          chatId !== this.chatId ||
+          this.history.length !== at
+        )
+          return;
+        this.history.push({ role: "assistant", content: correction });
+        this.add({
+          id: nextId(),
+          kind: "assistant",
+          text: correction,
+          h: this.dropped + this.history.length,
+          correction: true,
+        });
+        this.persist();
+      } catch {
+        // the answer stands as it was
+      } finally {
+        if (this.reviewing?.abort === abort) this.reviewing = null;
+        this.emit();
+      }
+    })();
+    this.reviewing = { abort, done };
+  }
+
+  /** Resolves once the second reading of the last answer, if any, is over. */
+  async settled(): Promise<void> {
+    await this.reviewing?.done;
   }
 
   /**

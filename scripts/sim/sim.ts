@@ -196,6 +196,7 @@ async function main() {
   const real: ChatFn = async (messages, tools, signal, options) => {
     const isPlanner = String(messages[0].content).startsWith("You are the roadmap planner");
     const isNotes = String(messages[0].content).startsWith("You keep a coach's notes");
+    const isReview = String(messages[0].content).startsWith("You check a coach's reply");
     const at = Date.now();
     const reply = await chat(endpoint, messages, tools, signal, options).catch((caught) => {
       // The agent recovers from some errors in silence: here they are seen
@@ -206,12 +207,17 @@ async function main() {
     });
     // Each call as it ends, on stderr: a turn that takes minutes shows where the time went
     console.error(
-      `  · ${isPlanner ? "planificador" : isNotes ? "notas" : "coach"} ${((Date.now() - at) / 1000).toFixed(1)}s, ${reply.usage?.completion ?? "?"} tokens${
+      `  · ${isPlanner ? "planificador" : isNotes ? "notas" : isReview ? "revisión" : "coach"} ${((Date.now() - at) / 1000).toFixed(1)}s, ${reply.usage?.completion ?? "?"} tokens${
         reply.toolCalls.length > 0
           ? ` → ${reply.toolCalls.map((call) => call.function.name).join(", ")}`
           : ""
       }`
     );
+    if (isReview) {
+      planner.push(
+        `    [revisión ${((Date.now() - at) / 1000).toFixed(1)}s] ${reply.toolCalls[0]?.function.arguments ?? reply.content}`
+      );
+    }
     if (isNotes) {
       planner.push(
         `    [notas ${((Date.now() - at) / 1000).toFixed(1)}s] ${reply.toolCalls[0]?.function.arguments ?? reply.content}`
@@ -243,6 +249,7 @@ async function main() {
     vision: () => false,
     titles: () => false,
     notes: () => process.env.SIM_NOTES !== "off",
+    review: () => process.env.SIM_REVIEW === "on",
     reasoning: () => process.env.SIM_REASONING === "on",
     web: {
       setting: () => (localStorage.getItem("lifeui.web") === "off" ? "off" : "on"),
@@ -269,6 +276,8 @@ async function main() {
   const started = Date.now();
   say(`\n### TÚ\n${message}\n`);
   await agent.send(message);
+  // The second reading runs while the person reads: here it is waited for
+  await agent.settled();
 
   const saved = store.load();
   const active = saved?.chats.find((one) => one.id === saved.activeId);
@@ -284,7 +293,7 @@ async function main() {
   for (const entry of agent.entries.slice(before + 1)) {
     if (entry.kind === "assistant") {
       say(
-        `### COACH${entry.stats ? ` (${entry.stats.tokens} tokens, ${entry.stats.speed} t/s)` : ""}`
+        `### COACH${entry.correction ? " (corrección)" : ""}${entry.stats ? ` (${entry.stats.tokens} tokens, ${entry.stats.speed} t/s)` : ""}`
       );
       say(`${entry.text}\n`);
     } else if (entry.kind === "tool") {

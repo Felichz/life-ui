@@ -112,6 +112,22 @@ What the coach tells the person after saving is checked against the tool's own a
 
 `npm run sim:score` measures a conversation written by the simulator on the same lines (what was saved against what the person said). It is consistency and not taste: a conversation can pass every check and still be a worse plan than a good coach would write. What a session contains, and whether the progression makes sense, stay the model's.
 
+### 4e. A second reading while the person reads
+
+With "Check every answer" on (off by default: one more call per answer), the
+answer is read again by the model once it is shown, while the person reads it
+(`review.ts`). The reviewer is not asked whether the answer is right: asked
+that, a 9B model approves itself or finds faults that are not there. It answers
+closed questions held to a schema (a number that differs from a tool's answer,
+a load left as "A or B", words put in the person's mouth, a question of theirs
+left unanswered, a diagnosis or a medication), each one with the sentence that
+shows it. The code keeps a finding only when that sentence is where it says,
+and checks what it can itself (a choice of loads, a question mark); links no
+search returned are found by the code alone. What stands becomes a short
+message after the answer, marked "Second reading": an answer is never
+rewritten under the eyes of the one reading it. A new message from the person
+stops the reading.
+
 ### 5. What stays the model's
 
 What to recommend, in which words, and what a session should contain. The notes and the move decide when to ask, what to ask for, and when to stop asking.

@@ -14,11 +14,15 @@ import {
   noon,
   startDate,
   timeOfDay,
+  phasesOffClock,
   weekdayNames,
   weekdayNumbers,
 } from "./when";
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
 import { plannerState, runRoadmapPlanner } from "./roadmapAgent";
+
+/** Clashing phase spans already sent back to the coach: the same request again goes through. */
+const clashSentBack = new Set<string>();
 
 /**
  * The agent's tools (ADR-002): each one is a call into the domain core with a
@@ -1084,6 +1088,18 @@ export const TOOLS: Tool[] = [
             detail: planning.given
               ? "The person has not said yes to the plan yet. Ask for their yes; build the roadmap when they give it."
               : "The person has not seen a plan yet. Lay it out in the chat first: the phases, what a session contains, the days and the time, how long it runs. Ask for their yes, and build the roadmap when they give it.",
+          },
+        };
+      }
+      // Phases on two clocks ("weeks 1-4", then "months 1-2") are sent back
+      // once: the planner cannot count the sessions of either
+      const clash = phasesOffClock(request);
+      if (clash && !clashSentBack.has(clash)) {
+        clashSentBack.add(clash);
+        return {
+          result: {
+            error: "phases-overlap",
+            detail: `The request puts its phases on two clocks that overlap: ${clash}. Give every phase its weeks on one count from the start (weeks 1-2, weeks 3-6, weeks 7-10), and send the request again. Do not tell the person about this.`,
           },
         };
       }
