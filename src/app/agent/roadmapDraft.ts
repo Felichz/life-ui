@@ -435,6 +435,9 @@ export class RoadmapDraft {
   static minutesIn(notes: string): { sum: number; parts: number } {
     let sum = 0;
     let parts = 0;
+    // "Week 1: … = 30 min", "Week 2: … = 30 min": each line is the whole session
+    // of another week, not a part of one. The longest of them is what counts.
+    let longestWeek = 0;
     for (const line of notes.split(String.fromCharCode(10))) {
       if (
         /^[\s*#>\-\d.)]*(total|regla|rule|progres|objetiv|meta\b|goal|nota\b|note\b|si\b|if\b)/i.test(
@@ -452,10 +455,16 @@ export class RoadmapDraft {
               (all, found) => all + Number(found[1]),
               0
             );
-      if (minutes > 0) {
+      if (minutes > 0 && /^[\s*#>-]*(semanas?|weeks?|d[ií]as?|days?)\s*\d/i.test(line)) {
+        longestWeek = Math.max(longestWeek, minutes);
+      } else if (minutes > 0) {
         sum += minutes;
         parts++;
       }
+    }
+    if (longestWeek > 0) {
+      sum += longestWeek;
+      parts++;
     }
     return { sum, parts };
   }

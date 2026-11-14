@@ -149,20 +149,25 @@ function score(file) {
     // Line by line: a line that gives its own total ("x 4 = 16 min") counts that
     // total; an interval ("1 min run / 4 min walk") without one is not summed
     const minutesOf = (line) => {
-      if (/^[\s*-]*(total|regla|rule|progres|objetiv|nota|note|si |if )/i.test(line.trim())) return 0;
+      if (/^[\s*-]*(total|regla|rule|progres|objetiv|nota|note|si |if )/i.test(line.trim()))
+        return 0;
       const total = /=\s*(\d+)\s*min/.exec(line);
       if (total) return Number(total[1]);
       if (/\d\s*min[^/]*\/[^/]*\d\s*min/.test(line)) return 0;
       return [...line.matchAll(/(\d+)\s*min\b/g)].reduce((sum, m) => sum + Number(m[1]), 0);
     };
+    // A line per week ("Semana 2: … = 30 min") is that week's whole session: the longest counts
+    const weekLine = (l) => /^[\s*-]*(semanas?|weeks?|d[ií]as?|days?)\s*\d/i.test(l.trim());
     const bad = notes.filter((n) => {
       const session = n.split("⏎  ⏎")[0];
-      const lines = session.split("⏎");
-      const timed = lines.filter((l) => minutesOf(l) > 0);
-      return (
-        timed.length >= 2 &&
-        lines.reduce((sum, l) => sum + minutesOf(l), 0) > Number(minutesAsked) * 1.1
-      );
+      const lines = session.split("⏎").map((l) => l.replace(/^- desde [^·]*· /, ""));
+      const parts = lines
+        .filter((l) => !weekLine(l))
+        .map(minutesOf)
+        .filter((m) => m > 0);
+      const weeks = lines.filter(weekLine).map(minutesOf);
+      const total = parts.reduce((a, b) => a + b, 0) + Math.max(0, ...weeks);
+      return parts.length + (weeks.length ? 1 : 0) >= 2 && total > Number(minutesAsked) * 1.1;
     });
     add(
       "a session fits its minutes",
