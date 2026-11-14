@@ -43,6 +43,13 @@ export interface Brief {
     given?: boolean;
     /** The plan is in the app: a roadmap was saved for it in this conversation. */
     built?: boolean;
+    /**
+     * The days and the weeks of each phase as the conversation stated them,
+     * kept when they were said: a compaction replaces the messages they were
+     * read from, and a roadmap saved after it lost them (a plan for every day
+     * was saved on Mondays only, read from "starting on Monday").
+     */
+    stated?: { days?: number[]; daysQuote?: string; phaseWeeks?: number[] };
   };
   /**
    * Whether their latest message says yes to what the coach proposed. Nothing
@@ -507,6 +514,7 @@ export async function updateBrief(options: {
               exact,
               ...(brief?.plan?.given ? { given: true } : {}),
               ...(brief?.plan?.built ? { built: true } : {}),
+              ...(brief?.plan?.stated ? { stated: brief.plan.stated } : {}),
             },
           }
         : {}),

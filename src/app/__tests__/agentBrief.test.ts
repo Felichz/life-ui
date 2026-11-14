@@ -153,6 +153,36 @@ describe("the days the person gave", () => {
   });
 });
 
+describe("what the conversation stated", () => {
+  it("is carried in the notes from one message to the next", async () => {
+    const stated = {
+      days: [0, 1, 2, 3, 4, 5, 6],
+      daysQuote: "todos los días",
+      phaseWeeks: [4, 4, 5],
+    };
+    const brief = await updateBrief({
+      brief: {
+        wants: ["tocar tres canciones"],
+        has: [],
+        limits: [],
+        unsure: [],
+        plan: {
+          length: "20 min",
+          days: "todos los días",
+          time: "20:00",
+          start: "",
+          given: true,
+          stated,
+        },
+      },
+      person: "si dale, armalo, empezando el lunes",
+      language: "Spanish",
+      chat: async () => notes({ agrees: true, plan: { wanted: true, start: "el lunes" } }),
+    });
+    expect(brief?.plan?.stated).toEqual(stated);
+  });
+});
+
 describe("what is a request to the coach", () => {
   it("is not something the person added", () => {
     expect(isRequestToCoach("armarlo así; empezando el sábado")).toBe(true);

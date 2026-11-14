@@ -399,6 +399,15 @@ export class RoadmapDraft {
     const limit = minutes * 1.2;
     for (const milestone of roadmap.milestones) {
       for (const step of milestone.steps) {
+        // The parts added up: "5 + 5 + 21 + 4" is 35, whatever "Total: 30 min" says
+        const { sum, parts } = RoadmapDraft.minutesIn(step.notes ?? "");
+        if (parts >= 2 && sum > minutes * 1.1) {
+          this.phaseLongSentBack = true;
+          throw new DraftError(
+            "phase-too-long",
+            `in "${milestone.title}" the parts of one session add up to ${sum} minutes, and the person's session is ${minutes}. Shorten the parts until they add up to ${minutes} at most, and write each part's minutes.`
+          );
+        }
         for (const line of (step.notes ?? "").split(String.fromCharCode(10))) {
           if (/^[\s*#>\-\d.)]*(progres|objetiv|meta\b|goal|nota\b|note\b)/i.test(line)) continue;
           const longest = Math.max(
@@ -417,6 +426,40 @@ export class RoadmapDraft {
         }
       }
     }
+  }
+
+  /**
+   * The minutes the parts of one session add up to, as its notes write them.
+   * A line that gives its own total ("4 rounds = 16 min") counts that; an
+   * interval ("1 min run / 3 min walk") without one is not summed; a line
+   * that states the total, a rule or the progress is not a part.
+   */
+  static minutesIn(notes: string): { sum: number; parts: number } {
+    let sum = 0;
+    let parts = 0;
+    for (const line of notes.split(String.fromCharCode(10))) {
+      if (
+        /^[\s*#>\-\d.)]*(total|regla|rule|progres|objetiv|meta\b|goal|nota\b|note\b|si\b|if\b)/i.test(
+          line
+        )
+      ) {
+        continue;
+      }
+      const total = /=\s*(\d{1,3})\s*min/i.exec(line);
+      const minutes = total
+        ? Number(total[1])
+        : /\d\s*min[^/]*\/[^/]*\d\s*min/i.test(line)
+          ? 0
+          : [...line.matchAll(/(\d{1,3})\s*(?:min|minutos?|minutes?)\b/gi)].reduce(
+              (all, found) => all + Number(found[1]),
+              0
+            );
+      if (minutes > 0) {
+        sum += minutes;
+        parts++;
+      }
+    }
+    return { sum, parts };
   }
 
   /**

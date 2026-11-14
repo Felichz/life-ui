@@ -433,6 +433,36 @@ describe("the roadmap draft", () => {
       expect(saved.milestones[0].sessions).toBe(4);
       expect(saved.in_todays_plan).toHaveLength(1);
 
+      // The parts of a session add up to more than the session has, whatever its "Total" says
+      expect(
+        RoadmapDraft.minutesIn(
+          [
+            "- Calentamiento caminando 5 min.",
+            "- Fortalecimiento de rodilla 5 min.",
+            '- Ciclo "1 min correr / 4 min caminar" x 4 veces = 21 min.',
+            "- Vuelta a la calma 4 min.",
+            "- Total: 30 min.",
+            "- Regla de rodilla: si duele, camina 5 min.",
+          ].join("\n")
+        )
+      ).toEqual({ sum: 35, parts: 4 });
+      const summed = new RoadmapDraft(setup(), new Date(), { minutes: 30 });
+      const thirtyFive = {
+        ...ROADMAP,
+        session_minutes: 30,
+        milestones: [
+          {
+            title: "Uno",
+            sessions: 6,
+            notes:
+              "- Calentar 5 min\n- Fuerza 5 min\n- Intervalos x 4 = 21 min\n- Calma 4 min\n- Total: 30 min",
+          },
+        ],
+      };
+      expect(() => summed.saveRoadmap(thirtyFive)).toThrow(
+        /phase-too-long: in "Uno" the parts of one session add up to 35 minutes/
+      );
+
       // A later phase asks for more minutes than the session has: sent back once
       const long30 = new RoadmapDraft(setup(), new Date(), { minutes: 30 });
       const tooMuch = {
