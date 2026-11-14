@@ -7,7 +7,10 @@
  * pages. The person asks about a sore elbow, the coach looks it up and lays
  * out a plan, the person says yes, the roadmap card waits for "Do it", and the
  * sessions land on the calendar. Then the first session runs at 9:00 with its
- * exercises on screen, and is closed at 9 out of 10.
+ * exercises on screen, and is closed at 9 out of 10. Last, the ten weeks that
+ * follow: every weekday the session of the day is run and closed through the
+ * core, and the roadmap on the Goals page is captured after each one, to its
+ * end (capture/progress.json: one frame a session, with its date).
  *
  * At each beat the rendered DOM is written to video/capture/<name>.html, with
  * where the scenes aim and how far the chat was scrolled (a cloned page keeps
@@ -169,7 +172,11 @@ const AIM: Record<string, Record<string, string>> = {
     list: `${CHAT} [aria-live="polite"]`,
     meter: 'section[aria-label="Today’s tempos"]',
   },
+  "c10-progress": { roadmap: 'section[aria-labelledby="roadmaps-title"]' },
 };
+const ROADMAP_SECTION = 'section[aria-labelledby="roadmaps-title"]';
+/** Honest scores for ten weeks: mostly good, a few flat days. */
+const SCORES = [8, 7, 9, 8, 6, 8, 9, 7, 8, 10];
 const rects: Record<string, unknown> = {};
 
 const snap = (name: string) =>
@@ -208,7 +215,7 @@ const snap = (name: string) =>
     );
 
 describe("film capture: from the chat to the calendar", () => {
-  it("plays one conversation and its first session through the real app", () => {
+  it("plays one conversation, its first session and the ten weeks after it through the real app", () => {
     let clock: Cypress.Clock;
     cy.clock(at(8, 38), ["Date"]).then((c) => (clock = c));
     const goTo = (hour: number, minute: number) =>
@@ -340,6 +347,73 @@ describe("film capture: from the chat to the calendar", () => {
     cy.contains(`${CHAT} button`, "Do it").click();
     cy.contains(`${CHAT} p`, "Same time tomorrow").should("be.visible");
     snap("c09-earned");
+
+    // Ten weeks: Goals after the first session, then every weekday's session to the last
+    cy.contains("a", "Goals").filter(":visible").first().click();
+    cy.contains("Right elbow without pain").should("be.visible");
+    snap("c10-progress");
+    const frames: { date: string; done: number; html: string }[] = [];
+    const frame = (date: Date, done: number) =>
+      cy.wait(40).then(() =>
+        cy.document().then((doc) => {
+          const section = doc.querySelector(ROADMAP_SECTION) as HTMLElement;
+          frames.push({
+            date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+            done,
+            html: section.innerHTML,
+          });
+        })
+      );
+    frame(new Date(2026, 10, 16), 1);
+    cy.window().then((win: any) => {
+      const q = win.__lifeui;
+      const templates = new Set<string>(
+        q.getRoadmaps()[0].milestones.flatMap((m: any) => m.steps.map((s: any) => s.templateId))
+      );
+      const session = () =>
+        q
+          .getState()
+          .currentDay?.activityInstances.find(
+            (i: any) => templates.has(i.templateId) && i.state !== "completed"
+          );
+      let done = 1;
+      const day = new Date(2026, 10, 16);
+      const next = () => {
+        if (done >= 50) return;
+        do day.setDate(day.getDate() + 1);
+        while (day.getDay() === 0 || day.getDay() === 6);
+        const on = (hour: number, minute: number) =>
+          clock.setSystemTime(
+            new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute).getTime()
+          );
+        try {
+          q.endDay();
+        } catch {
+          // no day was running
+        }
+        on(8, 50);
+        q.startDay();
+        try {
+          q.bringPlannedActivities();
+        } catch {
+          // nothing due
+        }
+        const todays = session();
+        if (!todays) throw new Error(`no session planned on ${day.toDateString()}`);
+        on(9, 0);
+        q.activateActivity(todays.id);
+        on(9, 10);
+        q.completeActivity(todays.id, { satisfactionScore: SCORES[done % SCORES.length] });
+        done += 1;
+        frame(new Date(day), done).then(next);
+      };
+      next();
+    });
+    cy.contains(ROADMAP_SECTION, "100").should("be.visible");
+    cy.then(() => {
+      expect(frames.length, "one frame a session").to.equal(50);
+      cy.writeFile(`${OUT}/progress.json`, frames);
+    });
     cy.then(() => cy.writeFile(`${OUT}/rects.json`, rects));
   });
 });

@@ -4,6 +4,8 @@
  * - compositions/*.html: each scene in scenes/, with every `<!-- snap:NAME -->`
  *   replaced by the captured DOM in capture/NAME.html (ids stripped, so many
  *   captures can share one page).
+ * - assets/progress.js: the roadmap after each of the fifty sessions
+ *   (capture/progress.json), which the progress scene plays as a time-lapse.
  * Run `npm run build` in ../ first when the app changed, and the capture
  * (tools/capture.cy.ts) when its screens did.
  */
@@ -45,6 +47,16 @@ const snap = (name, extra) => {
 // Where each scene aims, measured at capture time (a hidden scene can't measure itself)
 const rects = readFileSync(join(root, "capture", "rects.json"), "utf8");
 writeFileSync(join(root, "assets", "rects.js"), `window.RECTS = ${rects.trim()};\n`);
+
+// The roadmap after each session, with the same ids stripped as the captures
+const strip = (html) => html.replace(/\s(id|aria-controls|aria-describedby|for)="[^"]*"/g, "");
+const progress = JSON.parse(readFileSync(join(root, "capture", "progress.json"), "utf8")).map(
+  (frame) => ({ ...frame, html: strip(frame.html) })
+);
+writeFileSync(
+  join(root, "assets", "progress.js"),
+  `window.PROGRESS = ${JSON.stringify(progress)};\n`
+);
 
 mkdirSync(join(root, "compositions"), { recursive: true });
 for (const file of readdirSync(join(root, "scenes"))) {

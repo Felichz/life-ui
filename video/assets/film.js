@@ -155,5 +155,40 @@ window.FILM = (() => {
     tl.to(box, { clipPath: "inset(0% 0% 0% 0%)", duration: d, ease: "none" }, t);
   }
 
-  return { theme, r, withText, home, view, aim, move, click, cap, count, wipe, chat, live, typeIn };
+  /**
+   * A time-lapse of one part of a captured screen: `frames[i].html` replaces the
+   * element's content as the timeline passes, and `onFrame` hears each change.
+   * The frame shown is a function of timeline time alone, so it seeks.
+   */
+  function lapse(tl, el, frames, t, d, onFrame, ease = "power1.inOut") {
+    const state = { i: 0 };
+    let shown = -1;
+    const paint = () => {
+      const i = Math.max(0, Math.min(frames.length - 1, Math.round(state.i)));
+      if (i === shown) return;
+      shown = i;
+      el.innerHTML = frames[i].html;
+      onFrame?.(frames[i], i);
+    };
+    paint();
+    tl.fromTo(state, { i: 0 }, { i: frames.length - 1, duration: d, ease, onUpdate: paint }, t);
+  }
+
+  return {
+    theme,
+    r,
+    withText,
+    home,
+    view,
+    aim,
+    move,
+    click,
+    cap,
+    count,
+    wipe,
+    chat,
+    live,
+    typeIn,
+    lapse,
+  };
 })();

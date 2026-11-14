@@ -102,3 +102,41 @@ body {
   z-index: 40;
   transform-origin: 8px 6px;
 }
+
+/* The date the time-lapse is on, in a pill at the top centre */
+.f-date {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 56px;
+  z-index: 30;
+  margin: 0;
+  text-align: center;
+  opacity: 0;
+}
+.f-date span {
+  display: inline-flex;
+  gap: 18px;
+  align-items: baseline;
+  padding: 14px 30px;
+  border-radius: 999px;
+  background: rgb(var(--panel) / 0.96);
+  border: 1px solid rgb(var(--line-strong));
+  box-shadow:
+    0 1px 2px rgb(var(--shadow) / 0.08),
+    0 8px 24px -6px rgb(var(--shadow) / 0.22);
+  font-family: "Inter Variable", Inter, sans-serif;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--ink));
+}
+.f-date b {
+  font-weight: 650;
+  color: rgb(var(--accent-ink));
+}
+.f-date i {
+  font-style: normal;
+  color: rgb(var(--ink-3));
+}

@@ -1,6 +1,6 @@
 # LifeUI product film
 
-A silent 44.5-second film, "From the chat to the calendar", made with
+A silent 51.5-second film, "From the chat to the calendar", made with
 [HyperFrames](https://hyperframes.heygen.com) (HTML and GSAP rendered frame by frame).
 Rendered at 1920 x 1200 in a light and a dark edition for the portfolio case study.
 
@@ -9,7 +9,9 @@ through the real agent and core under a controlled clock. A scripted model stand
 the LLM and the web search is answered with real NHS pages, as in the end-to-end tests.
 The person asks about a sore elbow, the coach looks it up and lays out a plan, the
 roadmap card waits on "Do it", Goals shows each session's exercises with the guide
-links, and the first session runs at 9:00 and is closed through the chat. The rendered
+links, and the first session runs at 9:00 and is closed through the chat. Then the ten
+weeks that follow run in four seconds: every weekday's session is run and closed through
+the core, and the roadmap is captured after each one, to "Goal reached". The rendered
 DOM of each beat goes to `capture/`; the film mounts those captures under the app's own
 built CSS and moves a camera and a cursor over them. Storyline choice in
 `STORYLINES.md`, shot list and rules in `SPEC.md`. The first film (a day in forty
@@ -17,16 +19,18 @@ seconds) is in the git history before this one.
 
 ## Layout
 
-- `scenes/`: the eight scenes (source): seven written by `tools/scenes-coach.py` (the camera
+- `scenes/`: the nine scenes (source): eight written by `tools/scenes-coach.py` (the camera
   script of each is there) and `end.html`. `<!-- snap:NAME -->` marks where a captured
   screen goes.
 - `compositions/`: the scenes with their captures inlined (generated).
-- `capture/`: the captured screens and `rects.json`, where each scene aims
+- `capture/`: the captured screens, `rects.json`, where each scene aims, and
+  `progress.json`, the roadmap after each of the fifty sessions with its date
   (generated, measured at capture time).
 - `assets/film.css`, `assets/film.js`: the film's layout and its camera, cursor
-  and counter helpers. `assets/app.css` and `assets/rects.js` are generated.
-- `tools/build.mjs`: assembles `compositions/`, `assets/app.css` and
-  `assets/rects.js`.
+  counter and time-lapse helpers. `assets/app.css`, `assets/rects.js` and
+  `assets/progress.js` are generated.
+- `tools/build.mjs`: assembles `compositions/`, `assets/app.css`,
+  `assets/rects.js` and `assets/progress.js`.
 
 ## Make it
 

@@ -23,7 +23,7 @@ CURSOR = """        <div id="{id}-click" class="f-click"></div>
         </div>"""
 
 
-def scene(sid, snaps, captions, script, cursor=True):
+def scene(sid, snaps, captions, script, cursor=True, extra=""):
     snap_lines = "\n".join(f"            <!-- snap:{name} -->" for name in snaps)
     cap_lines = "\n".join(
         f'        <p id="{sid}-cap{i + 1}" class="f-cap">\n          <span>{text}</span>\n        </p>'
@@ -49,6 +49,7 @@ def scene(sid, snaps, captions, script, cursor=True):
           </div>
         </div>
 {cap_lines}
+{extra}
 {CURSOR.format(id=sid) if cursor else ""}
       </div>
       <script>
@@ -185,11 +186,42 @@ SCENES = {
           tl.to("#close-cursor", { opacity: 0, duration: 0.2 }, 1.9);
           F.move(tl, cam, F.home, 2.2, 0.7);""",
     ),
+    # 40.0-47.0: ten weeks in four seconds: the roadmap after every session, to "Goal reached"
+    "progress": (
+        ["c10-progress"],
+        ["Then, <em>one session a day</em>", "Ten weeks later: <em>goal reached</em>"],
+        """          const [s] = snaps;
+          F.chat(tl, s, "c10-progress");
+          const roadmap = F.r("c10-progress", "roadmap");
+          const vRoad = F.view(roadmap, 1.65, 0.5, 0.5);
+          const section = s.querySelector('section[aria-labelledby="roadmaps-title"]');
+          const day = document.querySelector("#progress-day");
+          const week = document.querySelector("#progress-week");
+          const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const label = (frame, i) => {
+            const [y, m, d] = frame.date.split("-").map(Number);
+            const date = new Date(y, m - 1, d);
+            day.textContent = `${DAYS[date.getDay()]} ${MONTHS[m - 1]} ${d}`;
+            week.textContent = `Week ${Math.floor(i / 5) + 1} of 10`;
+          };
+          tl.set(cam, F.home, 0);
+          F.move(tl, cam, vRoad, 0.2, 0.7);
+          F.cap(tl, "#progress-cap1", 0.5, 4.9);
+          tl.fromTo("#progress-date", { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.8);
+          F.lapse(tl, section, window.PROGRESS, 1.3, 3.8, label);
+          F.cap(tl, "#progress-cap2", 5.3);""",
+        False,
+        """        <p id="progress-date" class="f-date">
+          <span><b id="progress-week">Week 1 of 10</b><i id="progress-day">Mon Nov 16</i></span>
+        </p>""",
+    ),
 }
 
 for sid, spec in SCENES.items():
     snaps, captions, script = spec[0], spec[1], spec[2]
     cursor = spec[3] if len(spec) > 3 else True
+    extra = spec[4] if len(spec) > 4 else ""
     path = os.path.join(ROOT, "scenes", f"{sid}.html")
-    io.open(path, "w", encoding="utf-8", newline="\n").write(scene(sid, snaps, captions, script, cursor))
+    io.open(path, "w", encoding="utf-8", newline="\n").write(scene(sid, snaps, captions, script, cursor, extra))
     print("wrote", path)

@@ -3,10 +3,11 @@
 GOAL: a stranger sees what LifeUI is now, a coach in a chat that changes the
 day for you, and remembers one moment: a sentence about a sore elbow becomes
 50 sessions on the calendar, each one with its exercises and the guide that
-shows them.
+shows them, and ten weeks later the
+roadmap reads "Goal reached".
 OUTPUT: HyperFrames, 1920 x 1200 (the portfolio's 16:10 clip frame), 30 fps,
 rendered twice: `theme=light` and `theme=dark`. Silent.
-TIME: 44.5 s x 30 = 1335 frames.
+TIME: 51.5 s x 30 = 1545 frames.
 
 LOOK: the app's own world. Ground: the app canvas token (`--canvas`).
 Product: the real app, its DOM captured from the build
@@ -49,7 +50,12 @@ camera moves to the composer: "Done, it went well. A 9."
 36.0-40.0 close The close card shows its tempos; the cursor clicks Do it at
 37.6 s; the coach confirms, the meter shows the day.
 "Closed honestly, in a sentence".
-40.0-44.5 end The mark is drawn, LifeUI wipes in, the URL holds 2 s.
+40.0-47.0 progress Goals again, one session done. Ten weeks in four seconds: the
+roadmap after every session (fifty real captures, cut one after
+another), a pill at the top with the week and the date, the
+phases reached one by one, 100% and "Goal reached".
+"Then, one session a day", then "Ten weeks later: goal reached".
+47.0-51.5 end The mark is drawn, LifeUI wipes in, the URL holds 2 s.
 
 BANNED: dark void with floating UI; glow, particles, gradients, glass; a title
 over a dimmed screenshot; three cards in a row; everything fading and sliding
@@ -58,5 +64,6 @@ docked in a corner; invented UI (every screen is a capture of the real app,
 the conversation is a scripted run of the real agent).
 QA: frames 3.0 (composer typing), 8.0 (sources legible), 12.5 (plan phases),
 18.0 (card and Do it), 22.0 (the coach's summary), 29.0 (exercise links),
-33.0 (running session), 38.5 (close card, tempos), 42.5 (end card), in both
+33.0 (running session), 38.5 (close card, tempos), 42.6 (the lapse, week 3),
+46.5 (goal reached), 49.5 (end card), in both
 themes.

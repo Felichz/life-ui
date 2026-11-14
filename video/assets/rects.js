@@ -79,7 +79,7 @@ window.RECTS = {
   },
   "c03-card": {
     "height": 1200,
-    "chatScroll": 204,
+    "chatScroll": 205,
     "chatScrollMax": 204,
     "chat": [
       {
@@ -99,7 +99,7 @@ window.RECTS = {
     ],
     "doit": [
       {
-        "x": 1348,
+        "x": 1359,
         "y": 1011,
         "w": 48,
         "h": 28
@@ -108,11 +108,11 @@ window.RECTS = {
   },
   "c04-saved": {
     "height": 2070,
-    "chatScroll": 121,
+    "chatScroll": 122,
     "chatScrollMax": 121,
     "chat": [
       {
-        "x": 1029,
+        "x": 1040,
         "y": 0,
         "w": 400,
         "h": 1200
@@ -120,7 +120,7 @@ window.RECTS = {
     ],
     "list": [
       {
-        "x": 1030,
+        "x": 1041,
         "y": 56,
         "w": 399,
         "h": 1022
@@ -129,7 +129,7 @@ window.RECTS = {
   },
   "c05-goals": {
     "height": 1200,
-    "chatScroll": 121,
+    "chatScroll": 122,
     "chatScrollMax": 121,
     "roadmap": [
       {
@@ -162,7 +162,7 @@ window.RECTS = {
   },
   "c06-notes": {
     "height": 1200,
-    "chatScroll": 121,
+    "chatScroll": 122,
     "chatScrollMax": 121,
     "roadmap": [
       {
@@ -189,13 +189,13 @@ window.RECTS = {
   },
   "c07-running": {
     "height": 2176,
-    "chatScroll": 121,
+    "chatScroll": 122,
     "chatScrollMax": 121,
     "card": [
       {
         "x": 272,
         "y": 192,
-        "w": 717,
+        "w": 728,
         "h": 324
       }
     ],
@@ -215,7 +215,7 @@ window.RECTS = {
     ],
     "chat": [
       {
-        "x": 1029,
+        "x": 1040,
         "y": 0,
         "w": 400,
         "h": 1200
@@ -223,7 +223,7 @@ window.RECTS = {
     ],
     "input": [
       {
-        "x": 1043,
+        "x": 1054,
         "y": 1079,
         "w": 373,
         "h": 44
@@ -232,11 +232,11 @@ window.RECTS = {
   },
   "c08-close": {
     "height": 2176,
-    "chatScroll": 281,
+    "chatScroll": 282,
     "chatScrollMax": 281,
     "chat": [
       {
-        "x": 1029,
+        "x": 1040,
         "y": 0,
         "w": 400,
         "h": 1200
@@ -244,7 +244,7 @@ window.RECTS = {
     ],
     "list": [
       {
-        "x": 1030,
+        "x": 1041,
         "y": 56,
         "w": 399,
         "h": 1022
@@ -252,7 +252,7 @@ window.RECTS = {
     ],
     "doit": [
       {
-        "x": 1337,
+        "x": 1359,
         "y": 1011,
         "w": 48,
         "h": 28
@@ -265,7 +265,7 @@ window.RECTS = {
     "chatScrollMax": 347,
     "chat": [
       {
-        "x": 1029,
+        "x": 1040,
         "y": 0,
         "w": 400,
         "h": 1200
@@ -273,7 +273,7 @@ window.RECTS = {
     ],
     "list": [
       {
-        "x": 1030,
+        "x": 1041,
         "y": 56,
         "w": 399,
         "h": 1022
@@ -283,8 +283,21 @@ window.RECTS = {
       {
         "x": 272,
         "y": 108,
-        "w": 717,
+        "w": 728,
         "h": 82
+      }
+    ]
+  },
+  "c10-progress": {
+    "height": 1200,
+    "chatScroll": 347,
+    "chatScrollMax": 347,
+    "roadmap": [
+      {
+        "x": 272,
+        "y": 350,
+        "w": 728,
+        "h": 505
       }
     ]
   }
