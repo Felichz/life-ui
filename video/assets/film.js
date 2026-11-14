@@ -103,5 +103,57 @@ window.FILM = (() => {
     );
   }
 
-  return { theme, r, withText, home, view, aim, move, click, cap, count, wipe };
+  /**
+   * The chat as it was scrolled when captured: a cloned page starts at its
+   * top, so the list is put back where it was (capture/rects.json).
+   */
+  function chat(tl, snap, screen) {
+    // The page has a chat for each layout (the desktop column, the phone sheet): all of them
+    const lists = [...snap.querySelectorAll('section[aria-label="Chat"] [aria-live="polite"]')];
+    const saved = window.RECTS?.[screen] ?? {};
+    const atBottom = (saved.chatScrollMax ?? 0) > 0 && saved.chatScroll >= saved.chatScrollMax - 2;
+    for (const list of lists) {
+      if (atBottom) {
+        // Anchored to its bottom by layout, not by a scroll position: the renderer sets a
+        // scroll before a scene is shown, and a hidden list drops it; and the fonts may
+        // still change the height after this runs
+        list.style.overflow = "hidden";
+        list.style.justifyContent = "flex-end";
+      } else {
+        list.scrollTop = saved.chatScroll ?? 0;
+      }
+    }
+  }
+
+  /**
+   * Where an element of a captured screen is, measured in the film itself (in
+   * the capture's 1440-wide pixels): text can wrap a little differently here
+   * than in the browser that captured it. The last visible match.
+   */
+  function live(snap, selector, text) {
+    const all = [...snap.querySelectorAll(selector)].filter(
+      (el) => text === undefined || el.textContent.trim() === text
+    );
+    const el = all[all.length - 1];
+    if (!el) throw new Error(`FILM.live: nothing matches ${selector}${text ? `|${text}` : ""}`);
+    const box = snap.getBoundingClientRect();
+    const k = box.width / APP_W;
+    const r = el.getBoundingClientRect();
+    return {
+      x: (r.left - box.left) / k,
+      y: (r.top - box.top) / k,
+      w: r.width / k,
+      h: r.height / k,
+    };
+  }
+
+  /** The composer's text, revealed left to right as if typed. */
+  function typeIn(tl, snap, t, d = 2.2) {
+    const box = snap.querySelector('section[aria-label="Chat"] textarea');
+    if (!box) return;
+    tl.set(box, { clipPath: "inset(0% 100% 0% 0%)" }, 0);
+    tl.to(box, { clipPath: "inset(0% 0% 0% 0%)", duration: d, ease: "none" }, t);
+  }
+
+  return { theme, r, withText, home, view, aim, move, click, cap, count, wipe, chat, live, typeIn };
 })();

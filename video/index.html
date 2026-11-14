@@ -7,7 +7,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1920, height=1200" />
-    <title>LifeUI: a day in forty seconds</title>
+    <title>LifeUI: from the chat to the calendar</title>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <!-- The app's own built CSS (tools/build.mjs), then the film's layer -->
     <link rel="stylesheet" href="assets/app.css" />
@@ -24,41 +24,77 @@
       id="film"
       data-composition-id="main"
       data-start="0"
-      data-duration="38.9"
+      data-duration="44.5"
       data-width="1920"
       data-height="1200"
     >
       <div
-        id="start"
+        id="ask"
         class="clip"
-        data-composition-id="start"
-        data-composition-src="compositions/start.html"
+        data-composition-id="ask"
+        data-composition-src="compositions/ask.html"
         data-start="0"
-        data-duration="2.1"
-        data-track-index="1"
-        data-track-kind="graphics"
-        data-width="1920"
-        data-height="1200"
-      ></div>
-      <div
-        id="plan"
-        class="clip"
-        data-composition-id="plan"
-        data-composition-src="compositions/plan.html"
-        data-start="2.1"
-        data-duration="5.2"
-        data-track-index="1"
-        data-track-kind="graphics"
-        data-width="1920"
-        data-height="1200"
-      ></div>
-      <div
-        id="morning"
-        class="clip"
-        data-composition-id="morning"
-        data-composition-src="compositions/morning.html"
-        data-start="7.3"
         data-duration="6"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1200"
+      ></div>
+      <div
+        id="answer"
+        class="clip"
+        data-composition-id="answer"
+        data-composition-src="compositions/answer.html"
+        data-start="6"
+        data-duration="8"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1200"
+      ></div>
+      <div
+        id="card"
+        class="clip"
+        data-composition-id="card"
+        data-composition-src="compositions/card.html"
+        data-start="14"
+        data-duration="6"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1200"
+      ></div>
+      <div
+        id="saved"
+        class="clip"
+        data-composition-id="saved"
+        data-composition-src="compositions/saved.html"
+        data-start="20"
+        data-duration="4"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1200"
+      ></div>
+      <div
+        id="goals"
+        class="clip"
+        data-composition-id="goals"
+        data-composition-src="compositions/goals.html"
+        data-start="24"
+        data-duration="7"
+        data-track-index="1"
+        data-track-kind="graphics"
+        data-width="1920"
+        data-height="1200"
+      ></div>
+      <div
+        id="run"
+        class="clip"
+        data-composition-id="run"
+        data-composition-src="compositions/run.html"
+        data-start="31"
+        data-duration="5"
         data-track-index="1"
         data-track-kind="graphics"
         data-width="1920"
@@ -69,32 +105,8 @@
         class="clip"
         data-composition-id="close"
         data-composition-src="compositions/close.html"
-        data-start="13.3"
-        data-duration="10"
-        data-track-index="1"
-        data-track-kind="graphics"
-        data-width="1920"
-        data-height="1200"
-      ></div>
-      <div
-        id="earned"
-        class="clip"
-        data-composition-id="earned"
-        data-composition-src="compositions/earned.html"
-        data-start="23.3"
-        data-duration="5.6"
-        data-track-index="1"
-        data-track-kind="graphics"
-        data-width="1920"
-        data-height="1200"
-      ></div>
-      <div
-        id="review"
-        class="clip"
-        data-composition-id="review"
-        data-composition-src="compositions/review.html"
-        data-start="28.9"
-        data-duration="5.5"
+        data-start="36"
+        data-duration="4"
         data-track-index="1"
         data-track-kind="graphics"
         data-width="1920"
@@ -105,7 +117,7 @@
         class="clip"
         data-composition-id="end"
         data-composition-src="compositions/end.html"
-        data-start="34.4"
+        data-start="40"
         data-duration="4.5"
         data-track-index="1"
         data-track-kind="graphics"

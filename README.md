@@ -6,7 +6,7 @@ A HUD for real life: plan the day in time blocks, run one activity at a time, an
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-demo-dark.webp">
-  <img alt="Recording of the Today screen: Write report is running at 23 minutes; Finish opens the closing ritual, a 9 out of 10 rating previews +78 tempos, Save adds it to the log and raises the day to 157 tempos, and Read starts from a quick-start button." src="docs/screenshots/lifeui-demo-light.webp">
+  <img alt="From the product film: the person says yes to the coach, the roadmap card waits with its phases and real dates (Monday to Friday at 9:00, 50 sessions, Nov 16 to Jan 22), Do it saves it, and the coach says what is now on the calendar." src="docs/screenshots/lifeui-demo-light.webp">
 </picture>
 
 <sub>Screenshots use synthetic demo data. They follow your GitHub theme (light or dark).</sub>

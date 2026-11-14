@@ -14,19 +14,12 @@
       <div id="close" data-composition-id="close" data-width="1920" data-height="1200">
         <div class="f-win">
           <div id="close-cam" class="f-cam">
-            <!-- snap:05-report -->
-            <!-- snap:06-close-7 -->
-            <!-- snap:07-close-9 -->
+            <!-- snap:c08-close -->
+            <!-- snap:c09-earned -->
           </div>
         </div>
         <p id="close-cap1" class="f-cap">
-          <span>3:23 PM. Close it <em>honestly</em></span>
-        </p>
-        <p id="close-cap2" class="f-cap">
-          <span>Pick a score from <em>0 to 10</em></span>
-        </p>
-        <p id="close-cap3" class="f-cap">
-          <span>The preview <em>is what you get</em></span>
+          <span>Closed honestly, <em>in a sentence</em></span>
         </p>
         <div id="close-click" class="f-click"></div>
         <div id="close-cursor" class="f-cursor">
@@ -45,66 +38,23 @@
         (() => {
           const F = FILM;
           F.theme();
-          const $ = (s) => document.querySelector(s);
           const tl = gsap.timeline({ paused: true });
-          const cam = $("#close-cam");
-          const [running, seven, nine] = document.querySelectorAll("#close-cam .snap");
-          const card = F.r("05-report", "card");
-          const finish = F.r("05-report", "finish");
-          const elapsed = running.querySelector('[aria-label="Elapsed time"]');
-          const dialog = F.r("06-close-7", "dialog");
-          const pick = F.r("06-close-7", "nine");
-          const reward = F.withText(nine, "span", "+78");
-          const save = F.r("07-close-9", "save");
-          const vCard = F.view(card, 1.9, 0.5, 0.4);
-          const vDialog = F.view(dialog, 1.75, 0.5, 0.44);
-          tl.set(cam, F.home, 0);
-          tl.set([seven, nine], { opacity: 0 }, 0);
-          F.cap(tl, "#close-cap1", 0.2, 2.5);
-          F.move(tl, cam, vCard, 0.2, 0.6);
-          // the clock keeps running until Finish
-          const [mm, ss] = elapsed.textContent.split(":").map(Number);
-          F.count(
-            tl,
-            elapsed,
-            mm * 60 + ss,
-            mm * 60 + ss + 3,
-            0.1,
-            2.5,
-            (s) => {
-              const t = Math.floor(s);
-              return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-            },
-            "none"
-          );
-          const pFinish = F.aim(vCard, finish, 0.35, 0.55);
-          tl.fromTo(
-            "#close-cursor",
-            { x: 1960, y: 1240 },
-            { x: pFinish.x, y: pFinish.y, duration: 0.8, ease: "power2.inOut" },
-            1.5
-          );
-          F.click(tl, "#close-cursor", "#close-click", pFinish, 2.5);
-          tl.set(seven, { opacity: 1 }, 2.58);
-          F.move(tl, cam, vDialog, 2.7, 0.6);
-          F.cap(tl, "#close-cap2", 3.3, 5.4);
-          const pPick = F.aim(vDialog, pick, 0.55, 0.6);
-          tl.to(
-            "#close-cursor",
-            { x: pPick.x, y: pPick.y, duration: 0.7, ease: "power2.inOut" },
-            3.9
-          );
-          F.click(tl, "#close-cursor", "#close-click", pPick, 4.8);
-          tl.set(nine, { opacity: 1 }, 4.88);
-          F.count(tl, reward, 60, 78, 4.9, 0.9, (n) => `+${Math.round(n)}`);
-          F.cap(tl, "#close-cap3", 5.6);
-          const pSave = F.aim(vDialog, save, 0.5, 0.6);
-          tl.to(
-            "#close-cursor",
-            { x: pSave.x, y: pSave.y, duration: 0.7, ease: "power2.inOut" },
-            8.4
-          );
-          F.click(tl, "#close-cursor", "#close-click", pSave, 9.6);
+          const cam = document.querySelector("#close-cam");
+          const snaps = [...document.querySelectorAll("#close-cam .snap")];
+          if (snaps.length > 1) tl.set(snaps.slice(1), { opacity: 0 }, 0);
+          const [waiting, done] = snaps;
+          F.chat(tl, waiting, "c08-close");
+          F.chat(tl, done, "c09-earned");
+          const doit = F.r("c08-close", "doit");
+          const vCard = F.view({ x: 1029, y: doit.y - 260, w: 411, h: 300 }, 2.25, 0.5, 0.45);
+          tl.set(cam, vCard, 0);
+          F.cap(tl, "#close-cap1", 0.3);
+          const pDo = F.aim(vCard, doit, 0.5, 0.55);
+          tl.fromTo("#close-cursor", { x: 1960, y: 1240 }, { x: pDo.x, y: pDo.y, duration: 0.9, ease: "power2.inOut" }, 0.5);
+          F.click(tl, "#close-cursor", "#close-click", pDo, 1.6);
+          tl.set(done, { opacity: 1 }, 1.68);
+          tl.to("#close-cursor", { opacity: 0, duration: 0.2 }, 1.9);
+          F.move(tl, cam, F.home, 2.2, 0.7);
           window.__timelines["close"] = tl;
         })();
       </script>

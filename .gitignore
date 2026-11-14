@@ -31,3 +31,6 @@ Thumbs.db
 
 # Wrangler local state
 .wrangler/
+
+# HyperFrames check reports and caches
+.hyperframes/

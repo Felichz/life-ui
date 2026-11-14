@@ -6,7 +6,7 @@ export default defineConfig({
   ...baseConfig,
   e2e: {
     ...baseConfig.e2e,
-    specPattern: "video/tools/capture.cy.ts",
+    specPattern: "video/tools/capture*.cy.ts",
     excludeSpecPattern: [],
   },
 });
