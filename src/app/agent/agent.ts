@@ -1030,6 +1030,7 @@ export class Agent {
       stated.days = theirs.days;
       stated.daysQuote = theirs.quote;
       stated.daysBy = "person";
+      stated.personDays = theirs.days;
     }
     if (this.brief?.plan) this.brief = { ...this.brief, plan: { ...this.brief.plan, stated } };
   }
@@ -1051,7 +1052,9 @@ export class Agent {
         return {
           days: stated.days,
           daysQuote: stated.quote,
-          daysBy: message.role === "user" ? "person" : "coach",
+          // The coach's plan on the very days the person named is the person's word
+          daysBy:
+            message.role === "user" || sameDays(stated.days, kept?.personDays) ? "person" : "coach",
         };
       }
     }
@@ -1785,6 +1788,11 @@ function roadmapFacts(roadmap: Roadmap): string {
   return `"${roadmap.title}" (${roadmap.milestones.length} phases${
     sessions > 0 ? `, ${sessions} sessions in all` : ""
   }${when})`;
+}
+
+/** Whether two lists name the same weekdays. */
+function sameDays(one: number[], other: number[] | undefined): boolean {
+  return Boolean(other) && one.length === other!.length && one.every((day) => other!.includes(day));
 }
 
 /** True when a reply meant for the person mentions a tool by name. */
