@@ -199,7 +199,19 @@ export function phaseWeeks(plan: string): number[] | null {
     const match = /(?:semanas?|weeks?)\s*(\d{1,2})\s*(?:[-–—]|a|al|to|through)\s*(\d{1,2})\b/i.exec(
       line
     );
-    if (match) found.push([Number(match[1]), Number(match[2])]);
+    if (match) {
+      found.push([Number(match[1]), Number(match[2])]);
+      continue;
+    }
+    // A phase with no end ("from week 7 on"): four weeks, as the planner is told to give it
+    const open =
+      /(?:a partir de la|desde la)\s+semana\s+(\d{1,2})|semana\s+(\d{1,2})\s+en adelante|from week\s+(\d{1,2})|week\s+(\d{1,2})\s+onwards?/i.exec(
+        line
+      );
+    if (open) {
+      const from = Number(open[1] ?? open[2] ?? open[3] ?? open[4]);
+      found.push([from, from + 3]);
+    }
   }
   if (found.length < 2 || found[0][0] !== 1) return null;
   for (let index = 0; index < found.length; index++) {

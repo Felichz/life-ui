@@ -102,6 +102,12 @@ describe("the weeks of a plan's phases", () => {
     ].join("\n");
     expect(phaseWeeks(plan)).toEqual([4, 5, 4]);
     expect(phaseWeeks("Phase 1 (weeks 1 to 2)\nPhase 2 (weeks 3 to 7)")).toEqual([2, 5]);
+    // A phase with no end is four weeks, as the planner gives it
+    expect(
+      phaseWeeks(
+        "**Fase 1 (Semanas 1-2)**\n**Fase 2 (Semanas 3-6)**\n**Fase 3: Retorno (A partir de la semana 7)**"
+      )
+    ).toEqual([2, 4, 4]);
     // Not a plan's phases: one alone, not from week one, or with a gap
     expect(phaseWeeks("Semanas 1-4 y nada más")).toBeNull();
     expect(phaseWeeks("Semanas 3-4\nSemanas 5-6")).toBeNull();
