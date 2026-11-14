@@ -19,7 +19,7 @@ day's meter before the camera pulls back to the Review.
 - Beats: hook (one activity running) -> plan (the day in time blocks, later ones
   locked) -> close (Finish, pick 9 out of 10, the preview shows +78) -> payoff
   (+78 lands, the tempo bar passes the daily reference) -> claim ("Tempos only go
-  up") -> end card (mark, name, life-ui-one.vercel.app).
+  up") -> end card (mark, name, lifeui.medanolabs.com).
 - Look: the app's own light or dark canvas, Inter, indigo only on what is clicked,
   amber only on tempos.
 
