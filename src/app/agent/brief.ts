@@ -1,5 +1,5 @@
 import type { ChatMessage, ChatOptions, ModelReply } from "./llm";
-import { daysStated, weekdayNames, weekdaysIn, weeksUntil } from "./when";
+import { daysStated, phaseWeeks, weekdayNames, weekdaysIn, weeksUntil } from "./when";
 import { t } from "../i18n";
 
 /**
@@ -634,6 +634,17 @@ export async function planGaps(options: {
     over.push(
       `it leaves a number as a choice ("${choice}"): give one value for each phase, the one they start with, and say what goes up in the next phase and by how much`
     );
+  }
+  // The phases' weeks add up to how long they asked for: three months is about 13, not 9
+  const asked = brief.plan?.weeks;
+  const phases = phaseWeeks(plan);
+  if (asked && phases) {
+    const runs = phases.reduce((sum, weeks) => sum + weeks, 0);
+    if (Math.abs(runs - asked) > Math.max(1, Math.round(asked * 0.15))) {
+      over.push(
+        `its phases run ${runs} weeks (${phases.join(" + ")}), and they asked for about ${asked}: make the phases add up to ${asked} weeks`
+      );
+    }
   }
   const count = miscounted(plan, brief.plan?.weeks);
   if (count) {

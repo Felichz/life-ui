@@ -10,6 +10,7 @@ import {
   isRequestToCoach,
   openChoice,
   overfull,
+  planGaps,
   planNeeds,
   saidIn,
   sessionTakes,
@@ -189,6 +190,31 @@ describe("what is a request to the coach", () => {
     expect(isRequestToCoach("si dale, hazlo")).toBe(true);
     expect(isRequestToCoach("estirar la espalda al final de cada sesión")).toBe(false);
     expect(isRequestToCoach("me duele la rodilla izquierda")).toBe(false);
+  });
+});
+
+describe("a plan shorter than asked", () => {
+  it("is sent back when its phases do not add up to the weeks asked for", async () => {
+    const plan = [
+      "**Fase 1 (Semanas 1-3): Acordes**",
+      "**Fase 2 (Semanas 4-6): Ritmo**",
+      "**Fase 3 (Semanas 7-9): Canciones**",
+      "x".repeat(800),
+    ].join("\n");
+    const gaps = await planGaps({
+      brief: {
+        wants: [],
+        has: [],
+        limits: [],
+        unsure: [],
+        plan: { length: "", days: "", time: "", start: "", weeks: 13 },
+      },
+      plan,
+      chat: async () => call("check_plan", { not_used: [], not_given: [], breaks: [] }),
+    });
+    expect(gaps.join(" ")).toContain(
+      "its phases run 9 weeks (3 + 3 + 3), and they asked for about 13"
+    );
   });
 });
 
