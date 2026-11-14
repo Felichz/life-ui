@@ -500,6 +500,16 @@ describe("the roadmap draft", () => {
           ].join("\n")
         )
       ).toEqual({ sum: 35, parts: 4 });
+      // A line per week is that week's whole session, not a part of one
+      expect(
+        RoadmapDraft.minutesIn(
+          [
+            "- Semana 1: Correr 1 minuto, caminar 2 minutos (repetir 6 veces = 30 min).",
+            "- Semana 2: Correr 2 minutos, caminar 2 minutos (repetir 7 veces = 30 min).",
+            "- Semana 3: Correr 3 minutos, caminar 2 minutos (repetir 5 veces = 30 min).",
+          ].join(String.fromCharCode(10))
+        )
+      ).toEqual({ sum: 30, parts: 1 });
       const summed = new RoadmapDraft(setup(), new Date(), { minutes: 30 });
       const thirtyFive = {
         ...ROADMAP,
