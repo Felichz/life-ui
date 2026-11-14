@@ -21,7 +21,10 @@ import { describeFacts, disagreements, savedFacts } from "./saved";
 import {
   briefLines,
   nextMove,
+  linksIn,
+  missingFrom,
   planGaps,
+  samePage,
   planNeeds,
   saidIn,
   unagreed,
@@ -809,6 +812,7 @@ export class Agent {
       this.keepStated(said, person);
       return;
     }
+    const missingBefore = this.brief?.plan && this.brief.asked ? missingFrom(this.brief) : [];
     this.brief = await updateBrief({
       chat: this.options.chat,
       brief: this.brief,
@@ -821,6 +825,16 @@ export class Agent {
         this.notesRead = true;
       },
     });
+    // Asked, and none of it answered: asking again is asking twice. The coach
+    // assumes what is missing, says so, and gives the plan
+    if (
+      this.brief?.plan &&
+      missingBefore.length > 0 &&
+      missingFrom(this.brief).filter((item) => missingBefore.includes(item)).length ===
+        missingBefore.length
+    ) {
+      this.brief = { ...this.brief, asked: Math.max(2, this.brief.asked ?? 0) };
+    }
     // A plan is wanted and there is still room to ask: what do its numbers depend on?
     if (
       this.brief?.plan &&
@@ -930,6 +944,16 @@ export class Agent {
     if (this.owesSearch()) {
       notes.push(
         "They asked you to look this up: call web_search now, before you say anything about what is known. Never say you looked something up without a search in this reply."
+      );
+    }
+    // The links it may give: a 9B model wrote "youtube.com/watch?v=example_stretch"
+    const links = this.brief?.plan ? this.knownLinks() : [];
+    if (links.length > 0) {
+      notes.push(
+        `Links you may give, from your searches (never any other, never one you make up): ${links
+          .slice(0, 8)
+          .map((one) => `${one.title} <${one.url}>`)
+          .join("; ")}.`
       );
     }
     // With notes on the person, the move comes from them: ask what is missing, or recommend
@@ -1095,6 +1119,31 @@ export class Agent {
     return kept ? { phaseWeeks: kept } : {};
   }
 
+  /**
+   * The links that may be given: the sources of every search in this
+   * conversation (kept on its card, which a compaction does not touch) and
+   * what the person wrote.
+   */
+  private knownLinks(): Array<{ title: string; url: string }> {
+    const found: Array<{ title: string; url: string }> = [];
+    for (const entry of this.entries) {
+      if (entry.kind !== "tool") continue;
+      for (const source of (entry as { sources?: Array<{ title: string; url: string }> }).sources ??
+        []) {
+        if (!found.some((one) => samePage(one.url, source.url))) found.push(source);
+      }
+    }
+    for (const message of this.history) {
+      if (message.role !== "user") continue;
+      for (const url of linksIn(textOf(message.content))) {
+        if (!url.startsWith("[") && !found.some((one) => samePage(one.url, url))) {
+          found.push({ title: url, url });
+        }
+      }
+    }
+    return found;
+  }
+
   /** What the person wrote lately, to check a change against their own words. */
   private recentUserText(count = 3): string {
     return this.history
@@ -1170,7 +1219,12 @@ export class Agent {
       now: this.options.now ?? (() => new Date()),
       http: this.options.web?.http,
       signal: this.abort?.signal,
-      said: { ...saidIn(this.brief), ...this.daysSaid(), ...this.phasesSaid() },
+      said: {
+        ...saidIn(this.brief),
+        ...this.daysSaid(),
+        ...this.phasesSaid(),
+        links: this.knownLinks().map((one) => one.url),
+      },
       // What the person has written in this conversation, and what was noted of it
       spoken: [
         ...this.history
@@ -1629,6 +1683,7 @@ export class Agent {
               brief: this.brief,
               plan: reply.content,
               signal: abort.signal,
+              links: this.knownLinks().map((one) => one.url),
             });
             if (abort.signal.aborted) return;
             if (gaps.length > 0) {

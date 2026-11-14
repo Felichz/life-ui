@@ -474,6 +474,10 @@ export async function runRoadmapPlanner(options: {
       `the phases of the plan they agreed to run ${said.phaseWeeks.join(", ")} weeks, which are ${said.phaseWeeks
         .map((weeks) => weeks * perWeek)
         .join(", ")} sessions in the same order: use exactly those counts`,
+    said.links?.length &&
+      `the only links you may write in notes are these (each where it shows that exercise or step), never one you make up: ${said.links
+        .slice(0, 8)
+        .join(", ")}`,
     said.use?.length &&
       `they have ${said.use.join("; ")}: the sessions use what of it fits the plan, with its load or number`,
   ].filter(Boolean);

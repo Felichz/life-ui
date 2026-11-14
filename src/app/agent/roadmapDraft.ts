@@ -470,6 +470,32 @@ export class RoadmapDraft {
   }
 
   /**
+   * A link no search returned and the person did not write is not saved: a
+   * Markdown link keeps its words and loses its address, a bare one goes. The
+   * person would open a page that does not exist.
+   */
+  private onlyKnownLinks(roadmap: DraftRoadmap) {
+    const known = this.said.links;
+    if (!known) return;
+    const kept = (url: string) =>
+      known.some(
+        (one) => one.replace(/\/+$/, "").toLowerCase() === url.replace(/\/+$/, "").toLowerCase()
+      );
+    const clean = (text: string | undefined) =>
+      text
+        ?.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (whole, words: string, url: string) =>
+          kept(url) ? whole : words
+        )
+        .replace(/(^|[^(\w])(https?:\/\/[^\s)\]>"']+)/g, (whole, before: string, url: string) =>
+          kept(url.replace(/[.,;:!?]+$/, "")) ? whole : before
+        );
+    roadmap.rules = clean(roadmap.rules);
+    for (const milestone of roadmap.milestones) {
+      for (const step of milestone.steps) step.notes = clean(step.notes);
+    }
+  }
+
+  /**
    * The rules are what holds in every session. Told "choose one day a week
    * (Tuesday or Thursday)", a person would have two schedules: the calendar's
    * and the rules'. Sent back once; the days live in the schedule.
@@ -774,6 +800,7 @@ export class RoadmapDraft {
       };
       if (!existing) {
         this.keepsTo(roadmap);
+        this.onlyKnownLinks(roadmap);
         // Every check that sends the plan back says its problem in one answer:
         // sent one at a time, a plan with three of them used up the planner's
         // tries, and nothing was saved

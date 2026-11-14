@@ -286,6 +286,8 @@ export interface Said {
   startOn?: number;
   /** What their yes came with: the roadmap has to carry it. */
   added?: string[];
+  /** The links that may be written in a roadmap: from the searches and the person. */
+  links?: string[];
   /** What they have that the roadmap's sessions can use. */
   use?: string[];
   /**
@@ -430,6 +432,21 @@ function questionsIn(reply: string): string {
 }
 
 /**
+ * Whether a message asks for a plan, a routine or a programme: "¿qué me
+ * recomiendas como plan a corto y largo plazo?" was noted by a 9B model as
+ * no plan wanted, and the coach never got to one. Read here as well.
+ */
+export function asksForPlan(message: string): boolean {
+  const text = message
+    .toLocaleLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return /\b(plan(es)?|rutina|programa de|roadmap|hoja de ruta|routine|training plan|programme|program)\b/.test(
+    text
+  );
+}
+
+/**
  * The notes after the person's newest message. Any failure leaves them as
  * they were: they help the answer, they are not needed for it.
  */
@@ -470,7 +487,7 @@ export async function updateBrief(options: {
       string,
       unknown
     >;
-    const wanted = Boolean(brief?.plan) || plan.wanted === true;
+    const wanted = Boolean(brief?.plan) || plan.wanted === true || asksForPlan(options.person);
     const noted = {
       length: text(plan.session_length),
       days: text(plan.days),
@@ -615,11 +632,24 @@ function named(thing: string, plan: string): boolean {
  * the code does not find it in the plan either. Empty when nothing is missing,
  * and on any failure: the check improves a plan, it is not needed for one.
  */
+/** The links in a text, without what closes a sentence or a Markdown link around them. */
+export function linksIn(text: string): string[] {
+  return [...text.matchAll(/https?:\/\/[^\s)\]>"']+/g)].map((found) =>
+    found[0].replace(/[.,;:!?]+$/, "")
+  );
+}
+
+/** The same page, written with or without its last slash or its case. */
+export const samePage = (one: string, other: string) =>
+  one.replace(/\/+$/, "").toLocaleLowerCase() === other.replace(/\/+$/, "").toLocaleLowerCase();
+
 export async function planGaps(options: {
   chat: Chat;
   brief: Brief;
   plan: string;
   signal?: AbortSignal;
+  /** The links the plan may give: what the searches returned and what the person wrote. */
+  links?: string[];
 }): Promise<string[]> {
   const { brief, plan } = options;
   // Counted here, not asked of a model: a session written longer than the one they have
@@ -650,6 +680,18 @@ export async function planGaps(options: {
     if (Math.abs(runs - asked) > Math.max(1, Math.round(asked * 0.15))) {
       over.push(
         `its phases run ${runs} weeks (${phases.join(" + ")}), and they asked for about ${asked}: make the phases add up to ${asked} weeks`
+      );
+    }
+  }
+  // A link nobody found is made up: "youtube.com/watch?v=example_stretch"
+  if (options.links) {
+    const known = options.links;
+    const invented = linksIn(plan).filter((link) => !known.some((one) => samePage(one, link)));
+    if (invented.length > 0) {
+      over.push(
+        `it links to pages no search of yours returned (${invented.slice(0, 3).join(", ")}): a link you did not find does not exist. Use only these, each for what it shows: ${
+          known.slice(0, 8).join(", ") || "none, so write no link"
+        }`
       );
     }
   }
