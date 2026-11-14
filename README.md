@@ -5,11 +5,11 @@ A HUD for real life: plan the day in time blocks, run one activity at a time, an
 [Live app](https://lifeui.medanolabs.com) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-demo-dark.webp">
-  <img alt="From the product film: the person says yes to the coach, the roadmap card waits with its phases and real dates (Monday to Friday at 9:00, 50 sessions, Nov 16 to Jan 22), Do it saves it, and the coach says what is now on the calendar." src="docs/screenshots/lifeui-demo-light.webp">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-today-dark.webp">
+  <img src="docs/readme/01-today-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A HUD for real life. Plan the day in time blocks, run one activity at a time, and close each one with a single honest moment. Marked: 1, Tempos today, as a share of your daily reference: an anchor, never a debt. 2, Only one activity runs at a time, against its estimate or timebox. 3, Quick start for pinned activities. Everything has a shortcut.">
 </picture>
 
-<sub>Screenshots use synthetic demo data. They follow your GitHub theme (light or dark).</sub>
+<sub>The pictures follow your GitHub theme (light or dark). Screenshots use synthetic demo data.</sub>
 
 ## What it is
 
@@ -17,40 +17,25 @@ LifeUI is not a todo app, a habit tracker or a time tracker. You keep a library 
 
 Every ending (finishing, switching to something else, ending the day) goes through one closing ritual: how satisfied are you with what you did, from 0 to 10? The answer earns tempos, computed as `ceil(base minutes × score / 7)`, where the base is your estimate when there is one and the real time otherwise. A 7 is 100%, and a 0 counts nothing. Tempos only go up: no streaks, no penalties, and free time costs nothing. The daily target is a reference shown as a percentage, never as what is missing.
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-closing-dark.webp">
-        <img alt="Closing ritual dialog: actual time of 23 minutes against a 60-minute estimate, a 0 to 10 satisfaction scale with 7 selected, and a reward preview of +60 tempos." src="docs/screenshots/lifeui-closing-light.webp">
-      </picture>
-      <p><b>Closing ritual.</b> One honest moment per activity. The reward preview is the reward.</p>
-    </td>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-review-dark.webp">
-        <img alt="Review screen: tempos against the daily reference, an hour-by-hour strip of the day, time tracked by activity type, and a table of every close with its satisfaction and tempos." src="docs/screenshots/lifeui-review-light.webp">
-      </picture>
-      <p><b>Review.</b> The day hour by hour, time by activity type, and the trend across days.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-library-dark.webp">
-        <img alt="Library of reusable activities, each with its duration contract (clear goal, flexible range or timebox), usage count, average satisfaction and a quick-start pin." src="docs/screenshots/lifeui-library-light.webp">
-      </picture>
-      <p><b>Library.</b> Three duration contracts: a clear goal with an estimate, a flexible range, or a timebox with a minimum, a maximum or both.</p>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-mobile-dark.webp">
-        <img alt="The closing ritual as a bottom sheet on a phone, with the 0 to 10 scale and the +60 tempos reward preview." src="docs/screenshots/lifeui-mobile-light.webp" width="260">
-      </picture>
-      <p><b>On a phone.</b> The same ritual as a bottom sheet, with touch-sized targets.</p>
-    </td>
-  </tr>
-</table>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-closing-dark.webp">
+  <img src="docs/readme/02-closing-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Every activity ends with one honest moment. Rate it from 0 to 10. The preview shows the tempos you will earn, from the same function that awards them.">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-review-dark.webp">
+  <img src="docs/readme/03-review-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Look back to adjust, not to judge yourself. The day hour by hour, time tracked by activity type, and every close with its satisfaction and tempos.">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-library-dark.webp">
+  <img src="docs/readme/04-library-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A library of repeatable activities. Each one keeps its duration contract (a clear goal, a flexible range or a timebox), how often you ran it and how it went.">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/05-phone-dark.webp">
+  <img src="docs/readme/05-phone-light.webp" width="100%" alt="LifeUI, screenshot on a phone. The closing ritual on a phone. The same dialog as a bottom sheet, with the 0 to 10 scale and the reward preview.">
+</picture>
 
 The interface is available in English and Spanish. It opens in English on first launch and can be switched to Spanish in Settings or from the command palette.
 
