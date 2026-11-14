@@ -53,6 +53,8 @@ export interface Brief {
       days?: number[];
       daysQuote?: string;
       daysBy?: "person" | "coach";
+      /** The days the person named themselves, whatever the coach said after. */
+      personDays?: number[];
       phaseWeeks?: number[];
     };
   };

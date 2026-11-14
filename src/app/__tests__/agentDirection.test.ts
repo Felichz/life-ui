@@ -401,6 +401,19 @@ describe("the roadmap draft", () => {
       more.saveRoadmap({ ...ROADMAP, rules: "- Estirar dos minutos al final" });
       expect(more.changed).toBe(true);
 
+      // Several problems come back in one answer, and the next call is accepted
+      const many = new RoadmapDraft(setup(), new Date(), {
+        days: [2, 4, 6],
+        daysQuote: "martes, jueves y sábado",
+        daysBy: "coach",
+        use: ["mancuernas de 5kg"],
+      });
+      expect(() => many.saveRoadmap(ROADMAP)).toThrow(
+        /several: fix all of these in one call: \(1\) other-days.*\(2\) unused-things/
+      );
+      many.saveRoadmap(ROADMAP);
+      expect(many.changed).toBe(true);
+
       // Days the person named are theirs: sent back once, then put right
       const everyDay = new RoadmapDraft(setup(), new Date(), {
         days: [0, 1, 2, 3, 4, 5, 6],

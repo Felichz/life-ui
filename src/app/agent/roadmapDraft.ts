@@ -771,36 +771,59 @@ export class RoadmapDraft {
       };
       if (!existing) {
         this.keepsTo(roadmap);
-        this.rulesAreNotTheSchedule(roadmap);
-        this.everyPhaseFits(roadmap);
-        this.onTheirDays(roadmap);
-        this.onTheirPhases(roadmap);
-        this.carriesWhatWasAdded(roadmap);
-        this.usesWhatTheyHave(roadmap);
-        // Sent back once: most often the days or a count were copied wrong, and
-        // the numbers show which. A second time it stands, and the card says so.
-        const shorter = this.shorterThanAsked(roadmap);
-        if (shorter && !this.sentBack) {
-          this.sentBack = true;
-          const total = roadmap.milestones
-            .flatMap((milestone) => milestone.steps)
-            .reduce((sum, step) => sum + this.sessionsOf(step), 0);
-          const perWeek = roadmap.schedule?.weekdays.length ?? 1;
+        // Every check that sends the plan back says its problem in one answer:
+        // sent one at a time, a plan with three of them used up the planner's
+        // tries, and nothing was saved
+        const problems: DraftError[] = [];
+        const check = (run: () => void) => {
+          try {
+            run();
+          } catch (caught) {
+            if (caught instanceof DraftError) problems.push(caught);
+            else throw caught;
+          }
+        };
+        check(() => this.rulesAreNotTheSchedule(roadmap));
+        check(() => this.everyPhaseFits(roadmap));
+        check(() => this.onTheirDays(roadmap));
+        check(() => this.onTheirPhases(roadmap));
+        check(() => this.carriesWhatWasAdded(roadmap));
+        check(() => this.usesWhatTheyHave(roadmap));
+        check(() => {
+          // Sent back once: most often the days or a count were copied wrong, and
+          // the numbers show which. A second time it stands, and the card says so.
+          const shorter = this.shorterThanAsked(roadmap);
+          if (shorter && !this.sentBack) {
+            this.sentBack = true;
+            const total = roadmap.milestones
+              .flatMap((milestone) => milestone.steps)
+              .reduce((sum, step) => sum + this.sessionsOf(step), 0);
+            const perWeek = roadmap.schedule?.weekdays.length ?? 1;
+            throw new DraftError(
+              "shorter-than-asked",
+              `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run only ${shorter.weeks}. ${this.said.weeks} weeks are ${shorter.expected} in all. Count the sessions of each phase again from the plan in the conversation: a phase of N weeks is N x ${perWeek} sessions. If the plan they agreed to really is this short, send the same call again.`
+            );
+          }
+        });
+        check(() => {
+          const longer = this.longerThanAsked(roadmap);
+          if (longer && !this.sentBack) {
+            this.sentBack = true;
+            const total = roadmap.milestones
+              .flatMap((milestone) => milestone.steps)
+              .reduce((sum, step) => sum + this.sessionsOf(step), 0);
+            const perWeek = roadmap.schedule?.weekdays.length ?? 1;
+            throw new DraftError(
+              "longer-than-asked",
+              `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run ${longer.weeks} weeks, to ${longer.until}. Check the days of the week and the number of sessions against the plan in the conversation: in ${this.said.weeks} weeks, ${perWeek} day${perWeek === 1 ? "" : "s"} a week is ${this.said.weeks! * perWeek} sessions. If the plan they agreed to really is this long, send the same call again.`
+            );
+          }
+        });
+        if (problems.length === 1) throw problems[0];
+        if (problems.length > 1) {
           throw new DraftError(
-            "shorter-than-asked",
-            `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run only ${shorter.weeks}. ${this.said.weeks} weeks are ${shorter.expected} in all. Count the sessions of each phase again from the plan in the conversation: a phase of N weeks is N x ${perWeek} sessions. If the plan they agreed to really is this short, send the same call again.`
-          );
-        }
-        const longer = this.longerThanAsked(roadmap);
-        if (longer && !this.sentBack) {
-          this.sentBack = true;
-          const total = roadmap.milestones
-            .flatMap((milestone) => milestone.steps)
-            .reduce((sum, step) => sum + this.sessionsOf(step), 0);
-          const perWeek = roadmap.schedule?.weekdays.length ?? 1;
-          throw new DraftError(
-            "longer-than-asked",
-            `the person asked for about ${this.said.weeks} weeks; ${total} sessions on ${perWeek} day${perWeek === 1 ? "" : "s"} a week run ${longer.weeks} weeks, to ${longer.until}. Check the days of the week and the number of sessions against the plan in the conversation: in ${this.said.weeks} weeks, ${perWeek} day${perWeek === 1 ? "" : "s"} a week is ${this.said.weeks! * perWeek} sessions. If the plan they agreed to really is this long, send the same call again.`
+            "several",
+            `fix all of these in one call: ${problems.map((problem, index) => `(${index + 1}) ${problem.message}`).join(" ")}`
           );
         }
       }
