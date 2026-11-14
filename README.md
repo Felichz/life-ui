@@ -2,7 +2,7 @@
 
 A HUD for real life: plan the day in time blocks, run one activity at a time, and close each one with a single honest self-assessment that earns tempos.
 
-[Live app](https://life-ui-one.vercel.app) · [Case study](https://portfolio-felix-teal.vercel.app/work/lifeui/) · Built by [Felix Andersson](https://portfolio-felix-teal.vercel.app/)
+[Live app](https://lifeui.medanolabs.com) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/lifeui-demo-dark.webp">
