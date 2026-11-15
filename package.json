@@ -1,8 +1,8 @@
 {
   "name": "life-ui",
   "private": true,
-  "version": "1.0.0",
-  "description": "A HUD for real life: plan your day, focus on one thing at a time, and close it with an honest self-assessment that earns tempos.",
+  "version": "0.2.0",
+  "description": "A local AI harness for organizing your life: an AI coach on your machine that plans your day with you, one activity at a time, closed honestly.",
   "author": "Felix Andersson",
   "license": "MIT",
   "type": "module",
@@ -54,6 +54,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@tailwindcss/container-queries": "^0.1.1",
     "@tauri-apps/cli": "^2.12.4",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",

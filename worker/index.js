@@ -1,4 +1,4 @@
-/* global URL, Request, Response */
+/* global URL, Request, Response, Headers */
 // Runs for the site's videos (run_worker_first in wrangler.jsonc), and when no static asset matches.
 // The app lives under /app/ and has client-side routes: a deep link into it gets the app's
 // index.html. Until 2026-11 the app was at the root: its old addresses go to their place under /app/.

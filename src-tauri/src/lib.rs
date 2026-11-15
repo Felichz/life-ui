@@ -21,6 +21,20 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // The window is made here, not from the config alone: a portable copy
+            // keeps the WebView's own data (the conversations) beside it too
+            let config = app
+                .config()
+                .app
+                .windows
+                .first()
+                .cloned()
+                .ok_or("no window in tauri.conf.json")?;
+            let mut window = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+            if let Some(dir) = state::portable_dir() {
+                window = window.data_directory(dir.join("webview"));
+            }
+            window.build()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

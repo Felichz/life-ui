@@ -1,10 +1,10 @@
 [package]
 name = "lifeui"
-version = "0.1.0"
-description = "LifeUI desktop: the day, run by a local agent"
+version = "0.2.0"
+description = "LifeUI desktop: a local AI harness for organizing your life"
 authors = ["Felix Andersson"]
 license = "MIT"
-repository = ""
+repository = "https://github.com/Felichz/life-ui"
 edition = "2024"
 rust-version = "1.90"
 
