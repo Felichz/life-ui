@@ -347,6 +347,17 @@
         outline: 2px solid rgb(var(--ink-2));
         outline-offset: 2px;
       }
+      /* The green light is the one a visitor comes for: its hit area reaches a few pixels past the dot (less
+         toward yellow, so yellow keeps its own), and once the pointer is in it the dot grows a little toward it. */
+      .light--zoom::before {
+        content: "";
+        position: absolute;
+        inset: -8px -8px -8px -4px;
+        border-radius: 10px;
+      }
+      .light--zoom:not(:disabled):hover {
+        scale: 1.3;
+      }
       html:not(.lights-used) .lights:not([inert]) .light--zoom::after {
         content: "";
         position: absolute;
