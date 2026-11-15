@@ -39,7 +39,7 @@
       /* The app's own tokens (src/app/styles.css), light and dark: by the system's setting, or the one picked with
        the theme button (data-theme on <html>). */
       :root {
-        --canvas: 252 252 253;
+        --canvas: 252 252 253; --canvas-flip: 14 15 18;
         --panel: 255 255 255;
         --sunk: 245 245 248;
         --line: 230 230 236;
@@ -59,7 +59,7 @@
       }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) {
-          --canvas: 14 15 18;
+          --canvas: 14 15 18; --canvas-flip: 252 252 253;
           --panel: 21 22 26;
           --sunk: 10 11 13;
           --line: 38 39 46;
@@ -77,7 +77,7 @@
         }
       }
       :root[data-theme="dark"] {
-        --canvas: 14 15 18;
+        --canvas: 14 15 18; --canvas-flip: 252 252 253;
         --panel: 21 22 26;
         --sunk: 10 11 13;
         --line: 38 39 46;
@@ -397,7 +397,7 @@
         position: fixed;
         inset: 0;
         z-index: 49;
-        background: rgb(var(--canvas));
+        background: rgb(var(--canvas-flip)); /* the opposite theme to the film, so its edges show */
       }
       .player.is-max {
         position: fixed;
