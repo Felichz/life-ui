@@ -51,10 +51,12 @@ const write = (text: string) =>
 
 describe("LifeUI", () => {
   it("first run: shows how it works and points to the chat", () => {
+    cy.viewport(1440, 900);
     cy.visitFresh();
     cy.contains("h1", /Buen(os|as) (días|tardes|noches)/);
     cy.contains("Cierre honesto");
-    cy.contains("díselo a LifeUI en el chat");
+    // The HUD offers to start the day, and saying it is the way to
+    cy.contains("button", "Empezar el día");
     cy.contains("No hay modelo cargado");
   });
 
@@ -113,16 +115,22 @@ describe("LifeUI", () => {
     cy.get('section[aria-label="Tempos del día"]').should("contain", "30");
   });
 
-  it("on mobile, navigates with the bottom bar and opens the chat", () => {
+  it("on mobile, the conversation is a screen of its own beside the places", () => {
     cy.viewport(375, 812);
     cy.visitFresh();
+    cy.get('section[aria-label="Chat"]').filter(":visible").should("exist");
     cy.get('nav[aria-label="Principal"]')
       .filter(":visible")
       .within(() => {
         cy.contains("Biblioteca").click();
       });
     cy.location("pathname").should("eq", "/library");
-    cy.get('button[aria-label="Hablar con LifeUI"]').click();
+    cy.get('section[aria-label="Chat"]').filter(":visible").should("not.exist");
+    cy.get('nav[aria-label="Principal"]')
+      .filter(":visible")
+      .within(() => {
+        cy.contains("Coach").click();
+      });
     cy.get('section[aria-label="Chat"]').filter(":visible").should("exist");
   });
 });

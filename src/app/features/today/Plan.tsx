@@ -1,28 +1,33 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Clock3, Columns3, List, Lock } from "lucide-react";
-import type { TimeBlock } from "../../../types";
-import { Segmented } from "../../components/ui/Segmented";
+import { Check, Lock } from "lucide-react";
+import type {
+  AppState,
+  CompletedActivityRecord,
+  EventInstance,
+  TimeBlock,
+  UUID,
+} from "../../../types";
 import { Tooltip } from "../../components/ui/Tooltip";
 import { LiveDot, TypeIcon } from "../../components/TypeIcon";
-import { SectionTitle } from "../../components/PageHeader";
 import {
   blockName,
   blockRange,
   blockStatus,
+  recordContract,
   type BlockStatus,
   type PlanItem,
 } from "../../lib/domain";
 import { cn } from "../../lib/cn";
-import { formatDayMinutes } from "../../lib/format";
+import { formatDayMinutes, formatMinutes, formatTime } from "../../lib/format";
 import { MISSED_AFTER } from "../../agent/snapshot";
 import { ActivityNotes, NotesToggle } from "./Upcoming";
 import { t } from "../../i18n";
 
 /**
- * The day's plan, read-only: every change goes through the chat (ADR-002).
- * Scheduled activities show their time and come first in their block; one
- * whose time passed shows it, without judgment (ADR-006).
+ * The day as one line of time, read-only: every change goes through the chat
+ * (ADR-002). What was done and logged comes first, then a mark for now (with
+ * what is running), then what is still planned, block by block. The plan and
+ * the log were two columns; they are one day, split at now.
  */
 
 export interface PlanGroup {
@@ -31,202 +36,192 @@ export interface PlanGroup {
   items: PlanItem[];
 }
 
-type View = "list" | "board";
-const VIEW_KEY = "lifeui.planView";
+type Done =
+  | { kind: "record"; at: string; record: CompletedActivityRecord }
+  | { kind: "event"; at: string; event: EventInstance };
 
-function readView(): View {
-  try {
-    return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list";
-  } catch {
-    return "list";
-  }
+function doneToday(state: AppState, dayId: UUID): Done[] {
+  return [
+    ...state.global.completedActivityRecords
+      .filter((record) => record.dayId === dayId)
+      .map((record) => ({ kind: "record" as const, at: record.startTime, record })),
+    ...state.global.eventInstances
+      .filter((event) => event.dayId === dayId)
+      .map((event) => ({ kind: "event" as const, at: event.timestamp, event })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
 }
 
-export function Plan({
+export function DayTimeline({
+  state,
+  dayId,
   groups,
-  total,
+  active,
   nowMinutes,
 }: {
+  state: AppState;
+  dayId: UUID;
   groups: PlanGroup[];
-  total: number;
+  active: PlanItem | null;
   nowMinutes: number;
 }) {
-  const [view, setView] = useState<View>(readView);
-
-  const changeView = (next: View) => {
-    setView(next);
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // preference kept in memory only
-    }
-  };
+  const done = doneToday(state, dayId);
+  const past = groups.filter((group) => group.status === "past" && group.items.length > 0);
+  // The current block first, then "To do", then what comes later
+  const ahead = [
+    ...groups.filter((group) => group.status === "now"),
+    ...groups.filter((group) => group.status === "always"),
+    ...groups.filter((group) => group.status === "later"),
+  ];
+  const nothingYet = done.length === 0 && past.length === 0;
 
   return (
-    <section aria-labelledby="plan-title">
-      <SectionTitle
-        meta={total > 0 ? total : undefined}
-        actions={
-          <>
-            <Segmented
-              label={t("plan.view")}
-              size="sm"
-              value={view}
-              onChange={changeView}
-              className="hidden md:inline-flex"
-              options={[
-                { value: "list", label: t("plan.view.list"), icon: <List /> },
-                { value: "board", label: t("plan.view.board"), icon: <Columns3 /> },
-              ]}
-            />
-            <Tooltip content={t("plan.editBlocks")}>
-              <Link
-                to="/library?tab=blocks"
-                className="ml-1 inline-flex h-7 items-center gap-1.5 rounded px-2 text-sm font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink coarse:h-9"
-              >
-                <Clock3 className="size-4" />
-                {t("plan.blocks")}
-              </Link>
-            </Tooltip>
-          </>
-        }
-      >
-        <span id="plan-title">{t("plan.title")}</span>
-      </SectionTitle>
+    <div className="flex flex-col">
+      {done.length > 0 && (
+        <ol aria-label={t("today.log")} className="flex flex-col">
+          {done.map((entry) =>
+            entry.kind === "record" ? (
+              <DoneRow key={entry.record.id} record={entry.record} />
+            ) : (
+              <EventRow key={entry.event.id} event={entry.event} />
+            )
+          )}
+        </ol>
+      )}
+      {past.map((group) => (
+        <Group key={group.block.id} group={group} nowMinutes={nowMinutes} />
+      ))}
 
-      {view === "board" ? (
-        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 xl:mx-0 xl:px-0">
-          {groups.map((group) => (
-            <BoardColumn key={group.block.id} group={group} nowMinutes={nowMinutes} />
-          ))}
-        </div>
+      <NowMark minutes={nowMinutes} first={nothingYet} />
+      {active && <RunningRow item={active} />}
+
+      {ahead.map((group) => (
+        <Group key={group.block.id} group={group} nowMinutes={nowMinutes} />
+      ))}
+    </div>
+  );
+}
+
+/** Now, as a line across the day: the one indigo mark of the timeline. */
+function NowMark({ minutes, first }: { minutes: number; first: boolean }) {
+  return (
+    <div
+      className={cn("flex items-center gap-2 pb-2", first ? "pt-0" : "pt-4")}
+      aria-label={t("block.status.now")}
+    >
+      <span className="tabular shrink-0 text-xs font-semibold text-accent-ink">
+        {t("block.status.now")} · {formatDayMinutes(minutes)}
+      </span>
+      <span aria-hidden className="h-px flex-1 bg-accent/40" />
+    </div>
+  );
+}
+
+/** The time column: "9:40" in Spanish, "11:15 AM" in English. */
+const TIME = "tabular w-11 shrink-0 whitespace-nowrap text-sm text-ink-3 [:lang(en)_&]:w-[62px]";
+
+function DoneRow({ record }: { record: CompletedActivityRecord }) {
+  const interrupted = record.state === "interrupted";
+  const contract = recordContract(record);
+  return (
+    <li className="flex min-h-[40px] items-center gap-2.5 py-1.5">
+      <span className={TIME}>{formatTime(record.startTime)}</span>
+      <Check aria-hidden className="size-4 shrink-0 text-ink-3" strokeWidth={2.2} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base text-ink-2">{record.templateTitle}</p>
+        <p className="tabular truncate text-xs text-ink-3">
+          {formatMinutes(record.durationMinutes)}
+          {contract && ` · ${contract.label}`}
+          {!interrupted &&
+            record.satisfactionScore !== undefined &&
+            ` · ${record.satisfactionScore}/10`}
+        </p>
+      </div>
+      {interrupted ? (
+        <span className="shrink-0 text-xs text-ink-3">{t("log.notFinished")}</span>
       ) : (
-        <div className="flex flex-col gap-5">
-          {groups.map((group) => (
-            <ListGroup key={group.block.id} group={group} nowMinutes={nowMinutes} />
+        <span className="tabular shrink-0 rounded bg-tempo/15 px-1.5 py-0.5 text-xs font-semibold text-tempo-ink">
+          +{record.temposAwarded ?? 0}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function EventRow({ event }: { event: EventInstance }) {
+  return (
+    <li className="flex min-h-[32px] items-center gap-2.5 py-1">
+      <span className={TIME}>{formatTime(event.timestamp)}</span>
+      <span aria-hidden className="mx-1 size-2 shrink-0 rotate-45 bg-event" />
+      <span className="min-w-0 flex-1 truncate text-sm text-ink-2">{event.templateName}</span>
+      <span className="text-xs text-ink-3">{t("log.event")}</span>
+    </li>
+  );
+}
+
+/** What is running, with what it holds open: the person reads it while doing it (ADR-008). */
+function RunningRow({ item }: { item: PlanItem }) {
+  return (
+    <div className="mb-2 rounded-lg bg-live/5 px-3 py-2.5">
+      <div className="flex items-center gap-2.5">
+        <LiveDot />
+        <p className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{item.title}</p>
+        {item.contract && (
+          <span className="tabular shrink-0 text-sm text-ink-3">{item.contract.label}</span>
+        )}
+      </div>
+      {item.instance.notes && <ActivityNotes notes={item.instance.notes} className="mt-2.5" />}
+    </div>
+  );
+}
+
+function Group({ group, nowMinutes }: { group: PlanGroup; nowMinutes: number }) {
+  const items = group.items.filter((item) => !item.isActive);
+  // A block with nothing left in it says so in one quiet line, and only while it is current
+  if (items.length === 0 && group.status !== "now") return null;
+  return (
+    <section aria-label={blockName(group.block)} className="pt-3">
+      <h3 className="flex h-7 items-center gap-2 text-sm">
+        <span
+          className={cn("font-semibold", group.status === "past" ? "text-ink-3" : "text-ink-2")}
+        >
+          {blockName(group.block)}
+        </span>
+        {!group.block.isDefault && (
+          <span className="tabular text-ink-3">{blockRange(group.block)}</span>
+        )}
+        {group.status === "later" && (
+          <span className="text-ink-3">· {t("block.status.later")}</span>
+        )}
+      </h3>
+      {group.status === "past" && (
+        <p className="mb-1 text-xs text-ink-3">{t("plan.pastNoticeChat")}</p>
+      )}
+      {items.length === 0 ? (
+        <p className="flex h-9 items-center text-sm text-ink-3">{t("plan.emptyChat")}</p>
+      ) : (
+        <ul className="flex flex-col">
+          {items.map((item) => (
+            <PlanRow key={item.instance.id} item={item} group={group} nowMinutes={nowMinutes} />
           ))}
-        </div>
+        </ul>
       )}
     </section>
   );
 }
 
-function StatusTag({ status }: { status: BlockStatus }) {
-  if (status === "now") {
-    return (
-      <span className="rounded bg-accent/10 px-1.5 py-px text-xs font-medium text-accent-ink">
-        {t("block.status.now")}
-      </span>
-    );
-  }
-  if (status === "past")
-    return <span className="text-xs text-ink-3">{t("block.status.past")}</span>;
-  if (status === "later")
-    return <span className="text-xs text-ink-3">{t("block.status.later")}</span>;
-  return null;
-}
-
-function GroupHeader({ group, compact = false }: { group: PlanGroup; compact?: boolean }) {
-  const { block, status, items } = group;
-  return (
-    <div className={cn("flex items-center gap-2", compact ? "h-9 px-1" : "h-8")}>
-      <h3 className={cn("text-base font-semibold", status === "past" ? "text-ink-2" : "text-ink")}>
-        {blockName(block)}
-      </h3>
-      {!block.isDefault && <span className="tabular text-sm text-ink-3">{blockRange(block)}</span>}
-      <StatusTag status={status} />
-      <span className="tabular text-sm text-ink-3">{items.length > 0 ? items.length : ""}</span>
-    </div>
-  );
-}
-
-function PastNotice({ group }: { group: PlanGroup }) {
-  if (group.status !== "past" || group.items.length === 0) return null;
-  return (
-    <p className="mb-1.5 rounded-md bg-subtle px-3 py-2 text-sm text-ink-2">
-      {t("plan.pastNoticeChat")}
-    </p>
-  );
-}
-
-function ListGroup({ group, nowMinutes }: { group: PlanGroup; nowMinutes: number }) {
-  const empty = group.items.length === 0;
-  // A past, empty block asks for nothing: a subtle line instead of a gap
-  const quiet = empty && group.status === "past";
-  return (
-    <div>
-      <GroupHeader group={group} />
-      <PastNotice group={group} />
-      <div
-        className={cn(
-          "flex flex-col rounded-lg border",
-          empty && !quiet && "min-h-[44px] border-dashed border-line",
-          quiet && "min-h-[32px] border-transparent",
-          !empty && "border-line bg-panel shadow-xs"
-        )}
-      >
-        {empty && (
-          <p
-            className={cn(
-              "flex items-center text-sm text-ink-3",
-              quiet ? "h-[30px] px-0" : "h-[42px] px-3"
-            )}
-          >
-            {quiet ? t("plan.emptyPast") : t("plan.emptyChat")}
-          </p>
-        )}
-        {group.items.map((item) => (
-          <PlanRow
-            key={item.instance.id}
-            item={item}
-            status={group.status}
-            block={group.block}
-            nowMinutes={nowMinutes}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BoardColumn({ group, nowMinutes }: { group: PlanGroup; nowMinutes: number }) {
-  return (
-    <div
-      className={cn(
-        "flex w-[288px] shrink-0 flex-col rounded-lg border border-line bg-subtle/70 p-1.5",
-        group.status === "now" && "border-accent/40"
-      )}
-    >
-      <GroupHeader group={group} compact />
-      <PastNotice group={group} />
-      <div className="flex min-h-[96px] flex-1 flex-col gap-1.5">
-        {group.items.map((item) => (
-          <PlanRow
-            key={item.instance.id}
-            item={item}
-            status={group.status}
-            block={group.block}
-            nowMinutes={nowMinutes}
-            card
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-interface PlanRowProps {
+function PlanRow({
+  item,
+  group,
+  nowMinutes,
+}: {
   item: PlanItem;
-  status: BlockStatus;
-  block: TimeBlock;
+  group: PlanGroup;
   nowMinutes: number;
-  card?: boolean;
-}
-
-function PlanRow({ item, status, block, nowMinutes, card = false }: PlanRowProps) {
+}) {
+  const { status, block } = group;
   const available = status === "always" || status === "now";
   const scheduled = item.instance.scheduledStart;
-  const missed = !item.isActive && scheduled !== undefined && nowMinutes > scheduled + MISSED_AFTER;
+  const missed = scheduled !== undefined && nowMinutes > scheduled + MISSED_AFTER;
   const lockedReason =
     status === "later"
       ? t("plan.availableFrom", {
@@ -238,84 +233,45 @@ function PlanRow({ item, status, block, nowMinutes, card = false }: PlanRowProps
   const [open, setOpen] = useState(false);
 
   return (
-    <div
-      className={cn(
-        card
-          ? "rounded-md border border-line bg-panel shadow-xs"
-          : "border-b border-line last:border-b-0 first:rounded-t-lg last:rounded-b-lg",
-        item.isActive && "bg-live/5"
-      )}
-    >
-      <div
-        className={cn(
-          "relative flex items-center gap-2.5",
-          card ? "min-h-[52px] px-2.5 py-2" : "min-h-[44px] px-3 coarse:min-h-[52px]"
-        )}
-      >
-        {scheduled !== undefined && (
-          <span
-            className={cn(
-              "tabular w-11 shrink-0 text-sm font-medium",
-              missed ? "text-ink-3 line-through" : "text-ink-2"
-            )}
-          >
-            {formatDayMinutes(scheduled)}
-          </span>
-        )}
+    <li className="border-b border-line/70 last:border-b-0">
+      <div className="flex min-h-[44px] items-center gap-2.5 py-1.5 coarse:min-h-[52px]">
+        <span className={cn(TIME, missed && "line-through")}>
+          {scheduled !== undefined ? formatDayMinutes(scheduled) : ""}
+        </span>
         <TypeIcon type={item.type} />
-        <div className={cn("min-w-0 flex-1", card && "py-0.5")}>
-          <span
+        <div className="min-w-0 flex-1">
+          <p
             className={cn(
-              "block truncate text-base font-medium",
+              "truncate text-base font-medium",
               status === "past" ? "text-ink-2" : "text-ink"
             )}
           >
             {item.title}
-          </span>
-          {card && item.contract && (
-            <span className="tabular block text-sm text-ink-3">{item.contract.label}</span>
+          </p>
+          {(item.contract || missed) && (
+            <p className="tabular truncate text-xs text-ink-3">
+              {item.contract?.label}
+              {missed && `${item.contract ? " · " : ""}${t("plan.timePassed")}`}
+            </p>
           )}
         </div>
-        {missed && (
-          <span className="shrink-0 rounded bg-hover px-1.5 py-0.5 text-xs text-ink-2">
-            {t("plan.timePassed")}
-          </span>
-        )}
-        {!card && item.contract && (
-          <span
-            className={cn(
-              "tabular shrink-0 text-sm text-ink-3",
-              (item.isActive || missed) && "hidden sm:block"
-            )}
-          >
-            {item.contract.label}
-          </span>
-        )}
-
         {notes && <NotesToggle open={open} onToggle={() => setOpen((now) => !now)} />}
-        {item.isActive ? (
-          <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded px-2 text-sm font-medium text-live">
-            <LiveDot />
-            <span className={cn(card && "sr-only")}>{t("focus.running")}</span>
-          </span>
-        ) : (
-          !available && (
-            <Tooltip content={lockedReason}>
-              <span
-                tabIndex={0}
-                aria-label={lockedReason}
-                className="flex size-7 shrink-0 items-center justify-center rounded text-ink-3"
-              >
-                <Lock className="size-3.5" />
-              </span>
-            </Tooltip>
-          )
+        {!available && (
+          <Tooltip content={lockedReason}>
+            <span
+              tabIndex={0}
+              aria-label={lockedReason}
+              className="flex size-7 shrink-0 items-center justify-center rounded text-ink-3"
+            >
+              <Lock className="size-3.5" />
+            </span>
+          </Tooltip>
         )}
       </div>
       {open && notes && (
-        <ActivityNotes notes={notes} className={card ? "mx-2 mb-2" : "mx-3 mb-3"} />
+        <ActivityNotes notes={notes} className="mb-3 ml-[54px] [:lang(en)_&]:ml-[72px]" />
       )}
-    </div>
+    </li>
   );
 }
 

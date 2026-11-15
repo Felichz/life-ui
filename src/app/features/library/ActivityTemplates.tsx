@@ -86,7 +86,7 @@ export function ActivityTemplates() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 @lg:flex-row @lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
           <Input
@@ -103,7 +103,7 @@ export function ActivityTemplates() {
             size="sm"
             value={filter}
             onChange={setFilter}
-            className="flex-1 sm:flex-none"
+            className="flex-1 @lg:flex-none"
             options={[
               { value: "all", label: t("library.filter.all") },
               { value: "clear-objective", label: t("type.objective.short") },
@@ -113,7 +113,7 @@ export function ActivityTemplates() {
           />
           <Button variant="primary" onClick={() => openTemplateEditor()}>
             <Plus />
-            <span className="hidden sm:inline">{t("library.newShort")}</span>
+            <span className="hidden @lg:inline">{t("library.newShort")}</span>
           </Button>
         </div>
       </div>

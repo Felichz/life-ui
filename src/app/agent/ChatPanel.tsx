@@ -49,6 +49,7 @@ import {
   formatNumber,
   formatTime,
   formatTokens,
+  greeting,
 } from "../lib/format";
 import { isDesktop, openExternal } from "../platform/desktop";
 import { useModel } from "../runtime/ModelGate";
@@ -57,6 +58,7 @@ import { useToast } from "../state/toast";
 import { ModelBadge } from "../runtime/ModelBadge";
 import { t, type MessageKey } from "../i18n";
 import { useAgent } from "./AgentProvider";
+import { useShell } from "../shell/ShellContext";
 import { getReasoning, onReasoning, setReasoning } from "./reasoning";
 import { getReview, onReview, setReview } from "./review";
 import { Markdown } from "./Markdown";
@@ -122,6 +124,25 @@ export function ChatPanel({ className }: { className?: string }) {
   );
   const blocked = usage.overflow && !busy;
 
+  // The rest of the shell writes here for the person (the HUD's Start and Finish)
+  const { registerComposer } = useShell();
+  const sendRef = useRef<(text: string) => void>(() => undefined);
+  useEffect(() => {
+    registerComposer({
+      fill: (text) => {
+        setDraft(text);
+        requestAnimationFrame(() => {
+          const input = inputRef.current;
+          if (!input) return;
+          input.focus();
+          input.setSelectionRange(text.length, text.length);
+        });
+      },
+      send: (text) => sendRef.current(text),
+    });
+    return () => registerComposer(null);
+  }, [registerComposer]);
+
   const send = (text = draft) => {
     if ((!text.trim() && files.length === 0) || busy || !available || blocked) return;
     following.current = true;
@@ -130,6 +151,8 @@ export function ChatPanel({ className }: { className?: string }) {
     setFiles([]);
     inputRef.current?.focus();
   };
+
+  sendRef.current = (text: string) => send(text);
 
   const groups = useMemo(() => groupEntries(entries), [entries]);
 
@@ -203,9 +226,9 @@ export function ChatPanel({ className }: { className?: string }) {
   return (
     <section
       aria-label={t("agent.title")}
-      className={cn("flex min-h-0 flex-col bg-panel", className)}
+      className={cn("flex min-h-0 flex-col bg-canvas", className)}
     >
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-line pl-5 pr-3">
+      <header className="flex h-12 shrink-0 items-center justify-between gap-2 pl-4 pr-3 sm:pl-6">
         {view === "list" ? (
           <>
             <h2 className="text-md font-semibold text-ink">{t("agent.chats")}</h2>
@@ -216,7 +239,9 @@ export function ChatPanel({ className }: { className?: string }) {
           </>
         ) : (
           <>
-            <h2 className="min-w-0 truncate text-md font-semibold text-ink">{t("agent.title")}</h2>
+            <h2 className="sr-only">{t("agent.title")}</h2>
+            <ModelBadge className="min-w-0 max-w-[440px] flex-1" />
+            <span className="flex-1" />
             <div className="flex shrink-0 items-center gap-0.5">
               {available && <ContextMeter usage={usage} busy={busy} />}
               <Tooltip content={t("agent.chats")} side="bottom">
@@ -240,7 +265,6 @@ export function ChatPanel({ className }: { className?: string }) {
           </>
         )}
       </header>
-      <ModelBadge className="border-b border-line py-2.5 pl-5 pr-3" />
 
       {view === "list" ? (
         <ChatList onOpen={() => setView("chat")} />
@@ -250,66 +274,71 @@ export function ChatPanel({ className }: { className?: string }) {
           <div
             ref={listRef}
             onScroll={onScroll}
-            className="fade-bottom flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-5 pb-7 pt-5"
+            className="fade-bottom flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-7 pt-4 sm:px-8"
             aria-live="polite"
           >
-            {!available ? (
-              <NoModel onChoose={openSetup} />
-            ) : entries.length === 0 ? (
-              <div className="m-auto flex max-w-[320px] flex-col items-center text-center">
-                <Logo className="size-9" />
-                <p className="mt-4 text-lg font-semibold text-ink">{t("agent.empty.title")}</p>
-                <p className="text-balance mt-1 text-sm text-ink-2">{t("agent.empty.body")}</p>
-                <ul className="mt-5 flex flex-wrap justify-center gap-1.5">
-                  {(state.currentDay ? DURING_DAY : BEFORE_DAY).map((key) => (
-                    <li key={key}>
-                      <button
-                        type="button"
-                        onClick={() => send(t(key))}
-                        className="h-8 rounded-full border border-line bg-panel px-3 text-sm text-ink-2 shadow-xs transition-colors duration-150 hover:border-line-strong hover:bg-subtle hover:text-ink coarse:h-10"
-                      >
-                        {t(key)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              groups.map((group) =>
-                Array.isArray(group) ? (
-                  <ToolList key={group[0].id} entries={group} />
-                ) : (
-                  <EntryView
-                    key={group.id}
-                    entry={group}
-                    onEdit={edit}
-                    last={group.id === lastId}
-                  />
-                )
-              )
-            )}
-            {busy && !waiting && !writing && (
-              <p className="flex animate-entry-in items-center gap-2 text-sm text-ink-3">
-                <span className="flex items-center gap-1" aria-hidden>
-                  {[0, 160, 320].map((delay) => (
-                    <span
-                      key={delay}
-                      className="size-1 animate-thinking rounded-full bg-ink-3"
-                      style={{ animationDelay: `${delay}ms` }}
+            {/* One column at a reading width, whatever the window: this is where the day is talked over */}
+            <div className="mx-auto flex w-full max-w-[640px] flex-1 flex-col gap-2.5 text-md">
+              {!available ? (
+                <NoModel onChoose={openSetup} />
+              ) : entries.length === 0 ? (
+                // Where the first message will appear: just above the composer, said in a person's voice
+                <div className="mb-2 mt-auto flex flex-col items-start pt-10">
+                  <Logo className="size-8" />
+                  <p className="mt-5 text-2xl font-semibold text-ink">{greeting()}</p>
+                  <p className="text-2xl font-semibold text-ink-3">{t("agent.empty.title")}</p>
+                  <p className="mt-3 max-w-[460px] text-md text-ink-2">{t("agent.empty.body")}</p>
+                  <ul className="mt-6 flex flex-wrap gap-2">
+                    {(state.currentDay ? DURING_DAY : BEFORE_DAY).map((key) => (
+                      <li key={key}>
+                        <button
+                          type="button"
+                          onClick={() => send(t(key))}
+                          className="h-9 rounded-full border border-line bg-panel px-3.5 text-base text-ink-2 shadow-xs transition-colors duration-150 hover:border-line-strong hover:bg-subtle hover:text-ink coarse:h-10"
+                        >
+                          {t(key)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                groups.map((group) =>
+                  Array.isArray(group) ? (
+                    <ToolList key={group[0].id} entries={group} />
+                  ) : (
+                    <EntryView
+                      key={group.id}
+                      entry={group}
+                      onEdit={edit}
+                      last={group.id === lastId}
                     />
-                  ))}
-                </span>
-                {compacting
-                  ? t("agent.compacting", {
-                      done: Math.min(compacting.done + 1, compacting.total),
-                      total: compacting.total,
-                    })
-                  : t("agent.thinking")}
-              </p>
-            )}
+                  )
+                )
+              )}
+              {busy && !waiting && !writing && (
+                <p className="flex animate-entry-in items-center gap-2 text-sm text-ink-3">
+                  <span className="flex items-center gap-1" aria-hidden>
+                    {[0, 160, 320].map((delay) => (
+                      <span
+                        key={delay}
+                        className="size-1 animate-thinking rounded-full bg-ink-3"
+                        style={{ animationDelay: `${delay}ms` }}
+                      />
+                    ))}
+                  </span>
+                  {compacting
+                    ? t("agent.compacting", {
+                        done: Math.min(compacting.done + 1, compacting.total),
+                        total: compacting.total,
+                      })
+                    : t("agent.thinking")}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="shrink-0 px-3 pb-3">
+          <div className="mx-auto w-full max-w-[672px] shrink-0 px-3 pb-3 sm:px-4 sm:pb-4">
             {blocked && (
               <div className="mb-2 rounded-lg border border-accent/50 bg-accent/5 px-3 py-2.5">
                 <p className="text-sm text-ink">
@@ -372,7 +401,7 @@ export function ChatPanel({ className }: { className?: string }) {
                 disabled={!available || blocked}
                 placeholder={t("agent.placeholder")}
                 aria-label={t("agent.placeholder")}
-                className="block max-h-40 min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-base text-ink outline-none placeholder:text-ink-3 [field-sizing:content]"
+                className="block max-h-40 min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-md text-ink outline-none placeholder:text-ink-3 [field-sizing:content]"
               />
               {/* How changes run sits where the message is sent from */}
               <div className="flex items-center gap-1 px-2 pb-2">
@@ -880,7 +909,7 @@ function EntryView({
     // A new turn: more air above than between the parts of one answer
     return (
       <div className={cn("group/message mt-3 flex flex-col items-end gap-1 first:mt-0", entrance)}>
-        <div className="max-w-[88%] rounded-lg rounded-br-sm bg-hover px-3 py-2 text-base text-ink">
+        <div className="max-w-[88%] rounded-lg rounded-br-sm bg-hover px-3.5 py-2 text-md text-ink">
           {entry.attachments && entry.attachments.length > 0 && (
             <ul className="mb-1.5 flex flex-wrap gap-1.5">
               {entry.attachments.map((file, index) => (
@@ -916,7 +945,7 @@ function EntryView({
   }
   if (entry.kind === "assistant") {
     return (
-      <div className={cn("group/message flex flex-col gap-1 pr-2", entrance)}>
+      <div className={cn("group/message flex flex-col gap-1 pr-2 leading-6 text-ink", entrance)}>
         {entry.correction && (
           <span className="flex items-center gap-1 text-xs text-ink-3 [&_svg]:size-3">
             <ShieldCheck aria-hidden="true" />

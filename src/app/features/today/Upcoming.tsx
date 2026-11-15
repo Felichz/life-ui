@@ -48,7 +48,7 @@ export function Upcoming({ className }: { className?: string }) {
         {shown.map((day) => (
           <li
             key={day.date}
-            className="flex flex-col gap-x-4 border-b border-line px-3 py-2 last:border-b-0 sm:flex-row"
+            className="flex flex-col gap-x-4 border-b border-line px-3 py-2 last:border-b-0 @lg:flex-row"
           >
             <p className="w-28 shrink-0 pt-1.5 text-sm font-medium text-ink-2">
               {day.date === localDate(tomorrow)

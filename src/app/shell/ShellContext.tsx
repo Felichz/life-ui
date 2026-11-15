@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { ActivityTemplate, UUID } from "../../types";
 import { AddActivityDialog } from "../features/activity/AddActivityDialog";
 import { TemplateSheet } from "../features/library/TemplateSheet";
@@ -10,10 +18,25 @@ interface TemplateEditorRequest {
   onSaved?: (template: ActivityTemplate) => void;
 }
 
+/** The chat's composer, as the rest of the shell reaches it. */
+export interface Composer {
+  /** Puts the text in the composer and focuses it, for the person to finish and send. */
+  fill: (text: string) => void;
+  /** Sends the text as the person's message. */
+  send: (text: string) => void;
+}
+
 interface ShellContextValue {
   openAddActivity: (options?: { blockId?: UUID; templateId?: UUID }) => void;
   openTemplateEditor: (request?: TemplateEditorRequest) => void;
   openPalette: () => void;
+  /**
+   * Everything is said in the chat (ADR-002): a button outside it writes there
+   * for the person ("I'm starting X") rather than acting on its own.
+   */
+  compose: (text: string, how?: "fill" | "send") => void;
+  /** The chat registers its composer here; null when it goes away. */
+  registerComposer: (composer: Composer | null) => void;
 }
 
 const ShellContext = createContext<ShellContextValue | null>(null);
@@ -34,10 +57,18 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     []
   );
   const openPalette = useCallback(() => setPaletteOpen(true), []);
+  const composer = useRef<Composer | null>(null);
+  const registerComposer = useCallback((next: Composer | null) => {
+    composer.current = next;
+  }, []);
+  const compose = useCallback((text: string, how: "fill" | "send" = "fill") => {
+    if (how === "send") composer.current?.send(text);
+    else composer.current?.fill(text);
+  }, []);
 
   const value = useMemo(
-    () => ({ openAddActivity, openTemplateEditor, openPalette }),
-    [openAddActivity, openTemplateEditor, openPalette]
+    () => ({ openAddActivity, openTemplateEditor, openPalette, compose, registerComposer }),
+    [openAddActivity, openTemplateEditor, openPalette, compose, registerComposer]
   );
 
   return (

@@ -149,13 +149,13 @@ export function BlocksEditor() {
 
 function BlockFields({ draft, onChange }: { draft: Draft; onChange: (draft: Draft) => void }) {
   return (
-    <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_120px_120px]">
+    <div className="mt-2.5 grid grid-cols-2 gap-2 @lg:grid-cols-[minmax(0,1fr)_120px_120px]">
       <Input
         value={draft.name}
         onChange={(event) => onChange({ ...draft, name: event.target.value })}
         placeholder={t("blocks.namePlaceholder")}
         aria-label={t("blocks.nameLabel")}
-        className="col-span-2 sm:col-span-1"
+        className="col-span-2 @lg:col-span-1"
       />
       <Input
         type="time"

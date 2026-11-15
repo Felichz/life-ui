@@ -60,6 +60,8 @@ export function AppRoutes() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<TodayPage />} />
+          {/* The day as a screen of its own on a phone; beside the conversation it is the index */}
+          <Route path="today" element={<TodayPage />} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="metas" element={<Navigate to="/goals" replace />} />
           <Route path="library" element={<LibraryPage />} />

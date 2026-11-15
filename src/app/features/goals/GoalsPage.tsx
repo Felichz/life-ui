@@ -88,14 +88,14 @@ function IdealLife() {
           </div>
         </div>
       ) : idealLife?.text ? (
-        <div className="rounded-xl border border-line bg-panel px-5 py-5 shadow-xs sm:px-6">
+        <div className="rounded-xl border border-line bg-panel px-5 py-5 shadow-xs @lg:px-6">
           <Markdown>{idealLife.text}</Markdown>
           <p className="mt-4 border-t border-line pt-3 text-sm text-ink-3">
             {t("goals.ideal.footer", { date: formatDayMonth(idealLife.updatedAt) })}
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-line px-5 py-6 sm:px-6">
+        <div className="rounded-xl border border-dashed border-line px-5 py-6 @lg:px-6">
           <p className="max-w-prose text-base text-ink-2">{t("goals.ideal.empty")}</p>
           <Button className="mt-4" onClick={() => setDraft("")}>
             <Pencil />
@@ -120,7 +120,7 @@ function Roadmaps() {
         <span id="roadmaps-title">{t("goals.roadmaps.title")}</span>
       </SectionTitle>
       {progress.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-5 py-6 text-base text-ink-2 sm:px-6">
+        <p className="rounded-xl border border-dashed border-line px-5 py-6 text-base text-ink-2 @lg:px-6">
           {t("goals.roadmaps.empty")}
         </p>
       ) : (
@@ -150,7 +150,7 @@ function RoadmapCard({ progress }: { progress: RoadmapProgress }) {
         paused && "bg-subtle/60 shadow-none"
       )}
     >
-      <header className="px-5 pb-4 pt-5 sm:px-6">
+      <header className="px-5 pb-4 pt-5 @lg:px-6">
         <div className="flex items-start justify-between gap-6">
           <div className="min-w-0">
             <h3 className="text-balance text-xl font-semibold text-ink">{roadmap.title}</h3>
@@ -214,7 +214,7 @@ function RoadmapCard({ progress }: { progress: RoadmapProgress }) {
         </div>
       </header>
 
-      <ol className="border-t border-line px-5 py-4 sm:px-6">
+      <ol className="border-t border-line px-5 py-4 @lg:px-6">
         {progress.milestones.map((entry, index) => (
           <Milestone
             key={entry.milestone.id}

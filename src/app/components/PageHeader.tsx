@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/cn";
 
+/**
+ * A place's header in the context panel: the title, a line under it, and its
+ * few actions. The panel is narrow beside the conversation and a whole screen
+ * on a phone; the title is sized for both.
+ */
 export function PageHeader({
   title,
   subtitle,
@@ -18,38 +23,37 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "flex justify-between gap-x-6 gap-y-3",
-        wrap ? "flex-wrap items-end" : "items-start sm:items-end",
+        "flex justify-between gap-x-4 gap-y-3",
+        wrap ? "flex-wrap items-end" : "items-start",
         className
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold text-ink">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-base text-ink-2">{subtitle}</p>}
+        <h1 className="text-xl font-semibold text-ink">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-sm text-ink-2">{subtitle}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }
 
-export function Page({
-  children,
-  width = "wide",
-}: {
-  children: ReactNode;
-  width?: "wide" | "narrow";
-}) {
+/** The header of a place, with the room under it the panel's sections start from. */
+export function PanelHeader(props: Parameters<typeof PageHeader>[0]) {
+  return <PageHeader {...props} className={cn("mb-6", props.className)} />;
+}
+
+/**
+ * A place in the context panel (or a phone's screen): one column at a reading
+ * width. `width` is kept for the places that asked for a wide page before the
+ * panel; the panel decides the width now.
+ */
+export function Page({ children }: { children: ReactNode; width?: "wide" | "narrow" }) {
   return (
-    <div
-      className={cn(
-        "mx-auto w-full px-4 pb-10 pt-5 sm:px-6 lg:px-10 lg:pt-8",
-        width === "wide" ? "max-w-[1240px]" : "max-w-[880px]"
-      )}
-    >
-      {children}
-    </div>
+    <div className="mx-auto w-full max-w-[720px] px-5 pb-12 pt-5 @lg:px-6 lg:pt-6">{children}</div>
   );
 }
+
+export const Panel = Page;
 
 export function SectionTitle({
   children,

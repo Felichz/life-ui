@@ -1,94 +1,76 @@
-import { useMemo } from "react";
-import { Page, PageHeader, SectionTitle } from "../../components/PageHeader";
+import { Link } from "react-router-dom";
+import { ArrowRight, Clock3 } from "lucide-react";
+import { Tooltip } from "../../components/ui/Tooltip";
 import { TempoMeter } from "../../components/TempoMeter";
-import { planItem, sortBlocks, templateMap } from "../../lib/domain";
-import { formatDateLong, formatNumber, minutesOfDay } from "../../lib/format";
-import { useNow } from "../../lib/useNow";
+import { formatDateLong, formatNumber, formatTime } from "../../lib/format";
 import { useSystem } from "../../state/system";
-import { DayLog } from "./DayLog";
-import { FocusPanel } from "./FocusPanel";
-import { Plan, planGroups } from "./Plan";
+import { Panel, PanelHeader } from "../../components/PageHeader";
+import { DayTimeline } from "./Plan";
 import { StartDay } from "./StartDay";
 import { Upcoming } from "./Upcoming";
-import { GoalsStrip } from "../goals/GoalsStrip";
+import { useDayPlan } from "./useDayPlan";
 import { t, tp } from "../../i18n";
 
+/**
+ * The day, in the context panel: one line of time from what was done to what
+ * is planned. Read-only (ADR-002): it changes as the person talks to the coach.
+ */
 export function TodayPage() {
+  const plan = useDayPlan();
   const { state } = useSystem();
-  return state.currentDay ? <Today /> : <StartDay />;
-}
-
-function Today() {
-  const { state, core } = useSystem();
-  const now = useNow(30_000);
-  const day = state.currentDay!;
-  const nowMinutes = minutesOfDay(now);
-
-  const { groups, active, suggestions, total } = useMemo(() => {
-    const templates = templateMap(state);
-    const activeId = day.activeActivityInstanceId;
-    const items = day.activityInstances
-      .slice()
-      .sort((a, b) => a.order - b.order)
-      .map((instance) => planItem(instance, templates, activeId));
-    const blocks = sortBlocks(state.global.timeBlocks);
-    const grouped = planGroups(blocks, items, nowMinutes);
-    const startable = grouped
-      .filter((group) => group.status === "now" || group.status === "always")
-      .sort((a, b) => Number(a.status === "always") - Number(b.status === "always"))
-      .flatMap((group) => group.items.filter((item) => !item.isActive));
-    return {
-      groups: grouped,
-      active: items.find((item) => item.isActive) ?? null,
-      suggestions: startable.slice(0, 3),
-      total: items.length,
-    };
-  }, [day, state, nowMinutes]);
-
-  const summary = core.getTempoSummary(day.day.id);
-
-  const tempo = (
-    <section aria-label={t("today.temposLabel")} className="flex flex-col gap-3">
-      <TempoMeter summary={summary} />
-      {summary.completedActivities > 0 && (
-        <p className="text-sm text-ink-2">
-          {tp("start.completed", summary.completedActivities)} · {t("today.avgSatisfaction")}{" "}
-          <span className="tabular font-medium text-ink">
-            {formatNumber(summary.averageSatisfaction, 1)}
-          </span>
-        </p>
-      )}
-    </section>
-  );
-
-  const log = (
-    <section aria-labelledby="log-title">
-      <SectionTitle>
-        <span id="log-title">{t("today.log")}</span>
-      </SectionTitle>
-      <DayLog state={state} dayId={day.day.id} now={now} />
-    </section>
-  );
+  if (!plan || !state.currentDay) return <StartDay />;
+  const day = state.currentDay;
+  const { summary } = plan;
 
   return (
-    <Page>
-      {/* Read-only: every change goes through the chat (ADR-002) */}
-      <PageHeader title={t("nav.today")} subtitle={formatDateLong(now)} />
+    <Panel>
+      <PanelHeader
+        title={t("nav.today")}
+        subtitle={
+          <span className="tabular">
+            {formatDateLong(new Date())}
+            {day.day.startTime && ` · ${t("today.since", { time: formatTime(day.day.startTime) })}`}
+          </span>
+        }
+        actions={
+          <Tooltip content={t("plan.editBlocks")}>
+            <Link
+              to="/library?tab=blocks"
+              aria-label={t("plan.editBlocks")}
+              className="flex size-8 items-center justify-center rounded text-ink-3 transition-colors hover:bg-hover hover:text-ink coarse:size-10"
+            >
+              <Clock3 className="size-4" />
+            </Link>
+          </Tooltip>
+        }
+      />
 
-      <div className="mt-6 grid grid-cols-1 gap-8 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:gap-10">
-        <div className="flex min-w-0 flex-col gap-8">
-          <div className="2xl:hidden">{tempo}</div>
-          <FocusPanel active={active} suggestions={suggestions} />
-          <Plan groups={groups} total={total} nowMinutes={nowMinutes} />
-          <Upcoming />
-          <GoalsStrip />
-          <div className="2xl:hidden">{log}</div>
-        </div>
-        <aside className="hidden flex-col gap-8 2xl:flex">
-          {tempo}
-          {log}
-        </aside>
+      {/* On a phone the HUD is too narrow for the tempos: they are here instead */}
+      <div className="mb-6 lg:hidden">
+        <TempoMeter summary={summary} variant="compact" />
       </div>
-    </Page>
+
+      <DayTimeline
+        state={state}
+        dayId={day.day.id}
+        groups={plan.groups}
+        active={plan.active}
+        nowMinutes={plan.nowMinutes}
+      />
+
+      <Upcoming className="mt-10" />
+
+      <Link
+        to="/review"
+        className="group mt-10 flex items-center gap-3 border-t border-line pt-4 text-sm text-ink-2 transition-colors hover:text-ink"
+      >
+        <span className="min-w-0 flex-1">
+          {summary.completedActivities > 0
+            ? `${tp("start.completed", summary.completedActivities)} · ${t("today.avgSatisfaction")} ${formatNumber(summary.averageSatisfaction, 1)}`
+            : t("today.reviewLink")}
+        </span>
+        <ArrowRight className="size-4 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+      </Link>
+    </Panel>
   );
 }

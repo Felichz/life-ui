@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent,
+} from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -6,98 +13,306 @@ import {
   Library,
   MessageSquare,
   Milestone,
+  PanelRightClose,
+  PanelRightOpen,
   Search,
   Settings,
 } from "lucide-react";
 import { ChatPanel } from "../agent/ChatPanel";
-import { Dialog, DialogContent, DialogTitle } from "../components/ui/Dialog";
-import { Kbd } from "../components/ui/Kbd";
-import { LiveDot, Logo, TypeIcon } from "../components/TypeIcon";
-import { TempoMeter } from "../components/TempoMeter";
+import { Tooltip } from "../components/ui/Tooltip";
+import { LiveDot, Logo } from "../components/TypeIcon";
 import { cn } from "../lib/cn";
 import { contractOf, templateMap } from "../lib/domain";
-import { formatClock, formatTime } from "../lib/format";
+import { formatClock } from "../lib/format";
 import { modKeyLabel, useHotkey } from "../lib/useHotkey";
 import { useNow } from "../lib/useNow";
 import { useSystem } from "../state/system";
 import { useToast } from "../state/toast";
 import { APP_NAME, t, type MessageKey } from "../i18n";
+import { NowBar } from "./NowBar";
+import { ThemeToggle } from "./ThemeToggle";
+import { PANEL_MIN, clampWidth, usePanel } from "./usePanel";
 import { useShell } from "./ShellContext";
 
-const NAV: { to: string; label: MessageKey; icon: typeof Library; end: boolean; key: string }[] = [
-  { to: "/", label: "nav.today", icon: CalendarCheck2, end: true, key: "h" },
-  { to: "/goals", label: "nav.goals", icon: Milestone, end: false, key: "m" },
-  { to: "/library", label: "nav.library", icon: Library, end: false, key: "b" },
-  { to: "/review", label: "nav.review", icon: BarChart3, end: false, key: "r" },
-  { to: "/settings", label: "nav.settings", icon: Settings, end: false, key: "a" },
+interface NavEntry {
+  to: string;
+  label: MessageKey;
+  icon: typeof Library;
+  /** The key after G that goes there. */
+  key: string;
+  /** Paths that count as this place too. */
+  also?: string[];
+}
+
+/** The places the context panel shows; the conversation stays beside all of them. */
+const PLACES: NavEntry[] = [
+  { to: "/", label: "nav.today", icon: CalendarCheck2, key: "h", also: ["/today"] },
+  { to: "/goals", label: "nav.goals", icon: Milestone, key: "m" },
+  { to: "/library", label: "nav.library", icon: Library, key: "b" },
+  { to: "/review", label: "nav.review", icon: BarChart3, key: "r" },
+];
+const SETTINGS: NavEntry = { to: "/settings", label: "nav.settings", icon: Settings, key: "a" };
+
+/** On a phone the conversation is a place of its own, and the day is another. */
+const PHONE: NavEntry[] = [
+  { to: "/", label: "nav.coach", icon: MessageSquare, key: "" },
+  { to: "/today", label: "nav.today", icon: CalendarCheck2, key: "" },
+  { to: "/goals", label: "nav.goals", icon: Milestone, key: "" },
+  { to: "/library", label: "nav.library", icon: Library, key: "" },
+  SETTINGS,
 ];
 
+const isAt = (pathname: string, entry: NavEntry) =>
+  entry.to === "/"
+    ? pathname === "/" || (entry.also ?? []).includes(pathname)
+    : pathname === entry.to ||
+      pathname.startsWith(`${entry.to}/`) ||
+      (entry.also ?? []).includes(pathname);
+
+/**
+ * The shell (ADR-002): the conversation in the middle of every screen, the HUD
+ * above it, and one context panel beside it that shows what the conversation
+ * is about (the day by default). On a phone the conversation and each place
+ * are screens of their own under the same HUD.
+ */
 export function AppShell() {
   const { openPalette } = useShell();
-  const { state } = useSystem();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const pillVisible = Boolean(state.currentDay?.activeActivityInstanceId) && pathname !== "/";
+  const home = pathname === "/";
+  const panel = usePanel();
+  // While the edge is dragged the width follows the pointer; it is kept when let go
+  const [dragging, setDragging] = useState<number | null>(null);
+  const width = dragging ?? panel.width;
 
   useHotkey("k", openPalette, { mod: true, allowInInputs: true });
+  useHotkey("b", () => panel.setOpen(!panel.open), { mod: true, allowInInputs: true });
 
-  // Linear-style navigation: G, then H/B/R/A
+  // Linear-style navigation: G, then H/M/B/R/A
   useGoTo((key) => {
-    const target = NAV.find((item) => item.key === key);
-    if (target) navigate(target.to);
+    const target = [...PLACES, SETTINGS].find((item) => item.key === key);
+    if (!target) return;
+    panel.setOpen(true);
+    navigate(target.to);
   });
 
   return (
-    <div className="flex min-h-dvh">
-      <Sidebar />
+    <div
+      style={{ "--panel": panel.open ? `${width}px` : "0px" } as CSSProperties}
+      className={cn(
+        "grid h-dvh overflow-hidden bg-canvas",
+        "grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] [grid-template-areas:'now''main''nav']",
+        // The rail sits on the right, next to the panel it switches
+        "lg:grid-cols-[minmax(0,1fr)_var(--panel)_84px] lg:grid-rows-[auto_minmax(0,1fr)] lg:[grid-template-areas:'now_ctx_rail''chat_ctx_rail']"
+      )}
+    >
+      <Rail open={panel.open} setOpen={panel.setOpen} />
+      <NowBar className="[grid-area:now]" />
+      {/* The conversation: the way everything changes */}
+      <ChatPanel
+        className={cn(
+          "min-h-0 [grid-area:main] lg:flex lg:[grid-area:chat]",
+          home ? "flex" : "hidden"
+        )}
+      />
+      {/* The context: what the conversation is about */}
       <main
         className={cn(
-          // Room for the tab bar, the running pill and the chat button, so none covers the last row
-          "min-w-0 flex-1 lg:pb-20 xl:pb-0",
-          pillVisible
-            ? "pb-[calc(192px+env(safe-area-inset-bottom))]"
-            : "pb-[calc(140px+env(safe-area-inset-bottom))]"
+          "min-h-0 overflow-y-auto bg-panel @container [grid-area:main] lg:border-l lg:border-line lg:[grid-area:ctx]",
+          home ? "hidden" : "block",
+          panel.open ? "lg:block" : "lg:hidden"
         )}
       >
         <Outlet />
       </main>
-      {/* The conversation is the way in (ADR-002): always beside the day from 1280 px */}
-      <ChatPanel className="sticky top-0 hidden h-dvh w-[400px] shrink-0 self-start border-l border-line xl:flex" />
-      <MobileChat raised={pillVisible} />
-      <MobileNav />
-      <RunningPill />
+      {panel.open && (
+        <PanelEdge
+          width={width}
+          onDrag={setDragging}
+          onDone={(next) => {
+            setDragging(null);
+            // Dragged nearly shut: the panel folds away instead of staying a sliver
+            if (next < PANEL_MIN - 80) panel.setOpen(false);
+            else panel.setWidth(clampWidth(next));
+          }}
+          onReset={() => panel.setWidth(null)}
+        />
+      )}
+      <PhoneNav />
       <ActivityWatcher />
     </div>
   );
 }
 
-/** Below 1280 px the chat opens as a sheet from a floating button. */
-function MobileChat({ raised }: { raised: boolean }) {
-  const [open, setOpen] = useState(false);
+/** The places, in a narrow rail with their names: nothing here competes with the day. */
+function Rail({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
+  const { openPalette } = useShell();
+  const { pathname } = useLocation();
+  const running = Boolean(useRunning());
+  const toggle = t(open ? "shell.panel.hide" : "shell.panel.show");
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={t("agent.open")}
+    <nav
+      aria-label={t("nav.main")}
+      className="hidden flex-col items-center gap-1 border-l border-line bg-sidebar px-2 pb-3 pt-4 [grid-area:rail] lg:flex"
+    >
+      <NavLink to="/" aria-label={APP_NAME} className="mb-4 rounded-lg p-1">
+        <Logo className="size-7" />
+      </NavLink>
+      {PLACES.map((entry) => (
+        <RailItem
+          key={entry.to}
+          entry={entry}
+          active={isAt(pathname, entry)}
+          live={entry.to === "/" && running}
+          open={open}
+          setOpen={setOpen}
+        />
+      ))}
+      <span className="flex-1" />
+      <Tooltip content={`${toggle} · ${modKeyLabel}+B`} side="left">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-label={toggle}
+          aria-pressed={open}
+          className="flex size-10 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+        >
+          {open ? (
+            <PanelRightClose className="size-[18px]" />
+          ) : (
+            <PanelRightOpen className="size-[18px]" />
+          )}
+        </button>
+      </Tooltip>
+      <ThemeToggle />
+      <Tooltip content={t("shell.search")} side="left">
+        <button
+          type="button"
+          onClick={openPalette}
+          aria-label={t("shell.search")}
+          className="flex size-10 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-hover hover:text-ink"
+        >
+          <Search className="size-[18px]" />
+        </button>
+      </Tooltip>
+      <RailItem entry={SETTINGS} active={isAt(pathname, SETTINGS)} open={open} setOpen={setOpen} />
+    </nav>
+  );
+}
+
+function RailItem({
+  entry,
+  active,
+  live = false,
+  open,
+  setOpen,
+}: {
+  entry: NavEntry;
+  active: boolean;
+  live?: boolean;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}) {
+  const Icon = entry.icon;
+  return (
+    <NavLink
+      to={entry.to}
+      aria-current={active && open ? "page" : undefined}
+      // The place already shown folds the panel away; any place opens it
+      onClick={(event) => {
+        if (active && open) {
+          event.preventDefault();
+          setOpen(false);
+        } else setOpen(true);
+      }}
+      className={cn(
+        "flex w-full flex-col items-center gap-1 rounded-lg px-0.5 pb-1.5 pt-2 text-2xs font-medium transition-colors",
+        active && open ? "bg-hover text-ink" : "text-ink-3 hover:bg-hover/70 hover:text-ink"
+      )}
+    >
+      <span className="relative">
+        <Icon className="size-5" strokeWidth={1.9} />
+        {live && <LiveDot className="absolute -right-1 -top-0.5" />}
+      </span>
+      <span className="w-full truncate text-center">{t(entry.label)}</span>
+    </NavLink>
+  );
+}
+
+/**
+ * The edge between the conversation and the panel: dragged to resize the
+ * panel, arrow keys for the same by keyboard, a double click for the usual
+ * width. Its line lights up while it is held.
+ */
+function PanelEdge({
+  width,
+  onDrag,
+  onDone,
+  onReset,
+}: {
+  width: number;
+  onDrag: (width: number) => void;
+  onDone: (width: number) => void;
+  onReset: () => void;
+}) {
+  const start = useRef<{ x: number; width: number } | null>(null);
+  const [held, setHeld] = useState(false);
+  const current = useRef(width);
+
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    start.current = { x: event.clientX, width };
+    current.current = width;
+    setHeld(true);
+  };
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!start.current) return;
+    // The panel is on the right: moving left makes it wider
+    const next = start.current.width + (start.current.x - event.clientX);
+    current.current = next;
+    onDrag(next < PANEL_MIN ? Math.max(PANEL_MIN - 80, next) : clampWidth(next));
+  };
+  const end = () => {
+    if (!start.current) return;
+    start.current = null;
+    setHeld(false);
+    onDone(current.current);
+  };
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 64 : 16;
+    if (event.key === "ArrowLeft") onDone(width + step);
+    else if (event.key === "ArrowRight") onDone(width - step);
+    else return;
+    event.preventDefault();
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={t("shell.panel.resize")}
+      aria-valuenow={Math.round(width)}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={end}
+      onPointerCancel={end}
+      onDoubleClick={onReset}
+      onKeyDown={onKeyDown}
+      className="group relative z-10 -ml-[5px] hidden w-[9px] cursor-col-resize touch-none justify-self-start outline-none [grid-area:ctx] lg:block"
+    >
+      <span
+        aria-hidden
         className={cn(
-          "fixed right-4 z-30 flex size-12 items-center justify-center rounded-full bg-accent-fill text-white shadow-pop transition-[bottom,background-color] duration-200 hover:bg-accent-fill-hover lg:bottom-6 xl:hidden",
-          // Above the running pill when it shows, never on top of it
-          raised
-            ? "bottom-[calc(132px+env(safe-area-inset-bottom))]"
-            : "bottom-[calc(80px+env(safe-area-inset-bottom))]"
+          "absolute inset-y-0 left-1 w-px transition-colors duration-150",
+          held
+            ? "bg-accent"
+            : "bg-transparent group-hover:bg-accent/60 group-focus-visible:bg-accent"
         )}
-      >
-        <MessageSquare className="size-5" />
-      </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent variant="sheet" aria-describedby={undefined} className="p-0">
-          <DialogTitle className="sr-only">{t("agent.title")}</DialogTitle>
-          {/* The sheet draws its own close button over the header's right end */}
-          <ChatPanel className="h-[80dvh] [&>header]:pr-12" />
-        </DialogContent>
-      </Dialog>
-    </>
+      />
+    </div>
   );
 }
 
@@ -125,88 +340,6 @@ function useGoTo(onKey: (key: string) => void) {
   }, []);
 }
 
-function Sidebar() {
-  const { openPalette } = useShell();
-  const { state } = useSystem();
-  const running = Boolean(state.currentDay?.activeActivityInstanceId);
-
-  return (
-    <aside className="sticky top-0 hidden h-dvh w-[232px] shrink-0 flex-col self-start border-r border-line bg-sidebar px-3 pb-3 pt-4 lg:flex">
-      <div className="flex items-center gap-2.5 px-2">
-        <Logo />
-        <span className="text-md font-semibold tracking-[-0.01em] text-ink">{APP_NAME}</span>
-      </div>
-
-      <button
-        type="button"
-        onClick={openPalette}
-        className="mt-4 flex h-8 items-center gap-2 rounded-md border border-line bg-panel px-2.5 text-sm text-ink-3 shadow-xs transition-colors hover:border-line-strong hover:text-ink-2"
-      >
-        <Search className="size-4" />
-        <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">
-          {t("shell.search")}
-        </span>
-        <span className="flex gap-0.5">
-          <Kbd>{modKeyLabel}</Kbd>
-          <Kbd>K</Kbd>
-        </span>
-      </button>
-
-      <nav aria-label={t("nav.main")} className="mt-4 flex flex-col gap-px">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                "flex h-8 items-center gap-2.5 rounded-md px-2 text-base font-medium transition-colors",
-                isActive ? "bg-hover text-ink" : "text-ink-2 hover:bg-hover/70 hover:text-ink"
-              )
-            }
-          >
-            <Icon className="size-4 shrink-0" strokeWidth={2} />
-            <span className="flex-1">{t(label)}</span>
-            {to === "/" && running && <LiveDot />}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="mt-auto">
-        {state.currentDay ? (
-          <SidebarDay />
-        ) : (
-          <div className="rounded-lg border border-line bg-panel p-3">
-            <p className="text-sm font-medium text-ink">{t("shell.noDay")}</p>
-            <p className="mt-0.5 text-sm text-ink-2">{t("shell.noDayHint")}</p>
-          </div>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-function SidebarDay() {
-  const { state, core } = useSystem();
-  const day = state.currentDay!;
-  const summary = core.getTempoSummary(day.day.id);
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-3">
-      <div>
-        <p className="text-xs text-ink-3">
-          {day.day.startTime
-            ? t("shell.dayRunningSince", { time: formatTime(day.day.startTime) })
-            : t("shell.dayRunning")}
-        </p>
-        <div className="mt-2">
-          <TempoMeter summary={summary} variant="compact" />
-        </div>
-      </div>
-      <RunningLink />
-    </div>
-  );
-}
-
 function useRunning() {
   const { state } = useSystem();
   const activeId = state.currentDay?.activeActivityInstanceId;
@@ -219,77 +352,40 @@ function useRunning() {
   return instance && template ? { instance, template } : null;
 }
 
-function RunningLink() {
-  const running = useRunning();
-  const now = useNow(1000);
-  if (!running) return <p className="text-sm text-ink-3">{t("shell.nothingRunning")}</p>;
-  const elapsed = now.getTime() - new Date(running.instance.startTime ?? now).getTime();
-  return (
-    <NavLink
-      to="/"
-      className="-mx-1 flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-hover"
-    >
-      <LiveDot />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">
-        {running.template.title}
-      </span>
-      <span className="tabular text-sm text-ink-2">{formatClock(elapsed)}</span>
-    </NavLink>
-  );
-}
-
-function MobileNav() {
-  const { state } = useSystem();
-  const running = Boolean(state.currentDay?.activeActivityInstanceId);
+function PhoneNav() {
+  const { pathname } = useLocation();
+  const running = Boolean(useRunning());
   return (
     <nav
       aria-label={t("nav.main")}
-      className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 backdrop-blur-md lg:hidden"
+      className="pb-safe border-t border-line bg-panel [grid-area:nav] lg:hidden"
     >
       <div className="mx-auto grid h-16 max-w-md grid-cols-5">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
+        {PHONE.map((entry) => {
+          const Icon = entry.icon;
+          const active = entry.to === "/" ? pathname === "/" : isAt(pathname, entry);
+          return (
+            <NavLink
+              key={entry.to}
+              to={entry.to}
+              aria-current={active ? "page" : undefined}
+              className={cn(
                 "relative flex flex-col items-center justify-center gap-1 text-2xs font-medium transition-colors",
-                isActive ? "text-accent-ink" : "text-ink-3"
-              )
-            }
-          >
-            <span className="relative">
-              <Icon className="size-[22px]" strokeWidth={1.9} />
-              {to === "/" && running && <LiveDot className="absolute -right-1 -top-0.5" />}
-            </span>
-            {t(label)}
-          </NavLink>
-        ))}
+                active ? "text-accent-ink" : "text-ink-3"
+              )}
+            >
+              <span className="relative">
+                <Icon className="size-[22px]" strokeWidth={1.9} />
+                {entry.to === "/today" && running && (
+                  <LiveDot className="absolute -right-1 -top-0.5" />
+                )}
+              </span>
+              {t(entry.label)}
+            </NavLink>
+          );
+        })}
       </div>
     </nav>
-  );
-}
-
-/** On mobile, outside Today: whatever is running, always in view. */
-function RunningPill() {
-  const running = useRunning();
-  const { pathname } = useLocation();
-  const now = useNow(1000);
-  if (!running || pathname === "/") return null;
-  const elapsed = now.getTime() - new Date(running.instance.startTime ?? now).getTime();
-  return (
-    <NavLink
-      to="/"
-      className="fixed inset-x-3 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 flex h-12 animate-toast-in items-center gap-3 rounded-lg border border-line bg-panel px-3.5 shadow-pop lg:hidden"
-    >
-      <LiveDot />
-      <TypeIcon type={running.template.type} />
-      <span className="min-w-0 flex-1 truncate text-base font-medium">
-        {running.template.title}
-      </span>
-      <span className="tabular text-base font-medium text-ink-2">{formatClock(elapsed)}</span>
-    </NavLink>
   );
 }
 

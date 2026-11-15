@@ -41,7 +41,7 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
   }
 
   return (
-    <div className="rounded-xl border border-line bg-panel p-4 shadow-xs sm:p-5">
+    <div className="rounded-xl border border-line bg-panel p-4 shadow-xs @lg:p-5">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div>
           <p className="text-sm text-ink-2">{t("trend.title")}</p>
@@ -68,9 +68,9 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
 
       <div className="mt-6 flex gap-2" aria-hidden>
         <div className="min-w-0 flex-1">
-          <div className="relative h-40 sm:h-44">
+          <div className="relative h-40 @lg:h-44">
             <div className="absolute inset-x-0 bottom-0 border-t border-line" />
-            <div className="absolute inset-0 flex items-end gap-1 sm:gap-1.5">
+            <div className="absolute inset-0 flex items-end gap-1 @lg:gap-1.5">
               {points.map(({ day, summary }) => {
                 const emphasized = day.id === (hovered ?? selectedId);
                 const height = (summary.totalTempos / max) * 100;
@@ -119,7 +119,7 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
                     "tabular absolute whitespace-nowrap text-2xs",
                     day.id === selectedId ? "font-medium text-ink-2" : "text-ink-3",
                     edge,
-                    !narrow && "hidden sm:block"
+                    !narrow && "hidden @lg:block"
                   )}
                   style={
                     index === 0 || fromEnd === 0
@@ -134,7 +134,7 @@ export function TrendChart({ days, selectedId, onSelect }: TrendChartProps) {
           </div>
         </div>
         {/* Reference axis in its own margin: it covers no bar */}
-        <div className="relative h-40 w-7 shrink-0 sm:h-44">
+        <div className="relative h-40 w-7 shrink-0 @lg:h-44">
           <span
             className="tabular absolute left-0 translate-y-1/2 text-2xs font-medium text-ink-2"
             style={{ bottom: `${(target / max) * 100}%` }}

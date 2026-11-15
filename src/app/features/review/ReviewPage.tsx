@@ -27,7 +27,7 @@ import {
 } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
 import { useSystem } from "../../state/system";
-import { buildStrip } from "../today/DayLog";
+import { buildStrip } from "./strip";
 import { TrendChart } from "./TrendChart";
 import { t, tp } from "../../i18n";
 
@@ -195,7 +195,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
         ) : (
           <div className="overflow-hidden rounded-lg border border-line bg-panel shadow-xs">
             <table className="w-full text-left text-sm">
-              <thead className="hidden border-b border-line bg-subtle text-xs text-ink-2 sm:table-header-group">
+              <thead className="hidden border-b border-line bg-subtle text-xs text-ink-2 @lg:table-header-group">
                 <tr>
                   <th scope="col" className="w-24 px-4 py-2 font-medium">
                     {t("review.col.time")}
@@ -222,12 +222,12 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                   return (
                     <tr
                       key={record.id}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-b border-line px-4 py-2.5 last:border-b-0 sm:table-row sm:px-0 sm:py-0"
+                      className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-b border-line px-4 py-2.5 last:border-b-0 @lg:table-row @lg:px-0 @lg:py-0"
                     >
-                      <td className="tabular order-1 whitespace-nowrap text-ink-3 sm:px-4 sm:py-2.5">
+                      <td className="tabular order-1 whitespace-nowrap text-ink-3 @lg:px-4 @lg:py-2.5">
                         {formatTime(record.startTime)}
                       </td>
-                      <td className="order-2 min-w-0 flex-1 sm:px-2 sm:py-2.5">
+                      <td className="order-2 min-w-0 flex-1 @lg:px-2 @lg:py-2.5">
                         <span className="flex items-center gap-2">
                           <TypeIcon type={record.type} />
                           <span
@@ -242,7 +242,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                           )}
                         </span>
                       </td>
-                      <td className="tabular order-4 w-full pl-[52px] text-ink-2 sm:w-auto sm:px-2 sm:py-2.5">
+                      <td className="tabular order-4 w-full pl-[52px] text-ink-2 @lg:w-auto @lg:px-2 @lg:py-2.5">
                         {formatMinutes(record.durationMinutes)}
                         {contract && (
                           <span className="text-ink-3">
@@ -254,10 +254,10 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                           </span>
                         )}
                       </td>
-                      <td className="tabular order-3 hidden text-right text-ink-2 sm:table-cell sm:px-2 sm:py-2.5">
+                      <td className="tabular order-3 hidden text-right text-ink-2 @lg:table-cell @lg:px-2 @lg:py-2.5">
                         {done ? `${record.satisfactionScore ?? 0}/10` : "—"}
                       </td>
-                      <td className="tabular order-3 text-right sm:px-4 sm:py-2.5">
+                      <td className="tabular order-3 text-right @lg:px-4 @lg:py-2.5">
                         {done ? (
                           <span className="rounded bg-tempo/15 px-1.5 py-0.5 text-xs font-semibold text-tempo-ink">
                             +{record.temposAwarded ?? 0}

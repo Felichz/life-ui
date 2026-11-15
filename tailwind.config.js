@@ -1,6 +1,8 @@
-/** @type {import('tailwindcss').Config} */
+import containerQueries from "@tailwindcss/container-queries";
+
 const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
+/** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["selector", '[data-theme="dark"]'],
   content: ["./index.html", "./src/app/**/*.{ts,tsx}"],
@@ -124,6 +126,7 @@ export default {
     },
   },
   plugins: [
+    containerQueries,
     ({ addVariant }) => {
       // Touch screens: larger tap targets
       addVariant("coarse", "@media (pointer: coarse)");

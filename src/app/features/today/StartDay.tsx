@@ -6,6 +6,7 @@ import { formatDateLong, formatDateShort, formatNumber, greeting } from "../../l
 import { useSystem } from "../../state/system";
 import { APP_NAME, t, tp } from "../../i18n";
 import { Upcoming } from "./Upcoming";
+import { Panel, PanelHeader } from "../../components/PageHeader";
 
 /** Screen with no day in progress: the day starts from the chat. */
 export function StartDay() {
@@ -18,10 +19,9 @@ export function StartDay() {
   const firstRun = state.global.days.length === 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-[560px] flex-col px-5 pb-16 pt-[9vh] sm:pt-[14vh]">
-      <h1 className="text-4xl font-semibold text-ink">{greeting(today)}</h1>
-      <p className="mt-1.5 text-md text-ink-2">{formatDateLong(today)}</p>
-      <p className="mt-5 max-w-md text-md text-ink-2">
+    <Panel>
+      <PanelHeader title={greeting(today)} subtitle={formatDateLong(today)} />
+      <p className="max-w-md text-base text-ink-2">
         {firstRun ? t("start.intro", { app: APP_NAME }) : t("start.back")}
       </p>
 
@@ -55,22 +55,15 @@ export function StartDay() {
         </div>
       )}
 
-      {/* What to say, shown the way it will look once said */}
-      <div className="mt-8 flex flex-col items-start gap-2.5">
-        <p className="text-base text-ink-2">{t("start.chatLead")}</p>
-        <p className="rounded-lg rounded-br-sm bg-hover px-3 py-2 text-base text-ink">
-          {t("agent.suggest.start")}
-        </p>
-        {firstRun && (
-          <Link
-            to="/library"
-            className="inline-flex h-10 items-center gap-1.5 px-2 text-base font-medium text-ink-2 hover:text-ink"
-          >
-            {t("start.prepareLibrary")}
-            <ArrowRight className="size-4" />
-          </Link>
-        )}
-      </div>
+      {firstRun && (
+        <Link
+          to="/library"
+          className="-ml-2 mt-4 inline-flex h-10 items-center gap-1.5 px-2 text-base font-medium text-ink-2 hover:text-ink"
+        >
+          {t("start.prepareLibrary")}
+          <ArrowRight className="size-4" />
+        </Link>
+      )}
 
       <Upcoming className="mt-10" />
 
@@ -134,6 +127,6 @@ export function StartDay() {
           ))}
         </ul>
       )}
-    </div>
+    </Panel>
   );
 }

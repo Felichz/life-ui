@@ -46,7 +46,7 @@ export function LibraryPage() {
       >
         <Tabs.List
           aria-label={t("library.sections")}
-          className="scrollbar-none -mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0"
+          className="scrollbar-none -mx-5 flex gap-1 overflow-x-auto border-b border-line px-5 @lg:-mx-6 @lg:px-6"
         >
           {TABS.map((item) => (
             <Tabs.Trigger

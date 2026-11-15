@@ -43,7 +43,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="grid gap-4 border-t border-line py-7 first:border-t-0 first:pt-2 md:grid-cols-[240px_minmax(0,1fr)] md:gap-10">
+    <section className="grid gap-4 border-t border-line py-7 first:border-t-0 first:pt-2 @3xl:grid-cols-[240px_minmax(0,1fr)] @3xl:gap-10">
       <div>
         <h2 className="text-md font-semibold text-ink">{title}</h2>
         {description && <p className="mt-1 text-sm text-ink-2">{description}</p>}
@@ -388,7 +388,7 @@ function DataSection() {
 
 function Row({ title, body, action }: { title: string; body: string; action: ReactNode }) {
   return (
-    <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 px-4 py-3.5 @lg:flex-row @lg:items-center @lg:justify-between">
       <div className="min-w-0">
         <p className="text-base font-medium text-ink">{title}</p>
         <p className="text-sm text-ink-2">{body}</p>
