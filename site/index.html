@@ -1291,8 +1291,8 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
               height: `${v.clientHeight}px`,
             });
             cover.hidden = false;
+            frozen = t;
           }
-          frozen = t;
           cover.dataset.playing = playing ? "1" : "0";
           v.poster = `/media/lifeui-film-${name}.webp`;
           v.src = src;
@@ -1311,16 +1311,17 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
               setTimeout(shown, 400);
             } else shown();
           };
+          // whatever happens to the new file, the cover never stays more than 3 seconds
+          setTimeout(shown, 3000);
           v.addEventListener(
             "loadedmetadata",
             () => {
               if (id !== swap) return;
               // a chapter picked while the new file loads wins over the time it had
-              if (t > 0.01 && v.currentTime < 0.01) {
-                v.addEventListener("seeked", ready, { once: true });
-                v.currentTime = t;
-              } else if (v.readyState >= 2) ready();
-              else v.addEventListener("loadeddata", ready, { once: true });
+              if (v.currentTime > 0.01) return ready();
+              // seeking loads the frame even when the file only preloads its metadata
+              v.addEventListener("seeked", ready, { once: true });
+              v.currentTime = t;
             },
             { once: true }
           );
