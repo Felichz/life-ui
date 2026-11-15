@@ -1,0 +1,40 @@
+name: Release
+
+# Builds the desktop app's Windows installer and attaches it to a GitHub release.
+# Push a tag like v0.1.0 (the version in src-tauri/tauri.conf.json) to make one:
+#   git tag v0.1.0 && git push origin v0.1.0
+# The release is created as a draft: review it on GitHub and publish it, and
+# https://github.com/Felichz/life-ui/releases/latest (the site's download button) points at it.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+        env:
+          CYPRESS_INSTALL_BINARY: 0
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: "LifeUI v__VERSION__"
+          releaseBody: "The Windows installer of the desktop app. macOS and Linux run from source (see the README)."
+          releaseDraft: true
+          prerelease: false
