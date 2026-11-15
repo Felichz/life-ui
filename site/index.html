@@ -266,20 +266,27 @@
         background: rgb(var(--canvas));
         cursor: pointer;
       }
-      /* The chat's scrollbar, over the film: a real scroll box where the chat is in the frame, scrolled with
-       the film (media/lifeui-film-scroll.json, from video/coach/tools/scroll.mjs), so the visitor's own
-       browser draws it, as the app's CSS asks for its scrollbars. */
+      /* The frame kept on screen while the film switches to the other theme's file (see edition()). */
+      .player__cover {
+        position: absolute;
+        object-fit: contain;
+        background: rgb(var(--canvas));
+        pointer-events: none;
+      }
+      /* The chat's scrollbar, drawn over the film where the chat is in the frame and moved with it, frame by
+       frame (media/lifeui-film-scroll.json, from video/coach/tools/scroll.mjs). Drawn rather than native so it
+       looks the same everywhere: browsers hide thin native scrollbars until the pointer is over them. */
       .scrollmap {
         position: absolute;
         overflow: hidden;
         pointer-events: none;
       }
-      .scrollmap__box {
+      .scrollmap__thumb {
         position: absolute;
-        overflow-x: hidden;
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: rgb(var(--line-strong)) transparent;
+        left: 0;
+        top: 0;
+        border-radius: 999px;
+        background: rgb(var(--ink-3) / 0.55);
       }
       .win__bar {
         position: relative;
@@ -941,7 +948,7 @@
                 aria-label="The person tells the coach their right elbow hurts after long days at the mouse. The coach searches the web, answers from NHS guides with a ten-week plan in three phases and asks which days and at what time; after weekdays at 9 it proposes the roadmap, 50 sessions from Monday November 16 to Friday January 22, and the yes puts them on the calendar and on Goals. The first session runs at 9:00 and is closed through the chat for 13 tempos, and the ten weeks pass on the roadmap until Goal reached."
               ></video>
               <div class="scrollmap" id="scrollmap" aria-hidden="true" hidden>
-                <div class="scrollmap__box"><div></div></div>
+                <div class="scrollmap__thumb"></div>
               </div>
               <button class="player__big" type="button" data-toggle aria-label="Play the film">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z" /></svg>
@@ -1255,25 +1262,68 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
         const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
         const ends = () => CHAPTERS.map((c, i) => [c[0], (CHAPTERS[i + 1] ?? [dur])[0], c[1]]);
 
-        // The edition follows the page's theme; switching it keeps the time and whether it was playing.
+        // The edition follows the page's theme. Switching keeps the picture and the time: the frame on screen
+        // stays (a canvas over the video) while the other file loads and seeks to the same time, and once that
+        // frame is on screen the film goes on from there, playing if it was. Until then the strip and the
+        // scrollbar keep the frozen time (now()).
+        const cover = document.createElement("canvas");
+        cover.className = "player__cover";
+        cover.hidden = true;
+        v.after(cover);
+        let frozen = null,
+          swap = 0;
+        const now = () => frozen ?? v.currentTime;
         const edition = () => {
           const name = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
           const src = `/media/lifeui-film-${name}.mp4`;
           if (v.getAttribute("src") === src) return;
-          const t = v.currentTime,
-            playing = !v.paused;
+          const id = ++swap;
+          const t = now(),
+            playing = frozen === null ? !v.paused : cover.dataset.playing === "1";
+          if (frozen === null && v.readyState >= 2) {
+            cover.width = v.videoWidth;
+            cover.height = v.videoHeight;
+            cover.getContext("2d").drawImage(v, 0, 0);
+            Object.assign(cover.style, {
+              left: `${v.offsetLeft}px`,
+              top: `${v.offsetTop}px`,
+              width: `${v.clientWidth}px`,
+              height: `${v.clientHeight}px`,
+            });
+            cover.hidden = false;
+          }
+          frozen = t;
+          cover.dataset.playing = playing ? "1" : "0";
           v.poster = `/media/lifeui-film-${name}.webp`;
           v.src = src;
-          // a chapter picked while the new file loads wins over the time it had
-          if (t)
-            v.addEventListener(
-              "loadedmetadata",
-              () => {
-                if (v.currentTime < 0.01) v.currentTime = t;
-              },
-              { once: true }
-            );
-          if (playing) v.play().catch(() => {});
+          const shown = () => {
+            if (id !== swap) return;
+            frozen = null;
+            cover.hidden = true;
+            draw();
+          };
+          const ready = () => {
+            if (id !== swap) return;
+            if (playing && !userPaused) v.play().catch(() => {});
+            // the cover goes once the new file's frame is on screen
+            if (v.requestVideoFrameCallback) {
+              v.requestVideoFrameCallback(shown);
+              setTimeout(shown, 400);
+            } else shown();
+          };
+          v.addEventListener(
+            "loadedmetadata",
+            () => {
+              if (id !== swap) return;
+              // a chapter picked while the new file loads wins over the time it had
+              if (t > 0.01 && v.currentTime < 0.01) {
+                v.addEventListener("seeked", ready, { once: true });
+                v.currentTime = t;
+              } else if (v.readyState >= 2) ready();
+              else v.addEventListener("loadeddata", ready, { once: true });
+            },
+            { once: true }
+          );
         };
         edition();
         document.addEventListener("themechange", edition);
@@ -1320,11 +1370,13 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
           }
         };
         const seek = (t) => {
+          frozen = null;
+          cover.hidden = true;
           v.currentTime = Math.max(0, Math.min(dur - 0.05, t));
           draw();
         };
         function draw() {
-          const t = v.currentTime;
+          const t = now();
           ends().forEach(([a, b], i) => {
             parts[i].fill.style.width = `${Math.max(0, Math.min(1, (t - a) / (b - a))) * 100}%`;
           });
@@ -1343,11 +1395,11 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
         })();
 
         // The chat's scrollbar (CSS above): each frame of the film says where the chat is in the 1920 x 1200
-        // frame, how much it holds and how far it has scrolled; the box follows the video's time, between
-        // two measured frames, and the video's picture as it sits in the window (contained when maximized).
+        // frame, how much it holds, how far it has scrolled and how big one app pixel is. The thumb follows the
+        // video's time, between two measured frames, and the video's picture as it sits in the window
+        // (contained when maximized). It has the app's size: 6px wide, 3px from the edge, at least 24px tall.
         const map = document.getElementById("scrollmap");
-        const box = map.firstElementChild;
-        const fill = box.firstElementChild;
+        const thumb = map.firstElementChild;
         fetch("/media/lifeui-film-scroll.json")
           .then((r) => (r.ok ? r.json() : Promise.reject()))
           .then(({ fps, frame: [FW, FH], rows }) => {
@@ -1355,7 +1407,7 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
             let last = "";
             (function follow() {
               requestAnimationFrame(follow);
-              const t = v.currentTime,
+              const t = now(),
                 cw = v.clientWidth,
                 ch = v.clientHeight;
               const key = `${t}|${cw}|${ch}`;
@@ -1376,10 +1428,21 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
                 a = rows[i],
                 b = rows[Math.min(rows.length - 1, i + 1)],
                 k = at - i;
-              const [x, y, w, h, content, top] = a.map((n, j) => (n + (b[j] - n) * k) * d);
-              Object.assign(box.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
-              fill.style.height = `${content}px`;
-              box.scrollTop = top;
+              // everything in the picture's pixels; px is one app pixel
+              const [x, y, w, h, content, top, px] = a.map((n, j) => (n + (b[j] - n) * k) * d);
+              if (content <= h + 0.5) thumb.style.visibility = "hidden";
+              else {
+                const pad = 2 * px,
+                  track = h - 2 * pad;
+                const len = Math.max(24 * px, (track * h) / content);
+                const pos = pad + ((track - len) * top) / (content - h);
+                Object.assign(thumb.style, {
+                  visibility: "",
+                  width: `${6 * px}px`,
+                  height: `${len}px`,
+                  translate: `${x + w - 9 * px}px ${y + pos}px`,
+                });
+              }
               // the end card covers the app from the end of the measured frames
               const end = rows.length / fps;
               map.style.opacity = String(Math.max(0, Math.min(1, 1 - (t - end) / 0.5)));
@@ -1401,10 +1464,10 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
             toggle();
           } else if (e.key === "ArrowRight") {
             e.preventDefault();
-            seek(v.currentTime + 5);
+            seek(now() + 5);
           } else if (e.key === "ArrowLeft") {
             e.preventDefault();
-            seek(v.currentTime - 5);
+            seek(now() - 5);
           } else if (e.key === "f") {
             used();
             maximize(!isMax);

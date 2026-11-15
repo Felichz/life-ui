@@ -1,9 +1,10 @@
-// Measures the chat's scroll in the film, for the site's player: on ../../site it draws a real scroll box over
-// the video, where the chat is, and scrolls it with the film (the visitor's own browser draws the scrollbar).
+// Measures the chat's scroll in the film, for the site's player: on ../../site the page draws the chat's
+// scrollbar over the video, where the chat is, and moves it with the film.
 //
 // It mounts compositions/app.html outside HyperFrames, seeks its timeline frame by frame (30 fps) and writes,
 // per frame, in the 1920 x 1200 frame's pixels: the scroller's box [x, y, w, h], the height of what it holds
-// and how far it has scrolled. Both editions lay out the same, so it measures the light one.
+// and how far it has scrolled; and last, the scale of one app pixel (the stage's times the camera's). Both
+// editions lay out the same, so it measures the light one.
 //
 // Run from video/coach after tools/shell.mjs, with Playwright and Chrome on the machine:
 //   PLAYWRIGHT=<path to a playwright package> node tools/scroll.mjs
@@ -59,7 +60,7 @@ const rows = await page.evaluate(() => {
     let bottom = 0;
     for (const c of feed.children) if (parseFloat(getComputedStyle(c).opacity) > 0.02) bottom = Math.max(bottom, c.offsetTop + c.offsetHeight);
     const content = Math.max(sc.clientHeight, feed.offsetTop + bottom + padB, top + sc.clientHeight);
-    rows.push([q(r.left), q(r.top), q(r.width), q(r.height), q(content * k), q(top * k)]);
+    rows.push([q(r.left), q(r.top), q(r.width), q(r.height), q(content * k), q(top * k), Math.round(k * 1000) / 1000]);
   }
   return rows;
 });
