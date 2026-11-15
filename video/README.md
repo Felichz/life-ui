@@ -1,5 +1,7 @@
 # LifeUI product film
 
+> **WIP:** the film is being redone; see [`WIP.md`](WIP.md). Nothing from this folder is published.
+
 A silent 51.5-second film, "From the chat to the calendar", made with
 [HyperFrames](https://hyperframes.heygen.com) (HTML and GSAP rendered frame by frame).
 Rendered at 1920 x 1200 in a light and a dark edition for the portfolio case study.
