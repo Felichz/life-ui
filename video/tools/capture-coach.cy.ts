@@ -241,7 +241,7 @@ describe("film capture: from the chat to the calendar", () => {
       body: { jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: SEARCH }] } },
     });
 
-    cy.viewport(1440, 1200);
+    cy.viewport(1440, 900);
     cy.visit("/", {
       onBeforeLoad(win) {
         win.localStorage.clear();
@@ -316,7 +316,7 @@ describe("film capture: from the chat to the calendar", () => {
     snap("c04-saved");
 
     // Goals: the roadmap, and what a session of its first phase holds
-    cy.contains("a", "Goals").filter(":visible").first().click();
+    cy.contains("nav a", "Goals").click();
     cy.contains("Right elbow without pain").should("be.visible");
     snap("c05-goals");
     cy.get('button[aria-label="Show what to do"]').filter(":visible").first().click();
@@ -324,7 +324,7 @@ describe("film capture: from the chat to the calendar", () => {
     snap("c06-notes");
 
     // 9:00, the first session runs with its exercises on screen
-    cy.contains("a", "Today").filter(":visible").first().click();
+    cy.contains("nav a", "Today").click();
     goTo(9, 0);
     cy.window().then((win: any) => {
       const q = win.__lifeui;
@@ -349,7 +349,7 @@ describe("film capture: from the chat to the calendar", () => {
     snap("c09-earned");
 
     // Ten weeks: Goals after the first session, then every weekday's session to the last
-    cy.contains("a", "Goals").filter(":visible").first().click();
+    cy.contains("nav a", "Goals").click();
     cy.contains("Right elbow without pain").should("be.visible");
     snap("c10-progress");
     const frames: { date: string; done: number; html: string }[] = [];

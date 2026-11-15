@@ -1,13 +1,16 @@
 # The product film: the brief, and how it was done
 
-Status (2026-11-15): **done.** The new film is `video/coach/` (HyperFrames, 52 s, light and
-dark): the chat, the web search, the plan, the yes, the calendar, the roadmap, a session closed
-through the chat, and the ten weeks on the roadmap to Goal reached, all from `capture/`. It
-plays on the site (`site/media/lifeui-film-*.mp4`) and in the portfolio. Render it with
-`npm run render:light` and `npm run render:dark` in `video/coach/`; the web copies are those
-renders re-encoded with `-crf 24 -tune animation -movflags +faststart`, and each poster is the
-frame at 20.8 s (the roadmap card waiting on Do it). The rest of this file is the brief it was
-made from.
+Status (2026-11-15): **done, second cut.** The film is `video/coach/` (HyperFrames, 33 s, light
+and dark), redone for the redesign (ADR-013: the conversation in the middle, the HUD above it, the
+panel beside it, the rail on the right) and made faster: the chat, the web search, the plan, the
+yes, the calendar, the roadmap, a session run and closed through the chat, and the ten weeks on
+the roadmap to Goal reached. It is no longer a recreation: `tools/shell.mjs` mounts the real app's
+captured DOM (`capture/`) under the app's own built CSS, and `tools/app.src.html` animates between
+the captured states (the HUD's four states, the panel's pages, the cards that fold into their row)
+and drives the roadmap's numbers from `capture/progress.json`. It plays on the site
+(`site/media/lifeui-film-*.mp4`) and in the portfolio. The web copies are the renders re-encoded
+with `-crf 24 -tune animation -movflags +faststart`; each poster is the frame at 9.9 s (the roadmap
+card waiting on Do it). The rest of this file is the brief the first cut was made from.
 
 ## What was asked
 

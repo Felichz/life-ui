@@ -14,35 +14,40 @@
     <script src="assets/lib.js"></script>
     <style>
       @font-face {
-        font-family: 'Inter LF';
+        font-family: 'Inter Variable';
         src: url('assets/fonts/inter-latin-wght-normal.woff2') format('woff2');
         font-weight: 100 900;
         font-display: block;
         unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2190-2199, U+2212, U+2215;
       }
       @font-face {
-        font-family: 'Inter LF';
+        font-family: 'Inter Variable';
         src: url('assets/fonts/inter-latin-ext-wght-normal.woff2') format('woff2');
         font-weight: 100 900;
         font-display: block;
         unicode-range: U+0100-024F, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
       }
     </style>
-    <link rel="stylesheet" href="assets/ui.css" />
+    <link rel="stylesheet" href="assets/app.css" />
+    <style>
+      html, body { margin: 0; width: 1920px; height: 1200px; overflow: hidden; background: rgb(var(--canvas)); }
+      #root { position: relative; width: 1920px; height: 1200px; overflow: hidden; background: rgb(var(--canvas)); font-family: 'Inter Variable', 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+      #root > div[data-composition-src] { position: absolute; inset: 0; }
+    </style>
     <script>
       // the edition: the app's tokens switch on <html data-theme>, from the `theme` variable
       LF.theme();
     </script>
   </head>
   <body>
-    <div id="root" data-composition-id="main" data-start="0" data-duration="52" data-width="1920" data-height="1200" data-fps="30">
-      <div id="el-app" data-composition-id="app" data-composition-src="compositions/app.html" data-start="0" data-duration="49" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1200"></div>
-      <div id="el-end" data-composition-id="end" data-composition-src="compositions/end.html" data-start="48.4" data-duration="3.6" data-track-index="2" data-track-kind="graphics" data-width="1920" data-height="1200"></div>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="33" data-width="1920" data-height="1200" data-fps="30">
+      <div id="el-app" data-composition-id="app" data-composition-src="compositions/app.html" data-start="0" data-duration="30.2" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1200"></div>
+      <div id="el-end" data-composition-id="end" data-composition-src="compositions/end.html" data-start="29.6" data-duration="3.4" data-track-index="2" data-track-kind="graphics" data-width="1920" data-height="1200"></div>
     </div>
     <script>
       const tl = gsap.timeline({ paused: true });
       // the end card fades in over the film
-      tl.fromTo('#el-end', { opacity: 0 }, { opacity: 1, duration: 0.6, ease: 'power1.inOut', immediateRender: false }, 48.4);
+      tl.fromTo('#el-end', { opacity: 0 }, { opacity: 1, duration: 0.5, ease: 'power1.inOut', immediateRender: false }, 29.6);
       window.__timelines['main'] = tl;
     </script>
   </body>

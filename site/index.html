@@ -829,7 +829,7 @@
               id="player"
               tabindex="0"
               role="region"
-              aria-label="Product film, 52 seconds, no sound. Space plays or pauses, the arrow keys skip 5 seconds."
+              aria-label="Product film, 33 seconds, no sound. Space plays or pauses, the arrow keys skip 5 seconds."
             >
               <div class="win__bar">
                 LifeUI<span class="lights-pair" data-side="left"
@@ -1173,19 +1173,19 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
       (() => {
         const CHAPTERS = [
           [0, "You ask"],
-          [4.2, "It looks it up"],
-          [7.7, "The plan"],
-          [15.8, "Your yes"],
-          [24.4, "On the calendar"],
-          [30.6, "The roadmap"],
-          [35.8, "A session"],
-          [43.4, "Ten weeks"],
+          [2.2, "It looks it up"],
+          [3.45, "The plan"],
+          [7.25, "Your yes"],
+          [11.1, "On the calendar"],
+          [12.7, "The roadmap"],
+          [16.6, "A session"],
+          [22.9, "Ten weeks"],
         ];
         const player = document.getElementById("player");
         const v = document.getElementById("pv");
         const track = document.getElementById("track");
         const tip = document.getElementById("tip");
-        let dur = 52;
+        let dur = 33;
         let userPaused = false;
         const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
         const ends = () => CHAPTERS.map((c, i) => [c[0], (CHAPTERS[i + 1] ?? [dur])[0], c[1]]);

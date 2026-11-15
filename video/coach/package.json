@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "data": "node tools/data.mjs",
-    "check": "node tools/data.mjs && npx --yes hyperframes@0.8.139 check",
-    "render:light": "node tools/data.mjs && npx --yes hyperframes@0.8.139 render -o ../renders/lifeui-film-light.mp4 --quality looks --fps 30 --variables \"{\\\"theme\\\":\\\"light\\\"}\"",
-    "render:dark": "node tools/data.mjs && npx --yes hyperframes@0.8.139 render -o ../renders/lifeui-film-dark.mp4 --quality looks --fps 30 --variables \"{\\\"theme\\\":\\\"dark\\\"}\""
+    "data": "node tools/data.mjs && node tools/shell.mjs",
+    "check": "node tools/data.mjs && node tools/shell.mjs && npx --yes hyperframes@0.8.139 check",
+    "render:light": "node tools/data.mjs && node tools/shell.mjs && npx --yes hyperframes@0.8.139 render -o ../renders/lifeui-film-light.mp4 --quality looks --fps 30 --variables \"{\\\"theme\\\":\\\"light\\\"}\"",
+    "render:dark": "node tools/data.mjs && node tools/shell.mjs && npx --yes hyperframes@0.8.139 render -o ../renders/lifeui-film-dark.mp4 --quality looks --fps 30 --variables \"{\\\"theme\\\":\\\"dark\\\"}\""
   }
 }
