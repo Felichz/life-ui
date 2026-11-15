@@ -266,6 +266,21 @@
         background: rgb(var(--canvas));
         cursor: pointer;
       }
+      /* The chat's scrollbar, over the film: a real scroll box where the chat is in the frame, scrolled with
+       the film (media/lifeui-film-scroll.json, from video/coach/tools/scroll.mjs), so the visitor's own
+       browser draws it, as the app's CSS asks for its scrollbars. */
+      .scrollmap {
+        position: absolute;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .scrollmap__box {
+        position: absolute;
+        overflow-x: hidden;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgb(var(--line-strong)) transparent;
+      }
       .win__bar {
         position: relative;
         height: 34px;
@@ -551,8 +566,22 @@
           0 8px 28px -6px rgb(var(--shadow) / 0.22);
         cursor: pointer;
         transition:
+          opacity 0.2s ease,
           color 0.15s,
           scale 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .theme-toggle.is-away,
+      .theme-toggle.is-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .theme-toggle[data-corner^="t"] {
+        top: max(16px, env(safe-area-inset-top));
+        bottom: auto;
+      }
+      .theme-toggle[data-corner$="l"] {
+        left: max(16px, env(safe-area-inset-left));
+        right: auto;
       }
       .theme-toggle:hover {
         color: rgb(var(--ink));
@@ -911,6 +940,9 @@
                 preload="metadata"
                 aria-label="The person tells the coach their right elbow hurts after long days at the mouse. The coach searches the web, answers from NHS guides with a ten-week plan in three phases and asks which days and at what time; after weekdays at 9 it proposes the roadmap, 50 sessions from Monday November 16 to Friday January 22, and the yes puts them on the calendar and on Goals. The first session runs at 9:00 and is closed through the chat for 13 tempos, and the ten weeks pass on the roadmap until Goal reached."
               ></video>
+              <div class="scrollmap" id="scrollmap" aria-hidden="true" hidden>
+                <div class="scrollmap__box"><div></div></div>
+              </div>
               <button class="player__big" type="button" data-toggle aria-label="Play the film">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z" /></svg>
               </button>
@@ -1162,6 +1194,39 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
         });
         btn.hidden = false;
         apply();
+
+        // The button keeps to the corner of the window nearest the mouse: it fades out, moves there and fades
+        // back in, and fades out while the mouse is outside the window. On touch it stays in its corner.
+        if (matchMedia("(hover: hover) and (pointer: fine)").matches) {
+          let corner = "br",
+            moving = 0;
+          const go = (c) => {
+            if (c === corner || btn.matches(":focus-visible")) return;
+            corner = c;
+            btn.classList.add("is-away");
+            clearTimeout(moving);
+            moving = setTimeout(() => {
+              btn.dataset.corner = corner;
+              btn.classList.remove("is-away");
+            }, 200);
+          };
+          addEventListener(
+            "pointermove",
+            (e) => {
+              if (e.pointerType !== "mouse") return;
+              // near the middle line it stays where it is, so it doesn't flicker
+              const m = 40,
+                w = innerWidth / 2,
+                h = innerHeight / 2;
+              const v = Math.abs(e.clientY - h) < m ? corner[0] : e.clientY < h ? "t" : "b";
+              const s = Math.abs(e.clientX - w) < m ? corner[1] : e.clientX < w ? "l" : "r";
+              btn.classList.remove("is-out");
+              go(v + s);
+            },
+            { passive: true }
+          );
+          document.documentElement.addEventListener("mouseleave", () => btn.classList.add("is-out"));
+        }
       })();
     </script>
     <script>
@@ -1276,6 +1341,51 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
           if (!v.paused) draw();
           requestAnimationFrame(frame);
         })();
+
+        // The chat's scrollbar (CSS above): each frame of the film says where the chat is in the 1920 x 1200
+        // frame, how much it holds and how far it has scrolled; the box follows the video's time, between
+        // two measured frames, and the video's picture as it sits in the window (contained when maximized).
+        const map = document.getElementById("scrollmap");
+        const box = map.firstElementChild;
+        const fill = box.firstElementChild;
+        fetch("/media/lifeui-film-scroll.json")
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
+          .then(({ fps, frame: [FW, FH], rows }) => {
+            map.hidden = false;
+            let last = "";
+            (function follow() {
+              requestAnimationFrame(follow);
+              const t = v.currentTime,
+                cw = v.clientWidth,
+                ch = v.clientHeight;
+              const key = `${t}|${cw}|${ch}`;
+              if (key === last) return;
+              last = key;
+              // the picture inside the video element
+              const d = Math.min(cw / FW, ch / FH);
+              const pw = FW * d,
+                ph = FH * d;
+              Object.assign(map.style, {
+                left: `${v.offsetLeft + (cw - pw) / 2}px`,
+                top: `${v.offsetTop + (ch - ph) / 2}px`,
+                width: `${pw}px`,
+                height: `${ph}px`,
+              });
+              const at = Math.max(0, Math.min(rows.length - 1, t * fps));
+              const i = Math.floor(at),
+                a = rows[i],
+                b = rows[Math.min(rows.length - 1, i + 1)],
+                k = at - i;
+              const [x, y, w, h, content, top] = a.map((n, j) => (n + (b[j] - n) * k) * d);
+              Object.assign(box.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+              fill.style.height = `${content}px`;
+              box.scrollTop = top;
+              // the end card covers the app from the end of the measured frames
+              const end = rows.length / fps;
+              map.style.opacity = String(Math.max(0, Math.min(1, 1 - (t - end) / 0.5)));
+            })();
+          })
+          .catch(() => {});
 
         player.querySelectorAll("[data-toggle]").forEach((b) =>
           b.addEventListener("click", (e) => {
