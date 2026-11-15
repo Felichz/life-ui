@@ -14,7 +14,8 @@ async function boot() {
   if (isDesktop()) await enableFileStorage();
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-      <App />
+      {/* The base path comes from the build (`vite build --base`): the site serves the app under /app/ */}
+      <App basename={import.meta.env.BASE_URL} />
     </React.StrictMode>
   );
 }

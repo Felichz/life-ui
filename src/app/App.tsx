@@ -92,7 +92,11 @@ function LegacyReviewRedirect() {
   return <Navigate to={day ? `/review?day=${day}` : "/review"} replace />;
 }
 
-export default function App() {
+/**
+ * @param basename where the app is served from: `/` by default, `/app/` on the website
+ *   (src/main.tsx passes the build's base path).
+ */
+export default function App({ basename = "/" }: { basename?: string }) {
   // Preload Review in the background so opening it doesn't show a blank gap
   useEffect(() => {
     const timer = window.setTimeout(() => void loadReview(), 1500);
@@ -102,7 +106,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AppProviders>
-        <BrowserRouter>
+        <BrowserRouter basename={basename}>
           <AppRoutes />
         </BrowserRouter>
       </AppProviders>

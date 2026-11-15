@@ -2,7 +2,7 @@
 
 A HUD for real life: plan the day in time blocks, run one activity at a time, and close each one with a single honest self-assessment that earns tempos.
 
-[Live app](https://lifeui.medanolabs.com) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
+**[Download for Windows](https://github.com/Felichz/life-ui/releases/latest)** · [Website and film](https://lifeui.medanolabs.com) · [Web app](https://lifeui.medanolabs.com/app/) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-today-dark.webp">
@@ -84,16 +84,19 @@ npm install
 npm run dev          # http://localhost:5174
 ```
 
-| Script              | What it does                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| `npm run dev`       | Vite dev server on port 5174                                                          |
-| `npm run build`     | Type-check and build for production into `dist/`                                      |
-| `npm run preview`   | Serve the production build on port 5174                                               |
-| `npm run typecheck` | Type-check the app, tooling and Cypress projects                                      |
-| `npm run lint`      | ESLint with Prettier, zero warnings allowed                                           |
-| `npm test`          | Unit and integration tests (Jest)                                                     |
-| `npm run test:e2e`  | End-to-end run in Cypress (needs `npm run dev` running)                               |
-| `npm run sim`       | Talk to the real agent and a local model from the terminal (see `scripts/sim/sim.ts`) |
+| Script                  | What it does                                                                            |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `npm run dev`           | Vite dev server on port 5174                                                            |
+| `npm run build`         | Type-check and build for production into `dist/`                                        |
+| `npm run preview`       | Serve the production build on port 5174                                                 |
+| `npm run desktop`       | The desktop app (Tauri) in development; needs Rust                                      |
+| `npm run desktop:build` | Build the desktop app's installer for this machine                                      |
+| `npm run build:site`    | Build the website into `dist-site/`: the landing page at `/`, the web app under `/app/` |
+| `npm run typecheck`     | Type-check the app, tooling and Cypress projects                                        |
+| `npm run lint`          | ESLint with Prettier, zero warnings allowed                                             |
+| `npm test`              | Unit and integration tests (Jest)                                                       |
+| `npm run test:e2e`      | End-to-end run in Cypress (needs `npm run dev` running)                                 |
+| `npm run sim`           | Talk to the real agent and a local model from the terminal (see `scripts/sim/sim.ts`)   |
 
 `npm run sim:score -- <transcript.txt>` scores a transcript the runner wrote: the saved roadmap against what the person said (days, session counts, phases, minutes, loads, rules, the coach's numbers). It judges nothing by taste, and passing it is not the same as a good coach.
 
@@ -128,6 +131,10 @@ src/
     lib/               formatting and read-only view helpers
   types.ts             shared domain types
 cypress/e2e/           end-to-end journey and README screenshot specs
+src-tauri/             the desktop shell (Rust): system resources, model runtimes, local state
+site/                  the landing page of lifeui.medanolabs.com
+worker/                the Worker that sends deep links to the web app under /app/
+video/                 the product film (HyperFrames), captured from the real app
 docs/adr/              architecture decision records
 ```
 
@@ -137,9 +144,17 @@ docs/adr/              architecture decision records
 - [`PRODUCT.md`](PRODUCT.md): users, purpose and product principles.
 - [`DESIGN.md`](DESIGN.md): the visual system (tokens, type, components, rules).
 
+## Desktop app and releases
+
+LifeUI is meant for a desktop: a Tauri app that runs the coach on a local model (Ollama or LM Studio) and keeps its state in a file on your machine. `npm run desktop` runs it from source.
+
+A release is built by GitHub Actions ([`release.yml`](.github/workflows/release.yml)): pushing a tag such as `v0.1.0` (the version in `src-tauri/tauri.conf.json`) builds the Windows installer and attaches it to a draft release, which is then reviewed and published on GitHub. The website's download button points at the latest published release.
+
 ## Deploying
 
-A static SPA. On Vercel, import the repo and deploy: [`vercel.json`](vercel.json) sets the Vite build, the SPA rewrite for client-side routes, and long-term caching for hashed assets.
+[lifeui.medanolabs.com](https://lifeui.medanolabs.com) is a Cloudflare Worker with static assets ([`wrangler.jsonc`](wrangler.jsonc)). `npm run build:site` builds what it serves into `dist-site/`: the landing page in [`site/`](site/) at the root (the film, how it works, the download and the source) and the web build of the app under `/app/`. [`worker/index.js`](worker/index.js) sends deep links under `/app/` to the app, and the addresses the app had at the root (`/goals`, `/library`, ...) to their place under `/app/`. The `deploy` script builds and publishes it; `deploy:staging` goes to lifeui-stg.medanolabs.com.
+
+The film on the landing page is rendered from [`video/`](video/README.md) and copied to `site/media/` as `lifeui-film-light.mp4` and `lifeui-film-dark.mp4`.
 
 ## License
 
