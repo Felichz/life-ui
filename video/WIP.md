@@ -1,8 +1,13 @@
-# WIP: the product film, to be redone
+# The product film: the brief, and how it was done
 
-Status (2026-11-14): **no film is published.** The site (`site/`) shows a still of the real
-app where the film's player will go, and the portfolio still plays the first film (a day in
-forty seconds). This file is the brief for the next attempt.
+Status (2026-11-15): **done.** The new film is `video/coach/` (HyperFrames, 52 s, light and
+dark): the chat, the web search, the plan, the yes, the calendar, the roadmap, a session closed
+through the chat, and the ten weeks on the roadmap to Goal reached, all from `capture/`. It
+plays on the site (`site/media/lifeui-film-*.mp4`) and in the portfolio. Render it with
+`npm run render:light` and `npm run render:dark` in `video/coach/`; the web copies are those
+renders re-encoded with `-crf 24 -tune animation -movflags +faststart`, and each poster is the
+frame at 20.8 s (the roadmap card waiting on Do it). The rest of this file is the brief it was
+made from.
 
 ## What was asked
 

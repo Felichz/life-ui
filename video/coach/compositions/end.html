@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /></head>
+  <body>
+    <template>
+      <div id="end" data-composition-id="end" data-width="1920" data-height="1200">
+        <div class="endc">
+          <svg class="endc-mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#5854D6" /><circle cx="15.5" cy="15.5" r="7.5" fill="none" stroke="#fff" stroke-width="3" /><path d="M15.5 8a7.5 7.5 0 0 1 7.5 7.5h-7.5z" fill="#fff" /><path d="M20 20l4.5 4.5" stroke="#F5B544" stroke-width="3" stroke-linecap="round" /></svg>
+          <div class="endc-name">LifeUI</div>
+          <div class="endc-tag">A HUD for real life, run by a coach in a chat.</div>
+          <div class="endc-url">lifeui.medanolabs.com</div>
+        </div>
+      </div>
+      <script>
+        (() => {
+          // the card after the film: the product, the line the site uses for it, and where to get it
+          const IR = LF.IR;
+          const root = document.querySelector('#el-end [data-composition-id="end"]') ?? document.querySelector('[data-composition-id="end"]:not([data-composition-src])');
+          const $ = (s) => root.querySelector(s);
+          const tl = gsap.timeline({ paused: true });
+          // after the 0.6 s cross-fade from the film
+          tl.fromTo($('.endc-mark'), { opacity: 0, y: 14, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: 'power3.out', ...IR }, 0.6);
+          tl.fromTo($('.endc-name'), { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out', ...IR }, 0.75);
+          tl.fromTo($('.endc-tag'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out', ...IR }, 1.0);
+          tl.fromTo($('.endc-url'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.6, ease: 'power3.out', ...IR }, 1.3);
+          window.__timelines['end'] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

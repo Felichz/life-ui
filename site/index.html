@@ -9,7 +9,7 @@
   <meta property="og:url" content="https://lifeui.medanolabs.com/" />
   <meta property="og:title" content="LifeUI" />
   <meta property="og:description" content="Plan it by talking. Close it honestly. A HUD for real life with a coach that plans with you, on your machine." />
-  <meta property="og:image" content="https://lifeui.medanolabs.com/media/lifeui-coach-light.webp" />
+  <meta property="og:image" content="https://lifeui.medanolabs.com/media/lifeui-film-light.webp" />
   <meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#0e0f12" media="(prefers-color-scheme: dark)" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -58,16 +58,16 @@
     .btn svg { width: 18px; height: 18px; }
     .note { margin-top: 14px; font-size: 14px; color: rgb(var(--ink-3)); }
 
-    /* The app, in the window the portfolio draws its previews in (as on knowgraph.medanolabs.com). It holds
-       a still of the real app until the product film is redone (video/WIP.md), then the film's player as on
-       KnowGraph's page. The whole window always fits the viewport, with room to breathe: its width is capped
-       so that the bar and the 16:10 screen (36px of it besides the screen) leave --breath above and below. */
-    .player { --chrome: 36px; --breath: max(28px, 7vh); --breath: max(28px, 7svh);
+    /* The product film, in the window the portfolio draws its previews in, with the player of
+       knowgraph.medanolabs.com. The whole window always fits the viewport, with room to breathe: its width is
+       capped so that the bar, the chapter strip and the 16:10 video (62px of it besides the video) leave
+       --breath above and below. */
+    .player { --chrome: 62px; --breath: max(28px, 7vh); --breath: max(28px, 7svh);
       width: min(100%, max(360px, calc((100vh - 2 * var(--breath) - var(--chrome)) * 1.6)));
       width: min(100%, max(360px, calc((100svh - 2 * var(--breath) - var(--chrome)) * 1.6)));
       position: relative; margin: 36px auto 0; border-radius: 16px; border: 1px solid rgb(var(--line-strong)); background: rgb(var(--canvas)); overflow: hidden; box-shadow: 0 1px 2px rgb(var(--shadow) / .08), 0 40px 110px -20px rgb(var(--shadow) / .34); outline: none; }
     .player:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent)), 0 40px 110px -20px rgb(var(--shadow) / .34); }
-    .player img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; background: rgb(var(--canvas)); }
+    .player video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; background: rgb(var(--canvas)); cursor: pointer; }
     .win__bar { position: relative; height: 34px; display: grid; place-items: center; background: rgb(var(--sunk)); border-bottom: 1px solid rgb(var(--line)); font-size: 13px; font-weight: 600; color: rgb(var(--ink-3)); }
     .lights-pair { position: absolute; inset: 0; pointer-events: none; }
     .lights { position: absolute; left: 13px; top: calc(50% - 6px); display: flex; gap: 8px; pointer-events: auto; }
@@ -91,10 +91,25 @@
     html.max-lock { overflow: hidden; }
     .stage.is-max::before { content: ''; position: fixed; inset: 0; z-index: 49; background: rgb(var(--canvas)); }
     .player.is-max { position: fixed; z-index: 50; inset: clamp(8px, 1.6vmin, 18px); width: auto; height: auto; margin: 0; display: flex; flex-direction: column; }
-    .player.is-max picture { flex: 1; min-height: 0; display: flex; }
-    .player.is-max img { flex: 1; min-height: 0; height: auto; aspect-ratio: auto; object-fit: contain; }
+    .player.is-max video { flex: 1; min-height: 0; height: 0; aspect-ratio: auto; object-fit: contain; }
     .light .g-un, .player.is-max .light .g-in { display: none; }
     .player.is-max .light .g-un { display: block; }
+    /* The chapters: a strip of segments right under the window's bar, which is also the video's progress.
+       A segment is a button that jumps to its chapter; its name shows as a tooltip on hover or focus. */
+    .player__bar { padding: 0 14px; border-bottom: 1px solid rgb(var(--line)); background: rgb(var(--canvas)); }
+    .track { position: relative; height: 24px; }
+    .track__segs { display: flex; gap: 3px; height: 100%; }
+    .seg { display: grid; align-items: center; min-width: 0; padding: 0; border: 0; background: none; cursor: pointer; }
+    .seg span { position: relative; display: block; height: 4px; border-radius: 2px; background: rgb(var(--ink-3) / .28); overflow: hidden; transition: height .15s, border-radius .15s; }
+    .seg i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgb(var(--accent)); }
+    .seg:hover span, .seg:focus-visible span { height: 6px; border-radius: 3px; }
+    .seg:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: -2px; border-radius: 4px; }
+    .track__tip { position: absolute; top: calc(100% + 8px); z-index: 2; transform: translateX(-50%); padding: 5px 10px; border-radius: 8px; background: rgb(var(--panel)); border: 1px solid rgb(var(--line-strong)); box-shadow: 0 6px 20px rgb(var(--shadow) / .14); font-size: 13px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s; }
+    .track__tip.on { opacity: 1; }
+    .player__big { position: absolute; left: 50%; top: calc(50% + 30px); width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%; border: 0; background: rgb(var(--accent)); color: rgb(var(--on-accent)); box-shadow: 0 12px 40px rgb(var(--shadow) / .3); display: grid; place-items: center; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .player__big svg { width: 30px; height: 30px; margin-left: 4px; }
+    .player.is-paused .player__big { opacity: 1; pointer-events: auto; }
+    .player__big:focus-visible { outline: 3px solid rgb(var(--ink)); outline-offset: 3px; }
 
     section { padding: 88px 0 0; }
     h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; letter-spacing: -.035em; font-weight: 720; text-wrap: balance; }
@@ -167,9 +182,12 @@
         <p class="note">Windows installer · macOS and Linux run from source · MIT license</p>
 
         <div class="stage" id="stage">
-        <div class="player" id="player" tabindex="0" role="region" aria-label="LifeUI, the coach in the chat">
+        <div class="player is-paused" id="player" tabindex="0" role="region" aria-label="Product film, 52 seconds, no sound. Space plays or pauses, the arrow keys skip 5 seconds.">
           <div class="win__bar">LifeUI<span class="lights-pair" data-side="left"><span class="lights lights--left"><button class="light light--close" type="button" aria-label="Close" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button><button class="light light--min" type="button" aria-label="Minimize" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12"/></svg></button><button class="light light--zoom" type="button" data-fs aria-label="Maximize"><svg class="g-in" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h9l-9 9zM18 18H9l9-9z" fill="currentColor"/></svg><svg class="g-un" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.5 11.5H3.5l8-8zM12.5 12.5h8l-8 8z" fill="currentColor"/></svg></button></span><span class="lights lights--right" inert><button class="light light--close" type="button" aria-label="Close" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button><button class="light light--min" type="button" aria-label="Minimize" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 12h12"/></svg></button><button class="light light--zoom" type="button" data-fs aria-label="Maximize"><svg class="g-in" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h9l-9 9zM18 18H9l9-9z" fill="currentColor"/></svg><svg class="g-un" viewBox="0 0 24 24" aria-hidden="true"><path d="M11.5 11.5H3.5l8-8zM12.5 12.5h8l-8 8z" fill="currentColor"/></svg></button></span></span></div>
-          <picture><source media="(prefers-color-scheme: dark)" srcset="/media/lifeui-coach-dark.webp"><img src="/media/lifeui-coach-light.webp" width="1920" height="1200" alt="LifeUI's Today screen with the chat: the person asks about a sore elbow, the coach searches the web and answers with its sources (NHS guides) and a ten-week plan in three phases, and asks which days and at what time."></picture>
+          <div class="player__bar"><div class="track" id="track" role="group" aria-label="Chapters"><div class="track__segs" id="segs"></div><div class="track__tip" id="tip" aria-hidden="true"></div></div></div>
+          <video id="pv" src="/media/lifeui-film-light.mp4" poster="/media/lifeui-film-light.webp" width="1920" height="1200" muted loop playsinline preload="metadata"
+            aria-label="The person tells the coach their right elbow hurts after long days at the mouse. The coach searches the web, answers from NHS guides with a ten-week plan in three phases and asks which days and at what time; after weekdays at 9 it proposes the roadmap, 50 sessions from Monday November 16 to Friday January 22, and the yes puts them on the calendar and on Goals. The first session runs at 9:00 and is closed through the chat for 13 tempos, and the ten weeks pass on the roadmap until Goal reached."></video>
+          <button class="player__big" type="button" data-toggle aria-label="Play the film"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg></button>
         </div>
         </div>
       </div>
@@ -238,10 +256,86 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
   </div>
 
   <script>
-    // The window's lights and maximize, as on knowgraph.medanolabs.com. The film's player (chapters,
-    // play and pause) comes back with the film (video/WIP.md).
+    // The film's player, as on knowgraph.medanolabs.com: a strip of chapters (each segment jumps to its chapter,
+    // and names itself on hover), click to play or pause, the arrow keys to skip, and maximize from the window's
+    // green light. The light or dark edition follows the system's setting. It autoplays muted (the film has no
+    // sound) unless the visitor prefers reduced motion, and pauses while it's off screen, unless the visitor
+    // paused it themselves.
     (() => {
+      const CHAPTERS = [
+        [0, 'You ask'], [4.2, 'It looks it up'], [7.7, 'The plan'], [15.8, 'Your yes'],
+        [24.4, 'On the calendar'], [30.6, 'The roadmap'], [35.8, 'A session'], [43.4, 'Ten weeks'],
+      ];
       const player = document.getElementById('player');
+      const v = document.getElementById('pv');
+      const track = document.getElementById('track');
+      const tip = document.getElementById('tip');
+      let dur = 52;
+      let userPaused = false;
+      const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+      const ends = () => CHAPTERS.map((c, i) => [c[0], (CHAPTERS[i + 1] ?? [dur])[0], c[1]]);
+
+      // The edition: switching it keeps the time and whether it was playing.
+      const dark = matchMedia('(prefers-color-scheme: dark)');
+      const edition = () => {
+        const name = dark.matches ? 'dark' : 'light';
+        const src = `/media/lifeui-film-${name}.mp4`;
+        if (v.getAttribute('src') === src) return;
+        const t = v.currentTime, playing = !v.paused;
+        v.poster = `/media/lifeui-film-${name}.webp`;
+        v.src = src;
+        // a chapter picked while the new file loads wins over the time it had
+        if (t) v.addEventListener('loadedmetadata', () => { if (v.currentTime < 0.01) v.currentTime = t; }, { once: true });
+        if (playing) v.play().catch(() => {});
+      };
+      edition();
+      dark.addEventListener('change', edition);
+
+      const segsEl = document.getElementById('segs');
+      const parts = ends().map(([a, b, name]) => {
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'seg'; btn.style.flex = String(b - a);
+        btn.setAttribute('aria-label', `${name}, ${fmt(a)}`);
+        btn.innerHTML = '<span><i></i></span>';
+        btn.addEventListener('click', () => { seek(a); play(); });
+        // The chapter's name, under its segment and kept inside the strip.
+        const show = () => {
+          tip.textContent = name;
+          const t = track.getBoundingClientRect(), r = btn.getBoundingClientRect(), half = tip.offsetWidth / 2;
+          tip.style.left = `${Math.max(half, Math.min(t.width - half, r.left - t.left + r.width / 2))}px`;
+          tip.classList.add('on');
+        };
+        const hide = () => tip.classList.remove('on');
+        btn.addEventListener('pointerenter', show); btn.addEventListener('pointerleave', hide);
+        btn.addEventListener('focus', () => btn.matches(':focus-visible') && show()); btn.addEventListener('blur', hide);
+        segsEl.appendChild(btn);
+        return { btn, fill: btn.querySelector('i') };
+      });
+
+      const play = () => { userPaused = false; v.play().catch(() => {}); };
+      const toggle = () => { if (v.paused) play(); else { userPaused = true; v.pause(); } };
+      const seek = (t) => { v.currentTime = Math.max(0, Math.min(dur - 0.05, t)); draw(); };
+      function draw() {
+        const t = v.currentTime;
+        ends().forEach(([a, b], i) => { parts[i].fill.style.width = `${Math.max(0, Math.min(1, (t - a) / (b - a))) * 100}%`; });
+        const cur = ends().findIndex(([a, b]) => t >= a && t < b);
+        parts.forEach((p, i) => p.btn.setAttribute('aria-current', String(i === cur)));
+        player.classList.toggle('is-paused', v.paused);
+      }
+      v.addEventListener('loadedmetadata', () => { dur = v.duration || dur; draw(); });
+      for (const e of ['timeupdate', 'play', 'pause', 'seeked']) v.addEventListener(e, draw);
+      (function frame() { if (!v.paused) draw(); requestAnimationFrame(frame); })();
+
+      player.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); toggle(); }));
+      v.addEventListener('click', toggle);
+      player.addEventListener('keydown', (e) => {
+        if (e.target.closest('.track, .lights')) return;
+        if (e.key === ' ' || e.key === 'k') { e.preventDefault(); toggle(); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); seek(v.currentTime + 5); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(v.currentTime - 5); }
+        else if (e.key === 'f') { used(); maximize(!isMax); }
+      });
+
       // Maximize, inside the page: the window goes fixed over a backdrop (CSS above). The stage keeps its
       // height meanwhile so the page doesn't jump, and the page behind doesn't scroll.
       const stage = document.getElementById('stage');
@@ -299,6 +393,12 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
         });
       }, { passive: true });
 
+      // Autoplay (muted) unless reduced motion is asked for; pause off screen, resume when back.
+      new IntersectionObserver(([entry]) => {
+        if (!entry.isIntersecting) { if (!v.paused) v.pause(); }
+        else if (!still.matches && !userPaused) v.play().catch(() => {});
+      }, { threshold: 0.25 }).observe(player);
+      draw();
     })();
   </script>
 </body>

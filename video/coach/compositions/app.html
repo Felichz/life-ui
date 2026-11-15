@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /></head>
+  <body>
+    <template>
+      <div id="app" data-composition-id="app" data-width="1920" data-height="1200" data-layout-allow-overflow>
+        <div class="stage">
+          <div class="cam" id="cam">
+            <div class="app">
+              <!-- ================= sidebar -->
+              <aside class="sb">
+                <div class="sb-logo">
+                  <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#5854D6" /><circle cx="15.5" cy="15.5" r="7.5" fill="none" stroke="#fff" stroke-width="3" /><path d="M15.5 8a7.5 7.5 0 0 1 7.5 7.5h-7.5z" fill="#fff" /><path d="M20 20l4.5 4.5" stroke="#F5B544" stroke-width="3" stroke-linecap="round" /></svg>
+                  LifeUI
+                </div>
+                <div class="sb-search"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>Search…<span class="k">Ctrl K</span></div>
+                <nav class="sb-nav">
+                  <div class="sb-sel" id="sb-sel"></div>
+                  <div class="sb-item sb-on" id="sb-today"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>Today</div>
+                  <div class="sb-item" id="sb-goals"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.5" /></svg>Goals</div>
+                  <div class="sb-item"><svg class="ic" viewBox="0 0 24 24"><path d="M4 4v16M9 4v16M14 4l5 16" /></svg>Library</div>
+                  <div class="sb-item"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>Review</div>
+                  <div class="sb-item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" /></svg>Settings</div>
+                </nav>
+                <div class="sb-day">
+                  <div class="ink3">Day in progress · since 8:38 AM</div>
+                  <div class="row"><span><span class="tp tab" id="sb-tp">0</span> tempos</span><span class="ink2 tab" id="sb-pct">0%</span></div>
+                  <div class="bar tempo" style="margin-top: 6px"><i id="sb-bar"></i></div>
+                  <div class="row" style="margin-top: 10px"><span id="sb-run" class="ink2">Nothing running.</span></div>
+                </div>
+              </aside>
+
+              <!-- ================= main -->
+              <main class="main">
+                <!-- Today -->
+                <section class="view" id="v-today">
+                  <h1 class="h1">Today</h1>
+                  <div class="sub">Monday, November 16</div>
+                  <div class="today">
+                    <div>
+                      <div class="now">
+                        <div class="card" id="now-idle">
+                          <div class="b" style="font-size: 17px">Nothing running</div>
+                          <div class="k" style="margin-top: 4px">Next in your plan. Tell LifeUI when you start one.</div>
+                          <div>
+                            <span class="chip grow" id="next-elbow" style="display: none"><svg class="ic" viewBox="0 0 24 24" style="color: rgb(var(--objective))"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></svg>Elbow and back exercises <span class="ink3">~10 min</span></span><span class="chip"><svg class="ic" viewBox="0 0 24 24" style="color: rgb(var(--ink-3))"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>Check email <span class="ink3">max 15 min</span></span>
+                          </div>
+                        </div>
+                        <div class="card" id="now-run" style="opacity: 0">
+                          <div class="run-top">
+                            <div>
+                              <div class="run-t"><svg class="ic" viewBox="0 0 24 24" style="color: rgb(var(--objective)); width: 20px; height: 20px"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></svg>Elbow and back exercises</div>
+                              <div class="run-meta"><span class="live"><span class="dot"></span>Running since 9:00 AM</span> · Clear goal · Morning</div>
+                            </div>
+                            <div class="timer tab" id="timer">0:00</div>
+                          </div>
+                          <div class="bar acc run-bar"><i id="run-bar"></i></div>
+                          <div class="run-note ink3" style="display: flex; justify-content: flex-end; margin-top: 4px">~10 min</div>
+                          <div class="run-note" id="run-note" style="opacity: 0">You’re 1 min past your estimate. No problem: close it when you’re done.</div>
+                        </div>
+                      </div>
+
+                      <div class="plan-h">Today’s plan <span class="ink3 tab" style="font-weight: 450" id="plan-n">3</span><span class="seg"><span class="on">List</span><span>Board</span><span>Blocks</span></span></div>
+                      <div class="blk"><div class="blk-h">To do</div><div class="empty">Nothing here yet.</div></div>
+                      <div class="blk">
+                        <div class="blk-h">Morning <span class="ink3">06:00–12:00</span><span class="badge">Now</span><span class="ink3 tab" id="m-n">1</span></div>
+                        <div class="rows">
+                          <div class="row grow" id="row-elbow" style="height: 0; border-top: 0"><span class="tm tab">09:00</span><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></svg>Elbow and back exercises<span class="r" id="row-elbow-r">~10 min</span></div>
+                          <div class="row" id="row-mail"><svg class="ic" viewBox="0 0 24 24" style="color: rgb(var(--ink-3))"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>Check email<span class="r">max 15 min</span></div>
+                        </div>
+                      </div>
+                      <div class="blk">
+                        <div class="blk-h">Afternoon <span class="ink3">12:00–18:00 · Later 1</span></div>
+                        <div class="rows"><div class="row"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></svg>Write report<span class="r">~45 min</span></div></div>
+                      </div>
+                      <div class="blk">
+                        <div class="blk-h">Evening <span class="ink3">18:00–23:00 · Later 1</span></div>
+                        <div class="rows"><div class="row"><svg class="ic" viewBox="0 0 24 24" style="color: rgb(var(--ink-3))"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>Read<span class="r">min 20 min</span></div></div>
+                      </div>
+                      <div class="blk" id="coming" style="opacity: 0">
+                        <div class="blk-h">Coming days <span class="ink3 tab">49</span></div>
+                        <div class="rows" id="coming-rows"></div>
+                      </div>
+                    </div>
+
+                    <div class="side">
+                      <div><span class="tnum tab" id="t-num">0</span> <span class="tline">tempos today</span></div>
+                      <div class="tline"><b class="tab" id="t-pct">0%</b> of your daily reference · 100</div>
+                      <div class="bar tempo" style="margin-top: 10px"><i id="t-bar"></i></div>
+                      <div class="tline" id="t-sum" style="margin-top: 10px; opacity: 0">1 completed · average satisfaction <b>9</b></div>
+                      <div class="grow" id="gwrap" style="height: 0; opacity: 0">
+                        <div class="lbl">Goals</div>
+                        <div class="card gmini"><div class="t">Right elbow without pain</div><div class="s"><span>Calm it down</span><span class="tab" id="gm-pct">0%</span></div><div class="bar acc"><i id="gm-bar"></i></div></div>
+                      </div>
+                      <div class="lbl">Log</div>
+                      <div class="log-track"><i class="log-mark" id="log-mark" style="opacity: 0"></i></div>
+                      <div class="log-axis tab"><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span></div>
+                      <div class="log-empty" id="log-empty">What you close and the events you log will show up here.</div>
+                      <div class="log-entry" id="log-entry" style="opacity: 0">
+                        <span class="t tab">9:00 AM</span>
+                        <span><span class="b">Elbow and back exercises</span><br /><span class="ink3 tab">11 min · ~10 min · 9/10</span></span>
+                        <span class="plus tab">+13</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- Goals -->
+                <section class="view" id="v-goals" style="opacity: 0">
+                  <h1 class="h1">Goals</h1>
+                  <div class="sub">The life you want, and the way there.</div>
+                  <div class="card ideal"><div class="b">Ideal life</div><p>This is where how you would like to live, and what you want to reach, goes in your own words.</p></div>
+                  <div class="plan-h" style="margin-top: 20px">Roadmaps <span class="ink3 tab" style="font-weight: 450">1</span></div>
+                  <div class="card rm" id="rm">
+                    <div class="rm-date tab" id="rm-date">Mon Nov 16</div>
+                    <div class="rm-top">
+                      <div>
+                        <div class="rm-t">Right elbow without pain</div>
+                        <div class="sub" style="font-size: 13px">Work at the computer without elbow or back pain.</div>
+                        <div class="ink3 tab" style="font-size: 12.5px; margin-top: 6px"><span id="rm-steps">0 of 3 steps</span> · Mon, Tue, Wed, Thu, Fri · 09:00</div>
+                      </div>
+                      <div class="rm-pct tab"><span id="rm-pct">0</span><small>%</small></div>
+                    </div>
+                    <div class="rm-segs"><div class="bar acc"><i id="seg-0"></i></div><div class="bar acc"><i id="seg-1"></i></div><div class="bar acc"><i id="seg-2"></i></div></div>
+                    <div id="steps"></div>
+                  </div>
+                </section>
+              </main>
+
+              <!-- ================= chat -->
+              <aside class="chat">
+                <div class="chat-h">Chat <span class="tab" id="ctx">5.9K / 16K</span></div>
+                <div class="msgs">
+                  <div class="hello" id="hello">
+                    <div class="q">What do you want to do today?</div>
+                    <p>Write it like you’d say it: “start my day”, “write the report at 3 pm”, “I finished, it went well”.</p>
+                    <span class="sugg">What’s on for today?</span><span class="sugg">What should I do next?</span><span class="sugg">How is my week going?</span>
+                  </div>
+                  <div class="feed" id="feed">
+                    <div class="me" id="m-ask" style="display: none"></div>
+                    <div class="tool" id="m-search" style="display: none">
+                      <div class="tool-h"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" /></svg><span id="q-text"></span><span class="st8"><span class="spin" id="spin"></span><svg class="ic okc" id="okc" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg></span></div>
+                      <div id="srcs"></div>
+                    </div>
+                    <div class="ai" id="m-answer" style="display: none"></div>
+                    <div class="me" id="m-reply" style="display: none"></div>
+                    <div class="ask-card" id="m-card" style="display: none">
+                      <div class="t" id="card-t"></div>
+                      <div class="l" id="card-meta"></div>
+                      <div id="card-lines"></div>
+                      <div class="foot">
+                        <span class="wait" id="foot1-a">Waiting for you</span><span class="btn no" id="foot1-b">No</span>
+                        <span class="btn go" id="do1" style="position: relative">Do it<span class="ring" style="left: calc(50% - 20px); top: calc(50% - 20px)" id="ring1"></span><span class="cursor" id="cur1" style="left: 50%; top: 55%"><svg viewBox="0 0 24 24"><path d="M4 2l15 9-6.5 1.6L9.8 19z" fill="#16161a" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" /></svg></span></span>
+                        <div class="done-row" id="done1"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg>Done</div>
+                      </div>
+                    </div>
+                    <div class="ai" id="m-done" style="display: none"></div>
+                    <div class="me" id="m-close" style="display: none"></div>
+                    <div class="ask-card" id="m-closecard" style="display: none">
+                      <div class="t"><span id="cc-t"></span> <span class="tp-plus" id="cc-p"></span></div>
+                      <div class="foot">
+                        <span class="wait" id="foot2-a">Waiting for you</span><span class="btn no" id="foot2-b">No</span>
+                        <span class="btn go" id="do2" style="position: relative">Do it<span class="ring" style="left: calc(50% - 20px); top: calc(50% - 20px)" id="ring2"></span><span class="cursor" id="cur2" style="left: 50%; top: 55%"><svg viewBox="0 0 24 24"><path d="M4 2l15 9-6.5 1.6L9.8 19z" fill="#16161a" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" /></svg></span></span>
+                        <div class="done-row" id="done2"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10" /></svg>Done</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="comp">
+                  <div class="comp-text">
+                    <span class="ph" id="ph">Tell LifeUI what you want to do…</span>
+                    <span id="ty-ask"></span><span id="ty-reply"></span><span id="ty-close"></span><span class="caret" id="caret" style="opacity: 0"></span>
+                  </div>
+                  <div class="comp-f">
+                    <div class="mode"><span class="on">Ask first</span><span>Auto</span></div>
+                    <div class="send"><svg class="ic" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7" /></svg></div>
+                  </div>
+                </div>
+                <div class="hint">Asks before every change.</div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (() => {
+          const D = window.DATA, C = D.chat, IR = LF.IR;
+          const root = document.querySelector('#el-app [data-composition-id="app"]') ?? document.querySelector('[data-composition-id="app"]:not([data-composition-src])');
+          const $ = (s) => root.querySelector(s);
+          LF.theme(); // again here: in <head> the runtime has not passed the variables yet
+          const tl = gsap.timeline({ paused: true });
+          const feed = $('#feed');
+
+          // ---------- content from data.js (checked against the capture)
+          $('#m-ask').textContent = C.ask;
+          $('#q-text').textContent = `Search the web: “${C.search}”`;
+          $('#srcs').innerHTML = C.sources.map(([t, h]) => `<div class="src"><span>${t}</span><span class="ink3">· ${h}</span></div>`).join('');
+          $('#m-answer').innerHTML = C.answer
+            .map((b) => (b.p ? `<p>${b.p[0] ? `<b>${b.p[0]}</b> ` : ''}${b.p[1]}</p>` : `<ol>${b.ol.map(([h, r]) => `<li><b>${h}</b> ${r}</li>`).join('')}</ol>`))
+            .join('');
+          $('#m-reply').textContent = C.reply;
+          $('#card-t').textContent = C.roadmap.title;
+          $('#card-meta').textContent = C.roadmap.meta;
+          $('#card-lines').innerHTML = C.roadmap.lines.map((l) => `<div class="l">${l}</div>`).join('');
+          $('#m-done').innerHTML = `<p>${C.done}</p>`;
+          $('#m-close').textContent = C.close;
+          $('#cc-t').textContent = C.closeCard[0];
+          $('#cc-p').textContent = C.closeCard[1];
+          const guide = `<ul class="guide">${C.steps.map(([s, how]) => `<li>${s}${how ? ' (<span class="how">how</span>)' : ''}</li>`).join('')}</ul>`;
+          $('#coming-rows').innerHTML = D.sessions
+            .slice(1, 15)
+            .map((s, i) => `<div class="row" style="opacity:0"><span class="tm tab" style="width:96px">${i === 0 ? 'Tomorrow' : s.label}</span><span class="tm tab">09:00</span>Elbow and back exercises<span class="r">~10 min</span></div>`)
+            .join('');
+          const P = D.phases;
+          const from = ['', 'From Mon Nov 30', 'From Mon Dec 28'];
+          $('#steps').innerHTML = P.map(
+            (p, i) => `<div class="st">
+              <div class="st-n ${i === 0 ? 'cur' : ''}" id="stn-${i}"><span id="stn-${i}-n">${i + 1}</span><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="rgb(var(--success))"/><path d="m6.5 11.2 3 3 6-6.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" id="stk-${i}"/></svg></div>
+              <div>
+                <div class="st-h">${p.name} <span class="tag ${i === 0 ? 'here' : ''}" id="tag-${i}">${i === 0 ? 'You are here' : 'Later'}</span></div>
+                <div class="st-r"><span>Elbow and back exercises</span><span class="tab" id="cnt-${i}">${i === 0 ? '0 of 10 sessions' : p.total + ' sessions'}</span></div>
+                ${i === 0 ? `<div class="grow" id="guide-wrap" style="height:0">${guide}</div>` : ''}
+                <div class="st-sub" id="sub-${i}">${i === 0 ? 'In today’s plan · 9 planned' : from[i]}</div>
+              </div>
+            </div>`,
+          ).join('');
+          const answerWords = LF.words($('#m-answer'));
+
+          // ================= timeline (seconds)
+          const T = { ask0: 0.6, send1: 3.4, cam1: 3.7, search: 4.2, ok: 7.3, ans0: 7.7, ans1: 15.0, rep0: 15.8, send2: 17.9, card: 19.0, curIn: 21.2, do1: 22.7, done: 23.5, camOut: 24.4, today: 25.2, coming: 26.0, gmini: 28.0, goals1: 30.6, guide: 31.6, back: 35.8, run: 36.1, close0: 37.9, send3: 39.0, ccard: 39.5, cur2: 40.0, do2: 40.9, earn: 41.3, goals2: 42.6, lapse0: 43.4, lapse1: 48.4 };
+
+          // ---------- 1 · the ask, typed and sent
+          tl.fromTo($('#ph'), { opacity: 1 }, { opacity: 0, duration: 0.15, ...IR }, T.ask0 - 0.1);
+          tl.fromTo($('#caret'), { opacity: 0 }, { opacity: 1, duration: 0.1, ...IR }, T.ask0 - 0.1);
+          LF.type(tl, $('#ty-ask'), C.ask, T.ask0, T.send1 - T.ask0 - 0.25);
+          tl.set($('#ty-ask'), { display: 'none' }, T.send1);
+          tl.fromTo($('#caret'), { opacity: 1 }, { opacity: 0, duration: 0.1, ...IR }, T.send1);
+          tl.fromTo($('#ph'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.send1 + 0.1);
+          tl.fromTo($('#hello'), { opacity: 1 }, { opacity: 0, duration: 0.3, ...IR }, T.send1);
+          LF.join(tl, feed, $('#m-ask'), T.send1);
+
+          // the camera leans toward the chat for the conversation
+          const cam = $('#cam');
+          const lean = { scale: 1.16, x: 1440 - 1440 * 1.16, y: 900 - 900 * 1.16 };
+          tl.fromTo(cam, { scale: 1, x: 0, y: 0 }, { ...lean, duration: 1.1, ease: 'power3.inOut', ...IR }, T.cam1);
+
+          // ---------- 2 · the coach searches the web: four sources, one by one
+          LF.join(tl, feed, $('#m-search'), T.search);
+          tl.fromTo($('#spin'), { rotation: 0 }, { rotation: 360 * 4, duration: T.ok - T.search, ease: 'none', ...IR }, T.search);
+          [...root.querySelectorAll('#srcs .src')].forEach((s, i) => tl.fromTo(s, { opacity: 0, x: -6 }, { opacity: 1, x: 0, duration: 0.35, ease: 'power2.out', ...IR }, T.search + 0.7 + i * 0.6));
+          tl.fromTo($('#spin'), { opacity: 1 }, { opacity: 0, duration: 0.2, ...IR }, T.ok);
+          tl.fromTo($('#okc'), { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(2)', ...IR }, T.ok);
+
+          // ---------- 3 · the answer: its room opens, then its words stream in; the plan's three phases light up
+          LF.join(tl, feed, $('#m-answer'), T.ans0);
+          LF.stream(tl, answerWords, T.ans0 + 0.3, T.ans1 - T.ans0 - 0.3);
+          const lis = [...root.querySelectorAll('#m-answer li')];
+          lis.forEach((li) => {
+            const firstWord = li.querySelector('.w');
+            const t0 = T.ans0 + 0.3 + answerWords.indexOf(firstWord) * ((T.ans1 - T.ans0 - 0.3) / answerWords.length);
+            li.classList.add('pre');
+            LF.cls(tl, li, 'pre', false, t0);
+            tl.fromTo(li, { backgroundColor: 'rgba(124,120,242,0)' }, { backgroundColor: 'rgba(124,120,242,0.16)', duration: 0.3, ...IR }, t0);
+            tl.fromTo(li, { backgroundColor: 'rgba(124,120,242,0.16)' }, { backgroundColor: 'rgba(124,120,242,0)', duration: 1.2, ...IR }, t0 + 1.4);
+          });
+          LF.count(tl, $('#ctx'), 5.9, 6.9, T.ans0, T.ans1 - T.ans0, (n) => n.toFixed(1) + 'K / 16K', 'none');
+
+          // ---------- 4 · the reply
+          tl.fromTo($('#ph'), { opacity: 1 }, { opacity: 0, duration: 0.15, ...IR }, T.rep0 - 0.1);
+          tl.fromTo($('#caret'), { opacity: 0 }, { opacity: 1, duration: 0.1, ...IR }, T.rep0 - 0.1);
+          LF.type(tl, $('#ty-reply'), C.reply, T.rep0, T.send2 - T.rep0 - 0.3);
+          tl.set($('#ty-reply'), { display: 'none' }, T.send2);
+          tl.fromTo($('#caret'), { opacity: 1 }, { opacity: 0, duration: 0.1, ...IR }, T.send2);
+          tl.fromTo($('#ph'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.send2 + 0.1);
+          LF.join(tl, feed, $('#m-reply'), T.send2);
+
+          // ---------- 5 · the roadmap card waits on "Do it"
+          LF.join(tl, feed, $('#m-card'), T.card);
+          LF.count(tl, $('#ctx'), 6.9, 7.0, T.card, 0.4, (n) => n.toFixed(1) + 'K / 16K', 'none');
+          LF.press(tl, $('#cur1'), $('#ring1'), T.curIn, T.do1);
+          ['#foot1-a', '#foot1-b', '#do1'].forEach((s) => tl.fromTo($(s), { opacity: 1 }, { opacity: 0, duration: 0.25, ...IR }, T.do1 + 0.5));
+          tl.fromTo($('#done1'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.do1 + 0.6);
+          LF.join(tl, feed, $('#m-done'), T.done);
+          tl.fromTo(cam, { ...lean }, { scale: 1, x: 0, y: 0, duration: 1.0, ease: 'power3.inOut', ...IR }, T.camOut);
+
+          // ---------- 6 · Today takes the plan in
+          tl.fromTo($('#row-elbow'), { height: 0, opacity: 0 }, { height: 42, opacity: 1, duration: 0.5, ease: 'power3.out', ...IR }, T.today);
+          tl.set($('#row-elbow'), { borderTopWidth: 0 }, T.today);
+          tl.set($('#row-mail'), { borderTopWidth: 1 }, T.today);
+          LF.count(tl, $('#plan-n'), 3, 4, T.today, 0.01);
+          LF.count(tl, $('#m-n'), 1, 2, T.today, 0.01);
+          tl.set($('#next-elbow'), { display: 'inline-flex' }, T.today + 0.2);
+          tl.fromTo($('#next-elbow'), { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.4, ease: 'power2.out', ...IR }, T.today + 0.2);
+          tl.fromTo($('#coming'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', ...IR }, T.coming);
+          [...root.querySelectorAll('#coming-rows .row')].forEach((r, i) => tl.fromTo(r, { opacity: 0 }, { opacity: 1, duration: 0.25, ...IR }, T.coming + 0.25 + i * 0.1));
+          tl.fromTo($('#gwrap'), { opacity: 0 }, { opacity: 1, duration: 0.4, ...IR }, T.gmini + 0.15);
+          tl.fromTo($('#gwrap'), { height: 0 }, { height: $('#gwrap').scrollHeight, duration: 0.5, ease: 'power3.out', ...IR }, T.gmini);
+
+          // ---------- 7 · Goals: the roadmap, and the first step's session with its guide
+          const toGoals = (t) => {
+            tl.fromTo($('#sb-sel'), { y: 0 }, { y: 34, duration: 0.35, ease: 'power2.inOut', ...IR }, t);
+            tl.set($('#sb-today'), { color: 'rgb(var(--ink-2))' }, t + 0.15);
+            tl.set($('#sb-goals'), { color: 'rgb(var(--ink))' }, t + 0.15);
+            tl.fromTo($('#v-today'), { opacity: 1 }, { opacity: 0, duration: 0.3, ...IR }, t);
+            tl.fromTo($('#v-goals'), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', ...IR }, t + 0.2);
+          };
+          const toToday = (t) => {
+            tl.fromTo($('#sb-sel'), { y: 34 }, { y: 0, duration: 0.35, ease: 'power2.inOut', ...IR }, t);
+            tl.set($('#sb-today'), { color: 'rgb(var(--ink))' }, t + 0.15);
+            tl.set($('#sb-goals'), { color: 'rgb(var(--ink-2))' }, t + 0.15);
+            tl.fromTo($('#v-goals'), { opacity: 1 }, { opacity: 0, duration: 0.3, ...IR }, t);
+            tl.fromTo($('#v-today'), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', ...IR }, t + 0.2);
+          };
+          toGoals(T.goals1);
+          const goalsState0 = T.goals1; // painted by the lapse helper below (st.i = 0)
+          const gh = LF.height($('#guide-wrap > ul')) + 12;
+          tl.fromTo($('#guide-wrap'), { height: 0 }, { height: gh, duration: 0.6, ease: 'power3.out', ...IR }, T.guide);
+          [...root.querySelectorAll('#guide-wrap li')].forEach((li, i) => tl.fromTo(li, { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.guide + 0.2 + i * 0.18));
+
+          // ---------- 8 · nine o'clock: it runs, and is closed through the chat
+          toToday(T.back);
+          tl.fromTo($('#now-idle'), { opacity: 1 }, { opacity: 0, duration: 0.3, ...IR }, T.run);
+          tl.fromTo($('#now-run'), { opacity: 0 }, { opacity: 1, duration: 0.35, ...IR }, T.run + 0.1);
+          LF.text(tl, $('#sb-run'), 'Nothing running.', 'Elbow and back exercises', T.run);
+          LF.text(tl, $('#row-elbow-r'), '~10 min', 'Running', T.run);
+          LF.cls(tl, $('#row-elbow-r'), 'is-live', true, T.run);
+          LF.cls(tl, $('#row-elbow-r'), 'is-live', false, T.earn);
+          LF.count(tl, $('#timer'), 0, 660, T.run + 0.3, 1.5, (n) => `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, '0')}`, 'power1.in');
+          tl.fromTo($('#run-bar'), { scaleX: 0 }, { scaleX: 1, duration: 1.5, ease: 'power1.in', ...IR }, T.run + 0.3);
+          tl.fromTo($('#run-note'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.run + 1.7);
+          tl.fromTo($('#ph'), { opacity: 1 }, { opacity: 0, duration: 0.15, ...IR }, T.close0 - 0.1);
+          tl.fromTo($('#caret'), { opacity: 0 }, { opacity: 1, duration: 0.1, ...IR }, T.close0 - 0.1);
+          LF.type(tl, $('#ty-close'), C.close, T.close0, T.send3 - T.close0 - 0.25);
+          tl.set($('#ty-close'), { display: 'none' }, T.send3);
+          tl.fromTo($('#caret'), { opacity: 1 }, { opacity: 0, duration: 0.1, ...IR }, T.send3);
+          tl.fromTo($('#ph'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.send3 + 0.1);
+          LF.join(tl, feed, $('#m-close'), T.send3);
+          LF.join(tl, feed, $('#m-closecard'), T.ccard);
+          LF.press(tl, $('#cur2'), $('#ring2'), T.cur2, T.do2, [-150, -70]);
+          ['#foot2-a', '#foot2-b', '#do2'].forEach((s) => tl.fromTo($(s), { opacity: 1 }, { opacity: 0, duration: 0.25, ...IR }, T.do2 + 0.4));
+          tl.fromTo($('#done2'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.do2 + 0.5);
+          // closed: the run card leaves, the log takes the session, the tempos count up
+          tl.fromTo($('#now-run'), { opacity: 1 }, { opacity: 0, duration: 0.3, ...IR }, T.earn);
+          tl.fromTo($('#now-idle'), { opacity: 0 }, { opacity: 1, duration: 0.35, ...IR }, T.earn + 0.1);
+          tl.set($('#next-elbow'), { display: 'none' }, T.earn);
+          tl.fromTo($('#row-elbow'), { height: 42, opacity: 1 }, { height: 0, opacity: 0, duration: 0.4, ease: 'power2.inOut', ...IR }, T.earn);
+          tl.set($('#row-mail'), { borderTopWidth: 0 }, T.earn + 0.4);
+          LF.count(tl, $('#plan-n'), 4, 3, T.earn, 0.01);
+          LF.count(tl, $('#m-n'), 2, 1, T.earn, 0.01);
+          LF.text(tl, $('#sb-run'), 'Elbow and back exercises', 'Nothing running.', T.earn);
+          tl.fromTo($('#log-empty'), { opacity: 1 }, { opacity: 0, duration: 0.2, ...IR }, T.earn);
+          tl.fromTo($('#log-entry'), { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', ...IR }, T.earn + 0.15);
+          tl.fromTo($('#log-mark'), { opacity: 0, scaleY: 0 }, { opacity: 1, scaleY: 1, duration: 0.4, ease: 'back.out(2)', ...IR }, T.earn + 0.15);
+          LF.count(tl, [$('#t-num'), $('#sb-tp')], 0, 13, T.earn + 0.2, 0.9);
+          LF.count(tl, [$('#t-pct'), $('#sb-pct')], 0, 13, T.earn + 0.2, 0.9, (n) => Math.round(n) + '%');
+          tl.fromTo([$('#t-bar'), $('#sb-bar')], { scaleX: 0 }, { scaleX: 0.13, duration: 0.9, ease: 'power2.out', ...IR }, T.earn + 0.2);
+          tl.fromTo($('#t-sum'), { opacity: 0 }, { opacity: 1, duration: 0.3, ...IR }, T.earn + 0.7);
+          LF.count(tl, $('#gm-pct'), 0, 3, T.earn + 0.2, 0.9, (n) => Math.round(n) + '%');
+          tl.fromTo($('#gm-bar'), { scaleX: 0 }, { scaleX: 0.03, duration: 0.9, ...IR }, T.earn + 0.2);
+
+          // ---------- 9 · ten weeks, one continuous animation: the real roadmap after each of the fifty sessions
+          toGoals(T.goals2);
+          tl.fromTo($('#guide-wrap'), { height: gh }, { height: 0, duration: 0.4, ease: 'power2.inOut', ...IR }, T.goals2);
+          tl.fromTo(cam, { scale: 1, x: 0, y: 0 }, { scale: 1.1, x: -60, y: -90, duration: 1.0, ease: 'power3.inOut', ...IR }, T.goals2 + 0.3);
+          tl.fromTo($('#rm-date'), { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.35, ...IR }, T.lapse0 - 0.4);
+          const S = D.sessions, N = S.length;
+          const starts = [0, 10, 30];
+          const st = { i: 0 }; // sessions done, continuous: 0 before this scene shows the state after the first close (1)
+          const paint = () => {
+            const i = Math.max(0, Math.min(N + 1.2, st.i));
+            const k = Math.min(N, Math.floor(i)); // sessions done, whole
+            const a = S[Math.max(0, k - 1)], b = S[Math.min(N - 1, k)];
+            const f = Math.min(1, i - Math.floor(i));
+            const pct = k === 0 ? 0 : k >= N ? 100 : a.pct + (b.pct - a.pct) * f;
+            $('#rm-pct').textContent = String(Math.round(pct));
+            $('#rm-date').textContent = a.label;
+            $('#rm-pct').closest('.rm-pct').style.color = k >= N ? 'rgb(var(--success))' : '';
+            let reached = 0;
+            P.forEach((p, j) => {
+              const done = Math.max(0, Math.min(p.total, i - starts[j]));
+              root.querySelector('#seg-' + j).style.transform = `scaleX(${done / p.total})`;
+              const whole = Math.max(0, Math.min(p.total, k - starts[j]));
+              const complete = k >= p.until;
+              if (complete) reached++;
+              const tag = $('#tag-' + j);
+              const cnt = $('#cnt-' + j);
+              const n = $('#stn-' + j);
+              if (complete) {
+                tag.textContent = 'Reached on ' + p.reached;
+                tag.className = 'tag done';
+                n.className = 'st-n';
+                n.querySelector('svg').style.opacity = '1';
+                const draw = Math.max(0, Math.min(1, (i - p.until) / 0.9));
+                $('#stk-' + j).setAttribute('stroke-dashoffset', String(1 - draw));
+                $('#stn-' + j + '-n').style.opacity = '0';
+                cnt.textContent = `${p.total} of ${p.total} sessions`;
+              } else if (k >= starts[j]) {
+                tag.textContent = 'You are here';
+                tag.className = 'tag here';
+                n.className = 'st-n cur';
+                n.querySelector('svg').style.opacity = '0';
+                $('#stn-' + j + '-n').style.opacity = '1';
+                cnt.textContent = `${whole} of ${p.total} sessions`;
+              } else {
+                tag.textContent = 'Later';
+                tag.className = 'tag';
+                n.className = 'st-n';
+                n.querySelector('svg').style.opacity = '0';
+                $('#stn-' + j + '-n').style.opacity = '1';
+                cnt.textContent = `${p.total} sessions`;
+              }
+              $('#sub-' + j).style.opacity = k > 0 ? '0' : '1';
+            });
+            const steps = $('#rm-steps');
+            if (k >= N) {
+              steps.textContent = 'Goal reached';
+              steps.className = 'goal-reached';
+            } else {
+              steps.textContent = `${reached} of 3 steps`;
+              steps.className = '';
+            }
+          };
+          // scene 7 shows the roadmap before any session; seeking back there repaints it
+          tl.fromTo(st, { i: 0 }, { i: 0, duration: 0.01, onUpdate: paint, ...IR }, goalsState0);
+          // before the lapse, Goals shows the state after the first session (it was closed in scene 8)
+          tl.fromTo(st, { i: 1 }, { i: 1, duration: 0.01, onUpdate: paint, ...IR }, T.goals2);
+          tl.fromTo(st, { i: 1 }, { i: N + 1.2, duration: T.lapse1 - T.lapse0, ease: 'power1.inOut', onUpdate: paint, ...IR }, T.lapse0);
+
+          window.__timelines['app'] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>
