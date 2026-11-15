@@ -1,43 +1,47 @@
 # LifeUI
 
-A HUD for real life: plan the day in time blocks, run one activity at a time, and close each one with a single honest self-assessment that earns tempos.
+A local AI harness for organizing your life. An AI coach that runs on a model on your own machine (Ollama or LM Studio) talks your day over with you: it looks things up, lays out a plan and puts every session on your calendar once you say yes. You run one activity at a time and close each one by saying how it went, which earns tempos. Open source, and your day stays on your machine: only the web searches you allow go out.
 
-**[Download for Windows](https://github.com/Felichz/life-ui/releases/latest)** · [Website and film](https://lifeui.medanolabs.com) · [Web app](https://lifeui.medanolabs.com/app/) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
+**[Download the desktop app](https://github.com/Felichz/life-ui/releases/latest)** (Windows, macOS, Linux) · [Website and film](https://lifeui.medanolabs.com) · [Web app](https://lifeui.medanolabs.com/app/) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-today-dark.webp">
-  <img src="docs/readme/01-today-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A HUD for real life. Plan the day in time blocks, run one activity at a time, and close each one with a single honest moment. Marked: 1, Tempos today, as a share of your daily reference: an anchor, never a debt. 2, Only one activity runs at a time, against its estimate or timebox. 3, Quick start for pinned activities. Everything has a shortcut.">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-coach-dark.webp">
+  <img src="docs/readme/01-coach-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A coach for your day, in a chat. Tell it what is going on. It looks things up, lays out a plan, and puts it on your calendar once you say yes. Marked: 1, What is running or what comes next, and the day’s tempos, above every screen. 2, Nothing changes without your yes: every change waits on a card. 3, The day as one line of time, from what you did to what is planned.">
 </picture>
 
 <sub>The pictures follow your GitHub theme (light or dark). Screenshots use synthetic demo data.</sub>
 
 ## What it is
 
-LifeUI is not a todo app, a habit tracker or a time tracker. You keep a library of activities you repeat, drop them into the day's time blocks (Morning, Afternoon, To do), and run exactly one at a time. Only To do and the block you are in right now can be started. What is running, and for how long, is always on screen, in the tab title, and in a floating bar on mobile.
+LifeUI is not a todo app, a habit tracker or a time tracker. It is a conversation with a coach that changes your day for you ([ADR-002](docs/adr/002-agent-mediated-app.md), [ADR-009](docs/adr/009-coach-and-web-research.md)). The conversation is in the middle of every screen; above it, a thin bar shows what is running and for how long, or what comes next, and the day's tempos; beside it, one panel shows the day as a single line of time, or your goals, your library or a look back ([ADR-013](docs/adr/013-the-conversation-in-the-middle.md)). You can resize that panel or fold it away.
 
-Every ending (finishing, switching to something else, ending the day) goes through one closing ritual: how satisfied are you with what you did, from 0 to 10? The answer earns tempos, computed as `ceil(base minutes × score / 7)`, where the base is your estimate when there is one and the real time otherwise. A 7 is 100%, and a 0 counts nothing. Tempos only go up: no streaks, no penalties, and free time costs nothing. The daily target is a reference shown as a percentage, never as what is missing.
+Nothing changes without your yes. Every change the coach makes waits on a card ("Do it" / "No"), or, in Auto mode, can be undone. With your permission it searches the web to back its advice, and the sources it used show under the search.
+
+A goal that takes weeks becomes a roadmap ([ADR-011](docs/adr/011-a-roadmap-owns-its-sessions.md)): phases of real sessions on your calendar, each one saying what to do, with the guide that shows how. The coach keeps notes on what you told it (what you want, what you have, your limits) so it asks only what is missing ([ADR-012](docs/adr/012-the-coachs-notes.md)).
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-closing-dark.webp">
-  <img src="docs/readme/02-closing-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Every activity ends with one honest moment. Rate it from 0 to 10. The preview shows the tempos you will earn, from the same function that awards them.">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-goals-dark.webp">
+  <img src="docs/readme/02-goals-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A goal becomes sessions on your calendar. A roadmap in phases. Each session says what to do, with the guide that shows how. Marked: 1, Progress counts only what you really closed. Nothing shows what is missing. 2, Every exercise links to the guide the coach found.">
+</picture>
+
+Every ending goes through one honest moment: you say how it went, in your own words, and the coach reads a 0 to 10 satisfaction from them. That earns tempos, computed as `ceil(base minutes × score / 7)`, where the base is your estimate when there is one and the real time otherwise. A 7 is 100%, and a 0 counts nothing. Tempos only go up: no streaks, no penalties, and free time costs nothing. The daily target is a reference shown as a percentage, never as what is missing.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-close-dark.webp">
+  <img src="docs/readme/03-close-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Close it in a sentence. Say how it went. The coach reads the score from your words, and the card shows the tempos it earns before you confirm. Marked: 1, The running session, its clock, and its progress along the bar’s edge. 2, Tempos only go up: no streaks, no penalties, free time costs nothing.">
 </picture>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-review-dark.webp">
-  <img src="docs/readme/03-review-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Look back to adjust, not to judge yourself. The day hour by hour, time tracked by activity type, and every close with its satisfaction and tempos.">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-library-dark.webp">
-  <img src="docs/readme/04-library-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A library of repeatable activities. Each one keeps its duration contract (a clear goal, a flexible range or a timebox), how often you ran it and how it went.">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-review-dark.webp">
+  <img src="docs/readme/04-review-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Look back to adjust, not to judge yourself. The day hour by hour, time by activity type, and every close with its satisfaction and tempos.">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/05-phone-dark.webp">
-  <img src="docs/readme/05-phone-light.webp" width="100%" alt="LifeUI, screenshot on a phone. The closing ritual on a phone. The same dialog as a bottom sheet, with the 0 to 10 scale and the reward preview.">
+  <img src="docs/readme/05-phone-light.webp" width="100%" alt="LifeUI, screenshot on a phone. On a phone, the conversation is home. The same bar on top with what is running. The day, your goals and the library are one tap away.">
 </picture>
 
-The interface is available in English and Spanish. It opens in English on first launch and can be switched to Spanish in Settings or from the command palette.
+The interface is available in English and Spanish, in a light and a dark theme (one click away on the rail). It opens in English on first launch and can be switched to Spanish in Settings or from the command palette.
 
 ## How it's built
 
@@ -46,7 +50,7 @@ The domain logic and the UI are separate layers. The UI never re-implements a ru
 ```mermaid
 flowchart LR
   subgraph UI["src/app · React UI"]
-    Screens["Screens<br/>Today · Library · Review · Settings"]
+    Screens["Screens<br/>Coach · Today · Goals · Library · Review"]
     Flow["ClosingFlowProvider<br/>single closing path"]
   end
   subgraph Core["src/system · domain core (framework-free TS)"]
@@ -71,7 +75,7 @@ flowchart LR
 
 ## Stack
 
-React 18, TypeScript (strict), Vite, React Router, Tailwind CSS with CSS-variable design tokens (light and dark follow the system), Radix UI primitives, `@hello-pangea/dnd`, Inter (self-hosted), Jest with Testing Library, Cypress, GitHub Actions, Vercel.
+React 18, TypeScript (strict), Vite, React Router, Tailwind CSS with CSS-variable design tokens and container queries, Radix UI primitives, Inter (self-hosted), Tauri 2 (Rust) for the desktop app, Jest with Testing Library, Cypress, GitHub Actions, Cloudflare Workers.
 
 ## Getting started
 
@@ -100,20 +104,20 @@ npm run dev          # http://localhost:5174
 
 `npm run sim:score -- <transcript.txt>` scores a transcript the runner wrote: the saved roadmap against what the person said (days, session counts, phases, minutes, loads, rules, the coach's numbers). It judges nothing by taste, and passing it is not the same as a good coach.
 
-Keyboard: `Ctrl/⌘ K` command palette · `N` add activity · `E` log event · `T` finish the running activity · `G` then `H`/`B`/`R`/`A` to navigate · `0` to `9` to score in the closing ritual.
+Keyboard: `Ctrl/⌘ K` command palette · `Ctrl/⌘ B` show or hide the panel · `G` then `H`/`M`/`B`/`R`/`A` to open Today, Goals, Library, Review or Settings.
 
 ## Testing
 
-252 Jest tests across 15 suites, plus 5 Cypress end-to-end tests.
+450 Jest tests across 31 suites, plus 6 Cypress end-to-end tests.
 
 - **Core** ([`src/system/__tests__`](src/system/__tests__)): unit tests for the managers, the tempo formula and persistence (including migrations and import), plus integration tests for starting a day, the library, planning, and the closing ritual.
 - **UI** ([`src/app/__tests__`](src/app/__tests__)): view-logic tests, i18n key and placeholder parity, and flow tests that render the real app against a real `SystemCore`: closing with the previewed reward, switching activity through the ritual, cancelling, "I didn't finish it", and quick starts.
-- **End to end** ([`cypress/e2e/journey.cy.ts`](cypress/e2e/journey.cy.ts)): first run through ending the day in the browser, mobile navigation, the language switch, and redirects from the old Spanish routes.
+- **End to end** ([`cypress/e2e/journey.cy.ts`](cypress/e2e/journey.cy.ts)): first run through ending the day in the browser, the conversation as its own screen on a phone, the language switch, and redirects from the old Spanish routes.
 
-The 1x PNG screenshots in `docs/screenshots/` are generated by a separate Cypress spec with synthetic demo data (`npm run dev` must be running):
+The README's pictures come from a separate Cypress spec: one scripted conversation with the coach through the real agent and core, with synthetic data, captured in both themes (`npm run dev` must be running). The panels around the shots are drawn by the portfolio's `scripts/readme/build.mjs`.
 
 ```bash
-npx cypress run --config-file cypress.screenshots.config.ts
+npx cypress run --browser chrome --config-file cypress.screenshots.config.ts
 ```
 
 ## Project structure
@@ -123,10 +127,11 @@ src/
   system/              domain core: SystemCore, managers, UtilityService, persistence
     __tests__/         unit and integration tests for the core
   app/
+    agent/             the coach: its turn loop, tools, notes, planner and the chat
     state/             core adapter, closing flow, theme, toasts
-    features/          today, library, review, settings, plus the activity dialogs
+    features/          today, goals, library, review, settings, plus the activity dialogs
     components/ui/     design-system primitives (Button, Dialog, Menu, Tooltip...)
-    shell/             app shell, sidebar, command palette
+    shell/             app shell: the HUD, the rail, the resizable panel, the command palette
     i18n/              typed EN/ES messages
     lib/               formatting and read-only view helpers
   types.ts             shared domain types
@@ -141,14 +146,34 @@ docs/adr/              architecture decision records
 ## Decisions
 
 - [ADR-001: the tempo system](docs/adr/001-tempo-system.md): the reward formula and what was deliberately removed.
+- [ADR-013: the conversation in the middle](docs/adr/013-the-conversation-in-the-middle.md): the coach-centred shell, the HUD and the one context panel.
 - [`PRODUCT.md`](PRODUCT.md): users, purpose and product principles.
 - [`DESIGN.md`](DESIGN.md): the visual system (tokens, type, components, rules).
 
 ## Desktop app and releases
 
-LifeUI is meant for a desktop: a Tauri app that runs the coach on a local model (Ollama or LM Studio) and keeps its state in a file on your machine. `npm run desktop` runs it from source.
+LifeUI is meant for a desktop: a Tauri app that runs the coach on a local model (Ollama or LM Studio) and keeps its state in a file on your machine. Each [release](https://github.com/Felichz/life-ui/releases/latest) has:
 
-A release is built by GitHub Actions ([`release.yml`](.github/workflows/release.yml)): pushing a tag such as `v0.1.0` (the version in `src-tauri/tauri.conf.json`) builds the Windows installer and attaches it to a draft release, which is then reviewed and published on GitHub. The website's download button points at the latest published release.
+| System  | File                                | What it is                                                                                                                                                                      |
+| ------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | `LifeUI_<version>_x64-setup.exe`    | The installer, for your user (no admin needed)                                                                                                                                  |
+| Windows | `LifeUI_<version>_x64_en-US.msi`    | The same as an MSI, for managed installs                                                                                                                                        |
+| Windows | `LifeUI_<version>_x64_portable.zip` | Nothing to install: `LifeUI.exe` keeps everything (the day, the library, the conversations) in the `LifeUI-data` folder beside it. Needs WebView2, which Windows 10 and 11 have |
+| macOS   | `LifeUI_<version>_universal.dmg`    | Apple silicon and Intel                                                                                                                                                         |
+| Linux   | `.AppImage`, `.deb`, `.rpm`         | x86_64                                                                                                                                                                          |
+
+The builds are not signed with a paid certificate, so the system asks once before the first launch. On Windows, SmartScreen may say "Windows protected your PC": choose More info, then Run anyway. On macOS, right-click the app, choose Open, then Open again.
+
+`npm run desktop` runs the app from source and `npm run desktop:build` builds this machine's packages into `src-tauri/target/release/bundle/` (Node 20 or later and Rust).
+
+**Making a release.** GitHub Actions ([`release.yml`](.github/workflows/release.yml)) builds all of the above on Windows, macOS and Linux runners. Set the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `package.json`, then push a tag with it:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The release is created as a draft with every file attached; review it on GitHub and publish it. The website's download button points at the latest published release.
 
 ## Deploying
 
