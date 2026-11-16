@@ -198,3 +198,39 @@ describe("the day through the chat", () => {
     expect(core.getActiveActivity()?.id).toBe(otherInstance.id);
   });
 });
+
+describe("tasks from the panel (ADR-015)", () => {
+  it("start with a button, and the coach is told and answers", async () => {
+    const { chat, seen } = script(say("¡Vamos! Avísame cuando termines."));
+    const { core, reportInstance } = setup(chat);
+    const [start] = screen.getAllByRole("button", { name: "Empezar «Escribir informe»" });
+    await act(async () => {
+      fireEvent.click(start);
+    });
+    expect(core.getActiveActivity()?.id).toBe(reportInstance.id);
+    await screen.findByText("¡Vamos! Avísame cuando termines.");
+    const sent = seen[0].filter((message) => message.role === "user").at(-1);
+    expect(String(sent?.content)).toContain("Empecé «Escribir informe».");
+  });
+
+  it("finish with a yes: did you complete it, and the coach hears it", async () => {
+    const { chat, seen } = script(say("¡Bien hecho!"));
+    const { core, reportInstance } = setup(chat);
+    core.activateActivity(reportInstance.id);
+    const finish = await screen.findAllByRole("button", { name: "Terminar" });
+    await act(async () => {
+      fireEvent.click(finish[0]);
+    });
+    const dialog = await screen.findByTestId("closing-dialog");
+    expect(dialog).toHaveTextContent("¿Completaste «Escribir informe»?");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Sí, la completé/ }));
+    });
+    const [record] = core.getState().global.completedActivityRecords;
+    expect(record).toMatchObject({ state: "completed", templateTitle: "Escribir informe" });
+    expect(record).not.toHaveProperty("temposAwarded");
+    await screen.findByText("¡Bien hecho!");
+    const sent = seen[0].filter((message) => message.role === "user").at(-1);
+    expect(String(sent?.content)).toContain("Terminé «Escribir informe»: la completé.");
+  });
+});

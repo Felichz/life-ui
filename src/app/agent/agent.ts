@@ -1418,7 +1418,17 @@ export class Agent {
     const first = lines.findIndex((line) => /[?¿]/.test(line));
     let cut = first < 0 ? lines.length : first;
     while (cut > 0 && (!lines[cut - 1].trim() || /:\s*$/.test(lines[cut - 1]))) cut--;
-    const intro = lines.slice(0, cut).join("\n").trim();
+    const before = lines.slice(0, cut).join("\n").trim();
+    // A 9B model wrote the same safety note above every card: said once, it is not said again
+    const opening = before.slice(0, 60).toLocaleLowerCase();
+    const repeated =
+      opening.length >= 20 &&
+      this.history.some(
+        (message) =>
+          message.role === "assistant" &&
+          textOf(message.content).toLocaleLowerCase().includes(opening)
+      );
+    const intro = repeated ? "" : before;
     this.history.push({ role: "assistant", content: intro || null, tool_calls: [call] });
     const result = await this.runTool(call);
     this.history.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
