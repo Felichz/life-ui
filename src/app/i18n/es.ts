@@ -678,7 +678,8 @@ export const es = {
   "remote.key": "Clave de API",
   "remote.key.optional": "Clave de API (opcional)",
   "remote.key.hint.web": "Se guarda solo en este navegador.",
-  "remote.key.hint.desktop": "Se guarda solo en esta computadora.",
+  "remote.key.hint.desktop":
+    "Se guarda en el almacén de credenciales de tu sistema, no en un archivo.",
   "remote.key.get": "Conseguir una clave en {provider}",
   "remote.model": "Modelo",
   "remote.model.placeholder": "Escribe o elige un modelo",

@@ -24,7 +24,7 @@ The web build (ADR-002) has no local runtime: its setup goes straight to the clo
 
 ### As built (2026-11-15)
 
-The web build and the desktop app share one setup, "Use a model through an API": OpenRouter, OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Mistral, xAI, Together AI, Fireworks AI, Cerebras, MiniMax and any OpenAI-compatible endpoint (`src/app/runtime/providers.ts`). Every one of them was checked to answer a browser (CORS) from the site's origin, so the web build calls them directly; Anthropic needs its `anthropic-dangerous-direct-browser-access` header. The choice is tried with one short request before it is kept. Keys are kept in the browser's storage on the web, and for now in the app's own storage on the desktop too: the operating system's credential store is still to do.
+The web build and the desktop app share one setup, "Use a model through an API": OpenRouter, OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Mistral, xAI, Together AI, Fireworks AI, Cerebras, MiniMax and any OpenAI-compatible endpoint (`src/app/runtime/providers.ts`). Every one of them was checked to answer a browser (CORS) from the site's origin, so the web build calls them directly; Anthropic needs its `anthropic-dangerous-direct-browser-access` header. The choice is tried with one short request before it is kept. Keys are kept in the browser's storage on the web, and in the operating system's credential store on the desktop (Windows Credential Manager, the macOS Keychain, the Secret Service on Linux; `src-tauri/src/secrets.rs`): the stored choice keeps everything but the key.
 
 ## Consequences
 

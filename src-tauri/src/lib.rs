@@ -5,6 +5,7 @@
 mod gpu_processes;
 mod resources;
 mod runtimes;
+mod secrets;
 mod state;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -56,6 +57,9 @@ pub fn run() {
             runtimes::lmstudio_load,
             runtimes::lmstudio_unload,
             runtimes::start_runtime,
+            secrets::secret_get,
+            secrets::secret_set,
+            secrets::secret_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running LifeUI");

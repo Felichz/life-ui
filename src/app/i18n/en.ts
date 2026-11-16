@@ -682,7 +682,7 @@ export const en: Record<MessageKey, string> = {
   "remote.key": "API key",
   "remote.key.optional": "API key (optional)",
   "remote.key.hint.web": "It is kept only in this browser.",
-  "remote.key.hint.desktop": "It is kept only on this computer.",
+  "remote.key.hint.desktop": "It is kept in your system’s credential store, not in a file.",
   "remote.key.get": "Get a key from {provider}",
   "remote.model": "Model",
   "remote.model.placeholder": "Type or pick a model",

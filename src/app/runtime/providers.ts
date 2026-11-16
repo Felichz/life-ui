@@ -1,5 +1,5 @@
 import type { ModelEndpoint } from "../agent/llm";
-import { desktopFetch, isDesktop } from "../platform/desktop";
+import { desktopFetch, invoke, isDesktop } from "../platform/desktop";
 
 /**
  * Models through an API (ADR-005): the providers that speak the chat
@@ -129,12 +129,58 @@ export function savedRemote(): RemoteModel | null {
   }
 }
 
+/** Where the desktop app keeps the key, in the system's credential store. */
+const SECRET = "remote-api-key";
+
+/** The desktop app with its Rust side (not the dev stand-in, which has none). */
+function keyStore(): boolean {
+  return (
+    isDesktop() &&
+    !(window as unknown as { __TAURI_INTERNALS__?: { mock?: boolean } }).__TAURI_INTERNALS__?.mock
+  );
+}
+
+/**
+ * Keeps the choice. On the web the key stays in this browser's storage, with
+ * the rest (ADR-005). On the desktop it goes to the operating system's
+ * credential store, and the stored choice keeps everything but the key.
+ */
 export function saveRemote(remote: RemoteModel | null) {
+  const desktop = keyStore();
   try {
-    if (remote) localStorage.setItem(KEY, JSON.stringify(remote));
-    else localStorage.removeItem(KEY);
+    if (remote) {
+      localStorage.setItem(
+        KEY,
+        JSON.stringify(desktop ? { ...remote, apiKey: undefined } : remote)
+      );
+    } else localStorage.removeItem(KEY);
   } catch {
     // storage is off in this browser: the choice lasts until the page closes
+  }
+  if (desktop) {
+    const done = remote?.apiKey
+      ? invoke("secret_set", { name: SECRET, value: remote.apiKey })
+      : invoke("secret_delete", { name: SECRET });
+    void done.catch(() => undefined);
+  }
+}
+
+/**
+ * The saved choice with its key. On the desktop the key is read from the
+ * credential store; a key left in storage by 0.3.0's first builds is moved there.
+ */
+export async function loadRemote(): Promise<RemoteModel | null> {
+  const saved = savedRemote();
+  if (!saved || !keyStore()) return saved;
+  if (saved.apiKey) {
+    saveRemote(saved);
+    return saved;
+  }
+  try {
+    const key = await invoke<string | null>("secret_get", { name: SECRET });
+    return { ...saved, apiKey: key ?? "" };
+  } catch {
+    return saved;
   }
 }
 

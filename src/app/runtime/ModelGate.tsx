@@ -71,7 +71,7 @@ import {
   type Verdict,
 } from "./models";
 import { RemoteSetup } from "./RemoteSetup";
-import { remoteEndpoint, saveRemote, savedRemote, type RemoteModel } from "./providers";
+import { loadRemote, remoteEndpoint, saveRemote, savedRemote, type RemoteModel } from "./providers";
 
 type Step =
   | { kind: "checking" }
@@ -154,7 +154,15 @@ export const useModel = () => useContext(ModelContext);
  * only one: chosen once, it is used from then on without asking.
  */
 export function ModelGate({ children }: { children: ReactNode }) {
-  const [remote, setRemote] = useState<RemoteModel | null>(savedRemote);
+  // On the desktop the key comes from the credential store, a moment after launch:
+  // until then the model is not offered, so no request goes out without it
+  const [remote, setRemote] = useState<RemoteModel | null>(() =>
+    isDesktop() ? null : savedRemote()
+  );
+  useEffect(() => {
+    if (!isDesktop() || !savedRemote()) return;
+    void loadRemote().then((loaded) => setRemote((now) => now ?? loaded));
+  }, []);
   const [step, setStep] = useState<Step>(() =>
     isDesktop() && !savedRemote() ? { kind: "checking" } : { kind: "done" }
   );
