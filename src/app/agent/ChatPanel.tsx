@@ -38,6 +38,7 @@ import {
   X,
 } from "lucide-react";
 import { Button, IconButton } from "../components/ui/Button";
+import { Input } from "../components/ui/Field";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "../components/ui/Menu";
 import { Segmented } from "../components/ui/Segmented";
 import { Tooltip } from "../components/ui/Tooltip";
@@ -631,11 +632,9 @@ function NoModel({ onChoose }: { onChoose: () => void }) {
       <p className="mt-1 text-sm text-ink-2">
         {isDesktop() ? t("agent.noModel.body") : t("agent.webModel")}
       </p>
-      {isDesktop() && (
-        <Button variant="secondary" size="sm" className="mt-3" onClick={onChoose}>
-          {t("agent.noModel.cta")}
-        </Button>
-      )}
+      <Button variant="secondary" size="sm" className="mt-3" onClick={onChoose}>
+        {t(isDesktop() ? "agent.noModel.cta" : "remote.cta")}
+      </Button>
     </div>
   );
 }
@@ -789,6 +788,164 @@ function ToolList({ entries }: { entries: ToolEntry[] }) {
   );
 }
 
+type AskEntry = Extract<Entry, { kind: "ask" }>;
+type Answer = { picked: string[]; own?: string };
+
+/**
+ * The coach's questions with choices: pick one (or several, where it says so)
+ * or write your own. The answers go as the person's next message; written in
+ * the chat instead, the card steps back.
+ */
+function AskCard({ entry }: { entry: AskEntry }) {
+  const { agent, busy } = useAgent();
+  const entrance = useEntrance(entry.id);
+  const [answers, setAnswers] = useState<Answer[]>(() =>
+    entry.questions.map(() => ({ picked: [], own: "" }))
+  );
+  const open = entry.status === "open";
+  const shown = entry.answers ?? answers;
+  const complete = answers.every((one) => one.picked.length > 0 || one.own?.trim());
+
+  const pick = (index: number, label: string) => {
+    if (!open) return;
+    setAnswers((current) =>
+      current.map((one, at) => {
+        if (at !== index) return one;
+        if (!entry.questions[index].multiple) return { picked: [label], own: "" };
+        const picked = one.picked.includes(label)
+          ? one.picked.filter((each) => each !== label)
+          : [...one.picked, label];
+        return { ...one, picked };
+      })
+    );
+  };
+  const write = (index: number, own: string) =>
+    setAnswers((current) =>
+      current.map((one, at) =>
+        at !== index ? one : entry.questions[index].multiple ? { ...one, own } : { picked: [], own }
+      )
+    );
+  const submit = () => {
+    if (!open || !complete || busy) return;
+    void agent.answer(
+      entry.id,
+      answers.map((one) => ({
+        picked: one.picked,
+        ...(one.own?.trim() ? { own: one.own.trim() } : {}),
+      }))
+    );
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-2.5",
+        open ? "border-accent/50 bg-accent/5" : "border-line bg-subtle/60",
+        entrance
+      )}
+    >
+      <div className="flex flex-col gap-3.5">
+        {entry.questions.map((question, index) => {
+          const answer = shown[index] ?? { picked: [] };
+          const many = Boolean(question.multiple);
+          return (
+            <fieldset key={index} className="flex min-w-0 flex-col gap-1.5">
+              <legend className="contents">
+                {question.header && (
+                  <span className="block text-xs font-medium uppercase tracking-wide text-ink-3">
+                    {question.header}
+                  </span>
+                )}
+                <span className="block text-base font-medium text-ink">{question.question}</span>
+                {many && open && (
+                  <span className="block text-xs text-ink-2">{t("agent.ask.many")}</span>
+                )}
+              </legend>
+              <ul className="flex flex-col gap-1">
+                {question.options.map((option) => {
+                  const chosen = answer.picked.includes(option.label);
+                  return (
+                    <li key={option.label}>
+                      <button
+                        type="button"
+                        role={many ? "checkbox" : "radio"}
+                        aria-checked={chosen}
+                        disabled={!open}
+                        onClick={() => pick(index, option.label)}
+                        className={cn(
+                          "flex w-full items-start gap-2.5 rounded-md border px-2.5 py-1.5 text-left transition-colors duration-150 coarse:py-2.5",
+                          chosen ? "border-accent/60 bg-accent/10" : "border-line bg-panel",
+                          open ? "hover:border-line-strong" : !chosen && "opacity-60"
+                        )}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "mt-[3px] flex size-3.5 shrink-0 items-center justify-center border",
+                            many ? "rounded-[3px]" : "rounded-full",
+                            chosen
+                              ? "border-accent-fill bg-accent-fill text-white"
+                              : "border-line-strong"
+                          )}
+                        >
+                          {chosen &&
+                            (many ? (
+                              <Check className="size-2.5" strokeWidth={3} />
+                            ) : (
+                              <span className="size-1.5 rounded-full bg-white" />
+                            ))}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm text-ink">{option.label}</span>
+                          {option.description && (
+                            <span className="block text-xs text-ink-2">{option.description}</span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {open ? (
+                <Input
+                  value={answer.own ?? ""}
+                  onChange={(event) => write(index, event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      submit();
+                    }
+                  }}
+                  placeholder={t("agent.ask.own")}
+                  aria-label={`${question.question} ${t("agent.ask.own")}`}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                answer.own && (
+                  <p className="rounded-md border border-accent/60 bg-accent/10 px-2.5 py-1.5 text-sm text-ink">
+                    {answer.own}
+                  </p>
+                )
+              )}
+            </fieldset>
+          );
+        })}
+      </div>
+      {open ? (
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" variant="primary" disabled={!complete || busy} onClick={submit}>
+            {t("agent.ask.send")}
+          </Button>
+        </div>
+      ) : (
+        entry.status === "skipped" && (
+          <p className="mt-2 text-xs text-ink-3">{t("agent.ask.skipped")}</p>
+        )
+      )}
+    </div>
+  );
+}
+
 /** What can be done with one message: quiet until the message is pointed at. */
 function MessageActions({
   children,
@@ -905,6 +1062,7 @@ function EntryView({
   const { agent } = useAgent();
   const entrance = useEntrance(entry.id);
   if (entry.kind === "compact") return <CompactNote entry={entry} />;
+  if (entry.kind === "ask") return <AskCard entry={entry} />;
   if (entry.kind === "user") {
     // A new turn: more air above than between the parts of one answer
     return (

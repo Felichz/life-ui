@@ -1,7 +1,16 @@
 import type { ISystemCore, Roadmap } from "../../types";
 import { isCoreError } from "../../system";
 import { daySnapshot } from "./snapshot";
-import { ToolError, TOOLS, toolByName, toolSchemas, type Tool, type ToolContext } from "./tools";
+import {
+  ToolError,
+  TOOLS,
+  answerText,
+  toolByName,
+  toolSchemas,
+  type AskQuestion,
+  type Tool,
+  type ToolContext,
+} from "./tools";
 import { t } from "../i18n";
 import {
   DEFAULT_CONTEXT,
@@ -28,6 +37,7 @@ import {
   speaksOfPain,
   samePage,
   planNeeds,
+  asksForMissing,
   saidIn,
   unagreed,
   updateBrief,
@@ -99,6 +109,15 @@ export type Entry =
       chunks: number;
       before: number;
       after: number;
+    }
+  | {
+      id: string;
+      kind: "ask";
+      /** Questions with choices: the person picks, or writes their own answer. */
+      questions: AskQuestion[];
+      /** Answered on the card, or passed over by writing in the chat instead. */
+      status: "open" | "answered" | "skipped";
+      answers?: Array<{ picked: string[]; own?: string }>;
     }
   | { id: string; kind: "error"; text: string };
 
@@ -309,6 +328,8 @@ export class Agent {
   private webThisTurn = false;
   /** The notes speak of the person's latest message (the call was made, and it worked). */
   private notesRead = false;
+  /** A card of questions was shown in this step: the turn ends with it. */
+  private asked: AskQuestion[] | null = null;
   /** Tool calls that failed in this turn, by tool. */
   private failures = new Map<string, number>();
   /** The second reading of the last answer, while it runs: the person's next message stops it. */
@@ -1279,6 +1300,7 @@ export class Agent {
       },
     };
 
+    if (tool.asks) return this.runAsk(tool, ctx, args);
     if (tool.external) return this.runExternal(tool, ctx, args);
     if (tool.prepare) return this.runPrepared(tool, ctx, args);
 
@@ -1338,6 +1360,104 @@ export class Agent {
       this.patch(entry.id, { status: "error", error: String(result.error) });
       return result;
     }
+  }
+
+  /**
+   * Questions with choices, on a card. Nothing changes and nothing waits: the
+   * turn ends with the card, and the answers come as the person's next message,
+   * where everything that reads their words (the notes, the days and times they
+   * said) reads them too.
+   */
+  private runAsk(tool: Tool, ctx: ToolContext, args: Record<string, unknown>) {
+    if (this.asked) {
+      return {
+        error: "already-asked",
+        detail: "One card of questions per message. End your turn.",
+      };
+    }
+    let questions: AskQuestion[];
+    try {
+      questions = tool.run(ctx, args) as AskQuestion[];
+    } catch (caught) {
+      return failure(caught);
+    }
+    this.asked = questions;
+    this.add({ id: nextId(), kind: "ask", questions, status: "open" });
+    return {
+      shown: true,
+      note: "The person sees the questions with their options and answers in their next message. Your turn ends here.",
+    };
+  }
+
+  /** Whether the person's latest message asks something. */
+  private personAskedLast(): boolean {
+    const last = [...this.history].reverse().find((message) => message.role === "user");
+    return Boolean(last && /[?¿]/.test(textOf(last.content)));
+  }
+
+  /**
+   * A reply that asks in words, turned into a card: the model is called once
+   * more with only the card to answer with, and what it wrote before the
+   * questions stays as the words above the card. Null when that call fails.
+   */
+  private async toCard(written: string, signal: AbortSignal): Promise<{ intro: string } | null> {
+    const card = toolSchemas().find((tool) => tool.function.name === "ask_choices");
+    if (!card) return null;
+    let reply: ModelReply;
+    try {
+      reply = await this.options.chat(
+        [
+          ...this.request(),
+          { role: "assistant", content: written },
+          {
+            role: "user",
+            content:
+              "[Automatic note, not from the person: put the questions of your reply on a card now. One question for each thing you asked, each with 2 to 4 short options taken from your reply or the usual answers, the one you would recommend first. Same language as your reply.]",
+          },
+        ],
+        [card],
+        signal,
+        { toolChoice: "required", reasoning: false, maxTokens: 600 }
+      );
+    } catch {
+      return null;
+    }
+    const call = reply.toolCalls.find((one) => one.function.name === "ask_choices");
+    if (!call) return null;
+    // What came before the questions: the line that leads into them goes with them
+    const lines = written.split("\n");
+    const first = lines.findIndex((line) => /[?¿]/.test(line));
+    let cut = first < 0 ? lines.length : first;
+    while (cut > 0 && (!lines[cut - 1].trim() || /:\s*$/.test(lines[cut - 1]))) cut--;
+    const intro = lines.slice(0, cut).join("\n").trim();
+    this.history.push({ role: "assistant", content: intro || null, tool_calls: [call] });
+    const result = await this.runTool(call);
+    this.history.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+    if (!this.asked) {
+      // The card was refused (no real options): the words stand as they were
+      this.history.pop();
+      this.history.pop();
+      return null;
+    }
+    const asked = this.asked as AskQuestion[];
+    this.history.push({
+      role: "assistant",
+      content: asked
+        .map((one) => `${one.question} (${one.options.map((option) => option.label).join(" / ")})`)
+        .join("\n"),
+    });
+    return { intro };
+  }
+
+  /** The person answers a card of questions: their answers are their next message. */
+  async answer(entryId: string, answers: Array<{ picked: string[]; own?: string }>) {
+    const entry = this.entries.find((one) => one.id === entryId);
+    if (entry?.kind !== "ask" || entry.status !== "open" || this.busy) return;
+    const text = answerText(entry.questions, answers);
+    if (!text) return;
+    this.patch(entryId, { status: "answered", answers });
+    this.history.push({ role: "user", content: text });
+    await this.run();
   }
 
   /**
@@ -1494,6 +1614,11 @@ export class Agent {
           ];
 
     if (!this.title) this.title = (message || attachments[0]?.name || "").slice(0, 60);
+    // Written in the chat instead: the card's questions are answered there, or set aside
+    for (const entry of this.entries) {
+      if (entry.kind === "ask" && entry.status === "open")
+        this.patch(entry.id, { status: "skipped" });
+    }
     this.add({
       id: nextId(),
       kind: "user",
@@ -1525,7 +1650,7 @@ export class Agent {
       turn[0]?.kind === "user" &&
       turn[0].h !== undefined &&
       turn[0].h >= this.dropped &&
-      !turn.some((e) => e.kind === "tool" || e.kind === "compact")
+      !turn.some((e) => e.kind === "tool" || e.kind === "compact" || e.kind === "ask")
     );
   }
 
@@ -1548,6 +1673,7 @@ export class Agent {
     this.reviewing = null;
     this.busy = true;
     this.webThisTurn = false;
+    this.asked = null;
     this.failures.clear();
     const abort = new AbortController();
     this.abort = abort;
@@ -1741,6 +1867,23 @@ export class Agent {
               continue;
             }
           }
+          // The questions for what is missing go on a card: a 9B model wrote them
+          // in words, options in brackets, whatever its notes said. One call more,
+          // held to the card's schema, turns them into it.
+          if (
+            !this.asked &&
+            /[?¿]/.test(reply.content) &&
+            this.notesRead &&
+            asksForMissing(this.brief, this.personAskedLast())
+          ) {
+            const carded = await this.toCard(reply.content, abort.signal);
+            if (abort.signal.aborted) return;
+            if (carded) {
+              discard();
+              if (carded.intro) settle(carded.intro);
+              return;
+            }
+          }
           const answer = reply.content || "…";
           this.history.push({ role: "assistant", content: answer });
           this.measure(reply);
@@ -1769,6 +1912,23 @@ export class Agent {
           });
         }
         if (abort.signal.aborted) return;
+        // The questions are on the card: the turn ends, and the model's history
+        // says what it asked, in words, for the next message to answer
+        // (set by the tools just run: TypeScript reads the reset above as final)
+        const asked = this.asked as AskQuestion[] | null;
+        if (asked) {
+          this.history.push({
+            role: "assistant",
+            content: asked
+              .map(
+                (one) =>
+                  `${one.question} (${one.options.map((option) => option.label).join(" / ")})`
+              )
+              .join("\n"),
+          });
+          this.makeTitle();
+          return;
+        }
       }
       this.add({ id: nextId(), kind: "error", text: "too-many-steps" });
     } catch (caught) {

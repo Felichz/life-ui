@@ -1163,6 +1163,16 @@ export function measuredGoal(brief: Brief): string | null {
   return null;
 }
 
+/**
+ * Whether the next move is to ask for what is missing (the first branch of
+ * nextMove): then the questions go on a card, and the agent holds the model to it.
+ */
+export function asksForMissing(brief: Brief | null, personAsked: boolean): boolean {
+  if (!brief || personAsked) return false;
+  if (!brief.plan && LISTS.every((name) => brief[name].length === 0)) return false;
+  return missingFrom(brief).length > 0 && (brief.asked ?? 0) < 2;
+}
+
 export function nextMove(brief: Brief | null, personAsked: boolean): string {
   if (!brief) return "";
   // Notes with nothing in them are of someone running their day ("I have
@@ -1179,9 +1189,13 @@ export function nextMove(brief: Brief | null, personAsked: boolean): string {
     const found = brief.research
       ? "They asked you to look it up: first, in a few lines, say what you found that they can use now, with its source. Then "
       : "";
-    return `If they want advice or a plan: do not give the whole plan yet. ${found}${found ? "in" : "In"} one short message, ask only for what they have not told you, ${most === 3 ? "three" : "two"} things at most: ${missing
+    // Asked on a card, the answers are a tap: a 9B model asked in words, with the
+    // options in brackets, until it was told to call the card by name
+    return `If they want advice or a plan: do not give the whole plan yet. ${found}Ask only for what they have not told you, ${most === 3 ? "three" : "two"} things at most: ${missing
       .slice(0, most)
-      .join("; ")}. Ask nothing else.`;
+      .join(
+        "; "
+      )}. Ask them with ask_choices: one question for each thing, each with 2 to 4 short options, the one you would recommend first (they can always write their own). Before the card write at most two short lines (what is safe to do now, if it matters); do not write the questions or the options in your text. Ask nothing else.`;
   }
   if (!brief.plan) {
     // No plan was asked for. If the coach is about to propose one anyway, it

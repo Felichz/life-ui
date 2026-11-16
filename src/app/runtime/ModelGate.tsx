@@ -70,6 +70,8 @@ import {
   type Runtimes,
   type Verdict,
 } from "./models";
+import { RemoteSetup } from "./RemoteSetup";
+import { remoteEndpoint, saveRemote, savedRemote, type RemoteModel } from "./providers";
 
 type Step =
   | { kind: "checking" }
@@ -82,6 +84,8 @@ type Step =
       needs: Record<number, number | null> | null;
     }
   | { kind: "loading"; model: LocalModel }
+  /** A model through an API (ADR-005): the web build's only way, the desktop's other one. */
+  | { kind: "remote" }
   | {
       kind: "loaded";
       model: LocalModel;
@@ -115,6 +119,8 @@ interface Current {
 interface ModelContextValue {
   /** The loaded model the agent talks to, or null. */
   endpoint: ModelEndpoint | null;
+  /** The model through an API, when that is what the agent talks to. */
+  remote: RemoteModel | null;
   /** The loaded model, and where it sits when known. */
   model: LocalModel | null;
   placement: Placement | null;
@@ -130,6 +136,7 @@ interface ModelContextValue {
 
 const ModelContext = createContext<ModelContextValue>({
   endpoint: null,
+  remote: null,
   model: null,
   placement: null,
   context: AGENT_CONTEXT,
@@ -143,17 +150,24 @@ export const useModel = () => useContext(ModelContext);
 /**
  * The desktop app's way in (ADR-004): pick a downloaded model the first time,
  * and on every launch ask before loading it, showing whether it fits on the
- * GPU. The app renders behind it; the web build skips it.
+ * GPU. A model through an API (ADR-005) is the other way, and the web build's
+ * only one: chosen once, it is used from then on without asking.
  */
 export function ModelGate({ children }: { children: ReactNode }) {
+  const [remote, setRemote] = useState<RemoteModel | null>(savedRemote);
   const [step, setStep] = useState<Step>(() =>
-    isDesktop() ? { kind: "checking" } : { kind: "done" }
+    isDesktop() && !savedRemote() ? { kind: "checking" } : { kind: "done" }
   );
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Current | null>(null);
   const endpoint = useMemo(
-    () => (current ? endpointFor(current.model, current.context) : null),
-    [current]
+    () =>
+      current
+        ? endpointFor(current.model, current.context)
+        : remote
+          ? remoteEndpoint(remote)
+          : null,
+    [current, remote]
   );
 
   /** The speed test runs on its own and fills in wherever the model is shown. */
@@ -168,6 +182,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
 
   const openSetup = useCallback(async () => {
     const runtimes = await runtimeStatus();
+    setError(null);
     setStep({ kind: "setup", runtimes, models: await listModels(runtimes) });
   }, []);
 
@@ -212,6 +227,9 @@ export function ModelGate({ children }: { children: ReactNode }) {
 
   const choose = async (model: LocalModel) => {
     saveChoice(model);
+    // A local model replaces the one through an API
+    saveRemote(null);
+    setRemote(null);
     setError(null);
     try {
       // Changing models frees the old one first, so the new load sees the real free memory
@@ -255,11 +273,24 @@ export function ModelGate({ children }: { children: ReactNode }) {
     }
   };
 
+  const useRemote = async (chosen: RemoteModel) => {
+    saveRemote(chosen);
+    setRemote(chosen);
+    // The local model is not needed any more: its memory is freed
+    if (current) {
+      setCurrent(null);
+      await unload(current.model).catch(() => undefined);
+    }
+    setStep({ kind: "done" });
+  };
+
   const open = step.kind !== "done";
   const reopen = useCallback(() => {
     setError(null);
+    // Without a local runtime (the web build), or with an API model in use, its setup opens
+    if (!isDesktop() || remote) return setStep({ kind: "remote" });
     openSetup().catch((caught) => setError(String(caught)));
-  }, [openSetup]);
+  }, [openSetup, remote]);
   const unloadModel = useCallback(async () => {
     if (!current) return;
     await unload(current.model);
@@ -269,6 +300,7 @@ export function ModelGate({ children }: { children: ReactNode }) {
     <ModelContext.Provider
       value={{
         endpoint,
+        remote: current ? null : remote,
         model: current?.model ?? null,
         placement: current?.placement ?? null,
         context: current?.context ?? AGENT_CONTEXT,
@@ -288,6 +320,31 @@ export function ModelGate({ children }: { children: ReactNode }) {
               onStart={start}
               current={current?.model ?? null}
               onSkip={() => setStep({ kind: "done" })}
+              onRemote={() => setStep({ kind: "remote" })}
+            />
+          )}
+          {step.kind === "remote" && (
+            <RemoteSetup
+              initial={remote}
+              onSave={(chosen) => void useRemote(chosen)}
+              onSkip={() => setStep({ kind: "done" })}
+              onLocal={
+                isDesktop()
+                  ? () => {
+                      setError(null);
+                      openSetup().catch((caught) => setError(String(caught)));
+                    }
+                  : undefined
+              }
+              onRemove={
+                remote
+                  ? () => {
+                      saveRemote(null);
+                      setRemote(null);
+                      setStep({ kind: "done" });
+                    }
+                  : undefined
+              }
             />
           )}
           {step.kind === "load" && (
@@ -346,12 +403,14 @@ function Setup({
   onChoose,
   onStart,
   onSkip,
+  onRemote,
 }: {
   step: Extract<Step, { kind: "setup" }>;
   current: LocalModel | null;
   onChoose: (model: LocalModel) => void;
   onStart: (runtime: RuntimeId) => void;
   onSkip: () => void;
+  onRemote: () => void;
 }) {
   const { runtimes, models } = step;
   return (
@@ -431,6 +490,9 @@ function Setup({
         )}
       </DialogBody>
       <DialogFooter>
+        <Button variant="ghost" onClick={onRemote} className="mr-auto">
+          {t("remote.cta")}
+        </Button>
         <Button variant="ghost" onClick={onSkip}>
           {current ? t("model.keep", { name: current.name }) : t("model.skip")}
         </Button>

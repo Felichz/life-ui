@@ -12,6 +12,10 @@ export interface ModelEndpoint {
   apiKey?: string;
   /** Tokens of context the model was loaded with. */
   context?: number;
+  /** Headers a provider needs besides the key (ADR-005). */
+  headers?: Record<string, string>;
+  /** A model through an API rather than a local runtime: no local switches are sent. */
+  hosted?: boolean;
 }
 
 export interface ToolCall {
@@ -168,6 +172,8 @@ async function readStream(
 
 /** Tokens left for thinking on top of a call's limit (675 were measured on a short answer). */
 const REASONING_ROOM = 4096;
+/** What a hosted model refused and how it is asked instead, for this session. */
+const quirks = new Map<string, { completionTokens?: boolean; noTemperature?: boolean }>();
 /** Endpoints that answered 400 to the reasoning switch, for this session. */
 const refusesSwitch = new Set<string>();
 
@@ -179,12 +185,17 @@ export async function chat(
   options: ChatOptions = {}
 ): Promise<ModelReply> {
   const send = isDesktop() ? desktopFetch : fetch;
-  const post = (reasoningOff: boolean, force: Force) =>
-    send(`${endpoint.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+  const post = (reasoningOff: boolean, force: Force) => {
+    const quirk = quirks.get(`${endpoint.baseUrl}|${endpoint.model}`) ?? {};
+    const limit = options.maxTokens
+      ? options.maxTokens + (reasoningOff ? 0 : REASONING_ROOM)
+      : undefined;
+    return send(`${endpoint.baseUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(endpoint.apiKey ? { Authorization: `Bearer ${endpoint.apiKey}` } : {}),
+        ...endpoint.headers,
       },
       body: JSON.stringify({
         model: endpoint.model,
@@ -205,20 +216,26 @@ export async function chat(
           : {}),
         // What a model thinks counts against the limit too: while it thinks it
         // gets room for that, or the limit would cut the answer itself
-        ...(options.maxTokens
-          ? { max_tokens: options.maxTokens + (reasoningOff ? 0 : REASONING_ROOM) }
+        // Newer hosted models take the limit under another name (OpenAI's reasoning models)
+        ...(limit
+          ? quirk.completionTokens
+            ? { max_completion_tokens: limit }
+            : { max_tokens: limit }
           : {}),
         // LM Studio turns thinking off with reasoning_effort "none" (measured:
         // 2 s instead of 62 s on Qwen3.5 9B); Ollama's own switch is `think`
         ...(reasoningOff ? { reasoning_effort: "none", think: false } : {}),
-        temperature: 0.2,
+        // Some hosted models take only their default temperature
+        ...(quirk.noTemperature ? {} : { temperature: 0.2 }),
         stream: true,
         stream_options: { include_usage: true },
       }),
       signal,
     });
+  };
   const id = `${endpoint.baseUrl}|${endpoint.model}`;
-  let reasoningOff = options.reasoning === false && !refusesSwitch.has(id);
+  // The local runtimes' switch for thinking is not sent to a hosted model: it costs a refused request
+  let reasoningOff = options.reasoning === false && !endpoint.hosted && !refusesSwitch.has(id);
   let force: Force =
     options.toolChoice !== "required" || tools.length === 0
       ? "none"
@@ -226,6 +243,19 @@ export async function chat(
         ? "choice"
         : "schema";
   let response = await post(reasoningOff, force);
+  // A hosted model that names the parameter it refuses gets it changed, once, and remembered
+  for (let tries = 0; endpoint.hosted && tries < 2 && response.status === 400; tries++) {
+    const said = await response
+      .clone()
+      .text()
+      .catch(() => "");
+    const quirk = { ...quirks.get(id) };
+    if (/max_tokens/.test(said) && !quirk.completionTokens) quirk.completionTokens = true;
+    else if (/temperature/.test(said) && !quirk.noTemperature) quirk.noTemperature = true;
+    else break;
+    quirks.set(id, quirk);
+    response = await post(reasoningOff, force);
+  }
   // A 400 does not say which part of the request it refuses, and a context
   // that is too long is a 400 as well. So each extra is taken off in turn, and
   // the endpoint is remembered as refusing one only when the request went

@@ -812,6 +812,12 @@ describe("notes in the conversation", () => {
           seen.notes++;
           return noted.shift() ?? notes({});
         }
+        // Questions asked in words are put on a card: here the card call is declined
+        if (
+          String(messages.at(-1)?.content).includes("put the questions of your reply on a card")
+        ) {
+          return say("");
+        }
         seen.coach.push(messages);
         const reply = coach.shift();
         if (!reply) throw new Error("coach script ran out");
@@ -823,6 +829,52 @@ describe("notes in the conversation", () => {
   }
   const lastUser = (messages: ChatMessage[]) =>
     String([...messages].reverse().find((message) => message.role === "user")!.content);
+
+  it("puts the questions for what is missing on a card when the coach writes them in words", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages, tools) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
+        if (isNotes(messages)) {
+          return notes({
+            wants: ["un plan para volver a entrenar"],
+            plan: { ...NO_PLAN, wanted: true },
+          });
+        }
+        const offered = (tools as Array<{ function: { name: string } }>).map(
+          (one) => one.function.name
+        );
+        if (offered.length === 1 && offered[0] === "ask_choices") {
+          return call("ask_choices", {
+            questions: [
+              {
+                question: "¿Cuánto dura una sesión?",
+                options: [{ label: "20 min" }, { label: "30 min" }],
+              },
+              { question: "¿Qué días?", options: ["Lunes", "Jueves"], multiple: true },
+            ],
+          });
+        }
+        return say(
+          "Empieza suave.\n\nPara armarlo necesito saber:\n- ¿Cuánto dura una sesión (20 o 30 min)?\n- ¿Qué días?"
+        );
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("quiero un plan para volver a entrenar");
+    const card = agent.entries.find((entry) => entry.kind === "ask");
+    expect(card).toMatchObject({ status: "open" });
+    // What came before the questions stays as words; the questions are only on the card
+    const words = agent.entries.filter((entry) => entry.kind === "assistant");
+    expect(words).toHaveLength(1);
+    expect(words[0]).toMatchObject({ text: "Empieza suave." });
+  });
 
   it("ride next to the person's message, with the move, and are not kept in the history", async () => {
     const { agent, seen } = agentWith(
@@ -839,7 +891,7 @@ describe("notes in the conversation", () => {
     const sent = lastUser(seen.coach[0]);
     expect(sent).toContain("What they have told you so far");
     expect(sent).toContain("They want: un plan para volver a entrenar");
-    expect(sent).toContain("ask only for what they have not told you");
+    expect(sent).toContain("Ask only for what they have not told you");
     expect(sent.trim().endsWith("Reply in English.]")).toBe(true);
 
     // With a plan on the table every word is read: "ok" may be the yes it waits for
@@ -860,9 +912,9 @@ describe("notes in the conversation", () => {
       [notes({ wants: ["entrenar hoy"], instruction: true, plan: { ...NO_PLAN, wanted: true } })]
     );
     await agent.send("quiero entrenar hoy quince minutos, agrégalo a mi plan por favor");
-    expect(lastUser(seen.coach[0])).toContain("ask only for what they have not told you");
+    expect(lastUser(seen.coach[0])).toContain("Ask only for what they have not told you");
     expect(lastUser(seen.coach[1])).toContain("The change is made");
-    expect(lastUser(seen.coach[1])).not.toContain("ask only for what they have not told you");
+    expect(lastUser(seen.coach[1])).not.toContain("Ask only for what they have not told you");
   });
 
   it("keep a first roadmap from being built before the plan was seen and accepted", async () => {

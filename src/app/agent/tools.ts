@@ -90,6 +90,11 @@ export interface Tool {
   alwaysConfirm?: boolean;
   /** Sends something outside the machine: offered only when the person allows it (ADR-009). */
   external?: boolean;
+  /**
+   * Asks the person something with choices: shown as a card to answer, and the
+   * turn ends there. `run` returns the questions, checked and trimmed.
+   */
+  asks?: boolean;
   /** May be asynchronous (a web search). */
   run: (ctx: ToolContext, args: Args) => unknown;
   /**
@@ -500,6 +505,91 @@ const DURATION = {
   max_minutes: { type: "integer", description: "Maximum minutes, for a range or a timebox" },
 };
 
+/** One question with choices; the person can always write their own answer too. */
+export interface AskQuestion {
+  question: string;
+  header?: string;
+  options: Array<{ label: string; description?: string }>;
+  multiple?: boolean;
+}
+
+/** At most three questions on a card: a plan is asked about in one message (when, how long, what its numbers hang on). */
+const MAX_QUESTIONS = 3;
+const MAX_OPTIONS = 4;
+
+/**
+ * The questions as the card shows them. A small model adds its own "Other",
+ * repeats an option, or sends a lone option: those are dropped or refused.
+ */
+export function askedQuestions(args: Args): AskQuestion[] {
+  const raw = Array.isArray(args.questions) ? args.questions : [];
+  const questions: AskQuestion[] = [];
+  for (const item of raw.slice(0, MAX_QUESTIONS)) {
+    if (!item || typeof item !== "object") continue;
+    const one = item as Record<string, unknown>;
+    const question = str(one.question);
+    if (!question) continue;
+    const seen = new Set<string>();
+    const options = (Array.isArray(one.options) ? one.options : [])
+      .map((option) =>
+        typeof option === "string"
+          ? { label: option.trim() }
+          : option && typeof option === "object"
+            ? {
+                label: str((option as Record<string, unknown>).label),
+                description: str((option as Record<string, unknown>).description) || undefined,
+              }
+            : { label: "" }
+      )
+      .filter((option) => {
+        const key = option.label.toLocaleLowerCase();
+        if (!option.label || seen.has(key) || OTHER.test(option.label)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, MAX_OPTIONS)
+      .map((option) => (option.description ? option : { label: option.label }));
+    if (options.length < 2) continue;
+    const header = str(one.header);
+    questions.push({
+      question,
+      ...(header ? { header: header.slice(0, 30) } : {}),
+      options,
+      ...(one.multiple === true ? { multiple: true } : {}),
+    });
+  }
+  if (questions.length === 0) {
+    throw new ToolError(
+      "invalid-questions",
+      "each question needs its text and 2 to 4 options with a label; or ask in words"
+    );
+  }
+  return questions;
+}
+
+/** "Other", "Otra", "Something else": the card has its own place to write. */
+const OTHER = /^(other|otr[ao]s?|something else|algo m[aá]s|otra cosa|otra respuesta)\b/i;
+
+/** The answers to a card as the person's message: each question with what they chose. */
+export function answerText(
+  questions: AskQuestion[],
+  answers: Array<{ picked: string[]; own?: string }>
+): string {
+  return questions
+    .map((question, index) => {
+      const answer = answers[index];
+      const parts = [
+        ...(answer?.picked ?? []),
+        ...(answer?.own?.trim() ? [answer.own.trim()] : []),
+      ];
+      // Without its question marks: the person's message is an answer, not a question to answer
+      const topic = question.question.replace(/[¿?]/g, "").trim();
+      return parts.length > 0 ? `${topic}: ${parts.join(", ")}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export const TOOLS: Tool[] = [
   {
     name: "get_day",
@@ -540,6 +630,53 @@ export const TOOLS: Tool[] = [
       if (!guide) throw new ToolError("guide-not-found", Object.keys(GUIDES).join(", "));
       return { private: GUIDE_NOTE, guide };
     },
+  },
+  {
+    name: "ask_choices",
+    description:
+      "Ask the person one to three questions whose answer is a choice (which days, how many minutes, a level, one way or another), each with 2 to 4 short options. They pick on a card, or write their own answer: never add an 'Other' option. Put the option you would recommend first. Your turn ends with the card; their answers come as their next message. Questions and options in the person's language.",
+    parameters: {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          minItems: 1,
+          maxItems: MAX_QUESTIONS,
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string", description: "The whole question, as you would say it" },
+              header: { type: "string", description: "One or two words: what it is about" },
+              options: {
+                type: "array",
+                minItems: 2,
+                maxItems: MAX_OPTIONS,
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string", description: "A few words" },
+                    description: {
+                      type: "string",
+                      description: "Optional: what choosing it means",
+                    },
+                  },
+                  required: ["label"],
+                },
+              },
+              multiple: {
+                type: "boolean",
+                description: "More than one can be chosen (days of the week)",
+              },
+            },
+            required: ["question", "options"],
+          },
+        },
+      },
+      required: ["questions"],
+    },
+    mutates: false,
+    asks: true,
+    run: (_ctx, args) => askedQuestions(args),
   },
   {
     name: "start_day",

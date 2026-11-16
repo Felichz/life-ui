@@ -212,7 +212,8 @@ export function AgentProvider({
       agent,
       available: Boolean(injected || endpoint),
       // Without the desktop shell nothing says what the model can see
-      vision: Boolean(model?.vision),
+      // A model through an API does not say: unknown counts as yes
+      vision: model ? Boolean(model.vision) : true,
     }),
     [agent, injected, endpoint, model]
   );

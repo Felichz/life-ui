@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, Power } from "lucide-react";
+import { Cloud, Cpu, Power } from "lucide-react";
 import { Button, IconButton } from "../components/ui/Button";
 import { Tooltip } from "../components/ui/Tooltip";
 import { useToast } from "../state/toast";
@@ -8,18 +8,19 @@ import { formatNumber } from "../lib/format";
 import { isDesktop } from "../platform/desktop";
 import { t } from "../i18n";
 import { useModel } from "./ModelGate";
+import { providerName } from "./providers";
 
 const RUNTIME_NAME = { lmstudio: "LM Studio", ollama: "Ollama" } as const;
 
 /**
  * The model the agent runs on, always in sight (ADR-004): its name, runtime,
- * context and how much of it sits on the GPU, with a way to change it.
+ * context and how much of it sits on the GPU, with a way to change it. A model
+ * through an API (ADR-005) shows its provider instead.
  */
 export function ModelBadge({ className }: { className?: string }) {
-  const { model, placement, context, speed, openSetup, unloadModel } = useModel();
+  const { model, remote, placement, context, speed, openSetup, unloadModel } = useModel();
   const toast = useToast();
   const [unloading, setUnloading] = useState(false);
-  if (!isDesktop()) return null;
 
   const unload = async () => {
     if (!model) return;
@@ -37,40 +38,48 @@ export function ModelBadge({ className }: { className?: string }) {
     }
   };
 
-  const details = model
+  const details = remote
     ? [
-        RUNTIME_NAME[model.runtime],
-        t("model.badge.context", { tokens: formatNumber(context / 1024) }),
-        speed ? t("model.badge.speed", { speed: formatNumber(speed) }) : null,
-        placement
-          ? placement.onGpu >= 0.95
-            ? t("model.badge.gpuFull")
-            : t("model.badge.gpuPart", { share: Math.round(placement.onGpu * 100) })
-          : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : t("model.badge.none");
+        providerName(remote),
+        t("model.badge.context", { tokens: formatNumber(remote.context / 1024) }),
+      ].join(" · ")
+    : model
+      ? [
+          RUNTIME_NAME[model.runtime],
+          t("model.badge.context", { tokens: formatNumber(context / 1024) }),
+          speed ? t("model.badge.speed", { speed: formatNumber(speed) }) : null,
+          placement
+            ? placement.onGpu >= 0.95
+              ? t("model.badge.gpuFull")
+              : t("model.badge.gpuPart", { share: Math.round(placement.onGpu * 100) })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : isDesktop()
+        ? t("model.badge.none")
+        : t("remote.badge.none");
+  const live = Boolean(model || remote);
 
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <span
         className={cn(
           "flex size-7 shrink-0 items-center justify-center rounded-md",
-          model ? "bg-live/10 text-live" : "bg-hover text-ink-3"
+          live ? "bg-live/10 text-live" : "bg-hover text-ink-3"
         )}
       >
-        <Cpu className="size-4" />
+        {remote ? <Cloud className="size-4" /> : <Cpu className="size-4" />}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-ink">
-          {model ? model.name : t("agent.noModel.title")}
+          {remote ? remote.model : model ? model.name : t("agent.noModel.title")}
         </span>
         <span className="block truncate text-xs text-ink-2">{details}</span>
       </span>
       <span className="flex shrink-0 items-center gap-0.5">
         <Button size="sm" variant="ghost" onClick={openSetup} disabled={unloading}>
-          {model ? t("model.badge.change") : t("agent.noModel.cta")}
+          {live ? t("model.badge.change") : t(isDesktop() ? "agent.noModel.cta" : "remote.connect")}
         </Button>
         {model && (
           <Tooltip content={t("model.badge.unload")} side="bottom">
