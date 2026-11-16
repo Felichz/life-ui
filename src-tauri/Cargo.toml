@@ -1,6 +1,6 @@
 [package]
 name = "lifeui"
-version = "0.2.0"
+version = "0.3.0"
 description = "LifeUI desktop: a local AI harness for organizing your life"
 authors = ["Felix Andersson"]
 license = "MIT"
@@ -27,3 +27,5 @@ tauri-plugin-http = "2.9.0"
 sysinfo = "0.38.4"
 nvml-wrapper = "0.13.0"
 tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"

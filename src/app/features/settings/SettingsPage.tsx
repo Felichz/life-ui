@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -31,6 +32,16 @@ import { useTheme, type ThemePreference } from "../../state/theme";
 import { useToast } from "../../state/toast";
 import { LOCALES, LOCALE_NAMES, t, useLocale, type Locale } from "../../i18n";
 import { isDesktop } from "../../platform/desktop";
+import {
+  appVersion,
+  canUpdate,
+  findUpdate,
+  getAutoUpdate,
+  onAutoUpdate,
+  setAutoUpdate,
+  type Available,
+} from "../../platform/updates";
+import { Switch } from "../../components/ui/Switch";
 import { ModelBadge } from "../../runtime/ModelBadge";
 
 function Section({
@@ -58,7 +69,7 @@ export function SettingsPage() {
     <Page width="narrow">
       <PageHeader title={t("nav.settings")} />
       <div className="mt-6">
-        {isDesktop() && <ModelSection />}
+        <ModelSection />
         <TargetSection />
         <AppearanceSection />
         <LanguageSection />
@@ -80,6 +91,7 @@ export function SettingsPage() {
             ))}
           </dl>
         </Section>
+        {isDesktop() && <UpdatesSection />}
         <DataSection />
       </div>
     </Page>
@@ -178,6 +190,98 @@ function ModelSection() {
       <div className="rounded-lg border border-line bg-panel px-3 py-2.5">
         <ModelBadge />
       </div>
+    </Section>
+  );
+}
+
+/** Updates of the desktop app (ADR-014): automatic or by hand, and a look right now. */
+function UpdatesSection() {
+  const choice = useSyncExternalStore(onAutoUpdate, getAutoUpdate);
+  const [able, setAble] = useState<boolean | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
+  const [state, setState] = useState<
+    | { kind: "idle" }
+    | { kind: "looking" }
+    | { kind: "latest" }
+    | { kind: "found"; update: Available }
+    | { kind: "installing"; share: number }
+    | { kind: "failed" }
+  >({ kind: "idle" });
+  useEffect(() => {
+    void canUpdate().then(setAble);
+    void appVersion().then(setVersion);
+  }, []);
+
+  const look = async () => {
+    setState({ kind: "looking" });
+    try {
+      const update = await findUpdate();
+      setState(update ? { kind: "found", update } : { kind: "latest" });
+    } catch {
+      setState({ kind: "failed" });
+    }
+  };
+  const install = async (update: Available) => {
+    setState({ kind: "installing", share: 0 });
+    try {
+      await update.install((share) => setState({ kind: "installing", share }));
+    } catch {
+      setState({ kind: "failed" });
+    }
+  };
+
+  return (
+    <Section
+      title={t("settings.updates.title")}
+      description={version ? t("settings.updates.version", { version }) : undefined}
+    >
+      {able === false ? (
+        <p className="max-w-md text-sm text-ink-2">{t("settings.updates.portable")}</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <label className="flex max-w-md items-start justify-between gap-4">
+            <span>
+              <span className="block text-base font-medium text-ink">
+                {t("settings.updates.auto")}
+              </span>
+              <span className="block text-sm text-ink-2">{t("settings.updates.autoHint")}</span>
+            </span>
+            <Switch
+              checked={choice === "on"}
+              label={t("settings.updates.auto")}
+              onChange={(on) => setAutoUpdate(on ? "on" : "off")}
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            {state.kind === "found" ? (
+              <Button size="sm" variant="primary" onClick={() => void install(state.update)}>
+                <Download />
+                {t("settings.updates.install", { version: state.update.version })}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={state.kind === "looking" || state.kind === "installing"}
+                onClick={() => void look()}
+              >
+                {t("settings.updates.check")}
+              </Button>
+            )}
+            <span className="text-sm text-ink-2" role="status">
+              {state.kind === "looking"
+                ? t("settings.updates.looking")
+                : state.kind === "latest"
+                  ? t("settings.updates.latest")
+                  : state.kind === "installing"
+                    ? t("updates.installing", { share: String(Math.round(state.share * 100)) })
+                    : state.kind === "failed"
+                      ? t("updates.failed")
+                      : ""}
+            </span>
+          </div>
+        </div>
+      )}
     </Section>
   );
 }

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-r
 import type { ISystemCore } from "../types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ModelGate } from "./runtime/ModelGate";
+import { UpdateGate } from "./platform/UpdateGate";
 import { AgentProvider } from "./agent/AgentProvider";
 import type { ChatFn } from "./agent/agent";
 import { LocaleProvider, type Locale } from "./i18n";
@@ -45,6 +46,7 @@ export function AppProviders({
                 <ModelGate>
                   <AgentProvider chat={agentChat}>{children}</AgentProvider>
                 </ModelGate>
+                <UpdateGate />
               </ClosingFlowProvider>
             </ToastProvider>
           </TooltipProvider>

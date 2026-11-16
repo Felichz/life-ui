@@ -13,6 +13,10 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         // Links in the chat (the sources of a web search) open in the person's browser
         .plugin(tauri_plugin_opener::init())
+        // Updates (ADR-014): found on GitHub's latest release, checked against the app's public key
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // To start again on the new version once it is installed
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -41,6 +45,7 @@ pub fn run() {
             state::read_state,
             state::write_state,
             state::clear_state,
+            state::is_portable,
             resources::system_resources,
             gpu_processes::gpu_processes,
             gpu_processes::close_process,

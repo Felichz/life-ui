@@ -12,6 +12,12 @@ use tauri::{AppHandle, Manager};
 /// The folder that makes this a portable copy, when it sits beside the executable.
 pub const PORTABLE_DIR: &str = "LifeUI-data";
 
+/// Whether this copy runs portable: a portable copy is not updated in place (ADR-014).
+#[tauri::command]
+pub fn is_portable() -> bool {
+    portable_dir().is_some()
+}
+
 /// The portable data folder, if this copy runs portable.
 pub fn portable_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;

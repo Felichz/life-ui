@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The main window: core APIs, HTTP to local model runtimes, cloud providers and web search, and opening links in the browser",
+  "description": "The main window: core APIs, HTTP to local model runtimes, cloud providers and web search, opening links in the browser, and updates",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -19,6 +19,8 @@
           "url": "https://*"
         }
       ]
-    }
+    },
+    "updater:default",
+    "process:allow-restart"
   ]
 }

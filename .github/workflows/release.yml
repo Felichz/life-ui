@@ -8,7 +8,7 @@ name: Release
 # https://github.com/Felichz/life-ui/releases/latest (the site's download button) points at it.
 #
 # What each system gets:
-#   Windows  LifeUI_<v>_x64-setup.exe (installer, no admin needed), LifeUI_<v>_x64_en-US.msi,
+#   Windows  LifeUI_<v>_x64-setup.exe (installer: just you, or every user with admin), LifeUI_<v>_x64_en-US.msi,
 #            LifeUI_<v>_x64_portable.zip (LifeUI.exe and its LifeUI-data folder: nothing installed)
 #   macOS    LifeUI_<v>_universal.dmg (Apple silicon and Intel)
 #   Linux    .AppImage, .deb and .rpm (x86_64)
@@ -62,17 +62,23 @@ jobs:
         id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update files (ADR-014): the app installs only what this key signed.
+          # The key was made with `npx tauri signer generate`; its public half is in tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseName: "LifeUI v__VERSION__"
           releaseBody: |
-            The desktop app of LifeUI: the conversation with the coach in the middle, the day beside it. It runs the coach on a local model (LM Studio or Ollama).
+            The desktop app of LifeUI: your personal assistant and coach, built around you. It runs the coach on a local model (LM Studio or Ollama) or on a model through an API you choose. From this version on it can update itself.
 
-            **Windows:** `-setup.exe` installs it for you (no admin needed); the `.msi` is for managed installs; `_portable.zip` runs from any folder and keeps its data in the `LifeUI-data` folder beside it.
+            **Windows:** `-setup.exe` installs it for you, or for every user of the PC (that one asks for admin); the `.msi` is for managed installs; `_portable.zip` runs from any folder and keeps its data in the `LifeUI-data` folder beside it.
             **macOS:** the `.dmg` runs on Apple silicon and Intel.
             **Linux:** `.AppImage` runs anywhere; `.deb` and `.rpm` install it.
 
             The builds are not signed with a paid certificate. On Windows, SmartScreen may say "Windows protected your PC": More info, then Run anyway. On macOS, right-click the app, Open, then Open again.
+          # latest.json tells installed copies where the new version is and its signature
+          includeUpdaterJson: true
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
