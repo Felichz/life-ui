@@ -1,6 +1,6 @@
 /**
  * Presentation reads over the core state. Nothing here decides business
- * rules (tempos, validations): it only sorts, groups and names what the
+ * rules (progress, validations): it only sorts, groups and names what the
  * core already computed or stored.
  */
 import type {

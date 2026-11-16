@@ -59,7 +59,6 @@ function doToday(core: SystemCore, minutes = 15) {
   const instance = core.getState().currentDay!.activityInstances[0];
   core.activateActivity(instance.id);
   core.completeActivity(instance.id, {
-    satisfactionScore: 7,
     endTime: new Date(Date.now() + minutes * 60000).toISOString(),
   });
 }

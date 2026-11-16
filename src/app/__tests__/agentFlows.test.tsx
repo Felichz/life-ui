@@ -94,26 +94,23 @@ describe("the day through the chat", () => {
     expect(screen.getByRole("region", { name: "En marcha" })).toHaveTextContent("Escribir informe");
   });
 
-  it("closes with the score it inferred, the tempos the card promised and the person's words", async () => {
+  it("closes as done with the person's words", async () => {
     const { chat } = script(
-      call("finish_activity", { how_it_went: "salió bien, terminé el borrador", satisfaction: 8 }),
+      call("finish_activity", { how_it_went: "salió bien, terminé el borrador" }),
       say("Cerrado.")
     );
     const { core, reportInstance } = setup(chat);
     core.activateActivity(reportInstance.id);
 
     await write("terminé, salió bien");
-    // 30 estimated minutes x 8 / 7, rounded up
     expect(await screen.findByText("Cerrar «Escribir informe»")).toBeInTheDocument();
-    expect(screen.getByText("+35")).toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Hazlo" }));
     });
     await screen.findByText("Cerrado.");
 
     const record = core.getState().global.completedActivityRecords.at(-1)!;
-    expect(record.satisfactionScore).toBe(8);
-    expect(record.temposAwarded).toBe(35);
+    expect(record.state).toBe("completed");
     expect(record.closingNote).toBe("salió bien, terminé el borrador");
   });
 

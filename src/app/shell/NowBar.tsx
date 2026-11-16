@@ -1,27 +1,23 @@
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/Button";
-import { Tooltip } from "../components/ui/Tooltip";
 import { LiveDot, TypeIcon } from "../components/TypeIcon";
 import { blockName, blockRange, type Contract, type PlanItem } from "../lib/domain";
 import { cn } from "../lib/cn";
-import {
-  formatClock,
-  formatDateLong,
-  formatDayMinutes,
-  formatNumber,
-  formatTime,
-} from "../lib/format";
+import { formatClock, formatDateLong, formatDayMinutes, formatTime } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import { useDayPlan, type DayPlan } from "../features/today/useDayPlan";
 import { t } from "../i18n";
-import { useShell } from "./ShellContext";
+import { useTaskActions } from "./useTaskActions";
+import { useSystem } from "../state/system";
+import { activeGoals, goalFor } from "../lib/goals";
+import { Flag } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * The HUD above the conversation: what is running and for how long, or what
- * comes next, and the day's tempos. Always in view, whatever the context panel
- * shows. It changes nothing by itself: its button writes in the chat for the
- * person (ADR-002). The bar's bottom edge is the running activity's progress.
+ * comes next, and the goal it works toward (ADR-015). Always in view, whatever
+ * the context panel shows. Its buttons act at once and tell the coach in the
+ * chat. The bar's bottom edge is the running activity's progress.
  */
 export function NowBar({ className }: { className?: string }) {
   const plan = useDayPlan();
@@ -32,13 +28,7 @@ export function NowBar({ className }: { className?: string }) {
         className
       )}
     >
-      {!plan ? (
-        <NoDay />
-      ) : plan.active ? (
-        <Running item={plan.active} plan={plan} />
-      ) : (
-        <Idle plan={plan} />
-      )}
+      {!plan ? <NoDay /> : plan.active ? <Running item={plan.active} /> : <Idle plan={plan} />}
       {/* On a phone there is no rail: the theme switch rides on the HUD */}
       <ThemeToggle side="bottom" className="-mr-2 size-9 lg:hidden" />
     </div>
@@ -46,14 +36,14 @@ export function NowBar({ className }: { className?: string }) {
 }
 
 function NoDay() {
-  const { compose } = useShell();
+  const { startTheDay } = useTaskActions();
   return (
     <>
       <div className="min-w-0 flex-1">
         <p className="text-xs text-ink-3">{formatDateLong(new Date())}</p>
         <p className="truncate text-md font-semibold text-ink">{t("now.noDay")}</p>
       </div>
-      <Button variant="primary" size="sm" onClick={() => compose(t("agent.suggest.start"), "send")}>
+      <Button variant="primary" size="sm" onClick={startTheDay}>
         {t("now.startDay")}
       </Button>
     </>
@@ -61,7 +51,7 @@ function NoDay() {
 }
 
 function Idle({ plan }: { plan: DayPlan }) {
-  const { compose } = useShell();
+  const { start } = useTaskActions();
   const next = plan.next;
   if (!next) {
     return (
@@ -70,7 +60,7 @@ function Idle({ plan }: { plan: DayPlan }) {
           <p className="text-xs text-ink-3">{t("focus.idle.title")}</p>
           <p className="truncate text-md font-semibold text-ink">{t("now.free")}</p>
         </div>
-        <Tempos plan={plan} />
+        <Goal />
       </>
     );
   }
@@ -100,18 +90,18 @@ function Idle({ plan }: { plan: DayPlan }) {
           variant="secondary"
           size="sm"
           className="shrink-0"
-          onClick={() => compose(t("now.startMessage", { title: item.title }), "send")}
+          onClick={() => start(item.instance.id)}
         >
           {t("focus.start")}
         </Button>
       )}
-      <Tempos plan={plan} />
+      <Goal templateId={item.instance.templateId} />
     </>
   );
 }
 
-function Running({ item, plan }: { item: PlanItem; plan: DayPlan }) {
-  const { compose } = useShell();
+function Running({ item }: { item: PlanItem }) {
+  const { finish } = useTaskActions();
   const now = useNow(1000);
   const startedAt = item.instance.startTime ? new Date(item.instance.startTime) : now;
   const elapsedMs = Math.max(0, now.getTime() - startedAt.getTime());
@@ -137,36 +127,37 @@ function Running({ item, plan }: { item: PlanItem; plan: DayPlan }) {
       >
         {formatClock(elapsedMs)}
       </p>
-      <Tooltip content={t("now.finishHint")}>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="shrink-0"
-          onClick={() => compose(t("now.finishMessage", { title: item.title }))}
-        >
-          {t("focus.finish")}
-        </Button>
-      </Tooltip>
-      <Tempos plan={plan} />
+      <Button variant="secondary" size="sm" className="shrink-0" onClick={finish}>
+        {t("focus.finish")}
+      </Button>
+      <Goal templateId={item.instance.templateId} />
       {item.contract && <HudLine contract={item.contract} elapsed={elapsed} />}
     </section>
   );
 }
 
-/** The day's tempos, small: a number that only goes up, and the share of the reference. */
-function Tempos({ plan }: { plan: DayPlan }) {
-  const { summary } = plan;
+/**
+ * The goal in view (ADR-015): the one the task works toward, or the active
+ * goal nearest its end. Its percent is counted from sessions really done.
+ */
+function Goal({ templateId }: { templateId?: string }) {
+  const { core, state } = useSystem();
+  void state; // read again whenever the state changes
+  const goal = (templateId ? goalFor(core, templateId) : null) ?? activeGoals(core)[0] ?? null;
+  if (!goal) return null;
   return (
     <Link
-      to="/review"
-      aria-label={t("tempo.aria", { total: summary.totalTempos, percent: summary.displayPercent })}
-      className="-my-2 hidden shrink-0 flex-col items-end rounded-md px-2 py-1.5 transition-colors hover:bg-hover @md:flex"
+      to="/goals"
+      aria-label={t("goal.aria", { goal: goal.title, percent: goal.percent })}
+      className="-my-2 hidden max-w-[180px] shrink-0 flex-col items-end rounded-md px-2 py-1.5 transition-colors hover:bg-hover @md:flex"
     >
-      <span className="tabular text-md font-semibold leading-5 text-tempo-ink">
-        {formatNumber(summary.totalTempos)}
-        <span className="ml-1 text-xs font-normal text-ink-3">{t("tempo.unit")}</span>
+      <span className="flex max-w-full items-center gap-1.5 text-xs text-ink-3">
+        <Flag className="size-3 shrink-0" />
+        <span className="truncate">{goal.title}</span>
       </span>
-      <span className="tabular text-xs text-ink-3">{summary.displayPercent}%</span>
+      <span className="tabular text-md font-semibold leading-5 text-accent-ink">
+        {goal.percent}%
+      </span>
     </Link>
   );
 }

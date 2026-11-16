@@ -214,7 +214,7 @@ describe("PersistenceManager", () => {
       localStorage.clear = jest.fn(() => clearMockStorage());
     });
 
-    it("state without schemaVersion (v1) migrates to v2 with default dailyTempoTarget 100", () => {
+    it("state without schemaVersion (v1) migrates and loads without a daily reference", () => {
       // Save a v1 state (no schemaVersion)
       const v1State = {
         global: {
@@ -236,32 +236,11 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
+      // v1→v2 still writes one; tempos are gone (ADR-015), so it is dropped on load
+      expect(result!.global.userPreferences).not.toHaveProperty("dailyTempoTarget");
     });
 
-    it("preserves dailyTempoTarget if it already exists (does not overwrite)", () => {
-      const v1StateWithTarget = {
-        global: {
-          days: [],
-          activityTemplates: [],
-          eventTemplates: [],
-          timeBlocks: [],
-          userPreferences: {
-            dailyTempoTarget: 500, // the user had configured it
-            updatedAt: "2023-01-01T00:00:00.000Z",
-          },
-          completedActivityRecords: [],
-          eventInstances: [],
-        },
-        currentDay: null,
-      };
-      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v1StateWithTarget);
-
-      const result = persistenceManager.loadState();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(500);
-    });
-
-    it("marks old completedActivityRecords with tempos=0", () => {
+    it("loads old v1 records as they were closed, without score or tempos", () => {
       const v1StateWithRecords = {
         global: {
           days: [],
@@ -294,9 +273,11 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result!.global.completedActivityRecords.length).toBe(1);
-      expect(result!.global.completedActivityRecords[0].satisfactionScore).toBe(0);
-      expect(result!.global.completedActivityRecords[0].temposAwarded).toBe(0);
-      expect(result!.global.completedActivityRecords[0].beatEstimate).toBe(false);
+      const record = result!.global.completedActivityRecords[0];
+      expect(record.state).toBe("completed");
+      expect(record.beatEstimate).toBe(false);
+      expect(record).not.toHaveProperty("satisfactionScore");
+      expect(record).not.toHaveProperty("temposAwarded");
     });
 
     it("REBUILDS userPreferences if global is incomplete (partially corrupt state)", () => {
@@ -313,9 +294,9 @@ describe("PersistenceManager", () => {
 
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
-      // Must have rebuilt userPreferences with dailyTempoTarget=100
+      // Must have rebuilt userPreferences
       expect(result!.global.userPreferences).toBeDefined();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
+      expect(result!.global.userPreferences.updatedAt).toBeDefined();
     });
 
     it("REBUILDS userPreferences if the global object exists but userPreferences is missing", () => {
@@ -336,7 +317,7 @@ describe("PersistenceManager", () => {
       const result = persistenceManager.loadState();
       expect(result).not.toBeNull();
       expect(result!.global.userPreferences).toBeDefined();
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(100);
+      expect(result!.global.userPreferences.updatedAt).toBeDefined();
     });
 
     it("REBUILDS completedActivityRecords if the array is missing", () => {
@@ -370,7 +351,6 @@ describe("PersistenceManager", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 750, // user's custom value
             updatedAt: "2023-01-01T00:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -382,8 +362,57 @@ describe("PersistenceManager", () => {
       mockLocalStorage[STORAGE_KEY] = JSON.stringify(v2State);
 
       const result = persistenceManager.loadState();
-      // If it were v1, it would be overwritten to 1000. v2 keeps the 750.
-      expect(result!.global.userPreferences.dailyTempoTarget).toBe(750);
+      // A v1 load rebuilds the preferences with a new date; v2 keeps its own
+      expect(result!.global.userPreferences.updatedAt).toBe("2023-01-01T00:00:00.000Z");
+    });
+
+    it("a v3 state with scores, tempos and a daily reference loads and saves without them", () => {
+      const v3WithTempos = {
+        global: {
+          days: [],
+          activityTemplates: [],
+          eventTemplates: [],
+          timeBlocks: [],
+          userPreferences: {
+            dailyTempoTarget: 120,
+            updatedAt: "2023-01-01T00:00:00.000Z",
+          },
+          completedActivityRecords: [
+            {
+              id: "r1",
+              templateId: "t1",
+              templateTitle: "Leer",
+              state: "completed",
+              type: "clear-objective",
+              startTime: "2023-01-01T00:00:00.000Z",
+              endTime: "2023-01-01T00:30:00.000Z",
+              durationMinutes: 30,
+              dayId: "d1",
+              satisfactionScore: 8,
+              temposAwarded: 35,
+              beatEstimate: false,
+              createdAt: "2023-01-01T00:00:00.000Z",
+            },
+          ],
+          eventInstances: [],
+        },
+        currentDay: null,
+        schemaVersion: 3,
+      };
+      mockLocalStorage[STORAGE_KEY] = JSON.stringify(v3WithTempos);
+
+      const result = persistenceManager.loadState()!;
+      const record = result.global.completedActivityRecords[0];
+      expect(record.state).toBe("completed");
+      expect(record.durationMinutes).toBe(30);
+      expect(record).not.toHaveProperty("satisfactionScore");
+      expect(record).not.toHaveProperty("temposAwarded");
+      expect(result.global.userPreferences).not.toHaveProperty("dailyTempoTarget");
+
+      // Saved again, nothing of them is written either
+      persistenceManager.saveState(JSON.parse(JSON.stringify(v3WithTempos)));
+      const stored = mockLocalStorage[STORAGE_KEY];
+      expect(stored).not.toMatch(/satisfactionScore|temposAwarded|dailyTempoTarget/);
     });
 
     it("saveState includes schemaVersion=3 when persisting", () => {
@@ -524,8 +553,8 @@ describe("PersistenceManager", () => {
       expect(result).not.toBeNull();
       const global = result!.global as unknown as Record<string, unknown>;
 
-      // dailyTempoTarget created by v1→v2
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
+      // Tempos are gone (ADR-015): the daily reference is dropped on load
+      expect(global.userPreferences).not.toHaveProperty("dailyTempoTarget");
 
       // Legacy fields archived by v2→v3
       expect(global.subjectiveVariables).toBeUndefined();
@@ -613,8 +642,8 @@ describe("PersistenceManager", () => {
         (global.userPreferences as Record<string, unknown>).hiddenSubjectiveVariableIds
       ).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();
-      // dailyTempoTarget preserved by the migration
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(800);
+      // Tempos are gone (ADR-015): the daily reference is dropped on load
+      expect(global.userPreferences).not.toHaveProperty("dailyTempoTarget");
     });
 
     it("deserialize of v1 without schemaVersion runs v1→v2→v3", () => {
@@ -640,8 +669,8 @@ describe("PersistenceManager", () => {
       const result = persistenceManager.deserialize(JSON.stringify(v1State));
       const global = result.global as unknown as Record<string, unknown>;
 
-      // dailyTempoTarget created by v1→v2
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
+      // Tempos are gone (ADR-015): the daily reference is dropped on load
+      expect(global.userPreferences).not.toHaveProperty("dailyTempoTarget");
       // Legacy archived by v2→v3
       expect(global.subjectiveVariables).toBeUndefined();
       expect(global.legacyArchive).toBeDefined();

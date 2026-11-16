@@ -4,7 +4,6 @@ import { BarChart3, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import type { ActivityType, AppState, Day } from "../../../types";
 import { DayStrip } from "../../components/DayStrip";
 import { Page, PageHeader, SectionTitle } from "../../components/PageHeader";
-import { TempoMeter } from "../../components/TempoMeter";
 import { TypeIcon } from "../../components/TypeIcon";
 import { Button, IconButton } from "../../components/ui/Button";
 import { Menu, MenuCheckItem, MenuContent, MenuTrigger } from "../../components/ui/Menu";
@@ -20,7 +19,6 @@ import {
   formatDateLong,
   formatDateShort,
   formatMinutes,
-  formatNumber,
   formatTime,
   isSameLocalDay,
   minutesOfDay,
@@ -134,7 +132,7 @@ export function ReviewPage() {
 
 function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }) {
   const { core } = useSystem();
-  const summary = core.getTempoSummary(day.id);
+  const summary = core.getDaySummary(day.id);
   const isLive = day.state === "active";
   const { segments, events, records } = buildStrip(state, day.id, isLive ? now : undefined);
   const interrupted = records.filter((record) => record.state === "interrupted").length;
@@ -152,20 +150,20 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
 
   return (
     <div className="mt-6 flex flex-col gap-10">
-      <section aria-label={t("review.temposLabel")} className="flex flex-col gap-3">
-        <TempoMeter summary={summary} label={isLive ? t("tempo.today") : t("tempo.unit")} />
-        <p className="text-sm text-ink-2">
-          {summary.completedActivities > 0 ? (
-            <>
-              {tp("start.completed", summary.completedActivities)} · {t("today.avgSatisfaction")}{" "}
-              <span className="tabular font-medium text-ink">
-                {formatNumber(summary.averageSatisfaction, 1)}
-              </span>
-            </>
-          ) : (
-            t("review.noCompleted")
-          )}
+      <section aria-label={t("review.summaryLabel")} className="flex flex-col gap-1">
+        <p className="text-2xl font-semibold text-ink">
+          {summary.completed + summary.notCompleted > 0
+            ? tp("review.doneOf", summary.completed, {
+                total: summary.completed + summary.notCompleted,
+              })
+            : t("review.noCompleted")}
         </p>
+        {summary.minutesDone > 0 && (
+          <p className="tabular text-sm text-ink-2">
+            {t("review.minutesDone", { time: formatMinutes(summary.minutesDone) })}
+            {isLive && ` · ${t("review.soFar")}`}
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="journey-title">
@@ -206,11 +204,8 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                   <th scope="col" className="px-2 py-2 font-medium">
                     {t("review.col.actualExpected")}
                   </th>
-                  <th scope="col" className="w-24 px-2 py-2 text-right font-medium">
-                    {t("review.col.satisfaction")}
-                  </th>
-                  <th scope="col" className="w-24 px-4 py-2 text-right font-medium">
-                    {t("review.col.tempos")}
+                  <th scope="col" className="w-28 px-4 py-2 text-right font-medium">
+                    {t("review.col.result")}
                   </th>
                 </tr>
               </thead>
@@ -237,7 +232,7 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                           </span>
                           {!done && (
                             <span className="shrink-0 rounded bg-hover px-1.5 py-px text-xs text-ink-2">
-                              {t("log.notFinished")}
+                              {t("log.notDone")}
                             </span>
                           )}
                         </span>
@@ -254,16 +249,11 @@ function DayReview({ state, day, now }: { state: AppState; day: Day; now: Date }
                           </span>
                         )}
                       </td>
-                      <td className="tabular order-3 hidden text-right text-ink-2 @lg:table-cell @lg:px-2 @lg:py-2.5">
-                        {done ? `${record.satisfactionScore ?? 0}/10` : "—"}
-                      </td>
-                      <td className="tabular order-3 text-right @lg:px-4 @lg:py-2.5">
+                      <td className="order-3 text-right text-sm @lg:px-4 @lg:py-2.5">
                         {done ? (
-                          <span className="rounded bg-tempo/15 px-1.5 py-0.5 text-xs font-semibold text-tempo-ink">
-                            +{record.temposAwarded ?? 0}
-                          </span>
+                          <span className="text-success">{t("log.done")}</span>
                         ) : (
-                          <span className="text-ink-3">—</span>
+                          <span className="text-ink-3">{t("log.notDone")}</span>
                         )}
                       </td>
                     </tr>

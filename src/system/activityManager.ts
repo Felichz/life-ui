@@ -639,39 +639,24 @@ export class ActivityManager {
   }
 
   /**
-   * Completes the current active activity with the user's honest self-assessment.
-   *
-   * The core computes the tempos. The UI never recomputes the formula.
-   * score === 0 -> 0 tempos. Bonus only if clear-objective + beat estimate.
+   * Closes the running activity as done (ADR-015). What counts is that it was
+   * done: a roadmap counts it as one of its sessions. The person's words, when
+   * there are some, are kept with it.
    *
    * @param activityId ID of the instance to complete
-   * @param assessment Self-assessment 0-10
-   * @returns Result with the created record, tempos and the day's total
+   * @param close When it ended (frozen when the close was asked for) and their words
    */
   public completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
+    close: { endTime?: ISODateTimeString; note?: string } = {}
   ): CompletionResult {
     // If the UI passes endTime (timestamp frozen when completion was requested),
-    // use it. Otherwise fall back to "now". This keeps the duration from changing
-    // between the modal preview and the final save.
-    const timestamp = assessment.endTime || UtilityService.getCurrentISODateTime();
-    const { satisfactionScore } = assessment;
-
-    if (
-      typeof satisfactionScore !== "number" ||
-      satisfactionScore < 0 ||
-      satisfactionScore > 10 ||
-      !Number.isInteger(satisfactionScore)
-    ) {
-      throw new CoreError("invalid-satisfaction-score");
-    }
+    // use it. Otherwise fall back to "now", so the duration does not change while
+    // the person decides.
+    const timestamp = close.endTime || UtilityService.getCurrentISODateTime();
 
     let resultRecord: CompletedActivityRecord | null = null;
     let beatEstimate = false;
-    let temposAwarded = 0;
-    let dailyTotal = 0;
-    let target = 100;
 
     this.systemCore.updateState((state) => {
       if (!state.currentDay) {
@@ -706,12 +691,6 @@ export class ActivityManager {
         estimatedMinutes
       );
 
-      temposAwarded = UtilityService.calculateTemposAwarded(
-        durationMinutes,
-        satisfactionScore,
-        estimatedMinutes
-      );
-
       const completedRecord: CompletedActivityRecord = {
         id: UtilityService.generateUUID(),
         activityInstanceId: instance.id,
@@ -723,13 +702,11 @@ export class ActivityManager {
         endTime: timestamp,
         durationMinutes,
         dayId: state.currentDay.day.id,
-        satisfactionScore,
-        temposAwarded,
         beatEstimate,
         createdAt: timestamp,
       };
 
-      const note = assessment.note?.trim();
+      const note = close.note?.trim();
       if (note) completedRecord.closingNote = note.slice(0, 500);
 
       if (instance.clearObjectiveSettings) {
@@ -741,12 +718,6 @@ export class ActivityManager {
       }
 
       resultRecord = completedRecord;
-      target = state.global.userPreferences.dailyTempoTarget || 100;
-      const dayId = state.currentDay.day.id;
-      dailyTotal =
-        state.global.completedActivityRecords
-          .filter((r) => r.dayId === dayId && r.state === "completed")
-          .reduce((sum, r) => sum + (r.temposAwarded || 0), 0) + temposAwarded;
 
       const updatedInstances = state.currentDay.activityInstances.filter(
         (_, idx) => idx !== instanceIndex
@@ -770,26 +741,22 @@ export class ActivityManager {
       throw new CoreError("internal", `completing activity ${activityId}`);
     }
 
-    return {
-      record: resultRecord,
-      temposAwarded,
-      beatEstimate,
-      dailyTempoTotal: dailyTotal,
-      // Real uncapped ratio, consistent with TempoSummary.targetProgress.
-      targetProgress: dailyTotal / target,
-    };
+    return { record: resultRecord, beatEstimate };
   }
 
   /**
    * Interrupts the current active activity.
    *
-   * Schema v2+: no longer asks avoidable/cause. It only records the interruption
-   * with no tempos. No penalty. No moral judgment.
+   * Closes the running activity as not done (ADR-015). No cause is asked, no
+   * penalty, no moral judgment; the person's words are kept when there are some.
    *
    * @param activityId ID of the instance to interrupt
    * @returns Record of the interrupted activity
    */
-  public interruptActivity(activityId: UUID): CompletedActivityRecord {
+  public interruptActivity(
+    activityId: UUID,
+    close: { note?: string } = {}
+  ): CompletedActivityRecord {
     const timestamp = UtilityService.getCurrentISODateTime();
     let interruptedRecord: CompletedActivityRecord | null = null;
 
@@ -829,11 +796,11 @@ export class ActivityManager {
         endTime: timestamp,
         durationMinutes,
         dayId: state.currentDay.day.id,
-        satisfactionScore: 0,
-        temposAwarded: 0,
         beatEstimate: false,
         createdAt: timestamp,
       };
+      const note = close.note?.trim();
+      if (note) record.closingNote = note.slice(0, 500);
 
       if (instance.clearObjectiveSettings) {
         record.clearObjectiveSettings = instance.clearObjectiveSettings;

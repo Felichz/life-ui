@@ -692,21 +692,6 @@ function StatusIcon({ status, external }: { status: ToolEntry["status"]; externa
   return <CircleSlash className={cn(className, "text-ink-3")} />;
 }
 
-/** Amber is for tempos and nothing else: the reward, where the close happens. */
-function TempoBadge({ tempos, earned = false }: { tempos: number; earned?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "tabular shrink-0 rounded bg-tempo/15 px-1.5 py-0.5 text-xs font-semibold text-tempo-ink",
-        earned && "animate-tempo-bump"
-      )}
-    >
-      +{tempos}
-      <span className="sr-only"> {t("tempo.unit")}</span>
-    </span>
-  );
-}
-
 /** "who.int", from a link. */
 function hostOf(url: string): string {
   try {
@@ -761,9 +746,6 @@ function ToolRow({ entry }: { entry: ToolEntry }) {
           </span>
         )}
       </span>
-      {entry.status === "done" && entry.tempos !== undefined && (
-        <TempoBadge tempos={entry.tempos} earned={agent.isFresh(entry.id)} />
-      )}
       {entry.status === "done" && agent.canUndo(entry.id) && (
         <button
           type="button"
@@ -1161,7 +1143,6 @@ function EntryView({
     <div className={cn("rounded-lg border border-accent/50 bg-accent/5 px-3 py-2.5", entrance)}>
       <p className="flex items-start justify-between gap-3 text-base font-medium text-ink">
         {entry.summary}
-        {entry.tempos !== undefined && <TempoBadge tempos={entry.tempos} />}
       </p>
       {/* A change made of parts (a roadmap) shows them before the yes */}
       {entry.details && entry.details.length > 0 && (

@@ -181,7 +181,7 @@ describe("Flow 3: Organizing activities on the Kanban board", () => {
     expect(system.getActiveActivity()?.id).toBe(informeInstance.id);
 
     // Complete the activity so another can be activated
-    system.completeActivity(informeInstance.id, { satisfactionScore: 5 });
+    system.completeActivity(informeInstance.id);
 
     // After completing the activity, it should no longer exist in the instance list
     // So trying to activate it again should not find it
@@ -282,7 +282,7 @@ describe("Flow 3: Organizing activities on the Kanban board", () => {
 
     // Activate and complete this task
     const tareaCorreoActiva = system.activateActivity(tareaCorreoInstance.id);
-    system.completeActivity(tareaCorreoActiva.id, { satisfactionScore: 5 });
+    system.completeActivity(tareaCorreoActiva.id);
 
     // Check state before ending the day
     const actividadesAntes = system.getState().currentDay!.activityInstances;

@@ -75,7 +75,6 @@ describe("the Goals page", () => {
     const instance = core.createActivityInstance(base.id, todo.id);
     core.activateActivity(instance.id);
     core.completeActivity(instance.id, {
-      satisfactionScore: 7,
       endTime: new Date(Date.now() + 60_000).toISOString(),
     });
     open(core);

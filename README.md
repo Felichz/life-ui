@@ -24,7 +24,7 @@ A goal that takes weeks becomes a roadmap ([ADR-011](docs/adr/011-a-roadmap-owns
   <img src="docs/readme/02-goals-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A goal becomes sessions on your calendar. A roadmap in phases. Each session says what to do, with the guide that shows how. Marked: 1, Progress counts only what you really closed. Nothing shows what is missing. 2, Every exercise links to the guide the coach found.">
 </picture>
 
-Every ending goes through one honest moment: you say how it went, in your own words, and the coach reads a 0 to 10 satisfaction from them. That earns tempos, computed as `ceil(base minutes × score / 7)`, where the base is your estimate when there is one and the real time otherwise. A 7 is 100%, and a 0 counts nothing. Tempos only go up: no streaks, no penalties, and free time costs nothing. The daily target is a reference shown as a percentage, never as what is missing.
+What is measured is whether you did it ([ADR-015](docs/adr/015-goals-not-tempos.md)). Any task of today starts with one tap on the panel, or by telling the coach; when it ends, one question: did you complete it? A yes counts as a session of its goal, and the reward the app shows is that progress: the phase, its sessions, the percent of the way, until the goal is reached. A no carries no judgment. There are no points, no streaks and no penalties.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-close-dark.webp">
@@ -56,7 +56,7 @@ flowchart LR
   subgraph Core["src/system · domain core (framework-free TS)"]
     SC["SystemCore<br/>state + subscriptions"]
     M["Managers<br/>Day · Activity · TimeBlock · Event<br/>Analytics · Preferences"]
-    U["UtilityService<br/>tempo formula (single source)"]
+    U["UtilityService<br/>time and dates"]
     P["PersistenceManager<br/>versioned schema + migrations"]
   end
   Screens -- "reads state / calls methods" --> SC
@@ -67,7 +67,7 @@ flowchart LR
 
 - **Framework-free domain core.** [`src/system`](src/system) is plain TypeScript with no React imports. `SystemCore` ([`index.tsx`](src/system/index.tsx)) applies every change to a copy of the state, persists it, then notifies subscribers. Managers own each area (days, activities, time blocks, events, analytics, preferences). The UI reaches the core through one adapter, [`src/app/state/system.tsx`](src/app/state/system.tsx), and the UI tests drive a real `SystemCore` instead of mocks.
 - **Versioned persistence with migrations.** [`persistenceManager.ts`](src/system/persistenceManager.ts) runs every load through parse, validate, migrate (schema v1 to v2 to v3), sanitize. Fields removed in v3 are moved into a `legacyArchive` object instead of being discarded. JSON import in Settings goes through the same path as a normal load, and export produces the same format that goes to `localStorage`.
-- **Preview equals result.** The closing dialog ([`ClosingDialog.tsx`](src/app/features/activity/ClosingDialog.tsx)) calls `UtilityService.resolveBaseMinutes` and `calculatePreviewTempos`, the same functions the core uses in `calculateTemposAwarded` ([`utilityService.ts`](src/system/utilityService.ts)). The number on the Save button is the number that gets stored.
+- **Progress is counted, never stored twice.** A roadmap's progress is computed from the closes marked as done ([`directionManager.ts`](src/system/directionManager.ts)); the closing dialog, the HUD and the coach read the same standing through one helper ([`goals.ts`](src/app/lib/goals.ts)).
 - **One closing path.** Finishing, switching activity and ending the day all run through `requestCompletion → dialog → completeActivity | interruptActivity` ([`src/app/state/closing.tsx`](src/app/state/closing.tsx)). The next action only runs if the close was saved, and dismissing the dialog leaves the activity running.
 - **Typed i18n with no dependencies.** [`es.ts`](src/app/i18n/es.ts) is the reference copy and defines `MessageKey`; [`en.ts`](src/app/i18n/en.ts) is typed `Record<MessageKey, string>`, so a missing or extra key fails the type check. A test checks that both languages use the same `{placeholders}` in every string. Plurals use `Intl.PluralRules`, and dates and numbers use `Intl` in the active language.
 - **CI.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push to `main` and on pull requests: typecheck, lint with zero warnings allowed, Jest, the production build, and then Cypress against the built app.
@@ -110,8 +110,8 @@ Keyboard: `Ctrl/⌘ K` command palette · `Ctrl/⌘ B` show or hide the panel ·
 
 450 Jest tests across 31 suites, plus 6 Cypress end-to-end tests.
 
-- **Core** ([`src/system/__tests__`](src/system/__tests__)): unit tests for the managers, the tempo formula and persistence (including migrations and import), plus integration tests for starting a day, the library, planning, and the closing ritual.
-- **UI** ([`src/app/__tests__`](src/app/__tests__)): view-logic tests, i18n key and placeholder parity, and flow tests that render the real app against a real `SystemCore`: closing with the previewed reward, switching activity through the ritual, cancelling, "I didn't finish it", and quick starts.
+- **Core** ([`src/system/__tests__`](src/system/__tests__)): unit tests for the managers and persistence (including migrations and import), plus integration tests for starting a day, the library, planning, and the closing ritual.
+- **UI** ([`src/app/__tests__`](src/app/__tests__)): view-logic tests, i18n key and placeholder parity, and flow tests that render the real app against a real `SystemCore`: closing as done or not done, switching activity through the close, cancelling, and starting from the panel.
 - **End to end** ([`cypress/e2e/journey.cy.ts`](cypress/e2e/journey.cy.ts)): first run through ending the day in the browser, the conversation as its own screen on a phone, the language switch, and redirects from the old Spanish routes.
 
 The README's pictures come from a separate Cypress spec: one scripted conversation with the coach through the real agent and core, with synthetic data, captured in both themes (`npm run dev` must be running). The panels around the shots are drawn by the portfolio's `scripts/readme/build.mjs`.
@@ -145,7 +145,7 @@ docs/adr/              architecture decision records
 
 ## Decisions
 
-- [ADR-001: the tempo system](docs/adr/001-tempo-system.md): the reward formula and what was deliberately removed.
+- [ADR-015: goals, not tempos](docs/adr/015-goals-not-tempos.md): a task is done or not, and the reward is the way to a goal (it replaces ADR-001, the tempo system).
 - [ADR-013: the conversation in the middle](docs/adr/013-the-conversation-in-the-middle.md): the coach-centred shell, the HUD and the one context panel.
 - [`PRODUCT.md`](PRODUCT.md): users, purpose and product principles.
 - [`DESIGN.md`](DESIGN.md): the visual system (tokens, type, components, rules).

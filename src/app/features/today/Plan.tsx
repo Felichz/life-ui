@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Check, Lock } from "lucide-react";
+import { Check, CircleSlash, Lock, Play } from "lucide-react";
+import { Button } from "../../components/ui/Button";
+import { useTaskActions } from "../../shell/useTaskActions";
 import type {
   AppState,
   CompletedActivityRecord,
@@ -24,10 +26,10 @@ import { ActivityNotes, NotesToggle } from "./Upcoming";
 import { t } from "../../i18n";
 
 /**
- * The day as one line of time, read-only: every change goes through the chat
- * (ADR-002). What was done and logged comes first, then a mark for now (with
- * what is running), then what is still planned, block by block. The plan and
- * the log were two columns; they are one day, split at now.
+ * The day as one line of time. What was done and logged comes first, then a
+ * mark for now (with what is running), then what is still planned, block by
+ * block. A task that can start now has a Start button (ADR-015); every other
+ * change goes through the chat (ADR-002).
  */
 
 export interface PlanGroup {
@@ -125,24 +127,23 @@ function DoneRow({ record }: { record: CompletedActivityRecord }) {
   return (
     <li className="flex min-h-[40px] items-center gap-2.5 py-1.5">
       <span className={TIME}>{formatTime(record.startTime)}</span>
-      <Check aria-hidden className="size-4 shrink-0 text-ink-3" strokeWidth={2.2} />
+      {interrupted ? (
+        <CircleSlash aria-hidden className="size-4 shrink-0 text-ink-3" />
+      ) : (
+        <Check aria-hidden className="size-4 shrink-0 text-success" strokeWidth={2.4} />
+      )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base text-ink-2">{record.templateTitle}</p>
+        <p className={cn("truncate text-base", interrupted ? "text-ink-3" : "text-ink-2")}>
+          {record.templateTitle}
+        </p>
         <p className="tabular truncate text-xs text-ink-3">
           {formatMinutes(record.durationMinutes)}
           {contract && ` · ${contract.label}`}
-          {!interrupted &&
-            record.satisfactionScore !== undefined &&
-            ` · ${record.satisfactionScore}/10`}
         </p>
       </div>
-      {interrupted ? (
-        <span className="shrink-0 text-xs text-ink-3">{t("log.notFinished")}</span>
-      ) : (
-        <span className="tabular shrink-0 rounded bg-tempo/15 px-1.5 py-0.5 text-xs font-semibold text-tempo-ink">
-          +{record.temposAwarded ?? 0}
-        </span>
-      )}
+      <span className="shrink-0 text-xs text-ink-3">
+        {t(interrupted ? "log.notDone" : "log.done")}
+      </span>
     </li>
   );
 }
@@ -231,6 +232,7 @@ function PlanRow({
       : t("plan.pastLocked");
   const notes = item.instance.notes;
   const [open, setOpen] = useState(false);
+  const { start } = useTaskActions();
 
   return (
     <li className="border-b border-line/70 last:border-b-0">
@@ -256,6 +258,18 @@ function PlanRow({
           )}
         </div>
         {notes && <NotesToggle open={open} onToggle={() => setOpen((now) => !now)} />}
+        {available && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="shrink-0 text-ink-2"
+            onClick={() => start(item.instance.id)}
+            aria-label={t("plan.startAria", { title: item.title })}
+          >
+            <Play />
+            {t("focus.start")}
+          </Button>
+        )}
         {!available && (
           <Tooltip content={lockedReason}>
             <span

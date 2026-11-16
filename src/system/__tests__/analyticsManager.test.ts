@@ -100,8 +100,6 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       endTime: new Date(TODAY.getTime() + 2 * 60 * 60 * 1000).toISOString(),
       durationMinutes: 60,
       dayId: days[0].id,
-      satisfactionScore: 9,
-      temposAwarded: 78, // ceil(60 × 9 / 7) = 77.14 → 78
       beatEstimate: true,
       createdAt: TODAY.toISOString(),
     },
@@ -129,8 +127,6 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       endTime: new Date(TODAY.getTime() + 3.5 * 60 * 60 * 1000).toISOString(),
       durationMinutes: 30,
       dayId: days[0].id,
-      satisfactionScore: 8,
-      temposAwarded: 35, // ceil(30 × 8 / 7) = 34.29 → 35
       beatEstimate: false,
       createdAt: TODAY.toISOString(),
     },
@@ -162,7 +158,6 @@ const createMockState = (includeActiveActivity: boolean = false): AppState => {
       eventTemplates: [],
       timeBlocks: [],
       userPreferences: {
-        dailyTempoTarget: 100,
         updatedAt: TODAY.toISOString(),
       },
       completedActivityRecords,
@@ -368,66 +363,34 @@ describe("AnalyticsManager", () => {
     });
   });
 
-  describe("getTempoSummary", () => {
-    it("sums tempos only from the day's completed records", () => {
+  describe("getDaySummary", () => {
+    it("counts the day's tasks done and not done, and the minutes of what was done", () => {
       const state = createMockState(true);
-      // Override target to control the ratio
-      state.global.userPreferences.dailyTempoTarget = 100;
-      const manager = new AnalyticsManager(createMockSystemCore(state));
-
-      // todayId is the active day (mockState.global.days[0].id)
-      const todayId = state.global.days[0].id;
-      const summary = manager.getTempoSummary(todayId);
-
-      // 78 (completed 1: ceil(60 × 9 / 7)) + 35 (completed 3: ceil(30 × 8 / 7)) = 113
-      expect(summary.totalTempos).toBe(113);
-      expect(summary.completedActivities).toBe(2);
-    });
-
-    it("computes targetProgress uncapped", () => {
-      const state = createMockState(true);
-      state.global.userPreferences.dailyTempoTarget = 50; // low target
       const manager = new AnalyticsManager(createMockSystemCore(state));
       const todayId = state.global.days[0].id;
 
-      const summary = manager.getTempoSummary(todayId);
+      const summary = manager.getDaySummary(todayId);
 
-      // 113 / 50 = 2.26
-      expect(summary.targetProgress).toBeCloseTo(2.26, 2);
-      // progressBarValue capped at 100
-      expect(summary.progressBarValue).toBe(100);
-      // displayPercent: 226% (uncapped)
-      expect(summary.displayPercent).toBe(226);
+      // Two closed as done (60 and 30 minutes), one closed as not done
+      expect(summary).toEqual({ completed: 2, notCompleted: 1, minutesDone: 90 });
     });
 
-    it("returns zeros and undefined lastReward without activities", () => {
+    it("returns zeros for a day with nothing closed", () => {
       const state = createMockState(true);
       state.global.completedActivityRecords = [];
       const manager = new AnalyticsManager(createMockSystemCore(state));
       const todayId = state.global.days[0].id;
 
-      const summary = manager.getTempoSummary(todayId);
-
-      expect(summary.totalTempos).toBe(0);
-      expect(summary.completedActivities).toBe(0);
-      expect(summary.averageSatisfaction).toBe(0);
-      expect(summary.lastReward).toBeUndefined();
-    });
-
-    it("lastReward is the last completed record", () => {
-      const state = createMockState(true);
-      const manager = new AnalyticsManager(createMockSystemCore(state));
-      const todayId = state.global.days[0].id;
-
-      const summary = manager.getTempoSummary(todayId);
-
-      // The last completed record in mockState is createMockUUID(403)
-      expect(summary.lastReward?.recordId).toBe(createMockUUID(403));
+      expect(manager.getDaySummary(todayId)).toEqual({
+        completed: 0,
+        notCompleted: 0,
+        minutesDone: 0,
+      });
     });
   });
 
-  describe("getTempoTrends", () => {
-    it("returns one point per day with totalTempos, targetProgress and avg", () => {
+  describe("getDayTrends", () => {
+    it("returns one point per day with what was done and not done", () => {
       const state = createMockState();
       // Keep only the first day in the range and map its records to that day
       const todayId = state.global.days[0].id;
@@ -436,21 +399,16 @@ describe("AnalyticsManager", () => {
         ...r,
         dayId: todayId,
       }));
-      state.global.userPreferences.dailyTempoTarget = 100;
       const manager = new AnalyticsManager(createMockSystemCore(state));
 
-      const trends = manager.getTempoTrends({
+      const trends = manager.getDayTrends({
         from: YESTERDAY.toISOString(),
         to: TODAY.toISOString(),
       });
 
       expect(trends.length).toBe(1);
-      // 78 (60min × 9/7) + 35 (30min × 8/7) = 113
-      expect(trends[0].totalTempos).toBe(113);
-      // 113 / 100 = 1.13
-      expect(trends[0].targetProgress).toBeCloseTo(1.13, 2);
-      // averageSatisfaction = (9 + 8) / 2 = 8.5
-      expect(trends[0].averageSatisfaction).toBeCloseTo(8.5, 1);
+      expect(trends[0].completed).toBe(2);
+      expect(trends[0].notCompleted).toBe(1);
     });
 
     it("filters out days outside the range", () => {
@@ -467,7 +425,7 @@ describe("AnalyticsManager", () => {
       ];
       const manager = new AnalyticsManager(createMockSystemCore(state));
 
-      const trends = manager.getTempoTrends({
+      const trends = manager.getDayTrends({
         from: YESTERDAY.toISOString(),
         to: TODAY.toISOString(),
       });

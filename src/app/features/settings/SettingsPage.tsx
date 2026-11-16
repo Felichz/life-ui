@@ -4,13 +4,11 @@ import {
   useState,
   useSyncExternalStore,
   type ChangeEvent,
-  type FormEvent,
   type ReactNode,
 } from "react";
 import { getWebSetting, onWebSetting, setWebSetting, type WebSetting } from "../../agent/web";
 import { Download, Monitor, Moon, Sun, Trash2, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { UtilityService } from "../../../system/utilityService";
 import { Page, PageHeader } from "../../components/PageHeader";
 import { Button } from "../../components/ui/Button";
 import {
@@ -70,7 +68,6 @@ export function SettingsPage() {
       <PageHeader title={t("nav.settings")} />
       <div className="mt-6">
         <ModelSection />
-        <TargetSection />
         <AppearanceSection />
         <LanguageSection />
         <WebSection />
@@ -95,73 +92,6 @@ export function SettingsPage() {
         <DataSection />
       </div>
     </Page>
-  );
-}
-
-function TargetSection() {
-  const { state, core } = useSystem();
-  const toast = useToast();
-  const current = state.global.userPreferences.dailyTempoTarget ?? 100;
-  const [value, setValue] = useState(String(current));
-  const [error, setError] = useState<string | null>(null);
-  const divisor = UtilityService.SCORE_DIVISOR;
-
-  const save = (event: FormEvent) => {
-    event.preventDefault();
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-      setError(t("settings.target.error"));
-      return;
-    }
-    try {
-      core.updateDailyTempoTarget(parsed);
-      setError(null);
-      toast({
-        title: t("settings.target.updated"),
-        description: t("settings.target.updatedDetail", { n: parsed }),
-      });
-    } catch (caught) {
-      setError(errorMessage(caught));
-    }
-  };
-
-  return (
-    <Section title={t("settings.target.title")} description={t("settings.target.description")}>
-      <form onSubmit={save} className="flex flex-col gap-2">
-        <label htmlFor="target" className="text-sm font-medium text-ink">
-          {t("settings.target.label")}
-        </label>
-        <div className="flex gap-2">
-          <Input
-            id="target"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={value}
-            aria-invalid={Boolean(error) || undefined}
-            onChange={(event) => {
-              setValue(event.target.value);
-              setError(null);
-            }}
-            className="tabular w-32"
-          />
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={value === String(current)}
-            className="h-9 coarse:h-11"
-          >
-            {t("common.save")}
-          </Button>
-        </div>
-        {error && <p className="text-sm text-danger">{error}</p>}
-      </form>
-      <div className="mt-5 rounded-lg bg-subtle px-4 py-3.5 text-sm text-ink-2">
-        <p className="font-medium text-ink">{t("settings.formula.title")}</p>
-        <p className="tabular mt-1.5">{t("settings.formula.expression", { divisor })}</p>
-        <p className="mt-1.5">{t("settings.formula.explanation", { divisor })}</p>
-      </div>
-    </Section>
   );
 }
 

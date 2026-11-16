@@ -99,7 +99,6 @@ describe("ActivityManager", () => {
         eventTemplates: [],
         timeBlocks: [],
         userPreferences: {
-          dailyTempoTarget: 100,
           updatedAt: "2023-01-01T00:00:00.000Z",
         },
         completedActivityRecords: [],
@@ -115,15 +114,11 @@ describe("ActivityManager", () => {
     (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
     (UtilityService.getCurrentISODateTime as jest.Mock).mockReturnValue(mockTimestamp);
 
-    // Use the real implementations for the tempo calculation functions
-    // (auto-mock would have left them as undefined)
+    // The real beat-estimate check (auto-mock would have left it undefined)
     const actualUtilityService = jest.requireActual("../utilityService")
       .UtilityService as typeof UtilityService;
     (UtilityService.calculateBeatEstimate as jest.Mock).mockImplementation(
       actualUtilityService.calculateBeatEstimate
-    );
-    (UtilityService.calculateTemposAwarded as jest.Mock).mockImplementation(
-      actualUtilityService.calculateTemposAwarded
     );
 
     systemCore = new SystemCore() as jest.Mocked<SystemCore>;
@@ -600,15 +595,14 @@ describe("ActivityManager", () => {
         mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
         // Complete the activity
-        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 8 });
+        const result = activityManager.completeActivity(instanceId, { note: "Went well" });
 
         // Check that the completed activity record was created
         expect(result).toBeDefined();
         expect(result.record.state).toBe("completed");
         expect(result.record.templateId).toBe(mockTemplateId);
         expect(result.record.dayId).toBe(mockDayId);
-        expect(result.record.satisfactionScore).toBe(8);
-        expect(result.temposAwarded).toBeGreaterThan(0);
+        expect(result.record.closingNote).toBe("Went well");
 
         // Check that the instance was removed from the current day
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);
@@ -674,7 +668,7 @@ describe("ActivityManager", () => {
         mockAppState.currentDay!.activeActivityInstanceId = activeInstanceId;
 
         // Complete the active activity
-        activityManager.completeActivity(activeInstanceId, { satisfactionScore: 7 });
+        activityManager.completeActivity(activeInstanceId);
 
         // Check that only the active activity was removed
         expect(mockAppState.currentDay?.activityInstances.length).toBe(2);
@@ -696,38 +690,12 @@ describe("ActivityManager", () => {
         const instance = activityManager.createActivityInstance(mockTemplateId, mockBlockId);
 
         expect(() => {
-          activityManager.completeActivity(instance.id, { satisfactionScore: 8 });
+          activityManager.completeActivity(instance.id);
         }).toThrowCoreError("not-the-active-activity");
       });
 
-      it("should compute tempos correctly: clear-objective score 10 (MVP v3.1)", () => {
-        // 30 min estimated, 30 min actual -> ceil(30 × 10 / 7) = 43
-        const instanceId = "instance-no-bonus";
-        mockAppState.currentDay!.activityInstances.push({
-          id: instanceId,
-          templateId: mockTemplateId,
-          blockId: mockBlockId,
-          order: 0,
-          state: "active",
-          startTime: "2023-01-01T11:30:00.000Z",
-          createdAt: mockTimestamp,
-          updatedAt: mockTimestamp,
-          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
-        });
-        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
-
-        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
-
-        expect(result.beatEstimate).toBe(false);
-        // MVP v3.1 formula: ceil(30 × 10 / 7) = ceil(42.86) = 43
-        expect(result.temposAwarded).toBe(43);
-        expect(result.record.beatEstimate).toBe(false);
-        expect(result.record.temposAwarded).toBe(43);
-      });
-
-      it("should use the estimate (not the duration) on a beat (MVP v3.1)", () => {
+      it("marks a close under 80% of the estimate as beating it", () => {
         // 30 min estimated, 20 min actual (66%) -> beat
-        // ceil(30 × 10 / 7) = 43 (uses the estimate, not the actual duration)
         const instanceId = "instance-bonus";
         mockAppState.currentDay!.activityInstances.push({
           id: instanceId,
@@ -742,15 +710,13 @@ describe("ActivityManager", () => {
         });
         mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
-        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
+        const result = activityManager.completeActivity(instanceId);
 
         expect(result.beatEstimate).toBe(true);
-        // MVP v3.1 formula: ceil(30 × 10 / 7) = 43
-        expect(result.temposAwarded).toBe(43);
         expect(result.record.beatEstimate).toBe(true);
       });
 
-      it("should NOT give a bonus for timeboxing even if it beat the estimate (MVP v3.1)", () => {
+      it("never marks a timebox as beating an estimate", () => {
         // Switch the template to timeboxing
         mockAppState.global.activityTemplates[0].type = "timeboxing";
         mockAppState.global.activityTemplates[0].clearObjectiveSettings = undefined;
@@ -772,34 +738,10 @@ describe("ActivityManager", () => {
         });
         mockAppState.currentDay!.activeActivityInstanceId = instanceId;
 
-        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 10 });
+        const result = activityManager.completeActivity(instanceId);
 
         // timeboxing NEVER has beatEstimate (there is no estimate in the same sense)
         expect(result.beatEstimate).toBe(false);
-        // MVP v3.1 formula: ceil(15 × 10 / 7) = ceil(21.43) = 22
-        expect(result.temposAwarded).toBe(22);
-      });
-
-      it("score 0 -> 0 total tempos, even with a beat (MVP v3.1)", () => {
-        // 30 min estimated, 20 min actual (66%) -> beat available, but score 0
-        const instanceId = "instance-zero";
-        mockAppState.currentDay!.activityInstances.push({
-          id: instanceId,
-          templateId: mockTemplateId,
-          blockId: mockBlockId,
-          order: 0,
-          state: "active",
-          startTime: "2023-01-01T11:40:00.000Z",
-          createdAt: mockTimestamp,
-          updatedAt: mockTimestamp,
-          clearObjectiveSettings: { estimatedDurationMinutes: 30 },
-        });
-        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
-
-        const result = activityManager.completeActivity(instanceId, { satisfactionScore: 0 });
-
-        // MVP v3.1 formula: score 0 -> 0 tempos
-        expect(result.temposAwarded).toBe(0);
       });
 
       it("uses a frozen endTime: the duration does not change between request and confirm", () => {
@@ -827,51 +769,12 @@ describe("ActivityManager", () => {
         // The user stays 5 minutes in the modal (we change Date.now virtually)
         // Then completeActivity with the frozen endTime: must use the request's endTime
         const result = activityManager.completeActivity(instanceId, {
-          satisfactionScore: 10,
           endTime: request.requestedAt, // frozen
         });
 
         // The duration must be the request's (20), not the "now" one (25)
         expect(result.record.durationMinutes).toBe(20);
         expect(result.record.endTime).toBe(mockTimestamp); // respects the passed endTime
-      });
-
-      it("throws on an invalid score (< 0)", () => {
-        const instanceId = "instance-invalid";
-        mockAppState.currentDay!.activityInstances.push({
-          id: instanceId,
-          templateId: mockTemplateId,
-          blockId: mockBlockId,
-          order: 0,
-          state: "active",
-          startTime: "2023-01-01T11:30:00.000Z",
-          createdAt: mockTimestamp,
-          updatedAt: mockTimestamp,
-        });
-        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
-
-        expect(() => {
-          activityManager.completeActivity(instanceId, { satisfactionScore: -1 });
-        }).toThrowCoreError("invalid-satisfaction-score");
-      });
-
-      it("throws on a fractional (non-integer) score", () => {
-        const instanceId = "instance-fractional";
-        mockAppState.currentDay!.activityInstances.push({
-          id: instanceId,
-          templateId: mockTemplateId,
-          blockId: mockBlockId,
-          order: 0,
-          state: "active",
-          startTime: "2023-01-01T11:30:00.000Z",
-          createdAt: mockTimestamp,
-          updatedAt: mockTimestamp,
-        });
-        mockAppState.currentDay!.activeActivityInstanceId = instanceId;
-
-        expect(() => {
-          activityManager.completeActivity(instanceId, { satisfactionScore: 7.5 });
-        }).toThrowCoreError("invalid-satisfaction-score");
       });
     });
 
@@ -967,14 +870,16 @@ describe("ActivityManager", () => {
         mockUUID = "interrupted-id-123";
         (UtilityService.generateUUID as jest.Mock).mockReturnValue(mockUUID);
 
-        const result = activityManager.interruptActivity(instance.id);
+        const result = activityManager.interruptActivity(instance.id, {
+          note: "  No me dio el tiempo.  ",
+        });
 
-        // Schema v2+: there is no interruptionData anymore. Tempos=0 always.
+        // Closed as not done (ADR-015): no cause asked, the person's words kept
         expect(result.state).toBe("interrupted");
         expect(result.templateId).toBe(mockTemplateId);
-        expect(result.temposAwarded).toBe(0);
-        expect(result.satisfactionScore).toBe(0);
         expect(result.beatEstimate).toBe(false);
+        expect(result.closingNote).toBe("No me dio el tiempo.");
+        expect(result).not.toHaveProperty("satisfactionScore");
 
         // Check that the instance was deleted
         expect(mockAppState.currentDay?.activityInstances.length).toBe(0);

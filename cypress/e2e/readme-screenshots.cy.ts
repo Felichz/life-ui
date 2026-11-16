@@ -106,8 +106,8 @@ const ROADMAP = {
 };
 const DONE =
   "Done: 50 sessions, weekdays at 9:00 from today, in three phases. Each one shows its exercises with the guide's link; it's all under Goals.";
-const FINISHED = "Done, it went well. A 9.";
-const CLOSED = "Closed at 9 out of 10: +13 tempos. Same time tomorrow.";
+const FINISHED = "Done, it went well.";
+const CLOSED = "Completed: phase 1 of the elbow, 1 of 10 sessions. Same time tomorrow.";
 
 const CHAT = 'section[aria-label="Chat"]';
 const HUD = '[class*="grid-area:now"]';
@@ -157,7 +157,7 @@ describe("README screenshots", () => {
       }),
       call("save_roadmap", ROADMAP),
       say(DONE),
-      call("finish_activity", { how_it_went: "Done, it went well", satisfaction: 9 }),
+      call("finish_activity", { how_it_went: "Done, it went well" }),
       say(CLOSED),
     ];
     cy.intercept("POST", "**/__model/v1/chat/completions", (req) => {
@@ -217,7 +217,7 @@ describe("README screenshots", () => {
       const day = q.getCurrentDay();
       const blocks = q.getTimeBlocks();
       const block = (name: string) => blocks.find((b: any) => b.name === name).id;
-      const record = (t: any, hour: number, minute: number, duration: number, score: number) => {
+      const record = (t: any, hour: number, minute: number, duration: number) => {
         const start = new WinDate(2026, 10, 16, hour, minute);
         const end = new WinDate(start.getTime() + duration * 60000);
         return {
@@ -230,8 +230,6 @@ describe("README screenshots", () => {
           startTime: start.toISOString(),
           endTime: end.toISOString(),
           durationMinutes: duration,
-          satisfactionScore: score,
-          temposAwarded: Math.ceil((duration * score) / 7),
           beatEstimate: false,
           dayId: day.id,
           createdAt: end.toISOString(),
@@ -240,8 +238,8 @@ describe("README screenshots", () => {
       q.updateState((s: any) => {
         s.currentDay.day.startTime = new WinDate(2026, 10, 16, 7, 50).toISOString();
         s.global.completedActivityRecords.push(
-          record(meditate, 7, 55, 12, 8),
-          record(email, 8, 10, 14, 7)
+          record(meditate, 7, 55, 12),
+          record(email, 8, 10, 14)
         );
         return s;
       });
@@ -271,7 +269,7 @@ describe("README screenshots", () => {
     mark("goals", [["main article"], ['main a[href*="nhs"]']]);
     shoot("goals");
 
-    // 9:11, the first session runs; the close is one sentence, and its card shows the tempos
+    // 9:11, the first session runs; the close is one sentence, done or not done
     cy.contains("nav a", "Today").click();
     goTo(9, 0);
     cy.window().then((win: any) => {

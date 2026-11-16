@@ -7,8 +7,8 @@ import type {
   ActivityStatistics,
   CompletedActivityRecord,
   DayMinutes,
-  TempoSummary,
-  TempoTrendPoint,
+  DaySummary,
+  DayTrendPoint,
 } from "../types";
 
 /**
@@ -380,76 +380,36 @@ export class AnalyticsManager {
   }
 
   /**
-   * Tempo summary for a specific day
+   * A day in numbers (ADR-015): done and not done, and the minutes of what was done.
    */
-  public getTempoSummary(dayId: UUID): TempoSummary {
-    const state = this.systemCore.getState();
-    const target = state.global.userPreferences.dailyTempoTarget || 100;
-
-    const dayRecords = state.global.completedActivityRecords.filter(
-      (r) => r.dayId === dayId && r.state === "completed"
-    );
-
-    const totalTempos = dayRecords.reduce((sum, r) => sum + (r.temposAwarded || 0), 0);
-    const completedActivities = dayRecords.length;
-    const averageSatisfaction =
-      completedActivities > 0
-        ? dayRecords.reduce((sum, r) => sum + (r.satisfactionScore || 0), 0) / completedActivities
-        : 0;
-
-    const last = dayRecords[dayRecords.length - 1];
-
+  public getDaySummary(dayId: UUID): DaySummary {
+    const records = this.systemCore
+      .getState()
+      .global.completedActivityRecords.filter((r) => r.dayId === dayId);
+    const done = records.filter((r) => r.state === "completed");
     return {
-      totalTempos,
-      target,
-      targetProgress: totalTempos / target,
-      progressBarValue: Math.min(100, (totalTempos / target) * 100),
-      displayPercent: Math.round((totalTempos / target) * 100),
-      completedActivities,
-      averageSatisfaction,
-      lastReward: last
-        ? {
-            recordId: last.id,
-            activityTitle: last.templateTitle,
-            tempos: last.temposAwarded || 0,
-          }
-        : undefined,
+      completed: done.length,
+      notCompleted: records.length - done.length,
+      minutesDone: done.reduce((sum, r) => sum + r.durationMinutes, 0),
     };
   }
 
   /**
-   * Tempo trends over a time range
+   * Done and not done, day by day, over a range.
    */
-  public getTempoTrends(range: {
-    from: ISODateTimeString;
-    to: ISODateTimeString;
-  }): TempoTrendPoint[] {
+  public getDayTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): DayTrendPoint[] {
     const state = this.systemCore.getState();
-    const target = state.global.userPreferences.dailyTempoTarget || 100;
     const fromMs = new Date(range.from).getTime();
     const toMs = new Date(range.to).getTime();
-
-    const daysInRange = state.global.days.filter((d) => {
-      const created = new Date(d.createdAt).getTime();
-      return created >= fromMs && created <= toMs;
-    });
-
-    return daysInRange.map((day) => {
-      const records = state.global.completedActivityRecords.filter(
-        (r) => r.dayId === day.id && r.state === "completed"
-      );
-      const totalTempos = records.reduce((sum, r) => sum + (r.temposAwarded || 0), 0);
-      const avg =
-        records.length > 0
-          ? records.reduce((sum, r) => sum + (r.satisfactionScore || 0), 0) / records.length
-          : 0;
-
-      return {
-        date: day.createdAt,
-        totalTempos,
-        targetProgress: totalTempos / target,
-        averageSatisfaction: avg,
-      };
-    });
+    return state.global.days
+      .filter((d) => {
+        const created = new Date(d.createdAt).getTime();
+        return created >= fromMs && created <= toMs;
+      })
+      .map((day) => {
+        const records = state.global.completedActivityRecords.filter((r) => r.dayId === day.id);
+        const completed = records.filter((r) => r.state === "completed").length;
+        return { date: day.createdAt, completed, notCompleted: records.length - completed };
+      });
   }
 }

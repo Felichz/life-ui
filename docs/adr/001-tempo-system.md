@@ -1,6 +1,6 @@
 # ADR-001 — Tempo System: Design, Restoration, and Simplification
 
-**Status**: Accepted (with corrections)
+**Status**: Superseded by [ADR-015](015-goals-not-tempos.md) (2026-11-15): tempos and the score are gone
 **Date**: 2026-08-04
 **Decision**: Implement a tempo system with a percentage formula + honest self-assessment on completion, removing secondary features that do not contribute to the integrity of the contract.
 

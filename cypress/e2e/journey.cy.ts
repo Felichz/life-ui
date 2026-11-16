@@ -54,7 +54,7 @@ describe("LifeUI", () => {
     cy.viewport(1440, 900);
     cy.visitFresh();
     cy.contains("h1", /Buen(os|as) (días|tardes|noches)/);
-    cy.contains("Cierre honesto");
+    cy.contains("Una pregunta al terminar");
     // The HUD offers to start the day, and saying it is the way to
     cy.contains("button", "Empezar el día");
     cy.contains("No hay modelo cargado");
@@ -69,8 +69,8 @@ describe("LifeUI", () => {
       say("Añadido al plan."),
       call("start_activity", { item: "Escribir informe" }),
       say("En marcha."),
-      call("finish_activity", { how_it_went: "bien, hecho", satisfaction: 7 }),
-      say("Cerrado: +30 tempos."),
+      call("finish_activity", { how_it_went: "bien, hecho" }),
+      say("Completada."),
       call("log_event", { name: "Café" }),
       say("Café registrado."),
       call("end_day"),
@@ -95,10 +95,10 @@ describe("LifeUI", () => {
     cy.title().should("contain", "Escribir informe");
 
     write("terminé, salió bien");
-    // 30 estimated minutes x 7 / 7 = 30, never showing the score
-    chat().contains("li", "Cerrar «Escribir informe»").should("contain", "+30");
-    chat().contains("Cerrado: +30 tempos.");
-    cy.get("main").contains("30");
+    // Done or not done, from their words (ADR-015): no score, no tempos
+    chat().contains("li", "Cerrar «Escribir informe»");
+    chat().contains("Completada.");
+    cy.get("main").contains("Completada");
 
     write("me tomé un café");
     chat().contains("Registrar «Café»");
@@ -112,7 +112,7 @@ describe("LifeUI", () => {
 
     cy.visit("/review");
     cy.contains("td", "Escribir informe");
-    cy.get('section[aria-label="Tempos del día"]').should("contain", "30");
+    cy.get('section[aria-label="Resumen del día"]').should("contain", "1 de 1 completada");
   });
 
   it("on mobile, the conversation is a screen of its own beside the places", () => {

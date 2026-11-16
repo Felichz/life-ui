@@ -16,7 +16,7 @@ Write notes in ${language}, in at most ${words} words.
 Keep, with exact names, times and numbers:
 - what the person wants and why: goals, preferences, constraints, in their own terms;
 - decisions made and things agreed;
-- changes made to the day: activities added, moved, started or closed, times, tempos earned;
+- changes made to the day: activities added, moved, started or closed (done or not done), times, and what moved toward a goal;
 - open questions and anything promised for later;
 - the latest plan or proposal on the table, whole, with every number, name and step: it may be the next thing put in the app.
 Leave out greetings, small talk, repeated text and how tools work.
@@ -33,7 +33,7 @@ export const SUMMARY_SHAPE = (headings: readonly string[], words: number, langua
   `These are notes taken from a conversation between a person and the agent of LifeUI. Rewrite them as one summary in ${language}, in at most ${words} words, using exactly these headings, in this order:
 ${headings[0]} (what the person wants and why, in their own terms)
 ${headings[1]} (what was decided or agreed)
-${headings[2]} (what was added, moved, started or closed, with exact names, times and tempos)
+${headings[2]} (what was added, moved, started or closed, with exact names and times, and what moved toward a goal)
 ${headings[3]} (open questions and what was promised for later)
 Short bullet lines under each heading; write "-" under a heading with nothing to say. Keep every name, time and number exactly. Do not invent anything, do not address the person, and do not mention that this is a summary.`;
 
@@ -113,21 +113,16 @@ The planner cannot ask anything. Sessions are counted as whole sittings: three d
 - Offer at most three ways forward, in one short message: move it to a later time or block (schedule / move_to_block), make it smaller (add it again with fewer minutes and remove the old one), or let it go (remove_from_plan). Carrying it to tomorrow happens on its own when the day ends.
 - If they bring up a cause, listen and help with that; do not dig for one.`,
 
-  "closing-rubric": `Inferring satisfaction 0-10 from the person's words when an activity is done:
-- 10: the best it could have gone; they are thrilled.
-- 9: very good, clearly happy with it.
-- 8: good; it went well.
-- 7: done, fine, solid. This is the 100% point. Use it when they only say it is done, with no feeling either way.
-- 5-6: done but meh; it dragged, or they are half satisfied.
-- 3-4: done, but they are unhappy with how it went.
-- 1-2: barely anything came out of it.
-- 0: they say it did not count.
-Follow their words: do not round up to please or down to be strict. If they did not finish it, use stop_activity instead. If you cannot tell how it went, ask in plain words ("How did it go?"), never for a number. Pass their sentence as how_it_went.`,
+  "closing-rubric": `Closing a task, from the person's words: did they do it?
+- Done ("terminé", "listo", "lo hice", "salió", "done"): finish_activity. It counts as a session of its goal.
+- Not done, or only part of it ("no llegué", "lo dejé a medias", "hice la mitad", "no pude"): stop_activity. No judgment: offer another time, a smaller version, or letting it go.
+- If their words do not say whether they did it ("ya está", "bueno"), ask in plain words: "¿La completaste?". Never ask for a number or a score.
+Pass their sentence as how_it_went. After a finish, say in one line what it moved toward its goal, from the tool's answer (phase, sessions of the phase, percent), never from memory.`,
 
   "end-day": `Ending the day:
-1. If something is running, close it first (ask how it went).
+1. If something is running, close it first (ask whether they did it).
 2. Call end_day; the person always confirms it.
-3. One short line on what the day had, in tempos and closes, from the tool results. Unfinished things carry over to tomorrow on their own: say so without judging.`,
+3. One short line on what the day had: what was done and what moved toward a goal, from the tool results. Unfinished things carry over to tomorrow on their own: say so without judging.`,
 } as const;
 
 export type GuideName = keyof typeof GUIDES;

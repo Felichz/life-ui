@@ -85,7 +85,6 @@ describe("SystemCore", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 100,
             updatedAt: mockTimestamp,
           },
           completedActivityRecords: [],
@@ -112,7 +111,6 @@ describe("SystemCore", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T10:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -325,20 +323,12 @@ describe("SystemCore", () => {
         systemCore["userPreferencesManager"],
         "getUserPreferences"
       );
-      const updateDailyTempoTargetSpy = jest.spyOn(
-        systemCore["userPreferencesManager"],
-        "updateDailyTempoTarget"
-      );
-
       // Test the delegations
-      systemCore.updateUserPreferences({ dailyTempoTarget: 1500 });
-      expect(updatePreferencesSpy).toHaveBeenCalledWith({ dailyTempoTarget: 1500 });
+      systemCore.updateUserPreferences({ updatedAt: "2023-01-02T00:00:00.000Z" });
+      expect(updatePreferencesSpy).toHaveBeenCalledWith({ updatedAt: "2023-01-02T00:00:00.000Z" });
 
       systemCore.getUserPreferences();
       expect(getPreferencesSpy).toHaveBeenCalled();
-
-      systemCore.updateDailyTempoTarget(2000);
-      expect(updateDailyTempoTargetSpy).toHaveBeenCalledWith(2000);
     });
 
     it("delegates AnalyticsManager methods correctly", () => {
@@ -404,7 +394,6 @@ describe("SystemCore", () => {
           eventTemplates: [],
           timeBlocks: [],
           userPreferences: {
-            dailyTempoTarget: 100,
             updatedAt: "2023-01-01T08:00:00.000Z",
           },
           completedActivityRecords: [],
@@ -472,7 +461,8 @@ describe("SystemCore", () => {
       ).toBeUndefined();
       // But the archive is available
       expect(global.legacyArchive).toBeDefined();
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(1500);
+      // The daily reference is gone with the tempos (ADR-015)
+      expect(global.userPreferences).not.toHaveProperty("dailyTempoTarget");
     });
 
     it("importData of v1 without schemaVersion chains v1→v2→v3", () => {
@@ -510,8 +500,8 @@ describe("SystemCore", () => {
       const state = systemCore.getState();
       const global = state.global as unknown as Record<string, unknown>;
 
-      // dailyTempoTarget created by v1→v2
-      expect((global.userPreferences as { dailyTempoTarget: number }).dailyTempoTarget).toBe(100);
+      // v1→v2 still writes a daily reference, and it is dropped on the way in (ADR-015)
+      expect(global.userPreferences).not.toHaveProperty("dailyTempoTarget");
       // Legacy archived by v2→v3
       expect(global.legacyArchive).toBeDefined();
     });

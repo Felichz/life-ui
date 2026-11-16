@@ -26,6 +26,41 @@ export const STORAGE_KEY = "qualia_control_app_state";
 export const CURRENT_SCHEMA_VERSION = 3;
 
 /**
+ * Tempos and the 0-10 score are gone (ADR-015): a record keeps whether it was
+ * done, and the preferences lose the daily reference. Applied on every load and
+ * save, so an old file or an import comes in without them. The v1->v2 migration
+ * still writes them; this takes them off after it.
+ */
+export function stripTempos(state: AppState): AppState {
+  const global = state.global as unknown as Record<string, unknown>;
+  const records = Array.isArray(global?.completedActivityRecords)
+    ? (global.completedActivityRecords as Array<Record<string, unknown>>)
+    : null;
+  const prefs = global?.userPreferences as Record<string, unknown> | undefined;
+  const dirty =
+    (records?.some((r) => "satisfactionScore" in r || "temposAwarded" in r) ?? false) ||
+    (prefs !== undefined && prefs !== null && "dailyTempoTarget" in prefs);
+  if (!dirty) return state;
+  const cleanRecords = records?.map((r) => {
+    if (!("satisfactionScore" in r) && !("temposAwarded" in r)) return r;
+    const copy = { ...r };
+    delete copy.satisfactionScore;
+    delete copy.temposAwarded;
+    return copy;
+  });
+  const cleanPrefs = prefs ? { ...prefs } : prefs;
+  if (cleanPrefs) delete cleanPrefs.dailyTempoTarget;
+  return {
+    ...state,
+    global: {
+      ...(global as object),
+      ...(cleanRecords ? { completedActivityRecords: cleanRecords } : {}),
+      ...(cleanPrefs ? { userPreferences: cleanPrefs } : {}),
+    } as unknown as AppState["global"],
+  };
+}
+
+/**
  * Result of a state migration
  */
 export interface MigrationResult {
@@ -54,7 +89,7 @@ export class PersistenceManager implements IPersistenceManager {
    * `schemaVersion: CURRENT_SCHEMA_VERSION`. Used by `saveState` and `serialize`.
    */
   private buildSerializedState(state: AppState): string {
-    const sanitized = this.stripLegacyFields(state);
+    const sanitized = stripTempos(this.stripLegacyFields(state));
     const stateWithVersion = { ...sanitized, schemaVersion: CURRENT_SCHEMA_VERSION };
     return JSON.stringify(stateWithVersion);
   }
@@ -102,7 +137,7 @@ export class PersistenceManager implements IPersistenceManager {
     // payload with legacy fields (subjectiveVariables, etc.) may arrive.
     // The runtime must NEVER receive them, not even in memory during
     // the session. stripLegacyFields removes them idempotently.
-    return this.stripLegacyFields(migration.state);
+    return stripTempos(this.stripLegacyFields(migration.state));
   }
 
   /**
@@ -229,8 +264,6 @@ export class PersistenceManager implements IPersistenceManager {
     // Rebuild userPreferences if missing
     const existingPrefs = state.global?.userPreferences;
     const userPreferences = {
-      dailyTempoTarget:
-        typeof existingPrefs?.dailyTempoTarget === "number" ? existingPrefs.dailyTempoTarget : 100,
       updatedAt: existingPrefs?.updatedAt ?? new Date().toISOString(),
     };
     warnings.push("userPreferences rebuilt with defaults");

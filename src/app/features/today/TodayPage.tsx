@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Clock3 } from "lucide-react";
 import { Tooltip } from "../../components/ui/Tooltip";
-import { TempoMeter } from "../../components/TempoMeter";
-import { formatDateLong, formatNumber, formatTime } from "../../lib/format";
+import { formatDateLong, formatTime } from "../../lib/format";
 import { useSystem } from "../../state/system";
 import { Panel, PanelHeader } from "../../components/PageHeader";
 import { DayTimeline } from "./Plan";
@@ -13,7 +12,7 @@ import { t, tp } from "../../i18n";
 
 /**
  * The day, in the context panel: one line of time from what was done to what
- * is planned. Read-only (ADR-002): it changes as the person talks to the coach.
+ * is planned. Tasks start from it (ADR-015); the rest changes in the chat.
  */
 export function TodayPage() {
   const plan = useDayPlan();
@@ -45,11 +44,6 @@ export function TodayPage() {
         }
       />
 
-      {/* On a phone the HUD is too narrow for the tempos: they are here instead */}
-      <div className="mb-6 lg:hidden">
-        <TempoMeter summary={summary} variant="compact" />
-      </div>
-
       <DayTimeline
         state={state}
         dayId={day.day.id}
@@ -65,8 +59,10 @@ export function TodayPage() {
         className="group mt-10 flex items-center gap-3 border-t border-line pt-4 text-sm text-ink-2 transition-colors hover:text-ink"
       >
         <span className="min-w-0 flex-1">
-          {summary.completedActivities > 0
-            ? `${tp("start.completed", summary.completedActivities)} · ${t("today.avgSatisfaction")} ${formatNumber(summary.averageSatisfaction, 1)}`
+          {summary.completed + summary.notCompleted > 0
+            ? `${tp("start.completed", summary.completed)}${
+                summary.notCompleted > 0 ? ` · ${tp("today.notDone", summary.notCompleted)}` : ""
+              }`
             : t("today.reviewLink")}
         </span>
         <ArrowRight className="size-4 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />

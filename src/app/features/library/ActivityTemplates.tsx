@@ -27,12 +27,12 @@ export function ActivityTemplates() {
   const dayActive = Boolean(state.currentDay);
 
   const usage = useMemo(() => {
-    const stats = new Map<string, { count: number; satisfaction: number }>();
+    // How often it was done, of the times it was closed (ADR-015)
+    const stats = new Map<string, { count: number; closed: number }>();
     for (const record of state.global.completedActivityRecords) {
-      if (record.state !== "completed") continue;
-      const current = stats.get(record.templateId) ?? { count: 0, satisfaction: 0 };
-      current.count += 1;
-      current.satisfaction += record.satisfactionScore ?? 0;
+      const current = stats.get(record.templateId) ?? { count: 0, closed: 0 };
+      current.closed += 1;
+      if (record.state === "completed") current.count += 1;
       stats.set(record.templateId, current);
     }
     return stats;
@@ -151,7 +151,7 @@ export function ActivityTemplates() {
                         {" "}
                         ·{" "}
                         {tp("library.usage", stats.count, {
-                          average: formatNumber(stats.satisfaction / stats.count, 1),
+                          closed: formatNumber(stats.closed),
                         })}
                       </span>
                     )}

@@ -7,7 +7,7 @@
 /*
  * Tokens. RGB channels so Tailwind can apply opacity (bg-accent/10).
  * Neutrals with a very slight cool tint; an indigo accent for action and
- * selection; amber only for tempos (the reward); green only for "running".
+ * selection; amber is the brand mark; green only for "running".
  */
 :root {
   color-scheme: light;

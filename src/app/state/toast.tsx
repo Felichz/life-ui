@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, Check, X } from "lucide-react";
+import { AlertCircle, Check, X, Flag } from "lucide-react";
 import { t } from "../i18n";
 import { cn } from "../lib/cn";
 
@@ -18,8 +18,6 @@ export interface ToastInput {
   title: string;
   description?: string;
   tone?: Tone;
-  /** For reward notices: "+30" */
-  tempos?: number;
   duration?: number;
 }
 
@@ -77,9 +75,10 @@ function ToastView({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       onMouseLeave={() => setPaused(false)}
       className="pointer-events-auto flex w-full max-w-sm animate-toast-in items-start gap-3 rounded-lg border border-line bg-panel py-3 pl-3 pr-2 shadow-pop"
     >
-      {tone === "reward" && toast.tempos !== undefined ? (
-        <span className="tabular mt-px inline-flex h-6 min-w-[44px] shrink-0 items-center justify-center rounded-md bg-tempo/15 px-1.5 text-sm font-semibold text-tempo-ink">
-          +{toast.tempos}
+      {tone === "reward" ? (
+        // A step toward a goal (ADR-015)
+        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent-ink">
+          <Flag className="size-3" strokeWidth={2.5} />
         </span>
       ) : (
         <span

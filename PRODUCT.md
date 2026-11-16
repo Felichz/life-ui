@@ -8,7 +8,7 @@ web
 
 ## Users
 
-Primary: the author, using the app throughout the whole day to decide what to do next, run one thing at a time, and close each activity honestly. Used on desktop/laptop as a desktop app (Tauri) with a local model, and as a web build (cloud models) on the phone.
+Primary: the author, using the app throughout the whole day to decide what to do next, run one thing at a time, and say whether each one was done. Used on desktop/laptop as a desktop app (Tauri) with a local model, and as a web build (cloud models) on the phone.
 
 Later: other people who want the same kind of support. The product is personal today but should be understandable to a stranger without the author explaining it — no private jargon left unexplained, no dead ends that only the author knows how to escape.
 
@@ -16,15 +16,15 @@ Later: other people who want the same kind of support. The product is personal t
 
 LifeUI is "a UI for real life": like a game HUD, it shows the information that matters about the day without replacing the day. Life is the only real game; the app is only its interface.
 
-The loop: plan the day (library → time blocks), focus on exactly one active activity, close it honestly, and receive tempos. Since ADR-002 the person does all of this by talking to an agent in a chat column; the screens only show the day. The close is the person saying how it went in their own words, from which the agent infers the 0–10 satisfaction (never asked as a number). Tempos are an immutable reward, never a currency: they only go up, they never drain, and free time costs nothing.
+The loop (ADR-015): the coach turns a goal into a roadmap of real tasks on the calendar; the person starts a task (a button, or a word to the coach), focuses on exactly one, and closes it as done or not done. A done task moves its goal forward; that progress is the reward. Since ADR-002 the person does all of this by talking to an agent in a chat column; the screens only show the day. The close is the person saying how it went in their own words, from which the agent infers the 0–10 satisfaction (never asked as a number). Tempos are an immutable reward, never a currency: they only go up, they never drain, and free time costs nothing.
 
-Success: the user keeps opening the app because each honest close feels good, and the daily picture (tempos, % of reference, satisfaction, timeline) tells them something true about their day.
+Success: the user keeps opening the app because they can see themselves getting closer to their goals, and what the app counts (tasks done, sessions of each phase, the percent of the way) is true.
 
 ## Positioning
 
 A local AI harness for your life: a personal assistant and coach, built around the person, that runs on their own machine. What sets it apart from a chatbot is the harness around the model: tools that really change the day (plans, the calendar weeks ahead, roadmaps, web searches with sources), a memory of what the person said (the coach's notes and the ideal life), and one rule held in code, that nothing changes without the person's yes. Privacy is part of the pitch: the day stays on the machine, and only the searches the person allows go out. Not a todo app, not a habit tracker, not a chatbot.
 
-Inside the day, the distinctive mechanism is the closing ritual: every activity end passes through one self-assessment, and the reward is computed from effort (estimated or real minutes) × honesty (score / 7). Honesty is concentrated in one moment instead of spread as continuous friction.
+Inside the day, every activity end passes through one question: did you complete it? That answer is the only thing measured, and a yes moves the task's goal forward. It is asked in one moment, from the person's own words, instead of as continuous tracking.
 
 ## Operating Context
 
@@ -39,35 +39,35 @@ Inside the day, the distinctive mechanism is the closing ritual: every activity 
 - The coach keeps notes on what the person has told it (ADR-012): what they want, what they have, their limits, what they said only as a guess. A short call writes them; the code decides the coach's next move from them (ask what is missing, twice at most; then recommend; put it in the app only after a yes).
 - Events: one-tap point-in-time markers ("Tomé ibuprofeno", "Café") from reusable event templates.
 - Timeline of the day: completed and interrupted activities, the running one, events.
-- Overview: day metrics (tempos, % of reference, completed count, average satisfaction) and multi-day trends.
-- Settings: daily tempo reference (default 100), export / import JSON, clear data.
+- Overview: tasks done and not done per day, time on what was done, and a multi-day trend.
+- Settings: the model, appearance, language, web research, updates, export / import JSON, clear data.
 - Offline-first. The web build keeps its state in localStorage; the desktop app keeps it in a file (ADR-003). The agent runs on a local model through LM Studio or Ollama (ADR-004), or a cloud provider (ADR-005).
 - Bilingual UI: English and Spanish, switchable at any time; the first launch is in English and a saved choice wins after that. Spanish is the reference copy; English must stay equivalent in tone (kind, never judging).
 
 ## Capabilities and Constraints
 
-- Architecture: `src/system` is the domain core (SystemCore + managers) and owns all business logic, including the tempo formula `ceil(base × score / 7)`. The UI never recomputes rules; it only calls the core and renders. The preview in the closing ritual uses `UtilityService.calculatePreviewTempos` / `resolveBaseMinutes`, the same source the core uses.
+- Architecture: `src/system` is the domain core (SystemCore + managers) and owns all business logic, including a roadmap's progress counted from what was done. The UI never recomputes rules; it only calls the core and renders.
 - Stack: React 18 + TypeScript + Vite + react-router. Jest + Testing Library for unit tests, Cypress for E2E.
 - Removed on purpose (ADR-001): subjective variables, interruption causes, "was it avoidable?" questions, causal snapshots. Do not reintroduce them.
-- Terminology (ES / EN): día / day, foco / focus, en marcha / running, biblioteca / library, bloque / time block, "Por hacer" / "To do", evento / event, tempos / tempos, referencia diaria / daily reference, cierre / close, satisfacción / satisfaction, "No la terminé" / "I didn't finish it".
+- Terminology (ES / EN): día / day, foco / focus, en marcha / running, biblioteca / library, bloque / time block, "Por hacer" / "To do", evento / event, meta / goal, hoja de ruta / roadmap, cierre / close, completada / completed, "No la completé" / "I didn't complete it".
 
 ## Brand Commitments
 
 - Name: LifeUI (formerly Qualia Control; the old name survives only in the localStorage key so existing data keeps loading).
-- Voice: always kind to the user. Positive tone, rounding in their favor, optimistic defaults. The daily target is an anchor, never a debt: "42% of your daily reference", never "58 tempos to go". Interruptions carry no moral judgment ("That's fine. Tomorrow is another chance.").
+- Voice: always kind to the user. Positive tone, optimistic defaults. Progress is what was reached, never what is missing: "phase 1, 4 of 10 sessions", never "6 to go". Interruptions carry no moral judgment ("That's fine. Tomorrow is another chance.").
 - Honest dopamine only: no fake streaks, no rewards for looking at the screen, no punitive drains.
 
 ## Evidence on Hand
 
 - No real user data, testimonials, or metrics exist. Anything shown as sample data must be clearly synthetic.
-- Product docs: `docs/adr/` (001 tempo system, 002 agent-mediated app, 003 desktop shell, 004 local model runtime, 005 model providers, 006 scheduled times), `AGENT.md` (the agent's prompt) and the original vision and flows in `docs/archive/`.
+- Product docs: `docs/adr/` (001 tempo system, superseded by 015; 002 agent-mediated app, 003 desktop shell, 004 local model runtime, 005 model providers, 006 scheduled times), `AGENT.md` (the agent's prompt) and the original vision and flows in `docs/archive/`.
 
 ## Product Principles
 
 1. Free time is sacred: never drain, never penalize inactivity.
-2. Honesty lives in one moment: one closing ritual, no continuous friction.
+2. One question at the end of a task: did you complete it. No continuous friction.
 3. The core calculates, the UI evaluates.
-4. Three metrics, not twenty: tempos, % of reference, satisfaction.
+4. One measure that matters: was it done. Progress is toward goals, never toward a daily number.
 5. The app always treats the user well.
 
 ## Accessibility & Inclusion

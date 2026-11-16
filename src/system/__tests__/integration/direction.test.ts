@@ -32,7 +32,6 @@ function doOnce(core: SystemCore, templateId: string, minutes = 20) {
   const started = new Date(core.getActiveActivity()!.startTime!);
   // Each close ends a second after the one before, as real ones do
   core.completeActivity(instance.id, {
-    satisfactionScore: 7,
     endTime: new Date(started.getTime() + minutes * 60000 + ++tick * 1000).toISOString(),
   });
 }

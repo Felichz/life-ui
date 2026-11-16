@@ -14,14 +14,17 @@ import { planItem, templateMap, type PlanItem } from "../lib/domain";
 import { CoreError } from "../../system";
 import { errorMessage, useSystem } from "./system";
 import { useToast } from "./toast";
+import { goalFor } from "../lib/goals";
 
 /**
- * The only closing path (ADR-001): requestCompletion → dialog → completeActivity
- * or interruptActivity. Completing, switching activity and ending the day
- * all go through here; `then` only runs if the close was saved.
+ * The closing path from the panel (ADR-015): requestCompletion → "did you
+ * complete it?" → completeActivity or interruptActivity. `then` and
+ * `onClosed` only run if the close was saved.
  */
 export interface CloseOptions {
   then?: () => void;
+  /** Told how it ended, to tell the coach. */
+  onClosed?: (outcome: "done" | "not-done", title: string, note?: string) => void;
   /** What happens next, so the dialog can tell the user. */
   nextLabel?: string;
 }
@@ -79,40 +82,41 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
     [core, toast]
   );
 
-  const finish = useCallback((current: Pending) => {
+  const finish = useCallback((current: Pending, outcome: "done" | "not-done", note?: string) => {
     setPending(null);
     setError(null);
+    current.options.onClosed?.(outcome, current.request.activityTitle, note);
     current.options.then?.();
   }, []);
 
   const confirm = useCallback(
-    (score: number) => {
+    (note?: string) => {
       const current = pendingRef.current;
       if (!current || busy) return;
       setBusy(true);
       try {
         const result = core.completeActivity(current.activityId, {
-          satisfactionScore: score,
           endTime: current.request.requestedAt,
+          note,
         });
-        const summary = core.getTempoSummary(result.record.dayId);
-        toast(
-          result.temposAwarded > 0
-            ? {
-                tone: "reward",
-                tempos: result.temposAwarded,
-                title: current.request.activityTitle,
-                description: t("closing.toast.reward", {
-                  total: summary.totalTempos,
-                  percent: summary.displayPercent,
-                }),
-              }
-            : {
-                title: current.request.activityTitle,
-                description: t("closing.toast.noTempos"),
-              }
-        );
-        finish(current);
+        // The reward is the way to the goal (ADR-015)
+        const goal = goalFor(core, result.record.templateId);
+        toast({
+          tone: goal ? "reward" : "neutral",
+          title: t("closing.toast.done", { title: current.request.activityTitle }),
+          description: goal
+            ? goal.reached
+              ? t("closing.toast.goalReached", { goal: goal.title })
+              : t("closing.toast.goal", {
+                  goal: goal.title,
+                  phase: goal.phase,
+                  done: goal.phaseDone,
+                  total: goal.phaseTotal,
+                  percent: goal.percent,
+                })
+            : undefined,
+        });
+        finish(current, "done", note);
       } catch (caught) {
         setError(errorMessage(caught, t("error.saveClosing")));
       } finally {
@@ -122,25 +126,28 @@ export function ClosingFlowProvider({ children }: { children: ReactNode }) {
     [busy, core, finish, toast]
   );
 
-  const interrupt = useCallback(() => {
-    const current = pendingRef.current;
-    if (!current || busy) return;
-    setBusy(true);
-    try {
-      core.interruptActivity(current.activityId);
-      toast({
-        title: t("closing.toast.interrupted"),
-        description: t("closing.toast.interruptedDetail", {
-          title: current.request.activityTitle,
-        }),
-      });
-      finish(current);
-    } catch (caught) {
-      setError(errorMessage(caught, t("error.save")));
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, core, finish, toast]);
+  const interrupt = useCallback(
+    (note?: string) => {
+      const current = pendingRef.current;
+      if (!current || busy) return;
+      setBusy(true);
+      try {
+        core.interruptActivity(current.activityId, { note });
+        toast({
+          title: t("closing.toast.interrupted"),
+          description: t("closing.toast.interruptedDetail", {
+            title: current.request.activityTitle,
+          }),
+        });
+        finish(current, "not-done", note);
+      } catch (caught) {
+        setError(errorMessage(caught, t("error.save")));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, core, finish, toast]
+  );
 
   const cancel = useCallback(() => {
     setPending(null);

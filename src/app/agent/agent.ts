@@ -92,8 +92,6 @@ export type Entry =
       summary: string;
       status: "pending" | "running" | "done" | "rejected" | "error" | "undone";
       error?: string;
-      /** Tempos the change earns: the preview while it waits, the real ones once done. */
-      tempos?: number;
       /** A search on the web rather than a change to the day. */
       external?: boolean;
       /** What the change consists of, line by line (a roadmap's milestones). */
@@ -1313,11 +1311,8 @@ export class Agent {
     }
 
     let summary: string;
-    let tempos: number | undefined;
     try {
-      const described = tool.describe?.(ctx, args) ?? tool.name;
-      if (typeof described === "string") summary = described;
-      else ({ text: summary, tempos } = described);
+      summary = tool.describe?.(ctx, args) ?? tool.name;
     } catch (caught) {
       return failure(caught);
     }
@@ -1327,7 +1322,6 @@ export class Agent {
       name: tool.name,
       summary,
       status: "pending",
-      ...(tempos !== undefined ? { tempos } : {}),
     });
 
     // What a web page says must not change the day on its own: after a search
@@ -1345,12 +1339,7 @@ export class Agent {
     try {
       const result = tool.run(ctx, args);
       this.lastUndo = { entryId: entry.id, snapshot };
-      // The card promised a preview; once done it shows what the core awarded
-      const earned = (result as { tempos_earned?: unknown } | undefined)?.tempos_earned;
-      this.patch(entry.id, {
-        status: "done",
-        ...(typeof earned === "number" ? { tempos: earned } : {}),
-      });
+      this.patch(entry.id, { status: "done" });
       return result ?? { ok: true };
     } catch (caught) {
       // A change that fails halfway leaves nothing behind (an activity created
@@ -1535,7 +1524,7 @@ export class Agent {
     let summary: string;
     try {
       const described = tool.describe?.(ctx, args) ?? tool.name;
-      summary = typeof described === "string" ? described : described.text;
+      summary = described;
     } catch (caught) {
       return failure(caught);
     }

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { TempoSummary } from "../../../types";
+import type { DaySummary } from "../../../types";
 import { planItem, sortBlocks, templateMap, type PlanItem } from "../../lib/domain";
 import { minutesOfDay } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
@@ -19,7 +19,8 @@ export interface DayPlan {
   /** Items in the plan, the running one included. */
   total: number;
   nowMinutes: number;
-  summary: TempoSummary;
+  /** Done and not done today (ADR-015). */
+  summary: DaySummary;
 }
 
 /** The day as the screens read it. Null when no day is in progress. */
@@ -60,5 +61,5 @@ export function useDayPlan(): DayPlan | null {
   }, [day, state, nowMinutes]);
 
   if (!day || !plan) return null;
-  return { ...plan, nowMinutes, summary: core.getTempoSummary(day.day.id) };
+  return { ...plan, nowMinutes, summary: core.getDaySummary(day.day.id) };
 }

@@ -1,5 +1,4 @@
 import type { ISystemCore, UserPreferences } from "../types";
-import { CoreError } from "./errors";
 
 /**
  * User preferences manager
@@ -52,17 +51,5 @@ export class UserPreferencesManager {
 
     // Return the updated preferences
     return this.getUserPreferences();
-  }
-
-  /**
-   * Schema v2+: updates the daily tempo target
-   * @param target New target (positive integer)
-   * @returns Updated preferences
-   */
-  public updateDailyTempoTarget(target: number): UserPreferences {
-    if (typeof target !== "number" || target <= 0 || !Number.isInteger(target)) {
-      throw new CoreError("invalid-daily-target");
-    }
-    return this.updateUserPreferences({ dailyTempoTarget: target });
   }
 }

@@ -59,7 +59,6 @@ describe("Scheduling and closing notes", () => {
     system.activateActivity(reportId);
     system.requestCompletion(reportId);
     const { record } = system.completeActivity(reportId, {
-      satisfactionScore: 8,
       note: "  Went well, finished the draft.  ",
     });
     expect(record.closingNote).toBe("Went well, finished the draft.");

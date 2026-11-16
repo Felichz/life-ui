@@ -1,3 +1,4 @@
+import { activeGoals } from "../lib/goals";
 import { localDate } from "../../system/agendaManager";
 import type { AppState, ISystemCore, TimeBlock } from "../../types";
 import {
@@ -79,7 +80,6 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
 
   if (!current) return { ...base, day: "not started" as const };
 
-  const summary = core.getTempoSummary(current.day.id);
   const activeId = current.activeActivityInstanceId;
   const plan = current.activityInstances
     .slice()
@@ -127,7 +127,7 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
       at: formatDayMinutes(minutesOfDay(new Date(r.startTime))),
       minutes: r.durationMinutes,
       duration: recordContract(r)?.label ?? "free",
-      result: r.state === "completed" ? `+${r.temposAwarded ?? 0} tempos` : "not finished",
+      result: r.state === "completed" ? "done" : "not done",
     }));
 
   return {
@@ -137,11 +137,14 @@ export function daySnapshot(core: ISystemCore, now = new Date()) {
     running,
     plan,
     closed_today: closed,
-    tempos: {
-      today: summary.totalTempos,
-      percent_of_reference: summary.displayPercent,
-      reference: summary.target,
-    },
+    // The reward is the way to a goal (ADR-015): each one as the app counts it
+    goals: activeGoals(core).map((goal) => ({
+      goal: goal.title,
+      percent: goal.percent,
+      phase: goal.phase,
+      phase_sessions_done: `${goal.phaseDone} of ${goal.phaseTotal}`,
+      ...(goal.reached ? { reached: true } : {}),
+    })),
   };
 }
 
@@ -206,14 +209,11 @@ export function reviewSnapshot(core: ISystemCore, days = 7) {
     .sort((a, b) => dayStart(b).localeCompare(dayStart(a)))
     .slice(0, days)
     .map((day) => {
-      const summary = core.getTempoSummary(day.id);
       const records = state.global.completedActivityRecords.filter((r) => r.dayId === day.id);
       return {
         date: dayStart(day).slice(0, 10),
-        tempos: summary.totalTempos,
-        percent_of_reference: summary.displayPercent,
-        closed: records.filter((r) => r.state === "completed").map((r) => r.templateTitle),
-        not_finished: records.filter((r) => r.state === "interrupted").map((r) => r.templateTitle),
+        done: records.filter((r) => r.state === "completed").map((r) => r.templateTitle),
+        not_done: records.filter((r) => r.state === "interrupted").map((r) => r.templateTitle),
       };
     });
 }

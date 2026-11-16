@@ -1,9 +1,9 @@
 import type { ActivityTemplate, ActivityType, ISystemCore, TimeBlock } from "../../types";
-import { UtilityService } from "../../system/utilityService";
 import { localDate } from "../../system/agendaManager";
 import { sessionDates, sessionMinutes } from "../../system/directionManager";
 import { formatDateShort, formatDayMinutes, formatDayMonth } from "../lib/format";
 import { t } from "../i18n";
+import { goalFor } from "../lib/goals";
 import { agendaSnapshot, daySnapshot, librarySnapshot, reviewSnapshot, shortId } from "./snapshot";
 import { GUIDES, GUIDE_NOTE, type GuideName } from "./guides";
 import { searchWeb } from "./web";
@@ -104,8 +104,8 @@ export interface Tool {
   prepare?: (ctx: ToolContext, args: Args) => Promise<Prepared>;
   /** The line shown while `prepare` works. */
   working?: () => string;
-  /** One line for the card, in the person's language, and the tempos it would earn. */
-  describe?: (ctx: ToolContext, args: Args) => string | { text: string; tempos?: number };
+  /** One line for the card, in the person's language. */
+  describe?: (ctx: ToolContext, args: Args) => string;
 }
 
 /** A refusal the model can read and recover from, like the core's codes. */
@@ -474,23 +474,6 @@ const where = (block: TimeBlock, time: number | null) =>
     .filter(Boolean)
     .join(" · ");
 
-/** Tempos the close would earn, with the same function as the core. */
-function previewTempos(core: ISystemCore, score: number, now: Date): number {
-  const active = core.getActiveActivity();
-  if (!active) return 0;
-  const template = core.getActivityTemplates().find((tpl) => tpl.id === active.templateId);
-  const estimate =
-    active.clearObjectiveSettings?.estimatedDurationMinutes ??
-    template?.clearObjectiveSettings?.estimatedDurationMinutes;
-  const minutes = active.startTime
-    ? Math.max(0, Math.round((now.getTime() - new Date(active.startTime).getTime()) / 60000))
-    : 0;
-  return UtilityService.calculatePreviewTempos(
-    score,
-    UtilityService.resolveBaseMinutes(estimate, minutes)
-  );
-}
-
 const runningTitle = (core: ISystemCore) => {
   const active = core.getActiveActivity();
   // Refused here, before a card with no name on it is shown
@@ -594,7 +577,7 @@ export const TOOLS: Tool[] = [
   {
     name: "get_day",
     description:
-      "Read today: the time, blocks, the plan (with ids), what is running, what was closed and the tempos.",
+      "Read today: the time, blocks, the plan (with ids), what is running, and what was closed as done or not done.",
     parameters: { type: "object", properties: {} },
     mutates: false,
     run: ({ core, now }) => daySnapshot(core, now()),
@@ -608,7 +591,7 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "get_review",
-    description: "Read recent days: tempos, what was closed and what was not finished.",
+    description: "Read recent days: what was done and what was not.",
     parameters: {
       type: "object",
       properties: { days: { type: "integer", description: "How many days, default 7" } },
@@ -699,9 +682,9 @@ export const TOOLS: Tool[] = [
           "activity-running",
           "close it with finish_activity or stop_activity first"
         );
-      const summary = core.getTempoSummary(core.getCurrentDay()!.id);
+      const summary = core.getDaySummary(core.getCurrentDay()!.id);
       core.endDay();
-      return { ended: true, tempos: summary.totalTempos };
+      return { ended: true, done: summary.completed, not_done: summary.notCompleted };
     },
     describe: () => t("agent.tool.endDay"),
   },
@@ -857,53 +840,56 @@ export const TOOLS: Tool[] = [
   {
     name: "finish_activity",
     description:
-      'The person finished what is running ("terminé", "listo", "done"): close it as done. Not for something they are only starting. Satisfaction is inferred from their words (closing-rubric guide), never asked.',
+      'The person did what is running ("terminé", "listo", "lo hice", "done"): close it as done. Only when their words say they did it; if they did not say whether they completed it, ask them in plain words first. Not for something they are only starting.',
     parameters: {
       type: "object",
       properties: {
         how_it_went: { type: "string", description: "The person's own words about how it went" },
-        satisfaction: {
-          type: "integer",
-          minimum: 0,
-          maximum: 10,
-          description: "Inferred from their words",
-        },
       },
-      required: ["how_it_went", "satisfaction"],
+      required: ["how_it_went"],
     },
     mutates: true,
     run: ({ core }, args) => {
       const active = core.getActiveActivity();
       if (!active) throw new ToolError("nothing-running", NOTHING_RUNNING);
-      const score = Math.round(num(args.satisfaction) ?? Number.NaN);
       const request = core.requestCompletion(active.id);
-      const result = core.completeActivity(active.id, {
-        satisfactionScore: score,
+      core.completeActivity(active.id, {
         endTime: request.requestedAt,
         note: str(args.how_it_went),
       });
+      const goal = goalFor(core, active.templateId);
       return {
-        closed: request.activityTitle,
-        tempos_earned: result.temposAwarded,
-        tempos_today: result.dailyTempoTotal,
+        done: request.activityTitle,
+        // The reward is the way to the goal (ADR-015): said from here, never guessed
+        ...(goal
+          ? {
+              goal: goal.title,
+              goal_percent: goal.percent,
+              phase: goal.phase,
+              phase_sessions_done: `${goal.phaseDone} of ${goal.phaseTotal}`,
+              goal_reached: goal.reached,
+            }
+          : {}),
       };
     },
-    describe: ({ core, now }, args) => ({
-      text: t("agent.tool.finish", { title: runningTitle(core) }),
-      tempos: previewTempos(core, Math.round(num(args.satisfaction) ?? 0), now()),
-    }),
+    describe: ({ core }) => t("agent.tool.finish", { title: runningTitle(core) }),
   },
   {
     name: "stop_activity",
     description:
-      "Stop the running activity as not finished. No tempos, no judgment. It can be added to the plan again later.",
-    parameters: { type: "object", properties: {} },
+      'Close the running activity as not done: they did not do it, or not all of it ("no llegué", "lo dejé a medias", "no pude"). No judgment; it can be planned again.',
+    parameters: {
+      type: "object",
+      properties: {
+        how_it_went: { type: "string", description: "The person's own words, if they said any" },
+      },
+    },
     mutates: true,
-    run: ({ core }) => {
+    run: ({ core }, args) => {
       const active = core.getActiveActivity();
       if (!active) throw new ToolError("nothing-running", NOTHING_RUNNING);
-      const record = core.interruptActivity(active.id);
-      return { stopped: record.templateTitle };
+      const record = core.interruptActivity(active.id, { note: str(args.how_it_went) });
+      return { not_done: record.templateTitle };
     },
     describe: ({ core }) => t("agent.tool.stop", { title: runningTitle(core) }),
   },

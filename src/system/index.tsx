@@ -23,8 +23,8 @@ import type {
   UUID,
   CompletionRequest,
   CompletionResult,
-  TempoSummary,
-  TempoTrendPoint,
+  DaySummary,
+  DayTrendPoint,
   ISODateTimeString,
 } from "../types";
 import { PersistenceManager } from "./persistenceManager";
@@ -320,21 +320,23 @@ export class SystemCore implements ISystemCore {
   }
 
   /**
-   * Completes an activity with the user's self-assessment.
-   * Computes tempos in the core (the UI never recomputes the formula).
+   * Closes the running activity as done (ADR-015), with the person's words.
    */
   public completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
+    close: { endTime?: ISODateTimeString; note?: string } = {}
   ): CompletionResult {
-    return this.activityManager.completeActivity(activityId, assessment);
+    return this.activityManager.completeActivity(activityId, close);
   }
 
   /**
-   * Interrupts an activity. Schema v2+: no avoidable/cause question.
+   * Closes the running activity as not done (ADR-015). No cause is asked.
    */
-  public interruptActivity(activityId: UUID): CompletedActivityRecord {
-    return this.activityManager.interruptActivity(activityId);
+  public interruptActivity(
+    activityId: UUID,
+    close: { note?: string } = {}
+  ): CompletedActivityRecord {
+    return this.activityManager.interruptActivity(activityId, close);
   }
 
   /**
@@ -480,21 +482,14 @@ export class SystemCore implements ISystemCore {
     return this.analyticsManager.getCompletionRate();
   }
 
-  /**
-   * Schema v2+: tempo summary for a day
-   */
-  public getTempoSummary(dayId: UUID): TempoSummary {
-    return this.analyticsManager.getTempoSummary(dayId);
+  /** A day in numbers (ADR-015): done and not done. */
+  public getDaySummary(dayId: UUID): DaySummary {
+    return this.analyticsManager.getDaySummary(dayId);
   }
 
-  /**
-   * Schema v2+: tempo trends over a range
-   */
-  public getTempoTrends(range: {
-    from: ISODateTimeString;
-    to: ISODateTimeString;
-  }): TempoTrendPoint[] {
-    return this.analyticsManager.getTempoTrends(range);
+  /** Done and not done, day by day. */
+  public getDayTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): DayTrendPoint[] {
+    return this.analyticsManager.getDayTrends(range);
   }
 
   /**
@@ -520,13 +515,6 @@ export class SystemCore implements ISystemCore {
    */
   public getUserPreferences(): UserPreferences {
     return this.userPreferencesManager.getUserPreferences();
-  }
-
-  /**
-   * Schema v2+: updates the daily tempo target
-   */
-  public updateDailyTempoTarget(target: number): UserPreferences {
-    return this.userPreferencesManager.updateDailyTempoTarget(target);
   }
 
   // ===============================================
@@ -584,7 +572,6 @@ export class SystemCore implements ISystemCore {
       eventTemplates: [],
       timeBlocks: [],
       userPreferences: {
-        dailyTempoTarget: 100,
         updatedAt: timestamp,
       },
       completedActivityRecords: [],

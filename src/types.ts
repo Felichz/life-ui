@@ -318,11 +318,7 @@ export interface CompletedActivityRecord {
   endTime: ISODateTimeString;
   durationMinutes: MinutesNumber;
 
-  // Tempo system (schema v2+). The core always sets them;
-  // they are optional in the type only to tolerate legacy test fixtures
-  // and states from before the v1->v2 migration.
-  satisfactionScore?: number;
-  temposAwarded?: number;
+  /** Done in less than 80% of a single estimate: information, nothing more. */
   beatEstimate?: boolean;
 
   // Day it belongs to
@@ -394,8 +390,6 @@ export interface Day {
  * Persistent personalized settings
  */
 export interface UserPreferences {
-  dailyTempoTarget?: number; // Schema v2+: default 1000, optional for legacy
-
   updatedAt: ISODateTimeString;
 }
 
@@ -542,40 +536,21 @@ export interface ActivityStatistics {
 }
 
 /**
- * Tempo summary for a day
- * Derived calculation, not persisted
+ * A day in numbers (ADR-015): what was closed as done and as not done.
+ * Derived, not persisted. No target: progress is toward goals.
  */
-export interface TempoSummary {
-  totalTempos: number;
-  target: number;
-  /**
-   * Real ratio without a cap (can be > 1 if you exceeded the target).
-   * E.g.: 1847 / 1000 = 1.847
-   */
-  targetProgress: number;
-  /**
-   * Value for the progress bar (always 0..100).
-   * To show >100%, `displayPercent` is used, which is not capped either.
-   */
-  progressBarValue: number;
-  displayPercent: number;
-  completedActivities: number;
-  averageSatisfaction: number;
-  lastReward?: {
-    recordId: UUID;
-    activityTitle: string;
-    tempos: number;
-  };
+export interface DaySummary {
+  completed: number;
+  notCompleted: number;
+  /** Minutes of what was closed as done. */
+  minutesDone: number;
 }
 
-/**
- * Tempo trend point over time
- */
-export interface TempoTrendPoint {
+/** One day of the trend: what was done and not done. */
+export interface DayTrendPoint {
   date: ISODateTimeString;
-  totalTempos: number;
-  targetProgress: number;
-  averageSatisfaction: number;
+  completed: number;
+  notCompleted: number;
 }
 
 /**
@@ -588,13 +563,8 @@ export interface CompletionRequest {
   durationMinutes: number;
   estimatedMinutes?: number;
   /**
-   * Informational metric: indicates whether the activity was completed before 80%
-   * of the estimate (only applies to clear-objective with a single estimate).
-   *
-   * In MVP v3 it does NOT affect the tempo formula: the user decides the
-   * bonus explicitly by moving the slider to 8/9/10. This flag is
-   * kept only as info in the CompletionModal ("you beat the
-   * estimate") and as record data for future analytics.
+   * Informational: the activity was done before 80% of its estimate (only for a
+   * clear objective with a single estimate).
    */
   beatEstimate: boolean;
   requestedAt: ISODateTimeString;
@@ -605,14 +575,7 @@ export interface CompletionRequest {
  */
 export interface CompletionResult {
   record: CompletedActivityRecord;
-  temposAwarded: number;
   beatEstimate: boolean;
-  dailyTempoTotal: number;
-  /**
-   * Real ratio without a cap (can be > 1 if you exceeded the target).
-   * Consistent with `TempoSummary.targetProgress` and `TempoTrendPoint.targetProgress`.
-   */
-  targetProgress: number;
 }
 
 // ===============================================
@@ -664,9 +627,10 @@ export interface ISystemCore {
   deleteActivityInstance(id: UUID): void;
   activateActivity(id: UUID): ActivityInstance;
   requestCompletion(activityId: UUID): CompletionRequest;
+  /** Closes the running activity as done (ADR-015), with the person's words. */
   completeActivity(
     activityId: UUID,
-    assessment: { satisfactionScore: number; endTime?: ISODateTimeString; note?: string }
+    close?: { endTime?: ISODateTimeString; note?: string }
   ): CompletionResult;
   scheduleActivityInstance(id: UUID, minute: DayMinutes | null): ActivityInstance;
 
@@ -690,7 +654,8 @@ export interface ISystemCore {
   /** Where each milestone's planned sessions fall, for a roadmap with a schedule. */
   getRoadmapSessions(id: UUID): RoadmapSessions[];
   getRoadmapProgress(): RoadmapProgress[];
-  interruptActivity(activityId: UUID): CompletedActivityRecord;
+  /** Closes the running activity as not done, with the person's words. No penalty. */
+  interruptActivity(activityId: UUID, close?: { note?: string }): CompletedActivityRecord;
   getActiveActivity(): ActivityInstance | null;
 
   // TimeBlockManager methods
@@ -716,13 +681,12 @@ export interface ISystemCore {
   getActivityStats(templateId?: UUID): ActivityStatistics;
   getCompletionRate(): number;
   getEstimationAccuracy(): number;
-  getTempoSummary(dayId: UUID): TempoSummary;
-  getTempoTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): TempoTrendPoint[];
+  getDaySummary(dayId: UUID): DaySummary;
+  getDayTrends(range: { from: ISODateTimeString; to: ISODateTimeString }): DayTrendPoint[];
 
   // UserPreferencesManager methods
   updateUserPreferences(preferences: Partial<UserPreferences>): UserPreferences;
   getUserPreferences(): UserPreferences;
-  updateDailyTempoTarget(target: number): UserPreferences;
 
   // PersistenceManager methods
   exportData(): string;

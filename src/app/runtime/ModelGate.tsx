@@ -510,7 +510,7 @@ const VERDICT: Record<Verdict, { title: MessageKey; body: MessageKey; tone: stri
   offload: {
     title: "model.verdict.offload",
     body: "model.verdict.offloadBody",
-    // Amber is for tempos only: a slower load is a neutral notice
+    // A slower load is a neutral notice, not a warning
     tone: "bg-hover text-ink",
   },
   "too-big": {

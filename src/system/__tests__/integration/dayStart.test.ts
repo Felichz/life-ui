@@ -115,7 +115,7 @@ describe("Flow 1: Day start", () => {
     const activeMeditacion = system.activateActivity(meditacionInstance.id);
 
     // Complete the activity to have a record
-    system.completeActivity(activeMeditacion.id, { satisfactionScore: 5 });
+    system.completeActivity(activeMeditacion.id);
 
     // End the previous day
     system.endDay();
