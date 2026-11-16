@@ -22,7 +22,9 @@ Success: the user keeps opening the app because each honest close feels good, an
 
 ## Positioning
 
-Not a todo app, not a habit tracker, not a time tracker. The distinctive mechanism is the closing ritual: every activity end passes through one self-assessment, and the reward is computed from effort (estimated or real minutes) × honesty (score / 7). Honesty is concentrated in one moment instead of spread as continuous friction.
+A local AI harness for your life: a personal assistant and coach, built around the person, that runs on their own machine. What sets it apart from a chatbot is the harness around the model: tools that really change the day (plans, the calendar weeks ahead, roadmaps, web searches with sources), a memory of what the person said (the coach's notes and the ideal life), and one rule held in code, that nothing changes without the person's yes. Privacy is part of the pitch: the day stays on the machine, and only the searches the person allows go out. Not a todo app, not a habit tracker, not a chatbot.
+
+Inside the day, the distinctive mechanism is the closing ritual: every activity end passes through one self-assessment, and the reward is computed from effort (estimated or real minutes) × honesty (score / 7). Honesty is concentrated in one moment instead of spread as continuous friction.
 
 ## Operating Context
 

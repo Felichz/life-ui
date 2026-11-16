@@ -1,6 +1,6 @@
 # LifeUI
 
-A local AI harness for organizing your life. An AI coach that runs on a model on your own machine (Ollama or LM Studio) talks your day over with you: it looks things up, lays out a plan and puts every session on your calendar once you say yes. You run one activity at a time and close each one by saying how it went, which earns tempos. Open source, and your day stays on your machine: only the web searches you allow go out.
+Your personal assistant and coach, built around you. LifeUI is a local AI harness for your life: it wraps a language model, on your own machine (Ollama or LM Studio) or through an API you choose (OpenRouter, OpenAI, Gemini and others), with tools to change your day, a memory of what you told it, and one rule it cannot break, that nothing changes without your yes. It looks things up, lays out a plan and puts every session on your calendar once you say yes. Open source, and your day stays on your machine: only the web searches you allow go out.
 
 **[Download the desktop app](https://github.com/Felichz/life-ui/releases/latest)** (Windows, macOS, Linux) · [Website and film](https://lifeui.medanolabs.com) · [Web app](https://lifeui.medanolabs.com/app/) · [Case study](https://felix.medanolabs.com/work/lifeui/) · Built by [Felix Andersson](https://felix.medanolabs.com/)
 
@@ -13,7 +13,7 @@ A local AI harness for organizing your life. An AI coach that runs on a model on
 
 ## What it is
 
-LifeUI is not a todo app, a habit tracker or a time tracker. It is a conversation with a coach that changes your day for you ([ADR-002](docs/adr/002-agent-mediated-app.md), [ADR-009](docs/adr/009-coach-and-web-research.md)). The conversation is in the middle of every screen; above it, a thin bar shows what is running and for how long, or what comes next, and the day's tempos; beside it, one panel shows the day as a single line of time, or your goals, your library or a look back ([ADR-013](docs/adr/013-the-conversation-in-the-middle.md)). You can resize that panel or fold it away.
+LifeUI is not a todo app, a habit tracker or a chatbot. It is a conversation with a coach that can change your day for you, held by your yes ([ADR-002](docs/adr/002-agent-mediated-app.md), [ADR-009](docs/adr/009-coach-and-web-research.md)). The conversation is in the middle of every screen; above it, a thin bar shows what is running and for how long, or what comes next, and the day's tempos; beside it, one panel shows the day as a single line of time, or your goals, your library or a look back ([ADR-013](docs/adr/013-the-conversation-in-the-middle.md)). You can resize that panel or fold it away.
 
 Nothing changes without your yes. Every change the coach makes waits on a card ("Do it" / "No"), or, in Auto mode, can be undone. With your permission it searches the web to back its advice, and the sources it used show under the search.
 
