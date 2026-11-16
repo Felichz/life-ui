@@ -266,12 +266,26 @@
         background: rgb(var(--canvas));
         cursor: pointer;
       }
-      /* The frame kept on screen while the film switches to the other theme's file (see edition()). */
-      .player__cover {
+      /* The two editions of the film play together; the dark one sits over the light one (the script keeps it
+       on the light one's box) and the theme shows it or not, so switching is instant and keeps the frame. */
+      .player .pv-dark {
         position: absolute;
+        left: 0;
+        top: var(--chrome);
         object-fit: contain;
-        background: rgb(var(--canvas));
+        opacity: 0;
         pointer-events: none;
+        transition: opacity 0.18s ease;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) .player .pv-dark {
+          opacity: 1;
+          pointer-events: auto;
+        }
+      }
+      :root[data-theme="dark"] .player .pv-dark {
+        opacity: 1;
+        pointer-events: auto;
       }
       /* The chat's scrollbar, drawn over the film where the chat is in the frame and moved with it, frame by
        frame (media/lifeui-film-scroll.json, from video/coach/tools/scroll.mjs). Drawn rather than native so it
@@ -943,8 +957,22 @@
                 muted
                 loop
                 playsinline
-                preload="metadata"
+                preload="auto"
                 aria-label="The person tells the coach their right elbow hurts after long days at the mouse. The coach searches the web, answers from NHS guides with a ten-week plan in three phases and asks which days and at what time; after weekdays at 9 it proposes the roadmap, 50 sessions from Monday November 16 to Friday January 22, and the yes puts them on the calendar and on Goals. The first session runs at 9:00 and is closed through the chat for 13 tempos, and the ten weeks pass on the roadmap until Goal reached."
+              ></video>
+              <video
+                id="pv-dark"
+                class="pv-dark"
+                src="/media/lifeui-film-dark.mp4"
+                poster="/media/lifeui-film-dark.webp"
+                width="1920"
+                height="1200"
+                muted
+                loop
+                playsinline
+                preload="auto"
+                tabindex="-1"
+                aria-hidden="true"
               ></video>
               <div class="scrollmap" id="scrollmap" aria-hidden="true" hidden>
                 <div class="scrollmap__thumb"></div>
@@ -1238,9 +1266,9 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
     <script>
       // The film's player, as on knowgraph.medanolabs.com: a strip of chapters (each segment jumps to its chapter,
       // and names itself on hover), click to play or pause, the arrow keys to skip, and maximize from the window's
-      // green light. The light or dark edition follows the page's theme. It autoplays muted (the film has no
-      // sound) unless the visitor prefers reduced motion, and pauses while it's off screen, unless the visitor
-      // paused it themselves.
+      // green light. Both editions play and the page's theme shows the light or the dark one. It autoplays muted
+      // (the film has no sound) unless the visitor prefers reduced motion, and pauses while it's off screen,
+      // unless the visitor paused it themselves.
       (() => {
         const CHAPTERS = [
           [0, "You ask"],
@@ -1261,72 +1289,42 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
         const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
         const ends = () => CHAPTERS.map((c, i) => [c[0], (CHAPTERS[i + 1] ?? [dur])[0], c[1]]);
 
-        // The edition follows the page's theme. Switching keeps the picture and the time: the frame on screen
-        // stays (a canvas over the video) while the other file loads and seeks to the same time, and once that
-        // frame is on screen the film goes on from there, playing if it was. Until then the strip and the
-        // scrollbar keep the frozen time (now()).
-        const cover = document.createElement("canvas");
-        cover.className = "player__cover";
-        cover.hidden = true;
-        v.after(cover);
-        let frozen = null,
-          swap = 0;
-        const now = () => frozen ?? v.currentTime;
-        const edition = () => {
-          const name = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-          const src = `/media/lifeui-film-${name}.mp4`;
-          if (v.getAttribute("src") === src) return;
-          const id = ++swap;
-          const t = now(),
-            playing = frozen === null ? !v.paused : cover.dataset.playing === "1";
-          if (frozen === null && v.readyState >= 2) {
-            cover.width = v.videoWidth;
-            cover.height = v.videoHeight;
-            cover.getContext("2d").drawImage(v, 0, 0);
-            Object.assign(cover.style, {
-              left: `${v.offsetLeft}px`,
-              top: `${v.offsetTop}px`,
-              width: `${v.clientWidth}px`,
-              height: `${v.clientHeight}px`,
-            });
-            cover.hidden = false;
-            frozen = t;
+        // Both editions load and play together, in step; the theme only decides which one shows (CSS above).
+        // The light one (v) is the clock: the dark one follows its play, pause and seeks, and while playing its
+        // speed is nudged so it stays within a frame or two of it.
+        const alt = document.getElementById("pv-dark");
+        const now = () => v.currentTime;
+        v.addEventListener("play", () => alt.play().catch(() => {}));
+        v.addEventListener("pause", () => alt.pause());
+        v.addEventListener("seeking", () => {
+          alt.currentTime = v.currentTime;
+        });
+        alt.addEventListener("click", () => toggle());
+        (function step() {
+          requestAnimationFrame(step);
+          // the light one's box, to the subpixel, inside the window's border
+          const r = v.getBoundingClientRect(),
+            pr = player.getBoundingClientRect();
+          Object.assign(alt.style, {
+            left: `${r.left - pr.left - player.clientLeft}px`,
+            top: `${r.top - pr.top - player.clientTop}px`,
+            width: `${r.width}px`,
+            height: `${r.height}px`,
+          });
+          if (alt.readyState < 1 || alt.seeking) return;
+          let d = alt.currentTime - v.currentTime;
+          if (v.paused) {
+            if (!alt.paused) alt.pause();
+            if (Math.abs(d) > 0.02) alt.currentTime = v.currentTime;
+            return;
           }
-          cover.dataset.playing = playing ? "1" : "0";
-          v.poster = `/media/lifeui-film-${name}.webp`;
-          v.src = src;
-          const shown = () => {
-            if (id !== swap) return;
-            frozen = null;
-            cover.hidden = true;
-            draw();
-          };
-          const ready = () => {
-            if (id !== swap) return;
-            if (playing && !userPaused) v.play().catch(() => {});
-            // the cover goes once the new file's frame is on screen
-            if (v.requestVideoFrameCallback) {
-              v.requestVideoFrameCallback(shown);
-              setTimeout(shown, 400);
-            } else shown();
-          };
-          // whatever happens to the new file, the cover never stays more than 3 seconds
-          setTimeout(shown, 3000);
-          v.addEventListener(
-            "loadedmetadata",
-            () => {
-              if (id !== swap) return;
-              // a chapter picked while the new file loads wins over the time it had
-              if (v.currentTime > 0.01) return ready();
-              // seeking loads the frame even when the file only preloads its metadata
-              v.addEventListener("seeked", ready, { once: true });
-              v.currentTime = t;
-            },
-            { once: true }
-          );
-        };
-        edition();
-        document.addEventListener("themechange", edition);
+          if (alt.paused) alt.play().catch(() => {});
+          if (Math.abs(d) > dur / 2) d -= Math.sign(d) * dur; // across the loop's seam
+          if (Math.abs(d) > 0.3) {
+            alt.currentTime = v.currentTime;
+            alt.playbackRate = 1;
+          } else alt.playbackRate = Math.min(1.1, Math.max(0.9, 1 - d * 2));
+        })();
 
         const segsEl = document.getElementById("segs");
         const parts = ends().map(([a, b, name]) => {
@@ -1370,8 +1368,6 @@ npm run dev       <span class="c"># the web build, localhost:5174</span></pre>
           }
         };
         const seek = (t) => {
-          frozen = null;
-          cover.hidden = true;
           v.currentTime = Math.max(0, Math.min(dur - 0.05, t));
           draw();
         };
