@@ -830,6 +830,34 @@ describe("notes in the conversation", () => {
   const lastUser = (messages: ChatMessage[]) =>
     String([...messages].reverse().find((message) => message.role === "user")!.content);
 
+  it("does not offer the card of questions for a plain instruction about the day", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const offered: string[][] = [];
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages, tools) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
+        if (isNotes(messages)) return notes({ instruction: true });
+        offered.push(
+          (tools as Array<{ function: { name: string } }>).map((one) => one.function.name)
+        );
+        return say("Listo.");
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("agrega leer el informe a mi plan, 20 minutos");
+    expect(offered.length).toBeGreaterThan(0);
+    for (const names of offered) {
+      expect(names).toContain("add_to_plan");
+      expect(names).not.toContain("ask_choices");
+    }
+  });
+
   it("puts the questions for what is missing on a card when the coach writes them in words", async () => {
     const core = new SystemCore();
     core.clearState();

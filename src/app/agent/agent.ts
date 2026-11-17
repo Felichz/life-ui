@@ -520,8 +520,15 @@ export class Agent {
     // is nothing to close or to stop. Told "I have started reading", a 9B
     // model picked "finish" when it was offered, and "start" when it was not.
     const running = this.somethingRuns();
+    // The card of questions is for asking what a plan is missing, and only then:
+    // offered next to "add reading to my plan", a 9B model chose to ask about
+    // the person's goals instead of adding it. Without notes there is no way to
+    // tell, and it stays on the table.
+    const asking = !this.notesRead || asksForMissing(this.brief, this.personAskedLast());
     const all = toolSchemas(this.webSetting() !== "off").filter(
-      (tool) => running || !NEEDS_RUNNING.has(tool.function.name)
+      (tool) =>
+        (running || !NEEDS_RUNNING.has(tool.function.name)) &&
+        (asking || tool.function.name !== "ask_choices")
     );
     // The notes do not speak of this message (too short, or the call failed): nothing is held back
     if (!this.notesRead || this.brief?.instruction) return all;

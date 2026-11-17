@@ -1168,7 +1168,8 @@ export function measuredGoal(brief: Brief): string | null {
  * nextMove): then the questions go on a card, and the agent holds the model to it.
  */
 export function asksForMissing(brief: Brief | null, personAsked: boolean): boolean {
-  if (!brief || personAsked) return false;
+  // An instruction about the day ("add reading to my plan") is carried out, not asked about
+  if (!brief || personAsked || brief.instruction) return false;
   if (!brief.plan && LISTS.every((name) => brief[name].length === 0)) return false;
   return missingFrom(brief).length > 0 && (brief.asked ?? 0) < 2;
 }
