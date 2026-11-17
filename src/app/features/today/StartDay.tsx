@@ -63,10 +63,12 @@ export function StartDay() {
         {firstRun ? t("start.intro", { app: APP_NAME }) : t("start.back")}
       </p>
 
-      <Button variant="primary" className="mt-6" onClick={startTheDay}>
-        <Play />
-        {t("now.startDay")}
-      </Button>
+      <div className="mt-6">
+        <Button variant="primary" onClick={startTheDay}>
+          <Play />
+          {t("now.startDay")}
+        </Button>
+      </div>
 
       {forToday.length > 0 && (
         <div className="mt-7 rounded-lg border border-line bg-panel shadow-xs">
@@ -108,14 +110,14 @@ export function StartDay() {
       {firstRun && (
         <Link
           to="/library"
-          className="-ml-2 mt-4 inline-flex h-10 items-center gap-1.5 px-2 text-base font-medium text-ink-2 hover:text-ink"
+          className="-ml-2 mt-4 flex h-10 w-fit items-center gap-1.5 px-2 text-base font-medium text-ink-2 hover:text-ink"
         >
           {t("start.prepareLibrary")}
           <ArrowRight className="size-4" />
         </Link>
       )}
 
-      <Upcoming className="mt-10" />
+      <Upcoming className="mt-10" afterToday />
 
       {lastDay && lastSummary && (
         <Link

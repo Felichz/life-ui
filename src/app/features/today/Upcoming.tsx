@@ -18,13 +18,21 @@ const DAYS_SHOWN = 14;
  * What is planned for the days ahead (ADR-008), read-only like the rest of
  * the day: it is planned, changed and cancelled through the chat.
  */
-export function Upcoming({ className }: { className?: string }) {
+export function Upcoming({
+  className,
+  afterToday = false,
+}: {
+  className?: string;
+  /** Leave out today: the screen already lists today's tasks with their buttons. */
+  afterToday?: boolean;
+}) {
   const { state, core } = useSystem();
-  const planned = useMemo(
-    () => core.getPlannedActivities(),
-
-    [core, state.global.plannedActivities]
-  );
+  const planned = useMemo(() => {
+    const all = core.getPlannedActivities();
+    if (!afterToday) return all;
+    const today = localDate(new Date());
+    return all.filter((item) => item.date > today);
+  }, [core, state.global.plannedActivities, afterToday]);
   const templates = useMemo(() => templateMap(state), [state]);
   if (planned.length === 0) return null;
 

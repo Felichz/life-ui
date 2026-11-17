@@ -116,7 +116,7 @@ export function ClosingDialog({
                 {t("closing.goal", {
                   goal: goal.title,
                   phase: goal.phase,
-                  done: goal.phaseDone,
+                  next: goal.phaseDone + 1,
                   total: goal.phaseTotal,
                 })}
               </span>

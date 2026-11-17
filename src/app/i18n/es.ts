@@ -750,7 +750,7 @@ export const es = {
     "La copia portable no se actualiza sola: descarga la nueva desde el sitio y reemplaza la carpeta, manteniendo LifeUI-data.",
   "settings.model.title": "Modelo",
   "settings.model.description": "El modelo con el que funciona el coach: uno local o uno por API.",
-  "closing.goal": "Si la completaste, suma a «{goal}»: {phase}, {done} de {total} sesiones.",
+  "closing.goal": "Si la completaste, es la sesión {next} de {total} de {phase}, en «{goal}».",
   "closing.note": "¿Cómo te fue? (opcional)",
   "closing.notePlaceholder": "Una frase para el coach",
   "closing.done": "Sí, la completé",

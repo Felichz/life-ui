@@ -753,7 +753,7 @@ export const en: Record<MessageKey, string> = {
     "The portable copy does not update itself: download the new one from the site and replace the folder, keeping LifeUI-data.",
   "settings.model.title": "Model",
   "settings.model.description": "The model the coach runs on: a local one or one through an API.",
-  "closing.goal": "If you completed it, it adds to “{goal}”: {phase}, {done} of {total} sessions.",
+  "closing.goal": "If you completed it, it is session {next} of {total} of {phase}, in “{goal}”.",
   "closing.note": "How did it go? (optional)",
   "closing.notePlaceholder": "A sentence for the coach",
   "closing.done": "Yes, I completed it",

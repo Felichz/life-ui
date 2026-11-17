@@ -23,10 +23,20 @@ function standing(progress: RoadmapProgress): GoalStanding {
     progress.milestones[progress.milestones.length - 1];
   const steps = current?.steps ?? [];
   const reached = progress.milestones.every((one) => one.status === "done");
+  // Counted in sessions when every step is: 1 of 30 is 3%, not the mean of the phases
+  const all = progress.milestones.flatMap((one) => one.steps);
+  const sessions = all.length > 0 && all.every((one) => one.step.unit === all[0].step.unit);
+  const share = sessions
+    ? all.reduce((sum, one) => sum + one.done, 0) /
+      Math.max(
+        1,
+        all.reduce((sum, one) => sum + one.step.amount, 0)
+      )
+    : progress.fraction;
   return {
     roadmapId: progress.roadmap.id,
     title: progress.roadmap.title,
-    percent: reached ? 100 : Math.min(99, Math.floor(progress.fraction * 100)),
+    percent: reached ? 100 : Math.min(99, Math.floor(share * 100)),
     phase: current?.milestone.title ?? "",
     phaseDone: steps.reduce((sum, one) => sum + one.done, 0),
     phaseTotal: steps.reduce((sum, one) => sum + one.step.amount, 0),
