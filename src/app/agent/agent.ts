@@ -258,6 +258,12 @@ const DAY_TOOLS = new Set([
   "stop_activity",
   "log_event",
 ]);
+/** What a person says when what is running is done, or was not (Spanish and English). */
+const DONE_WORDS =
+  /(?<![\p{L}])(termin[eé]|listo|ya est[aá]|lo hice|la hice|complet[eé]|done|finished|completed|i did it)(?![\p{L}])/iu;
+const NOT_DONE_WORDS =
+  /(?<![\p{L}])no (la |lo )?(termin|complet|hice|pude|llegu)|a medias|(did not|didn['’]?t|couldn['’]?t) (finish|complete|do)|only (did )?half/iu;
+
 /** Failures of one tool in one turn before it is not run again. */
 const MAX_FAILURES = 2;
 /** A reply this long, to someone who wants a plan, is taken to be the plan (ADR-012). */
@@ -945,6 +951,20 @@ export class Agent {
     );
     const last = turns[turns.length - 1];
     const personAsked = last?.role === "user" && /[?¿]/.test(textOf(last.content));
+    // Something is running and they say how it ended: the close is the tool's to make.
+    // Told "ya está", a 9B model answered "lo cierro como hecho" and called nothing.
+    if (last?.role === "user" && this.somethingRuns()) {
+      const said = textOf(last.content);
+      if (NOT_DONE_WORDS.test(said)) {
+        notes.push(
+          "They are telling you they did not complete what is running: call stop_activity now with their words as how_it_went. It is not closed until the tool answers, so do not say it is."
+        );
+      } else if (DONE_WORDS.test(said)) {
+        notes.push(
+          "They are telling you they did what is running: call finish_activity now with their words as how_it_went. It is not closed until the tool answers, so do not say it is; then say in one line what it moved toward its goal, from the tool's answer."
+        );
+      }
+    }
     // The replies before this message that ended in questions, counted back from the latest
     let asked = 0;
     for (let index = turns.length - 2; index >= 0; index--) {

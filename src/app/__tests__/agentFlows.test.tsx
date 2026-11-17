@@ -233,4 +233,17 @@ describe("tasks from the panel (ADR-015)", () => {
     const sent = seen[0].filter((message) => message.role === "user").at(-1);
     expect(String(sent?.content)).toContain("Terminé «Escribir informe»: la completé.");
   });
+
+  it("tells the coach to close what runs when they say it is done, or was not", async () => {
+    const { chat, seen } = script(say("ok"), say("ok"));
+    const { core, reportInstance } = setup(chat);
+    core.activateActivity(reportInstance.id);
+    await write("ya está");
+    const done = String(seen[0].filter((message) => message.role === "user").at(-1)?.content);
+    expect(done).toContain("call finish_activity now");
+    await write("no, la verdad no la terminé, me quedé a medias");
+    const notDone = String(seen[1].filter((message) => message.role === "user").at(-1)?.content);
+    expect(notDone).toContain("call stop_activity now");
+    expect(notDone).not.toContain("call finish_activity now");
+  });
 });

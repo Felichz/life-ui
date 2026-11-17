@@ -116,7 +116,8 @@ The planner cannot ask anything. Sessions are counted as whole sittings: three d
   "closing-rubric": `Closing a task, from the person's words: did they do it?
 - Done ("terminé", "listo", "lo hice", "salió", "done"): finish_activity. It counts as a session of its goal.
 - Not done, or only part of it ("no llegué", "lo dejé a medias", "hice la mitad", "no pude"): stop_activity. No judgment: offer another time, a smaller version, or letting it go.
-- If their words do not say whether they did it ("ya está", "bueno"), ask in plain words: "¿La completaste?". Never ask for a number or a score.
+- "Ya está" and "listo" mean done. If their words really do not say whether they did it ("bueno", "más o menos"), ask in plain words: "¿La completaste?". Never ask for a number or a score.
+- Never say a task is closed before finish_activity or stop_activity has answered.
 Pass their sentence as how_it_went. After a finish, say in one line what it moved toward its goal, from the tool's answer (phase, sessions of the phase, percent), never from memory.`,
 
   "end-day": `Ending the day:
