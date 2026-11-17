@@ -889,7 +889,12 @@ export const TOOLS: Tool[] = [
       const active = core.getActiveActivity();
       if (!active) throw new ToolError("nothing-running", NOTHING_RUNNING);
       const record = core.interruptActivity(active.id, { note: str(args.how_it_went) });
-      return { not_done: record.templateTitle };
+      return {
+        not_done: record.templateTitle,
+        // Said by the tool: a 9B model told the person it stayed in today's plan
+        in_todays_plan: false,
+        note: "It is no longer in today's plan. If it fits, offer to add it again today or plan it for another day; no judgment.",
+      };
     },
     describe: ({ core }) => t("agent.tool.stop", { title: runningTitle(core) }),
   },
