@@ -830,6 +830,25 @@ describe("notes in the conversation", () => {
   const lastUser = (messages: ChatMessage[]) =>
     String([...messages].reverse().find((message) => message.role === "user")!.content);
 
+  it("tells the coach to send a lasting symptom to a professional, for the rest of the conversation", async () => {
+    const { agent, seen } = agentWith(
+      [say("Eso tiene que verlo alguien."), say("Vale.")],
+      [
+        notes({ symptom: true, has: ["dolor de cabeza casi todos los días", "mareos"] }),
+        notes({ has: ["no tengo tiempo de ir al médico"] }),
+      ]
+    );
+    await agent.send(
+      "llevo semanas con dolor de cabeza casi todos los días y mareos, arma un plan de salud"
+    );
+    expect(lastUser(seen.coach[0])).toContain("someone qualified has to see it first");
+    // The next message says nothing of it again: the note stays, and the plan moves stay off
+    await agent.send("no tengo tiempo de ir al médico");
+    const again = lastUser(seen.coach[1]);
+    expect(again).toContain("someone qualified has to see it first");
+    expect(again).not.toContain("do not give the whole plan yet");
+  });
+
   it("does not offer the card of questions for a plain instruction about the day", async () => {
     const core = new SystemCore();
     core.clearState();

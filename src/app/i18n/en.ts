@@ -780,4 +780,5 @@ export const en: Record<MessageKey, string> = {
   "review.minutesDone": "{time} on what was completed",
   "review.soFar": "so far",
   "review.col.result": "Result",
+  "agent.tool.record": "Record “{title}” as done",
 };

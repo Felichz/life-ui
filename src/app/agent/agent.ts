@@ -256,8 +256,19 @@ const DAY_TOOLS = new Set([
   "start_activity",
   "finish_activity",
   "stop_activity",
+  "record_done",
   "log_event",
 ]);
+/**
+ * Said next to every message once they have described a symptom. Rule 11 in the
+ * prompt did not hold a 9B model: told of weeks of headaches and dizziness, it
+ * wrote a "health plan" with salt water and cold compresses for the dizziness.
+ */
+const SYMPTOM_NOTE =
+  "They described a symptom or a health problem that lasts or can be serious. Do not lay out a plan for it, do not suggest treatments or remedies for it, and do not build a roadmap for it. If you have not said it yet in this conversation: say once, kindly and plainly, that someone qualified has to see it first, and offer the smallest step (one appointment, a phone or video consultation, a pharmacist) and to put that step on their calendar. If they say they have no time or no money, offer the smallest version of that step, never a plan. General habits (sleep, water, a walk) are fine as habits, said without claiming they help the symptom.";
+/** What a person says of something they are about to do or want to do (Spanish and English). */
+const FUTURE_WORDS =
+  /(?<![\p{L}])(voy a|vamos a|voy|iré|ire a|quiero|quisiera|pienso|planeo|tengo que|toca|mañana|después|luego|ahora voy|i['’]?m going to|i['’]?m gonna|i will|i['’]?ll|gonna|going to|want to|plan to|need to|tomorrow|later)(?![\p{L}])/iu;
 /** What a person says when what is running is done, or was not (Spanish and English). */
 const DONE_WORDS =
   /(?<![\p{L}])(termin[eé]|listo|ya est[aá]|lo hice|la hice|complet[eé]|done|finished|completed|i did it)(?![\p{L}])/iu;
@@ -531,10 +542,13 @@ export class Agent {
     // the person's goals instead of adding it. Without notes there is no way to
     // tell, and it stays on the table.
     const asking = !this.notesRead || asksForMissing(this.brief, this.personAskedLast());
+    // "Igual voy a leer un rato" is not something done: told so, a 9B model recorded it as done
+    const saidFuture = FUTURE_WORDS.test(this.lastUserSaid());
     const all = toolSchemas(this.webSetting() !== "off").filter(
       (tool) =>
         (running || !NEEDS_RUNNING.has(tool.function.name)) &&
-        (asking || tool.function.name !== "ask_choices")
+        (asking || tool.function.name !== "ask_choices") &&
+        (!saidFuture || tool.function.name !== "record_done")
     );
     // The notes do not speak of this message (too short, or the call failed): nothing is held back
     if (!this.notesRead || this.brief?.instruction) return all;
@@ -1024,7 +1038,9 @@ export class Agent {
       );
     }
     // With notes on the person, the move comes from them: ask what is missing, or recommend
-    const move = nextMove(this.brief, personAsked);
+    // A symptom that lasts or can be serious: no plan to treat it, a professional first (rule 11)
+    if (this.brief?.symptom) notes.push(SYMPTOM_NOTE);
+    const move = this.brief?.symptom ? "" : nextMove(this.brief, personAsked);
     if (move) notes.push(move);
     // What exists is said last: a plan that is already a roadmap is not built twice
     const roadmaps = this.options.core.getRoadmaps();
@@ -1403,6 +1419,12 @@ export class Agent {
       shown: true,
       note: "The person sees the questions with their options and answers in their next message. Your turn ends here.",
     };
+  }
+
+  /** The person's latest message, as text. */
+  private lastUserSaid(): string {
+    const last = [...this.history].reverse().find((message) => message.role === "user");
+    return last ? textOf(last.content) : "";
   }
 
   /** Whether the person's latest message asks something. */

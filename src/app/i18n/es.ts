@@ -777,6 +777,7 @@ export const es = {
   "review.minutesDone": "{time} en lo completado",
   "review.soFar": "hasta ahora",
   "review.col.result": "Resultado",
+  "agent.tool.record": "Anotar «{title}» como hecha",
 } as const;
 
 export type MessageKey = keyof typeof es;

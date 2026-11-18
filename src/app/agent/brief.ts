@@ -84,6 +84,12 @@ export interface Brief {
   /** Whether their latest message tells the app to do something now. */
   instruction?: boolean;
   /**
+   * They described pain, dizziness or another symptom that lasts or can be
+   * serious. Kept for the whole conversation: a plan is never built to treat
+   * it, and a professional comes first (AGENT.md, rule 11).
+   */
+  symptom?: boolean;
+  /**
    * Replies in which the coach has asked them questions. Kept here, not
    * counted from the conversation, so a compaction does not start it over.
    */
@@ -127,11 +133,13 @@ agrees: true only when this message says yes to what the coach proposed, or tell
 
 instruction: true when this message tells the app to do or change something (add, move, schedule, delete, write down; "move my sessions to Saturday"), or reports something the app has to record: that they started, finished or stopped something. Wanting a plan made, or agreeing to one, is not an instruction.
 
+symptom: true when this message describes pain, dizziness, headaches, a symptom or a health problem that has lasted days or weeks, or one that can be serious (chest pain, fainting, numbness, shortness of breath, a mood that will not lift). One tired day or one bad night is not.
+
 research: true only when this message asks the coach to look something up, search the internet or check what is known about it.
 
 The plan:
 - wanted: true when they want something set up to do again and again or over weeks (a plan, a routine, a habit, a programme of study or training).
-- session_length: how long one session can be, as they say it ("15 minutos"). Fill it whenever the message gives or accepts a duration, even if it is also a limit. Empty otherwise.
+- session_length: how long one session can be, as they say it ("15 minutos"). Fill it whenever the message gives or accepts a duration for a session, even if it is also a limit. What they can do today is not a session length ("I can jog 15 minutes without stopping", "I can lift 40 kg"): that goes in has. Empty otherwise.
 - days: which days of the week, or how many days a week ("lunes, miércoles y viernes"). Fill it whenever the message gives or accepts days. Empty otherwise.
 - time: the time of day ("19:00"). Fill it whenever the message gives or accepts a time. Empty otherwise.
 - start: when they want to start, as they say it. Empty unless they say.
@@ -156,6 +164,7 @@ const KEEP_NOTES = {
         agrees: { type: "boolean" },
         research: { type: "boolean" },
         instruction: { type: "boolean" },
+        symptom: { type: "boolean" },
         plan: {
           type: "object",
           properties: {
@@ -171,7 +180,7 @@ const KEEP_NOTES = {
           additionalProperties: false,
         },
       },
-      required: [...LISTS, "agrees", "research", "instruction", "plan"],
+      required: [...LISTS, "agrees", "research", "instruction", "symptom", "plan"],
       additionalProperties: false,
     },
   },
@@ -576,10 +585,11 @@ export async function updateBrief(options: {
     }
     if (notes.research === true) next.research = true;
     if (notes.instruction === true) next.instruction = true;
+    if (notes.symptom === true || brief?.symptom) next.symptom = true;
     options.onRead?.();
     const total = LISTS.reduce((sum, name) => sum + next[name].length, 0);
     // Empty notes still say what this message is: an instruction, a yes, a request to look something up
-    const speaks = next.agreed || next.research || next.instruction;
+    const speaks = next.agreed || next.research || next.instruction || next.symptom;
     return total === 0 && !next.plan && !speaks ? unagreed(brief) : next;
   } catch {
     return unagreed(brief);
@@ -1169,7 +1179,7 @@ export function measuredGoal(brief: Brief): string | null {
  */
 export function asksForMissing(brief: Brief | null, personAsked: boolean): boolean {
   // An instruction about the day ("add reading to my plan") is carried out, not asked about
-  if (!brief || personAsked || brief.instruction) return false;
+  if (!brief || personAsked || brief.instruction || brief.symptom) return false;
   if (!brief.plan && LISTS.every((name) => brief[name].length === 0)) return false;
   return missingFrom(brief).length > 0 && (brief.asked ?? 0) < 2;
 }

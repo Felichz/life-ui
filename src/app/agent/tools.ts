@@ -691,7 +691,7 @@ export const TOOLS: Tool[] = [
   {
     name: "add_to_plan",
     description:
-      'Add something to do to today\'s plan ("agrega…", "add…", "hoy quiero…"). Uses the library activity with that title, or creates it.',
+      'Add something to do to today\'s plan ("agrega…", "add…", "hoy quiero…"). Uses the library activity with that title, or creates it. When the message names several things, ONE call adds them all: the first in the fields, the rest in `also`. Only what is in the call is added; never say you added something that is not in it.',
     parameters: {
       type: "object",
       properties: {
@@ -706,24 +706,51 @@ export const TOOLS: Tool[] = [
           description: "What to do in it, if asked",
         },
         ...DURATION,
+        also: {
+          type: "array",
+          maxItems: 8,
+          description:
+            "The other things the same message asks to add (each with its own title, and minutes or time only if the person gave them)",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              time: { type: "string", description: "HH:MM, only if the person gave one" },
+              ...DURATION,
+            },
+            required: ["title"],
+          },
+        },
       },
       required: ["title"],
     },
     mutates: true,
     run: ({ core }, args) => {
-      const time = parseTime(args.time);
-      const { template, override } = templateFor(core, args);
-      const block = findBlock(core, args.block);
-      const instance = core.createActivityInstance(template.id, block.id, override as never);
-      if (str(args.notes)) core.updateActivityInstance(instance.id, { notes: str(args.notes) });
-      const placed = time !== null ? core.scheduleActivityInstance(instance.id, time) : instance;
-      return {
-        id: shortId(placed.id),
-        title: template.title,
-        time: time !== null ? formatDayMinutes(time) : undefined,
-      };
+      const more = (Array.isArray(args.also) ? args.also : []).filter(
+        (one): one is Args =>
+          Boolean(one) && typeof one === "object" && Boolean(str((one as Args).title))
+      );
+      const items: Args[] = [args, ...more.map((one) => ({ block: args.block, ...one }))];
+      const added = items.map((item) => {
+        const time = parseTime(item.time);
+        const { template, override } = templateFor(core, item);
+        const block = findBlock(core, item.block);
+        const instance = core.createActivityInstance(template.id, block.id, override as never);
+        if (str(item.notes)) core.updateActivityInstance(instance.id, { notes: str(item.notes) });
+        const placed = time !== null ? core.scheduleActivityInstance(instance.id, time) : instance;
+        return {
+          id: shortId(placed.id),
+          title: template.title,
+          time: time !== null ? formatDayMinutes(time) : undefined,
+        };
+      });
+      return added.length === 1 ? added[0] : { added };
     },
     describe: ({ core }, args) => {
+      const titles = [
+        str(args.title),
+        ...(Array.isArray(args.also) ? args.also : []).map((one) => str((one as Args)?.title)),
+      ].filter(Boolean);
       const time = (() => {
         try {
           return parseTime(args.time);
@@ -737,7 +764,7 @@ export const TOOLS: Tool[] = [
       } catch {
         block = core.getTimeBlocks().find((b) => b.isDefault)!;
       }
-      return t("agent.tool.add", { title: str(args.title), where: where(block, time) });
+      return t("agent.tool.add", { title: titles.join(", "), where: where(block, time) });
     },
   },
   {
@@ -873,6 +900,64 @@ export const TOOLS: Tool[] = [
       };
     },
     describe: ({ core }) => t("agent.tool.finish", { title: runningTitle(core) }),
+  },
+  {
+    name: "record_done",
+    description:
+      'The person already did something and nothing is running for it ("hoy estudié derivadas", "ya salí a correr", "I did my workout this morning"): records it as done, counted toward its goal if it works toward one. Not for what is running (finish_activity), and never log_event for something done. Their words go in how_it_went; minutes only if they said how long it took.',
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "The activity, as it is in the library if it is there",
+        },
+        minutes: { type: "integer", description: "How long it took, only if they said" },
+        how_it_went: { type: "string", description: "The person's own words about it" },
+      },
+      required: ["title", "how_it_went"],
+    },
+    mutates: true,
+    run: ({ core, now }, args) => {
+      if (core.getActiveActivity()) {
+        throw new ToolError(
+          "activity-running",
+          "something is running: close it first with finish_activity or stop_activity"
+        );
+      }
+      const { template } = templateFor(core, args);
+      // What is planned for today under that name is the one that was done
+      const planned = core
+        .getState()
+        .currentDay?.activityInstances.find((item) => item.templateId === template.id);
+      const block = core.getCurrentTimeBlock() ?? core.getTimeBlocks().find((b) => b.isDefault)!;
+      const instance = planned ?? core.createActivityInstance(template.id, block.id);
+      core.activateActivity(instance.id);
+      const minutes = num(args.minutes);
+      if (minutes !== undefined && minutes > 0) {
+        const since = new Date(now().getTime() - Math.min(minutes, 24 * 60) * 60000);
+        core.updateActivityInstance(instance.id, { startTime: since.toISOString() });
+      }
+      const request = core.requestCompletion(instance.id);
+      core.completeActivity(instance.id, {
+        endTime: request.requestedAt,
+        note: str(args.how_it_went),
+      });
+      const goal = goalFor(core, template.id);
+      return {
+        done: template.title,
+        ...(goal
+          ? {
+              goal: goal.title,
+              goal_percent: goal.percent,
+              phase: goal.phase,
+              phase_sessions_done: `${goal.phaseDone} of ${goal.phaseTotal}`,
+              goal_reached: goal.reached,
+            }
+          : {}),
+      };
+    },
+    describe: (_ctx, args) => t("agent.tool.record", { title: str(args.title) }),
   },
   {
     name: "stop_activity",
