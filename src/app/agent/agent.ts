@@ -269,6 +269,12 @@ const SYMPTOM_NOTE =
 /** What a person says of something they are about to do or want to do (Spanish and English). */
 const FUTURE_WORDS =
   /(?<![\p{L}])(voy a|vamos a|voy|iré|ire a|quiero|quisiera|pienso|planeo|tengo que|toca|mañana|después|luego|ahora voy|i['’]?m going to|i['’]?m gonna|i will|i['’]?ll|gonna|going to|want to|plan to|need to|tomorrow|later)(?![\p{L}])/iu;
+/**
+ * Words that tell the app to put something in the day ("agrega", "add", "hoy tengo que"),
+ * as against a person thinking aloud about a goal ("quiero aprender inglés").
+ */
+const ADD_WORDS =
+  /(?<![\p{L}])(agrega|agr[eé]game|agregar|a[ñn]ade|a[ñn]ademe|a[ñn]adir|pon|ponme|poner|anota|an[oó]talo|apunta|programa|ag[eé]ndame|add|put|schedule|hoy (?:tengo|quiero|voy|toca)|tengo que|today i (?:need|have|want|will)|i (?:need|have) to)(?![\p{L}])/iu;
 /** What a person says when what is running is done, or was not (Spanish and English). */
 const DONE_WORDS =
   /(?<![\p{L}])(termin[eé]|listo|ya est[aá]|lo hice|la hice|complet[eé]|done|finished|completed|i did it)(?![\p{L}])/iu;
@@ -544,11 +550,21 @@ export class Agent {
     const asking = !this.notesRead || asksForMissing(this.brief, this.personAskedLast());
     // "Igual voy a leer un rato" is not something done: told so, a 9B model recorded it as done
     const saidFuture = FUTURE_WORDS.test(this.lastUserSaid());
+    // Thinking aloud about a goal is not a request to add a task: "quiero aprender inglés"
+    // got a task called "Práctica de inglés" in today's plan, unasked
+    const talkingAboutAGoal = Boolean(
+      this.notesRead &&
+        this.brief &&
+        !this.brief.instruction &&
+        this.brief.wants.length > 0 &&
+        !ADD_WORDS.test(this.lastUserSaid())
+    );
     const all = toolSchemas(this.webSetting() !== "off").filter(
       (tool) =>
         (running || !NEEDS_RUNNING.has(tool.function.name)) &&
         (asking || tool.function.name !== "ask_choices") &&
-        (!saidFuture || tool.function.name !== "record_done")
+        (!saidFuture || tool.function.name !== "record_done") &&
+        (!talkingAboutAGoal || tool.function.name !== "add_to_plan")
     );
     // The notes do not speak of this message (too short, or the call failed): nothing is held back
     if (!this.notesRead || this.brief?.instruction) return all;
@@ -1320,6 +1336,7 @@ export class Agent {
         ...(this.brief?.unsure ?? []),
         ...(this.brief?.has ?? []).flatMap((fact) => fact.match(/\d+\s?[a-zA-Z]+/g) ?? []),
       ],
+      latest: this.lastUserSaid(),
       conversation: this.recentConversation(),
       ...(this.brief?.plan
         ? {

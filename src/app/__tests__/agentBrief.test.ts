@@ -4,6 +4,7 @@ import {
   briefLines,
   clockIn,
   durationIn,
+  symptomIn,
   asksForPlan,
   speaksOfPain,
   measuredGoal,
@@ -77,6 +78,11 @@ describe("a duration and a time, read from the person's own words", () => {
     expect(durationIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("15 min");
     expect(timeIn("y si 15 minutos me parece bien quiza a las 7pm por ahi")).toBe("19:00");
     expect(durationIn("I can do 1 hour")).toBe("1 h");
+    // What they can do today is not how long a session is
+    expect(durationIn("I want to run a 5k. I can jog about 15 minutes without stopping")).toBe("");
+    expect(durationIn("puedo trotar 15 minutos sin parar, pero solo tengo 40 minutos al día")).toBe(
+      "40 min"
+    );
     expect(durationIn("tengo media hora al mediodia")).toBe("30 min");
     expect(durationIn("una hora y media los sábados")).toBe("90 min");
     expect(timeIn("at 6:30 before work")).toBe("06:30");
@@ -834,7 +840,10 @@ describe("notes in the conversation", () => {
     const { agent, seen } = agentWith(
       [say("Eso tiene que verlo alguien."), say("Vale.")],
       [
-        notes({ symptom: true, has: ["dolor de cabeza casi todos los días", "mareos"] }),
+        notes({
+          symptom_words: "llevo semanas con dolor de cabeza casi todos los días",
+          has: ["dolor de cabeza casi todos los días", "mareos"],
+        }),
         notes({ has: ["no tengo tiempo de ir al médico"] }),
       ]
     );
@@ -847,6 +856,51 @@ describe("notes in the conversation", () => {
     const again = lastUser(seen.coach[1]);
     expect(again).toContain("someone qualified has to see it first");
     expect(again).not.toContain("do not give the whole plan yet");
+  });
+
+  it("takes a symptom only when its words are in the message and say how long or how bad", () => {
+    const sad = "hoy estoy muy cansado y no tengo ganas de hacer nada, dormí mal";
+    expect(symptomIn("muy cansado", sad)).toBe(false);
+    // words the model made up are not taken
+    expect(symptomIn("llevo semanas con dolor", sad)).toBe(false);
+    const sick = "llevo semanas con dolor de cabeza casi todos los días y mareos";
+    expect(symptomIn("Llevo semanas con dolor de cabeza", sick)).toBe(true);
+    expect(symptomIn("me duele el pecho", "me duele el pecho al subir escaleras")).toBe(true);
+  });
+
+  it("does not offer add_to_plan while the person only thinks aloud about a goal", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const offered: string[][] = [];
+    let calls = 0;
+    const agent = new Agent({
+      core,
+      prompt: "p",
+      notes: () => true,
+      chat: async (messages, tools) => {
+        if (isTiming(messages)) return call("time_session", { parts: [] });
+        if (isNeeds(messages)) return call("what_to_ask", { facts: [] });
+        if (isNotes(messages)) {
+          // the second message is an order: the notes read it as an instruction
+          return calls++ === 0
+            ? notes({ wants: ["aprender inglés"] })
+            : notes({ instruction: true });
+        }
+        offered.push(
+          (tools as Array<{ function: { name: string } }>).map((one) => one.function.name)
+        );
+        return say("¿Cuánto tiempo tienes?");
+      },
+    });
+    agent.mode = "auto";
+    await agent.send("quiero aprender inglés, tengo una entrevista en 3 meses");
+    // (the card call that follows a question has only the card to offer: left out)
+    const full = () => offered.filter((names) => names.length > 1);
+    expect(full()[0]).not.toContain("add_to_plan");
+    // Told to add something, it is there again
+    await agent.send("agrega practicar inglés 15 minutos a mi plan de hoy");
+    expect(full()[1]).toContain("add_to_plan");
   });
 
   it("does not offer the card of questions for a plain instruction about the day", async () => {

@@ -100,4 +100,27 @@ describe("adding several things in one message", () => {
     expect(offered[0]).not.toContain("record_done");
     expect(offered[1]).toContain("record_done");
   });
+
+  it("does not add what only an earlier message named", async () => {
+    const core = new SystemCore();
+    core.clearState();
+    core.startDay();
+    const replies = [
+      say("Te escucho."),
+      call("add_to_plan", { title: "Leer un rato", minutes: 20, also: [{ title: "Desahogarme" }] }),
+      say("Listo."),
+    ];
+    const chat: ChatFn = async () => replies.shift()!;
+    const agent = new Agent({ core, prompt: "p", chat });
+    agent.mode = "auto";
+    await agent.send("no sé, solo quería desahogarme");
+    await agent.send("gracias, igual voy a leer un rato, 20 minutos");
+    const titles = core
+      .getState()
+      .currentDay!.activityInstances.map(
+        (instance) =>
+          core.getActivityTemplates().find((template) => template.id === instance.templateId)!.title
+      );
+    expect(titles).toEqual(["Leer un rato"]);
+  });
 });

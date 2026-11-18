@@ -113,6 +113,21 @@ export function isRequestToCoach(phrase: string): boolean {
 }
 const MAX_ITEMS = 10;
 
+/** What makes a symptom one for a professional: it lasts, or it can be serious. */
+const SYMPTOM_EVIDENCE =
+  /(semanas?|meses|d[ií]as seguidos|todos los d[ií]as|casi todos los d[ií]as|a diario|desde hace|weeks?|months?|every day|daily|for days|dolor de pecho|pecho|desmay|entumec|hormigue|sin aliento|falta de aire|chest pain|faint|numb|short(?:ness)? of breath)/i;
+
+/**
+ * Whether the notes' words really say a symptom that lasts or can be serious:
+ * they have to be in the person's own message, and name how long or how bad.
+ * A yes-or-no from a 9B model flagged "tired, slept badly" as a symptom.
+ */
+export function symptomIn(words: string, message: string): boolean {
+  const norm = (text: string) => text.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  const quote = norm(words);
+  return quote.length >= 6 && norm(message).includes(quote) && SYMPTOM_EVIDENCE.test(quote);
+}
+
 const PROMPT = (language: string) =>
   `You keep a coach's notes about one person. You are given the newest message the person wrote, and the questions the coach had asked before it. Write down what the person says in that message.
 
@@ -133,7 +148,7 @@ agrees: true only when this message says yes to what the coach proposed, or tell
 
 instruction: true when this message tells the app to do or change something (add, move, schedule, delete, write down; "move my sessions to Saturday"), or reports something the app has to record: that they started, finished or stopped something. Wanting a plan made, or agreeing to one, is not an instruction.
 
-symptom: true when this message describes pain, dizziness, headaches, a symptom or a health problem that has lasted days or weeks, or one that can be serious (chest pain, fainting, numbness, shortness of breath, a mood that will not lift). One tired day or one bad night is not.
+symptom_words: when this message says that pain, dizziness, headaches or another symptom has lasted days or weeks ("for weeks", "every day"), or names something that can be serious (chest pain, fainting, numbness, shortness of breath), copy the person's own words that say it, exactly. Empty otherwise. Feeling tired, low, stressed or unmotivated today, or sleeping badly one night, is empty.
 
 research: true only when this message asks the coach to look something up, search the internet or check what is known about it.
 
@@ -164,7 +179,7 @@ const KEEP_NOTES = {
         agrees: { type: "boolean" },
         research: { type: "boolean" },
         instruction: { type: "boolean" },
-        symptom: { type: "boolean" },
+        symptom_words: said("The person's own words, copied exactly, or empty"),
         plan: {
           type: "object",
           properties: {
@@ -180,7 +195,7 @@ const KEEP_NOTES = {
           additionalProperties: false,
         },
       },
-      required: [...LISTS, "agrees", "research", "instruction", "symptom", "plan"],
+      required: [...LISTS, "agrees", "research", "instruction", "symptom_words", "plan"],
       additionalProperties: false,
     },
   },
@@ -216,8 +231,13 @@ function merge(before: string[], now: string[]): string[] {
  * next move hangs on them.
  */
 export function durationIn(message: string): string {
-  const minutes = /(\d{1,3})\s*(?:min\b|mins\b|minutos?\b|minutes?\b)/i.exec(message);
-  if (minutes) return `${minutes[1]} min`;
+  // "I can jog 15 minutes without stopping" is what they can do today, not how long a session is
+  const ability =
+    /^[\s,.]*(?:without (?:stopping|a break|resting|rest)|non-?stop|in a row|straight|sin parar|sin descansar|sin pausa|seguidos?|de corrido)/i;
+  const minutesAt = /(\d{1,3})\s*(?:min\b|mins\b|minutos?\b|minutes?\b)/gi;
+  for (let found = minutesAt.exec(message); found; found = minutesAt.exec(message)) {
+    if (!ability.test(message.slice(found.index + found[0].length))) return `${found[1]} min`;
+  }
   const hours = /(\d(?:[.,]\d)?)\s*(?:h\b|hs\b|horas?\b|hours?\b)/i.exec(message);
   if (hours) return `${hours[1]} h`;
   // Said in words, as people do
@@ -585,7 +605,7 @@ export async function updateBrief(options: {
     }
     if (notes.research === true) next.research = true;
     if (notes.instruction === true) next.instruction = true;
-    if (notes.symptom === true || brief?.symptom) next.symptom = true;
+    if (symptomIn(text(notes.symptom_words), options.person) || brief?.symptom) next.symptom = true;
     options.onRead?.();
     const total = LISTS.reduce((sum, name) => sum + next[name].length, 0);
     // Empty notes still say what this message is: an instruction, a yes, a request to look something up

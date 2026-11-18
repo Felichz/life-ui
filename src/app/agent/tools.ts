@@ -47,6 +47,8 @@ export interface ToolContext {
   planning?: { given: boolean; agreed: boolean; built: () => void };
   /** Everything the person has written in this conversation: their words, to check a note against. */
   spoken?: string;
+  /** Their latest message alone: what a tool may take from it, and nothing from the messages before. */
+  latest?: string;
   /** What the person said only as a guess about themselves: it never goes into a search. */
   private?: string[];
   /** The latest of the conversation, for a tool that hands its work to another agent. */
@@ -488,6 +490,20 @@ const DURATION = {
   max_minutes: { type: "integer", description: "Maximum minutes, for a range or a timebox" },
 };
 
+/** Whether a message names something: one of the words of its title (a stem of five letters) is in it. */
+export function mentions(message: string, title: string): boolean {
+  const plain = (text: string) =>
+    text
+      .toLocaleLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  const said = plain(message);
+  const words = plain(title)
+    .split(/[^a-z0-9ñ]+/)
+    .filter((word) => word.length >= 4);
+  return words.length === 0 || words.some((word) => said.includes(word.slice(0, 5)));
+}
+
 /** One question with choices; the person can always write their own answer too. */
 export interface AskQuestion {
   question: string;
@@ -725,11 +741,14 @@ export const TOOLS: Tool[] = [
       required: ["title"],
     },
     mutates: true,
-    run: ({ core }, args) => {
-      const more = (Array.isArray(args.also) ? args.also : []).filter(
+    run: ({ core, latest }, args) => {
+      const named = (Array.isArray(args.also) ? args.also : []).filter(
         (one): one is Args =>
           Boolean(one) && typeof one === "object" && Boolean(str((one as Args).title))
       );
+      // Only what this message names: a 9B model added "Desahogarme" from an earlier message
+      const more = named.filter((one) => latest === undefined || mentions(latest, str(one.title)));
+      const dropped = named.filter((one) => !more.includes(one)).map((one) => str(one.title));
       const items: Args[] = [args, ...more.map((one) => ({ block: args.block, ...one }))];
       const added = items.map((item) => {
         const time = parseTime(item.time);
@@ -744,7 +763,14 @@ export const TOOLS: Tool[] = [
           time: time !== null ? formatDayMinutes(time) : undefined,
         };
       });
-      return added.length === 1 ? added[0] : { added };
+      return added.length === 1 && dropped.length === 0
+        ? added[0]
+        : {
+            added,
+            ...(dropped.length > 0
+              ? { not_added: dropped, note: "Those were not in the person's message: not added." }
+              : {}),
+          };
     },
     describe: ({ core }, args) => {
       const titles = [
