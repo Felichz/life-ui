@@ -112,10 +112,9 @@ id(done, 'run-line');
 id(over, 'run-over');
 id(q(line, ':scope > span'), 'run-tick');
 id(q(run, 'section[aria-label="Running"] span.relative > span.absolute'), 'run-ring');
-id(q(run, 'section[aria-label="Running"] span.hidden'), 'run-note');
-const tpC = q(hud, '#hud-c a[aria-label*="tempos"] span.text-md');
-wrapText(tpC, '13', 'hud-tp');
-wrapText(q(hud, '#hud-c a[aria-label*="tempos"] span.text-xs:not(.ml-1)'), '13%', 'hud-pct');
+id(q(run, 'section[aria-label="Running"] span.hidden.min-w-0'), 'run-note');
+// The goal in view after the first session (ADR-015): 1 of 50 sessions is 2% of the way
+wrapText(q(hud, '#hud-c a[aria-label^="Goal"] span.tabular'), '2%', 'hud-pct');
 
 // ---------- the chat
 const chat = q(grid, 'section[aria-label="Chat"]');
@@ -134,7 +133,7 @@ scroller.append(hello);
 feed.classList.add('relative');
 const kids = [...feed.children];
 const names = ['m-ask', 'm-search', 'm-answer', 'm-reply', 'row1', 'm-done', 'm-close', 'row2', 'm-closed'];
-const expect = ['My right elbow', 'Search the web', "I'm not a doctor", 'Weekdays at 9', 'New roadmap', 'Done: 50 sessions', 'Done, it went well', 'Close “Elbow', 'Closed at 9'];
+const expect = ['My right elbow', 'Search the web', "I'm not a doctor", 'Weekdays at 9', 'New roadmap', 'Done: 50 sessions', 'Done, it went well', 'Close “Elbow', 'Done: phase 1'];
 if (kids.length !== names.length) throw new Error(`the chat has ${kids.length} entries, the film expects ${names.length}`);
 kids.forEach((k, i) => {
   if (!k.textContent.includes(expect[i])) throw new Error(`chat entry ${i} should start "${expect[i]}": ${k.textContent.slice(0, 60)}`);

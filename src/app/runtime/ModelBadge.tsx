@@ -8,6 +8,7 @@ import { formatNumber } from "../lib/format";
 import { isDesktop } from "../platform/desktop";
 import { t } from "../i18n";
 import { useModel } from "./ModelGate";
+import { useAgentAvailable } from "../agent/AgentProvider";
 import { providerName } from "./providers";
 
 const RUNTIME_NAME = { lmstudio: "LM Studio", ollama: "Ollama" } as const;
@@ -19,8 +20,11 @@ const RUNTIME_NAME = { lmstudio: "LM Studio", ollama: "Ollama" } as const;
  */
 export function ModelBadge({ className }: { className?: string }) {
   const { model, remote, placement, context, speed, openSetup, unloadModel } = useModel();
+  const available = useAgentAvailable();
   const toast = useToast();
   const [unloading, setUnloading] = useState(false);
+  // A model that comes from neither setup (a scripted one in tests, the dev model): nothing to show
+  if (!isDesktop() && !remote && available) return null;
 
   const unload = async () => {
     if (!model) return;

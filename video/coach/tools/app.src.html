@@ -14,6 +14,7 @@
           #app .cam { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
           /* secondary text a little darker than the app's 116 118 130 (4.4:1), so it clears AA in the video */
           :root:not([data-theme='dark']) #app .lf { --ink-3: 104 106 118; }
+          #app #run-note { display: inline-block; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
           #app .lf { position: absolute; inset: 0; background: rgb(var(--canvas)); color: rgb(var(--ink)); font-family: 'Inter Variable', 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
           #app .lf-page { position: absolute; inset: 0; overflow: hidden; }
           #app .lf-swap { position: relative; overflow: hidden; border-radius: 10px; }
@@ -305,7 +306,6 @@
           $('#run-line').style.width = '0%';
           $('#run-over').style.width = '0%';
           $('#run-timer').textContent = '0:00';
-          $('#hud-tp').textContent = '0';
           $('#hud-pct').textContent = '0%';
           tl.fromTo($('#run-line'), { width: '0%' }, { width: est + '%', duration: (T.timer1 - T.timer0) * 0.93, ease: 'power1.inOut', ...IR }, T.timer0);
           tl.fromTo($('#run-over'), { width: '0%' }, { width: overW, duration: 0.3, ease: 'power1.out', ...IR }, T.timer1 - 0.12);
@@ -329,19 +329,18 @@
           fold(2, T.do2 + 0.15);
           scrollTo(T.do2 + 0.15, need(bottomOf($('#sw2'), 2)), 0.42, 'power3.inOut');
           join($('#m-closed'), T.earn + 0.3, 2);
-          // the day takes the session: the bar shows what comes next, the tempos count up, the log keeps it
+          // the day takes the session: the bar shows what comes next, the goal moves, the log keeps it
           shot(T.earn, 0.8, { cx: 626, cy: 391, s: 1.15 });
           hudIn('#hud-c', T.earn + 0.1);
           fade($('#rail-dot'), 1, 0, T.earn + 0.1, 0.2);
-          LF.count(tl, $('#hud-tp'), 0, 13, T.earn + 0.25, 0.9);
-          LF.count(tl, $('#hud-pct'), 0, 13, T.earn + 0.25, 0.9, (n) => Math.round(n) + '%');
-          const tp = $('#hud-tp').closest('a');
-          tl.fromTo(tp, { scale: 1 }, { scale: 1.18, duration: 0.18, ease: 'power2.out', ...IR }, T.earn + 0.25);
-          tl.fromTo(tp, { scale: 1.18 }, { scale: 1, duration: 0.5, ease: 'back.out(3)', ...IR }, T.earn + 0.43);
+          LF.count(tl, $('#hud-pct'), 0, 2, T.earn + 0.25, 0.9, (n) => Math.round(n) + '%');
+          const goal = $('#hud-pct').closest('a');
+          tl.fromTo(goal, { scale: 1 }, { scale: 1.18, duration: 0.18, ease: 'power2.out', ...IR }, T.earn + 0.25);
+          tl.fromTo(goal, { scale: 1.18 }, { scale: 1, duration: 0.5, ease: 'back.out(3)', ...IR }, T.earn + 0.43);
           page('#p-run', '#p-today2', T.earn + 0.05);
           grow($('#t2-log'), T.earn + 0.12, 0.5);
-          const plus = $('#t2-log span.rounded');
-          tl.fromTo(plus, { scale: 0.5 }, { scale: 1, duration: 0.45, ease: 'back.out(3)', ...IR }, T.earn + 0.5);
+          const check = $('#t2-log svg');
+          tl.fromTo(check, { scale: 0.5 }, { scale: 1, duration: 0.45, ease: 'back.out(3)', ...IR }, T.earn + 0.5);
 
           // ======================================================== 8 · ten weeks, one continuous animation
           railTo('goals', T.goals2);

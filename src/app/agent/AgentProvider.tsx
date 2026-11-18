@@ -220,6 +220,11 @@ export function AgentProvider({
   return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
 }
 
+/** Whether the chat has a model, without listening to the conversation. */
+export function useAgentAvailable(): boolean {
+  return useContext(AgentContext)?.available ?? false;
+}
+
 export function useAgent() {
   const context = useContext(AgentContext);
   if (!context) throw new Error("useAgent must be used inside <AgentProvider>");

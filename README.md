@@ -6,14 +6,14 @@ Your personal assistant and coach, built around you. LifeUI is a local AI harnes
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/01-coach-dark.webp">
-  <img src="docs/readme/01-coach-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A coach for your day, in a chat. Tell it what is going on. It looks things up, lays out a plan, and puts it on your calendar once you say yes. Marked: 1, What is running or what comes next, and the day’s tempos, above every screen. 2, Nothing changes without your yes: every change waits on a card. 3, The day as one line of time, from what you did to what is planned.">
+  <img src="docs/readme/01-coach-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A coach for your day, in a chat. Tell it what is going on. It looks things up, lays out a plan, and puts it on your calendar once you say yes. Marked: 1, What is running or what comes next, and the goal it works toward, above every screen. 2, Nothing changes without your yes: every change waits on a card. 3, The day as one line of time, from what you did to what is planned.">
 </picture>
 
 <sub>The pictures follow your GitHub theme (light or dark). Screenshots use synthetic demo data.</sub>
 
 ## What it is
 
-LifeUI is not a todo app, a habit tracker or a chatbot. It is a conversation with a coach that can change your day for you, held by your yes ([ADR-002](docs/adr/002-agent-mediated-app.md), [ADR-009](docs/adr/009-coach-and-web-research.md)). The conversation is in the middle of every screen; above it, a thin bar shows what is running and for how long, or what comes next, and the day's tempos; beside it, one panel shows the day as a single line of time, or your goals, your library or a look back ([ADR-013](docs/adr/013-the-conversation-in-the-middle.md)). You can resize that panel or fold it away.
+LifeUI is not a todo app, a habit tracker or a chatbot. It is a conversation with a coach that can change your day for you, held by your yes ([ADR-002](docs/adr/002-agent-mediated-app.md), [ADR-009](docs/adr/009-coach-and-web-research.md)). The conversation is in the middle of every screen; above it, a thin bar shows what is running and for how long, or what comes next, and the goal it works toward; beside it, one panel shows the day as a single line of time, or your goals, your library or a look back ([ADR-013](docs/adr/013-the-conversation-in-the-middle.md)). You can resize that panel or fold it away.
 
 Nothing changes without your yes. Every change the coach makes waits on a card ("Do it" / "No"), or, in Auto mode, can be undone. With your permission it searches the web to back its advice, and the sources it used show under the search.
 
@@ -21,19 +21,19 @@ A goal that takes weeks becomes a roadmap ([ADR-011](docs/adr/011-a-roadmap-owns
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/02-goals-dark.webp">
-  <img src="docs/readme/02-goals-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A goal becomes sessions on your calendar. A roadmap in phases. Each session says what to do, with the guide that shows how. Marked: 1, Progress counts only what you really closed. Nothing shows what is missing. 2, Every exercise links to the guide the coach found.">
+  <img src="docs/readme/02-goals-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. A goal becomes sessions on your calendar. A roadmap in phases. Each session says what to do, with the guide that shows how. Marked: 1, Progress counts only the sessions you really completed. 2, Every exercise links to the guide the coach found.">
 </picture>
 
 What is measured is whether you did it ([ADR-015](docs/adr/015-goals-not-tempos.md)). Any task of today starts with one tap on the panel, or by telling the coach; when it ends, one question: did you complete it? A yes counts as a session of its goal, and the reward the app shows is that progress: the phase, its sessions, the percent of the way, until the goal is reached. A no carries no judgment. There are no points, no streaks and no penalties.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/03-close-dark.webp">
-  <img src="docs/readme/03-close-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Close it in a sentence. Say how it went. The coach reads the score from your words, and the card shows the tempos it earns before you confirm. Marked: 1, The running session, its clock, and its progress along the bar’s edge. 2, Tempos only go up: no streaks, no penalties, free time costs nothing.">
+  <img src="docs/readme/03-close-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Did you complete it? That is all it asks. Say it in the chat or tap Finish. A yes counts as a session of its goal. Marked: 1, The running session, its clock, and its progress along the bar’s edge. 2, The close waits for your yes too, and can be undone.">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/04-review-dark.webp">
-  <img src="docs/readme/04-review-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Look back to adjust, not to judge yourself. The day hour by hour, time by activity type, and every close with its satisfaction and tempos.">
+  <img src="docs/readme/04-review-light.webp" width="100%" alt="LifeUI, screenshot in a browser window. Look back to adjust, not to judge yourself. What you completed each day, the day hour by hour, and time by activity type. No points, no streaks.">
 </picture>
 
 <picture>

@@ -133,8 +133,8 @@ const ROADMAP = {
 const DONE =
   "Done: 50 sessions, weekdays at 9:00 from today, in three phases (10, 20 and 20). Each one shows its exercises with the guide's link, and you'll find it all under Goals.";
 
-const FINISHED = "Done, it went well. A 9.";
-const CLOSED = "Closed at 9 out of 10: +13 tempos. Same time tomorrow.";
+const FINISHED = "Done, it went well.";
+const CLOSED = "Done: phase 1, session 1 of 10, 2% of the way. Same time tomorrow.";
 
 /** What each screen's scenes aim at: selector -> rects of its visible matches. `|text` keeps exact text. */
 const CHAT = 'section[aria-label="Chat"]';
@@ -170,13 +170,11 @@ const AIM: Record<string, Record<string, string>> = {
   "c09-earned": {
     chat: CHAT,
     list: `${CHAT} [aria-live="polite"]`,
-    meter: 'section[aria-label="Today’s tempos"]',
+    goal: 'a[aria-label^="Goal"]',
   },
   "c10-progress": { roadmap: 'section[aria-labelledby="roadmaps-title"]' },
 };
 const ROADMAP_SECTION = 'section[aria-labelledby="roadmaps-title"]';
-/** Honest scores for ten weeks: mostly good, a few flat days. */
-const SCORES = [8, 7, 9, 8, 6, 8, 9, 7, 8, 10];
 const rects: Record<string, unknown> = {};
 
 const snap = (name: string) =>
@@ -230,7 +228,7 @@ describe("film capture: from the chat to the calendar", () => {
       }),
       call("save_roadmap", ROADMAP),
       say(DONE),
-      call("finish_activity", { how_it_went: "Done, it went well", satisfaction: 9 }),
+      call("finish_activity", { how_it_went: "Done, it went well" }),
       say(CLOSED),
     ];
     cy.intercept("POST", "**/__model/v1/chat/completions", (req) => {
@@ -340,7 +338,7 @@ describe("film capture: from the chat to the calendar", () => {
     cy.get(`${CHAT} textarea`).filter(":visible").type(FINISHED, { delay: 0 });
     snap("c07-running");
 
-    // Closed through the chat, as everything else: the card shows the tempos it earns
+    // Closed through the chat: the card waits for the yes, and the goal moves (ADR-015)
     cy.get(`${CHAT} textarea`).filter(":visible").type("{enter}");
     cy.contains(`${CHAT} button`, "Do it").should("be.visible");
     snap("c08-close");
@@ -403,7 +401,7 @@ describe("film capture: from the chat to the calendar", () => {
         on(9, 0);
         q.activateActivity(todays.id);
         on(9, 10);
-        q.completeActivity(todays.id, { satisfactionScore: SCORES[done % SCORES.length] });
+        q.completeActivity(todays.id);
         done += 1;
         frame(new Date(day), done).then(next);
       };

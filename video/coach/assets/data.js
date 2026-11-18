@@ -81,10 +81,9 @@ window.DATA = {
    ]
   },
   "done": "Done: 50 sessions, weekdays at 9:00 from today, in three phases (10, 20 and 20). Each one shows its exercises with the guide's link, and you'll find it all under Goals.",
-  "close": "Done, it went well. A 9.",
+  "close": "Done, it went well.",
   "closeCard": [
-   "Close “Elbow and back exercises”",
-   "+13 tempos"
+   "Close “Elbow and back exercises”"
   ],
   "steps": [
    [
