@@ -1,102 +1,22 @@
 import type { ModelEndpoint } from "../agent/llm";
 import { desktopFetch, invoke, isDesktop } from "../platform/desktop";
+import { providerById } from "./catalog";
+
+export { GROUP_ORDER, PROVIDERS, offeredProviders, providerById } from "./catalog";
+export type { Provider, ProviderGroup } from "./catalog";
 
 /**
  * Models through an API (ADR-005): the providers that speak the chat
- * completions API with tools. Each one was checked to accept requests from a
- * browser (CORS), so the web build talks to it directly: the key and the
- * conversation go from the browser to the provider and nowhere else.
+ * completions API with tools (catalog.ts). A person keeps several connections
+ * and one is in use: the key and the conversation go from this app to the
+ * provider of the one in use and nowhere else.
  */
-export interface Provider {
-  id: string;
-  name: string;
-  /** Empty for the custom endpoint, where the person writes it. */
-  baseUrl: string;
-  /** Where to get a key. */
-  keyUrl?: string;
-  /** Headers the provider needs besides the key. */
-  headers?: Record<string, string>;
-  /** The key can be left out (a local server). */
-  keyOptional?: boolean;
-}
 
-export const PROVIDERS: Provider[] = [
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    keyUrl: "https://openrouter.ai/keys",
-  },
-  {
-    id: "openai",
-    name: "OpenAI",
-    baseUrl: "https://api.openai.com/v1",
-    keyUrl: "https://platform.openai.com/api-keys",
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    baseUrl: "https://api.anthropic.com/v1",
-    keyUrl: "https://console.anthropic.com/settings/keys",
-    // Anthropic answers a browser only when it says it knows the key is in the browser
-    headers: { "anthropic-dangerous-direct-browser-access": "true" },
-  },
-  {
-    id: "google",
-    name: "Google Gemini",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    keyUrl: "https://aistudio.google.com/apikey",
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    baseUrl: "https://api.groq.com/openai/v1",
-    keyUrl: "https://console.groq.com/keys",
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/v1",
-    keyUrl: "https://platform.deepseek.com/api_keys",
-  },
-  {
-    id: "mistral",
-    name: "Mistral",
-    baseUrl: "https://api.mistral.ai/v1",
-    keyUrl: "https://console.mistral.ai/api-keys",
-  },
-  { id: "xai", name: "xAI", baseUrl: "https://api.x.ai/v1", keyUrl: "https://console.x.ai" },
-  {
-    id: "together",
-    name: "Together AI",
-    baseUrl: "https://api.together.xyz/v1",
-    keyUrl: "https://api.together.ai/settings/api-keys",
-  },
-  {
-    id: "fireworks",
-    name: "Fireworks AI",
-    baseUrl: "https://api.fireworks.ai/inference/v1",
-    keyUrl: "https://fireworks.ai/account/api-keys",
-  },
-  {
-    id: "cerebras",
-    name: "Cerebras",
-    baseUrl: "https://api.cerebras.ai/v1",
-    keyUrl: "https://cloud.cerebras.ai",
-  },
-  {
-    id: "minimax",
-    name: "MiniMax",
-    baseUrl: "https://api.minimax.io/v1",
-    keyUrl: "https://platform.minimax.io",
-  },
-  { id: "custom", name: "", baseUrl: "", keyOptional: true },
-];
-
-export const providerById = (id: string) => PROVIDERS.find((one) => one.id === id);
-
-/** A model through an API, as it is kept between launches. */
+/** A connection to a model through an API, as it is kept between launches. */
 export interface RemoteModel {
+  id: string;
+  /** How the person sees it in the list. */
+  label: string;
   provider: string;
   baseUrl: string;
   apiKey: string;
@@ -109,28 +29,20 @@ export interface RemoteModel {
 export const REMOTE_CONTEXTS = [16384, 32768, 65536, 131072];
 export const DEFAULT_REMOTE_CONTEXT = 32768;
 
-const KEY = "lifeui.remoteModel";
-
-export function savedRemote(): RemoteModel | null {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
-    const saved = JSON.parse(raw) as Partial<RemoteModel>;
-    if (!saved.provider || !saved.baseUrl || !saved.model) return null;
-    return {
-      provider: saved.provider,
-      baseUrl: saved.baseUrl,
-      apiKey: saved.apiKey ?? "",
-      model: saved.model,
-      context: saved.context ?? DEFAULT_REMOTE_CONTEXT,
-    };
-  } catch {
-    return null;
-  }
+/** The connections kept, and the one in use (null: none, or a local model). */
+export interface Connections {
+  active: string | null;
+  list: RemoteModel[];
 }
 
-/** Where the desktop app keeps the key, in the system's credential store. */
-const SECRET = "remote-api-key";
+export const NO_CONNECTIONS: Connections = { active: null, list: [] };
+
+const KEY = "lifeui.connections";
+/** The single connection kept before there could be several. */
+const LEGACY_KEY = "lifeui.remoteModel";
+const LEGACY_ID = "c-first";
+/** Where the desktop app kept that one's key in the credential store. */
+const LEGACY_SECRET = "remote-api-key";
 
 /** The desktop app with its Rust side (not the dev stand-in, which has none). */
 function keyStore(): boolean {
@@ -140,51 +52,13 @@ function keyStore(): boolean {
   );
 }
 
-/**
- * Keeps the choice. On the web the key stays in this browser's storage, with
- * the rest (ADR-005). On the desktop it goes to the operating system's
- * credential store, and the stored choice keeps everything but the key.
- */
-export function saveRemote(remote: RemoteModel | null) {
-  const desktop = keyStore();
-  try {
-    if (remote) {
-      localStorage.setItem(
-        KEY,
-        JSON.stringify(desktop ? { ...remote, apiKey: undefined } : remote)
-      );
-    } else localStorage.removeItem(KEY);
-  } catch {
-    // storage is off in this browser: the choice lasts until the page closes
-  }
-  if (desktop) {
-    const done = remote?.apiKey
-      ? invoke("secret_set", { name: SECRET, value: remote.apiKey })
-      : invoke("secret_delete", { name: SECRET });
-    void done.catch(() => undefined);
-  }
+const secretName = (id: string) => `conn-${id}`;
+
+export function newConnectionId(): string {
+  return `c-${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 }
 
-/**
- * The saved choice with its key. On the desktop the key is read from the
- * credential store; a key left in storage by 0.3.0's first builds is moved there.
- */
-export async function loadRemote(): Promise<RemoteModel | null> {
-  const saved = savedRemote();
-  if (!saved || !keyStore()) return saved;
-  if (saved.apiKey) {
-    saveRemote(saved);
-    return saved;
-  }
-  try {
-    const key = await invoke<string | null>("secret_get", { name: SECRET });
-    return { ...saved, apiKey: key ?? "" };
-  } catch {
-    return saved;
-  }
-}
-
-/** The name shown for a remote model's provider: the custom one shows its host. */
+/** What the person calls a connection when they gave no name: its provider, or its host. */
 export function providerName(remote: Pick<RemoteModel, "provider" | "baseUrl">): string {
   const known = providerById(remote.provider);
   if (known?.name) return known.name;
@@ -193,6 +67,133 @@ export function providerName(remote: Pick<RemoteModel, "provider" | "baseUrl">):
   } catch {
     return remote.baseUrl;
   }
+}
+
+function readOne(raw: unknown, fallbackId: string): RemoteModel | null {
+  if (!raw || typeof raw !== "object") return null;
+  const saved = raw as Partial<RemoteModel>;
+  if (!saved.provider || !saved.baseUrl || !saved.model) return null;
+  const connection = {
+    id: saved.id || fallbackId,
+    label: saved.label ?? "",
+    provider: saved.provider,
+    baseUrl: saved.baseUrl,
+    apiKey: saved.apiKey ?? "",
+    model: saved.model,
+    context: saved.context ?? DEFAULT_REMOTE_CONTEXT,
+  };
+  return { ...connection, label: connection.label || providerName(connection) };
+}
+
+/**
+ * The connections as they are kept. On the web the key is in this browser's
+ * storage, with the rest; on the desktop it is not (loadConnections reads it
+ * from the credential store). The single connection of before is carried over.
+ */
+export function savedConnections(): Connections {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const saved = JSON.parse(raw) as { active?: unknown; list?: unknown };
+      const list = (Array.isArray(saved.list) ? saved.list : [])
+        .map((one, index) => readOne(one, `c-${index}`))
+        .filter((one): one is RemoteModel => one !== null);
+      const active = typeof saved.active === "string" ? saved.active : null;
+      return { active: list.some((one) => one.id === active) ? active : null, list };
+    }
+    const legacy = readOne(JSON.parse(localStorage.getItem(LEGACY_KEY) ?? "null"), LEGACY_ID);
+    if (legacy) return { active: legacy.id, list: [{ ...legacy, id: LEGACY_ID }] };
+  } catch {
+    // storage is off, or what is in it is not readable: there are no connections
+  }
+  return NO_CONNECTIONS;
+}
+
+/**
+ * Keeps the connections. On the desktop each key goes to the operating system's
+ * credential store and the stored list keeps everything but the keys.
+ */
+export function saveConnections(connections: Connections): void {
+  const desktop = keyStore();
+  try {
+    localStorage.setItem(
+      KEY,
+      JSON.stringify(
+        desktop
+          ? { ...connections, list: connections.list.map((one) => ({ ...one, apiKey: undefined })) }
+          : connections
+      )
+    );
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    // storage is off in this browser: the choice lasts until the page closes
+  }
+  if (desktop) {
+    for (const one of connections.list) {
+      const done = one.apiKey
+        ? invoke("secret_set", { name: secretName(one.id), value: one.apiKey })
+        : invoke("secret_delete", { name: secretName(one.id) });
+      void done.catch(() => undefined);
+    }
+  }
+}
+
+/** The connections with their keys: on the desktop they are read from the credential store. */
+export async function loadConnections(): Promise<Connections> {
+  const saved = savedConnections();
+  if (!keyStore()) return saved;
+  const list = await Promise.all(
+    saved.list.map(async (one) => {
+      if (one.apiKey) return one;
+      try {
+        const key =
+          (await invoke<string | null>("secret_get", { name: secretName(one.id) })) ??
+          // 0.3.0 kept its one key under another name
+          (one.id === LEGACY_ID
+            ? await invoke<string | null>("secret_get", { name: LEGACY_SECRET })
+            : null);
+        return { ...one, apiKey: key ?? "" };
+      } catch {
+        return one;
+      }
+    })
+  );
+  const loaded = { ...saved, list };
+  // A key found under the old name or left in storage moves to its own place
+  if (
+    list.some((one, index) => one.apiKey && !saved.list[index].apiKey) ||
+    localStorage.getItem(LEGACY_KEY)
+  ) {
+    saveConnections(loaded);
+  }
+  return loaded;
+}
+
+export const activeConnection = (connections: Connections): RemoteModel | null =>
+  connections.list.find((one) => one.id === connections.active) ?? null;
+
+/** Adds a connection, or replaces the one with its id; in use from then on when asked. */
+export function withConnection(
+  connections: Connections,
+  connection: RemoteModel,
+  activate = true
+): Connections {
+  const exists = connections.list.some((one) => one.id === connection.id);
+  return {
+    active: activate ? connection.id : connections.active,
+    list: exists
+      ? connections.list.map((one) => (one.id === connection.id ? connection : one))
+      : [...connections.list, connection],
+  };
+}
+
+/** Takes a connection out, and its key with it. */
+export function withoutConnection(connections: Connections, id: string): Connections {
+  if (keyStore()) void invoke("secret_delete", { name: secretName(id) }).catch(() => undefined);
+  return {
+    active: connections.active === id ? null : connections.active,
+    list: connections.list.filter((one) => one.id !== id),
+  };
 }
 
 export function remoteEndpoint(remote: RemoteModel): ModelEndpoint {
@@ -243,7 +244,9 @@ export async function listRemoteModels(
       const one = raw as Record<string, unknown>;
       const id = typeof one.id === "string" ? one.id : typeof one.name === "string" ? one.name : "";
       if (!id) return null;
-      const context = [one.context_length, one.context_window, one.max_context_length].find(
+      // OpenCode says it as limit.context
+      const limit = (one.limit as { context?: unknown } | undefined)?.context;
+      const context = [one.context_length, one.context_window, one.max_context_length, limit].find(
         (value): value is number => typeof value === "number" && value > 0
       );
       const parameters = Array.isArray(one.supported_parameters) ? one.supported_parameters : null;

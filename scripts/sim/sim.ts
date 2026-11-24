@@ -20,7 +20,7 @@ import { runRoadmapPlanner } from "../../src/app/agent/roadmapAgent";
  * tapping "yes" would, and shown. The session (the day, the library, the
  * conversations) is kept in .sim/<session>/ between runs.
  *
- * SIM_URL, SIM_MODEL, SIM_CONTEXT, SIM_MODE (confirm|auto), SIM_WEB (on|off)
+ * SIM_URL, SIM_MODEL, SIM_KEY (a hosted model's key), SIM_CONTEXT, SIM_MODE (confirm|auto), SIM_WEB (on|off)
  * and SIM_REASONING (on|off) change the defaults below.
  */
 
@@ -29,6 +29,8 @@ const endpoint = {
   baseUrl: process.env.SIM_URL ?? "http://127.0.0.1:1234/v1",
   model: process.env.SIM_MODEL ?? "qwen/qwen3.5-9b",
   context: Number(process.env.SIM_CONTEXT ?? 12288),
+  // A model through an API (ADR-005): its key comes from the environment, never from a file
+  ...(process.env.SIM_KEY ? { apiKey: process.env.SIM_KEY, hosted: true } : {}),
 };
 
 const out: string[] = [];

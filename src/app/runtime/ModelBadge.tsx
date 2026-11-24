@@ -44,7 +44,7 @@ export function ModelBadge({ className }: { className?: string }) {
 
   const details = remote
     ? [
-        providerName(remote),
+        remote.label || providerName(remote),
         t("model.badge.context", { tokens: formatNumber(remote.context / 1024) }),
       ].join(" · ")
     : model

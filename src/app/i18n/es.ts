@@ -695,7 +695,6 @@ export const es = {
   "remote.save": "Probar y guardar",
   "remote.testing": "Probando…",
   "remote.failed": "No funcionó: {error}",
-  "remote.remove": "Quitar este modelo",
   "remote.local": "Modelos locales",
   "remote.badge.none": "Conecta uno por API para hablar con LifeUI",
   "remote.connect": "Conectar",
@@ -778,6 +777,20 @@ export const es = {
   "review.soFar": "hasta ahora",
   "review.col.result": "Resultado",
   "agent.tool.record": "Anotar «{title}» como hecha",
+  "remote.connections": "Tus conexiones",
+  "remote.add": "Agregar una conexión",
+  "remote.active": "En uso",
+  "remote.edit": "Editar",
+  "remote.delete": "Quitar",
+  "remote.back": "Volver a tus conexiones",
+  "remote.name": "Nombre",
+  "remote.name.hint": "Cómo la ves en la lista. Si lo dejas vacío, el del proveedor.",
+  "remote.desktopOnly": "Solo en la app de escritorio",
+  "remote.baseUrl.local": "La dirección del servidor en tu máquina; cambia el puerto si usas otro.",
+  "remote.group.direct": "APIs directas",
+  "remote.group.router": "Routers",
+  "remote.group.local": "En tu máquina",
+  "remote.group.custom": "Personalizado",
 } as const;
 
 export type MessageKey = keyof typeof es;

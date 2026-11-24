@@ -71,7 +71,16 @@ import {
   type Verdict,
 } from "./models";
 import { RemoteSetup } from "./RemoteSetup";
-import { loadRemote, remoteEndpoint, saveRemote, savedRemote, type RemoteModel } from "./providers";
+import {
+  NO_CONNECTIONS,
+  activeConnection,
+  loadConnections,
+  remoteEndpoint,
+  saveConnections,
+  savedConnections,
+  type Connections,
+  type RemoteModel,
+} from "./providers";
 
 type Step =
   | { kind: "checking" }
@@ -156,15 +165,19 @@ export const useModel = () => useContext(ModelContext);
 export function ModelGate({ children }: { children: ReactNode }) {
   // On the desktop the key comes from the credential store, a moment after launch:
   // until then the model is not offered, so no request goes out without it
-  const [remote, setRemote] = useState<RemoteModel | null>(() =>
-    isDesktop() ? null : savedRemote()
+  const [connections, setConnections] = useState<Connections>(() =>
+    isDesktop() ? NO_CONNECTIONS : savedConnections()
   );
+  const remote = activeConnection(connections);
   useEffect(() => {
-    if (!isDesktop() || !savedRemote()) return;
-    void loadRemote().then((loaded) => setRemote((now) => now ?? loaded));
+    if (!isDesktop() || savedConnections().list.length === 0) return;
+    void loadConnections().then((loaded) =>
+      // What was chosen while the keys were being read stays
+      setConnections((now) => (now.list.length > 0 ? now : loaded))
+    );
   }, []);
   const [step, setStep] = useState<Step>(() =>
-    isDesktop() && !savedRemote() ? { kind: "checking" } : { kind: "done" }
+    isDesktop() && !savedConnections().active ? { kind: "checking" } : { kind: "done" }
   );
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Current | null>(null);
@@ -235,9 +248,8 @@ export function ModelGate({ children }: { children: ReactNode }) {
 
   const choose = async (model: LocalModel) => {
     saveChoice(model);
-    // A local model replaces the one through an API
-    saveRemote(null);
-    setRemote(null);
+    // A local model replaces the connection in use: the connections stay for later
+    keepConnections({ ...connections, active: null });
     setError(null);
     try {
       // Changing models frees the old one first, so the new load sees the real free memory
@@ -281,11 +293,17 @@ export function ModelGate({ children }: { children: ReactNode }) {
     }
   };
 
-  const useRemote = async (chosen: RemoteModel) => {
-    saveRemote(chosen);
-    setRemote(chosen);
+  const keepConnections = (next: Connections) => {
+    saveConnections(next);
+    setConnections(next);
+  };
+
+  /** The connections changed; `close` when one was chosen to be in use. */
+  const changeConnections = async (next: Connections, close: boolean) => {
+    keepConnections(next);
+    if (!close) return;
     // The local model is not needed any more: its memory is freed
-    if (current) {
+    if (current && next.active) {
       setCurrent(null);
       await unload(current.model).catch(() => undefined);
     }
@@ -333,23 +351,14 @@ export function ModelGate({ children }: { children: ReactNode }) {
           )}
           {step.kind === "remote" && (
             <RemoteSetup
-              initial={remote}
-              onSave={(chosen) => void useRemote(chosen)}
+              connections={connections}
+              onChange={(next, close) => void changeConnections(next, close)}
               onSkip={() => setStep({ kind: "done" })}
               onLocal={
                 isDesktop()
                   ? () => {
                       setError(null);
                       openSetup().catch((caught) => setError(String(caught)));
-                    }
-                  : undefined
-              }
-              onRemove={
-                remote
-                  ? () => {
-                      saveRemote(null);
-                      setRemote(null);
-                      setStep({ kind: "done" });
                     }
                   : undefined
               }

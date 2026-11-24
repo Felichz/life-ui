@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Loader2, TriangleAlert } from "lucide-react";
-import { Button } from "../components/ui/Button";
+import { Check, ExternalLink, Loader2, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Button, IconButton } from "../components/ui/Button";
 import {
   DialogBody,
   DialogDescription,
@@ -12,43 +12,159 @@ import { Field, Input } from "../components/ui/Field";
 import { Segmented } from "../components/ui/Segmented";
 import { cn } from "../lib/cn";
 import { isDesktop, openExternal } from "../platform/desktop";
-import { t } from "../i18n";
+import { t, useLocale } from "../i18n";
 import {
   DEFAULT_REMOTE_CONTEXT,
-  PROVIDERS,
+  GROUP_ORDER,
   REMOTE_CONTEXTS,
   listRemoteModels,
+  newConnectionId,
+  offeredProviders,
   providerById,
+  providerName,
   testRemote,
+  withConnection,
+  withoutConnection,
+  type Connections,
   type RemoteModel,
   type RemoteModelInfo,
 } from "./providers";
 
 /**
- * A model through an API (ADR-005): a provider, a key, a model and how much of
- * the conversation it reads. It is tried once before it is kept, so a wrong key
- * or a typo shows here and not in the chat.
+ * The models through an API (ADR-005): the connections kept, one in use, and a
+ * form to add or change one (a provider, a key, a model and how much of the
+ * conversation it reads). A connection is tried once before it is kept, so a
+ * wrong key or a typo shows here and not in the chat.
  */
 export function RemoteSetup({
-  initial,
-  onSave,
+  connections,
+  onChange,
   onLocal,
   onSkip,
-  onRemove,
 }: {
-  initial: RemoteModel | null;
-  onSave: (remote: RemoteModel) => void;
+  connections: Connections;
+  /** The connections changed; `close` when one was chosen to be in use. */
+  onChange: (next: Connections, close: boolean) => void;
   /** The desktop app's way back to its local models. */
   onLocal?: () => void;
   onSkip: () => void;
-  onRemove?: () => void;
 }) {
+  const [editing, setEditing] = useState<RemoteModel | "new" | null>(
+    connections.list.length === 0 ? "new" : null
+  );
+  // The last connection removed: the form for a first one opens
+  useEffect(() => {
+    if (connections.list.length === 0 && editing === null) setEditing("new");
+  }, [connections.list.length, editing]);
+
+  if (editing !== null) {
+    return (
+      <ConnectionForm
+        initial={editing === "new" ? null : editing}
+        onBack={connections.list.length > 0 ? () => setEditing(null) : undefined}
+        onSaved={(saved) => {
+          onChange(withConnection(connections, saved, true), true);
+        }}
+        onLocal={onLocal}
+        onSkip={onSkip}
+      />
+    );
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{t("remote.connections")}</DialogTitle>
+        <DialogDescription>
+          {t(isDesktop() ? "remote.body.desktop" : "remote.body.web")}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogBody className="pb-4">
+        <ul className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto">
+          {connections.list.map((one) => {
+            const inUse = one.id === connections.active;
+            return (
+              <li
+                key={one.id}
+                className={cn(
+                  "flex items-center gap-1 rounded-lg border pr-1.5",
+                  inUse ? "border-accent/60 bg-accent/5" : "border-line bg-panel"
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...connections, active: one.id }, true)}
+                  className="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left hover:bg-subtle"
+                >
+                  <span className="block truncate text-base font-medium text-ink">{one.label}</span>
+                  <span className="tabular block truncate text-xs text-ink-2">
+                    {[providerName(one), one.model, `${one.context / 1024}K`].join(" · ")}
+                  </span>
+                </button>
+                {inUse && (
+                  <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent-ink">
+                    <Check className="size-3.5" strokeWidth={2.5} />
+                    {t("remote.active")}
+                  </span>
+                )}
+                <IconButton label={t("remote.edit")} size="sm" onClick={() => setEditing(one)}>
+                  <Pencil />
+                </IconButton>
+                <IconButton
+                  label={t("remote.delete")}
+                  size="sm"
+                  onClick={() => onChange(withoutConnection(connections, one.id), false)}
+                >
+                  <Trash2 />
+                </IconButton>
+              </li>
+            );
+          })}
+        </ul>
+      </DialogBody>
+      <DialogFooter className="flex-wrap">
+        <Button variant="secondary" onClick={() => setEditing("new")} className="mr-auto">
+          <Plus />
+          {t("remote.add")}
+        </Button>
+        {onLocal && (
+          <Button variant="ghost" onClick={onLocal}>
+            {t("remote.local")}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onSkip}>
+          {t("common.close")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+function ConnectionForm({
+  initial,
+  onBack,
+  onSaved,
+  onLocal,
+  onSkip,
+}: {
+  initial: RemoteModel | null;
+  onBack?: () => void;
+  onSaved: (saved: RemoteModel) => void;
+  onLocal?: () => void;
+  onSkip: () => void;
+}) {
+  const { locale } = useLocale();
+  const desktop = isDesktop();
+  const offered = useMemo(() => offeredProviders(desktop), [desktop]);
   const [provider, setProvider] = useState(initial?.provider ?? "openrouter");
   const known = providerById(provider);
   const custom = provider === "custom";
-  const [baseUrl, setBaseUrl] = useState(custom ? (initial?.baseUrl ?? "") : "");
+  const [name, setName] = useState(
+    initial && initial.label !== providerName(initial) ? initial.label : ""
+  );
+  const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? known?.baseUrl ?? "");
   const [apiKey, setApiKey] = useState(initial?.apiKey ?? "");
-  const [model, setModel] = useState(initial?.model ?? "");
+  const [model, setModel] = useState(initial?.model ?? known?.models?.[0] ?? "");
   const [context, setContext] = useState(initial?.context ?? DEFAULT_REMOTE_CONTEXT);
   const [models, setModels] = useState<RemoteModelInfo[] | null>(null);
   const [listing, setListing] = useState(false);
@@ -57,7 +173,8 @@ export function RemoteSetup({
   const [error, setError] = useState<string | null>(null);
   const listAbort = useRef<AbortController | null>(null);
 
-  const url = custom ? baseUrl.trim() : (known?.baseUrl ?? "");
+  const editableUrl = custom || Boolean(known?.local);
+  const url = (editableUrl ? baseUrl.trim() : (known?.baseUrl ?? "")).replace(/\/$/, "");
   const keyNeeded = !known?.keyOptional;
   const ready = Boolean(url && model.trim() && (apiKey.trim() || !keyNeeded));
 
@@ -85,7 +202,7 @@ export function RemoteSetup({
     }
   };
 
-  // A saved choice opens with its list already there
+  // A saved connection opens with its list already there
   useEffect(() => {
     if (initial) void loadModels(initial.provider, initial.baseUrl, initial.apiKey);
     return () => listAbort.current?.abort();
@@ -93,13 +210,16 @@ export function RemoteSetup({
 
   const pickProvider = (id: string) => {
     if (id === provider) return;
+    const next = providerById(id);
     setProvider(id);
-    setModel("");
+    setBaseUrl(next?.baseUrl ?? "");
+    setModel(next?.models?.[0] ?? "");
     setModels(null);
     setListFailed(false);
     setError(null);
-    const next = providerById(id);
-    if (next && next.id !== "custom") void loadModels(id, next.baseUrl, apiKey.trim());
+    if (next && next.id !== "custom" && next.baseUrl) {
+      void loadModels(id, next.baseUrl, apiKey.trim());
+    }
   };
 
   const info = useMemo(() => models?.find((one) => one.id === model.trim()), [models, model]);
@@ -111,18 +231,21 @@ export function RemoteSetup({
 
   const save = async () => {
     if (!ready || testing) return;
-    const remote: RemoteModel = {
+    const connection: RemoteModel = {
+      id: initial?.id ?? newConnectionId(),
+      label: "",
       provider,
-      baseUrl: url.replace(/\/$/, ""),
+      baseUrl: url,
       apiKey: apiKey.trim(),
       model: model.trim(),
       context,
     };
+    connection.label = name.trim() || providerName(connection);
     setTesting(true);
     setError(null);
     try {
-      await testRemote(remote);
-      onSave(remote);
+      await testRemote(connection);
+      onSaved(connection);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -131,7 +254,7 @@ export function RemoteSetup({
   };
 
   const openKeyPage = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!isDesktop() || !known?.keyUrl) return;
+    if (!desktop || !known?.keyUrl) return;
     event.preventDefault();
     void openExternal(known.keyUrl);
   };
@@ -141,35 +264,73 @@ export function RemoteSetup({
       <DialogHeader>
         <DialogTitle>{t("remote.title")}</DialogTitle>
         <DialogDescription>
-          {t(isDesktop() ? "remote.body.desktop" : "remote.body.web")}
+          {t(desktop ? "remote.body.desktop" : "remote.body.web")}
         </DialogDescription>
       </DialogHeader>
       <DialogBody className="flex flex-col gap-4 pb-4">
-        <div role="radiogroup" aria-label={t("remote.provider")} className="flex flex-col gap-1.5">
+        <div role="radiogroup" aria-label={t("remote.provider")} className="flex flex-col gap-3">
           <span className="text-sm font-medium text-ink">{t("remote.provider")}</span>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-            {PROVIDERS.map((one) => (
-              <button
-                key={one.id}
-                type="button"
-                role="radio"
-                aria-checked={provider === one.id}
-                onClick={() => pickProvider(one.id)}
-                className={cn(
-                  "h-9 truncate rounded-md border px-2.5 text-left text-sm transition-colors duration-150 coarse:h-11",
-                  provider === one.id
-                    ? "border-accent/60 bg-accent/10 font-medium text-ink"
-                    : "border-line bg-panel text-ink-2 hover:border-line-strong hover:text-ink"
-                )}
-              >
-                {one.name || t("remote.custom")}
-              </button>
-            ))}
-          </div>
+          {GROUP_ORDER.map((group) => {
+            const items = offered.filter((one) => one.group === group);
+            if (items.length === 0) return null;
+            return (
+              <div key={group} className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium uppercase tracking-wide text-ink-3">
+                  {t(`remote.group.${group}`)}
+                </span>
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                  {items.map((one) => {
+                    // Only the desktop app can reach a provider that does not answer a web page
+                    const blocked = !one.browser && !desktop;
+                    return (
+                      <button
+                        key={one.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={provider === one.id}
+                        disabled={blocked}
+                        title={blocked ? t("remote.desktopOnly") : undefined}
+                        onClick={() => pickProvider(one.id)}
+                        className={cn(
+                          "h-9 truncate rounded-md border px-2.5 text-left text-sm transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-45 coarse:h-11",
+                          provider === one.id
+                            ? "border-accent/60 bg-accent/10 font-medium text-ink"
+                            : "border-line bg-panel text-ink-2 hover:border-line-strong hover:text-ink"
+                        )}
+                      >
+                        {one.name || t("remote.custom")}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {known && (
+            <p className="text-sm text-ink-2" aria-live="polite">
+              {known.description[locale === "es" ? "es" : "en"]}
+              {!known.browser && !desktop && ` ${t("remote.desktopOnly")}.`}
+            </p>
+          )}
         </div>
 
-        {custom && (
-          <Field label={t("remote.baseUrl")} hint={t("remote.baseUrl.hint")}>
+        <Field label={t("remote.name")} hint={t("remote.name.hint")}>
+          {(id, describedBy) => (
+            <Input
+              id={id}
+              aria-describedby={describedBy}
+              value={name}
+              placeholder={known?.name || t("remote.custom")}
+              onChange={(event) => setName(event.target.value)}
+            />
+          )}
+        </Field>
+
+        {editableUrl && (
+          <Field
+            label={t("remote.baseUrl")}
+            hint={t(custom ? "remote.baseUrl.hint" : "remote.baseUrl.local")}
+          >
             {(id, describedBy) => (
               <Input
                 id={id}
@@ -188,7 +349,7 @@ export function RemoteSetup({
           label={t(keyNeeded ? "remote.key" : "remote.key.optional")}
           hint={
             <span className="flex flex-wrap items-center gap-x-2">
-              {t(isDesktop() ? "remote.key.hint.desktop" : "remote.key.hint.web")}
+              {t(desktop ? "remote.key.hint.desktop" : "remote.key.hint.web")}
               {known?.keyUrl && (
                 <a
                   href={known.keyUrl}
@@ -279,9 +440,9 @@ export function RemoteSetup({
         )}
       </DialogBody>
       <DialogFooter className="flex-wrap">
-        {onRemove && (
-          <Button variant="ghost" onClick={onRemove} className="mr-auto">
-            {t("remote.remove")}
+        {onBack && (
+          <Button variant="ghost" onClick={onBack} className="mr-auto">
+            {t("remote.back")}
           </Button>
         )}
         {onLocal && (
